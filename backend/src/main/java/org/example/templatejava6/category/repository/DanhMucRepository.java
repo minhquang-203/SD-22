@@ -1,0 +1,17 @@
+package org.example.templatejava6.category.repository;
+
+import org.example.templatejava6.category.entity.DanhMuc;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface DanhMucRepository extends JpaRepository<DanhMuc, Integer> {
+
+    List<DanhMuc> findByTrangThaiTrue();
+
+    boolean existsByMa(String ma);
+
+    boolean existsByMaAndIdNot(String ma, Integer id);
+}
