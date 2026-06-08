@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Uploads (ảnh sản phẩm upload runtime) ###
+uploads/

@@ -12,11 +12,13 @@ public class MauSacResponse {
     private String ma;
     private String ten;
     private String maHex;
+    private Boolean trangThai;
 
     public MauSacResponse(MauSac m) {
         this.id = m.getId();
         this.ma = m.getMa();
         this.ten = m.getTen();
         this.maHex = m.getMaHex();
+        this.trangThai = m.getTrangThai();
     }
 }

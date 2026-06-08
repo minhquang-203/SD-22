@@ -34,4 +34,5 @@ public class ChiTietSanPhamRequest {
 
     private Integer soLuongTon;
     private LocalDate hanSuDung;
+    private Boolean trangThai;
 }

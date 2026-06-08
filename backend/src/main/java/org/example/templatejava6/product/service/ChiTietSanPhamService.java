@@ -43,11 +43,13 @@ public class ChiTietSanPhamService {
                 .orElseThrow(() -> new ApiException("Không tìm thấy biến thể sản phẩm", "NOT_FOUND"));
         validateGia(request.getGiaBan());
         validateSku(request.getSku(), id);
+        Boolean trangThai = ct.getTrangThai();
         MapperUtil.mapToExisting(request, ct);
         if (request.getIdSanPham() != null) {
             ct.setSanPham(sanPhamService.getSanPhamOrThrow(request.getIdSanPham()));
         }
         ct.setMauSac(categoryService.getMauSacOrNull(request.getIdMauSac()));
+        ct.setTrangThai(request.getTrangThai() != null ? request.getTrangThai() : trangThai);
         ct.setId(id);
         chiTietSanPhamRepository.save(ct);
     }

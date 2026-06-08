@@ -21,4 +21,6 @@ public class MauSacRequest {
     private String ten;
 
     private String maHex;
+
+    private Boolean trangThai;
 }

@@ -21,4 +21,6 @@ public class DangSanPhamRequest {
     private String ten;
 
     private String moTa;
+
+    private Boolean trangThai;
 }

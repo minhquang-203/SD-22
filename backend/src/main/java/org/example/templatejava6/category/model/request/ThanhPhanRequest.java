@@ -22,4 +22,6 @@ public class ThanhPhanRequest {
 
     private String loai;
     private String moTa;
+
+    private Boolean trangThai;
 }

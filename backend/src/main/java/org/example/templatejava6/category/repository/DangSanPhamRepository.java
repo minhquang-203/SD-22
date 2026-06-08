@@ -6,4 +6,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface DangSanPhamRepository extends JpaRepository<DangSanPham, Integer> {
+
+    boolean existsByMa(String ma);
+
+    boolean existsByMaAndIdNot(String ma, Integer id);
 }

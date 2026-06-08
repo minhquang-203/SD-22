@@ -1,6 +1,5 @@
 package org.example.templatejava6.product.model.request;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -12,8 +11,11 @@ import lombok.Setter;
 @NoArgsConstructor
 public class AnhSanPhamRequest {
 
-    @NotBlank(message = "URL ảnh không được để trống")
+    /** URL đã lưu (khi cập nhật giữ ảnh cũ). Ảnh mới upload dùng fileIndex. */
     private String url;
+
+    /** Chỉ số file trong multipart `files` tương ứng ảnh mới. */
+    private Integer fileIndex;
 
     private Boolean laAnhChinh;
     private Integer thuTu;

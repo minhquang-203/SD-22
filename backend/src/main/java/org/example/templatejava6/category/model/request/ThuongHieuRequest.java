@@ -21,4 +21,6 @@ public class ThuongHieuRequest {
     private String ten;
 
     private String xuatXu;
+
+    private Boolean trangThai;
 }

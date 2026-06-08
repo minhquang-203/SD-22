@@ -63,7 +63,7 @@ public class SanPham {
     private Boolean khangNuoc;
 
     @Nationalized
-    @Column(name = "mo_ta")
+    @Column(name = "mo_ta", columnDefinition = "NVARCHAR(MAX)")
     private String moTa;
 
     @Column(name = "trang_thai")

@@ -10,4 +10,8 @@ import java.util.List;
 public interface ThuongHieuRepository extends JpaRepository<ThuongHieu, Integer> {
 
     List<ThuongHieu> findByTrangThaiTrue();
+
+    boolean existsByMa(String ma);
+
+    boolean existsByMaAndIdNot(String ma, Integer id);
 }

@@ -19,6 +19,10 @@ public interface SanPhamRepository extends JpaRepository<SanPham, Integer> {
 
     Page<SanPham> findByTenContainingIgnoreCaseAndTrangThaiTrue(String ten, Pageable pageable);
 
+    List<SanPham> findByTenContainingIgnoreCase(String ten);
+
+    Page<SanPham> findByTenContainingIgnoreCase(String ten, Pageable pageable);
+
     boolean existsByMaSanPham(String maSanPham);
 
     boolean existsByMaSanPhamAndIdNot(String maSanPham, Integer id);

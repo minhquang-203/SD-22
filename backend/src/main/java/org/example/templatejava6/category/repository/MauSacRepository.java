@@ -6,4 +6,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface MauSacRepository extends JpaRepository<MauSac, Integer> {
+
+    boolean existsByMa(String ma);
+
+    boolean existsByMaAndIdNot(String ma, Integer id);
 }

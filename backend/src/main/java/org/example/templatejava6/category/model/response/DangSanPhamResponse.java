@@ -12,11 +12,13 @@ public class DangSanPhamResponse {
     private String ma;
     private String ten;
     private String moTa;
+    private Boolean trangThai;
 
     public DangSanPhamResponse(DangSanPham d) {
         this.id = d.getId();
         this.ma = d.getMa();
         this.ten = d.getTen();
         this.moTa = d.getMoTa();
+        this.trangThai = d.getTrangThai();
     }
 }

@@ -4,6 +4,7 @@ import org.example.templatejava6.category.service.CategoryService;
 import org.example.templatejava6.common.entity.LoaiDa;
 import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.common.repository.LoaiDaRepository;
+import org.example.templatejava6.common.service.ProductFileStorageService;
 import org.example.templatejava6.common.util.MapperUtil;
 import org.example.templatejava6.product.entity.*;
 import org.example.templatejava6.product.model.request.AnhSanPhamRequest;
@@ -18,11 +19,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -37,28 +41,29 @@ public class SanPhamService {
     @Autowired private LoaiDaRepository loaiDaRepository;
     @Autowired private CategoryService categoryService;
     @Autowired private DanhGiaRepository danhGiaRepository;
+    @Autowired private ProductFileStorageService productFileStorageService;
 
     @Transactional(readOnly = true)
     public List<SanPhamResponse> getAll() {
-        return sanPhamRepository.findByTrangThaiTrue().stream().map(SanPhamResponse::new).toList();
+        return sanPhamRepository.findAll().stream().map(this::toListResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public Page<SanPhamResponse> phanTrang(Integer pageNo, Integer pageSize) {
         Pageable pageable = PageRequest.of(pageNo, pageSize);
-        return sanPhamRepository.findByTrangThaiTrue(pageable).map(SanPhamResponse::new);
+        return sanPhamRepository.findAll(pageable).map(this::toListResponse);
     }
 
     @Transactional(readOnly = true)
     public List<SanPhamResponse> timKiem(String keyword) {
-        return sanPhamRepository.findByTenContainingIgnoreCaseAndTrangThaiTrue(keyword)
-                .stream().map(SanPhamResponse::new).toList();
+        return sanPhamRepository.findByTenContainingIgnoreCase(keyword)
+                .stream().map(this::toListResponse).toList();
     }
 
     public Page<SanPhamResponse> timKiemPhanTrang(String keyword, Integer pageNo, Integer pageSize) {
         Pageable pageable = PageRequest.of(pageNo, pageSize);
-        return sanPhamRepository.findByTenContainingIgnoreCaseAndTrangThaiTrue(keyword, pageable)
-                .map(SanPhamResponse::new);
+        return sanPhamRepository.findByTenContainingIgnoreCase(keyword, pageable)
+                .map(this::toListResponse);
     }
 
     @Transactional(readOnly = true)
@@ -69,7 +74,7 @@ public class SanPhamService {
     }
 
     @Transactional
-    public void add(SanPhamRequest request) {
+    public void add(SanPhamRequest request, List<MultipartFile> files) {
         validateMaSanPham(request.getMaSanPham(), null);
         validateChiTiets(request.getChiTiets(), null);
 
@@ -84,11 +89,11 @@ public class SanPhamService {
         }
         sp = sanPhamRepository.save(sp);
 
-        saveRelations(sp, request);
+        saveRelations(sp, request, files, false);
     }
 
     @Transactional
-    public void update(Integer id, SanPhamRequest request) {
+    public void update(Integer id, SanPhamRequest request, List<MultipartFile> files) {
         SanPham sp = sanPhamRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Không tìm thấy sản phẩm", "NOT_FOUND"));
 
@@ -102,19 +107,25 @@ public class SanPhamService {
         sp.setId(id);
         sanPhamRepository.save(sp);
 
-        chiTietSanPhamRepository.deleteBySanPham(sp);
+        // Không xóa chi_tiet_san_pham — bảng hoa_don_chi_tiet/gio_hang đang tham chiếu
         anhSanPhamRepository.deleteBySanPham(sp);
         sanPhamLoaiDaRepository.deleteBySanPham(sp);
         sanPhamCongDungRepository.deleteBySanPham(sp);
         sanPhamThanhPhanRepository.deleteBySanPham(sp);
+        sanPhamThanhPhanRepository.flush();
 
-        saveRelations(sp, request);
+        saveRelations(sp, request, files, true);
     }
 
     public void delete(Integer id) {
+        updateTrangThai(id, false);
+    }
+
+    @Transactional
+    public void updateTrangThai(Integer id, Boolean trangThai) {
         SanPham sp = sanPhamRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Không tìm thấy sản phẩm", "NOT_FOUND"));
-        sp.setTrangThai(false);
+        sp.setTrangThai(trangThai);
         sanPhamRepository.save(sp);
     }
 
@@ -125,7 +136,7 @@ public class SanPhamService {
 
     private SanPhamDetailResponse buildDetailResponse(SanPham sp) {
         SanPhamDetailResponse response = new SanPhamDetailResponse(sp);
-        response.setChiTiets(chiTietSanPhamRepository.findBySanPhamAndTrangThaiTrue(sp)
+        response.setChiTiets(chiTietSanPhamRepository.findBySanPham(sp)
                 .stream().map(ChiTietSanPhamResponse::new).toList());
         response.setAnhs(anhSanPhamRepository.findBySanPhamOrderByThuTuAsc(sp)
                 .stream().map(AnhSanPhamResponse::new).toList());
@@ -140,26 +151,31 @@ public class SanPhamService {
         return response;
     }
 
-    private void saveRelations(SanPham sp, SanPhamRequest request) {
-        if (request.getChiTiets() != null) {
-            for (ChiTietSanPhamRequest ctReq : request.getChiTiets()) {
-                ChiTietSanPham ct = new ChiTietSanPham();
-                ct.setSanPham(sp);
-                ct.setMauSac(categoryService.getMauSacOrNull(ctReq.getIdMauSac()));
-                ct.setSku(ctReq.getSku());
-                ct.setDungTichMl(ctReq.getDungTichMl());
-                ct.setGiaBan(ctReq.getGiaBan());
-                ct.setSoLuongTon(ctReq.getSoLuongTon() != null ? ctReq.getSoLuongTon() : 0);
-                ct.setHanSuDung(ctReq.getHanSuDung());
-                ct.setTrangThai(true);
-                chiTietSanPhamRepository.save(ct);
-            }
-        }
+    private SanPhamResponse toListResponse(SanPham sp) {
+        SanPhamResponse response = new SanPhamResponse(sp);
+        response.setAnhChinhUrl(resolveMainImageUrl(sp.getId()));
+        return response;
+    }
+
+    private String resolveMainImageUrl(Integer sanPhamId) {
+        return anhSanPhamRepository.findFirstBySanPham_IdAndLaAnhChinhTrue(sanPhamId)
+                .map(AnhSanPham::getUrl)
+                .or(() -> anhSanPhamRepository.findFirstBySanPham_IdOrderByThuTuAsc(sanPhamId)
+                        .map(AnhSanPham::getUrl))
+                .orElse(null);
+    }
+
+    private void saveRelations(SanPham sp, SanPhamRequest request, List<MultipartFile> files, boolean isUpdate) {
+        saveChiTiets(sp, request.getChiTiets(), isUpdate);
         if (request.getAnhs() != null) {
             for (AnhSanPhamRequest anhReq : request.getAnhs()) {
+                String url = resolveImageUrl(anhReq, files);
+                if (url == null || url.isBlank()) {
+                    continue;
+                }
                 AnhSanPham anh = new AnhSanPham();
                 anh.setSanPham(sp);
-                anh.setUrl(anhReq.getUrl());
+                anh.setUrl(url);
                 anh.setLaAnhChinh(anhReq.getLaAnhChinh() != null ? anhReq.getLaAnhChinh() : false);
                 anh.setThuTu(anhReq.getThuTu() != null ? anhReq.getThuTu() : 0);
                 anhSanPhamRepository.save(anh);
@@ -191,6 +207,47 @@ public class SanPhamService {
                 sanPhamThanhPhanRepository.save(sptp);
             }
         }
+    }
+
+    private void saveChiTiets(SanPham sp, List<ChiTietSanPhamRequest> chiTiets, boolean isUpdate) {
+        if (chiTiets == null) {
+            return;
+        }
+
+        Map<String, ChiTietSanPham> existingBySku = new HashMap<>();
+        if (isUpdate) {
+            chiTietSanPhamRepository.findBySanPham(sp).forEach(ct -> existingBySku.put(ct.getSku(), ct));
+        }
+
+        for (ChiTietSanPhamRequest ctReq : chiTiets) {
+            ChiTietSanPham ct = isUpdate ? existingBySku.get(ctReq.getSku()) : null;
+            if (ct == null) {
+                ct = new ChiTietSanPham();
+                ct.setSanPham(sp);
+                ct.setSku(ctReq.getSku());
+            }
+            ct.setMauSac(categoryService.getMauSacOrNull(ctReq.getIdMauSac()));
+            ct.setDungTichMl(ctReq.getDungTichMl());
+            ct.setGiaBan(ctReq.getGiaBan());
+            ct.setSoLuongTon(ctReq.getSoLuongTon() != null ? ctReq.getSoLuongTon() : 0);
+            ct.setHanSuDung(ctReq.getHanSuDung());
+            ct.setTrangThai(true);
+            chiTietSanPhamRepository.save(ct);
+        }
+    }
+
+    private String resolveImageUrl(AnhSanPhamRequest anhReq, List<MultipartFile> files) {
+        if (anhReq.getUrl() != null && !anhReq.getUrl().isBlank()) {
+            return anhReq.getUrl().trim();
+        }
+        if (files == null || anhReq.getFileIndex() == null) {
+            return null;
+        }
+        int index = anhReq.getFileIndex();
+        if (index < 0 || index >= files.size()) {
+            throw new ApiException("File ảnh không khớp với dữ liệu gửi lên", "VALIDATION_ERROR");
+        }
+        return productFileStorageService.store(files.get(index));
     }
 
     private void validateMaSanPham(String maSanPham, Integer excludeId) {

@@ -33,4 +33,7 @@ public class MauSac {
     @Size(max = 7)
     @Column(name = "ma_hex", length = 7)
     private String maHex;
+
+    @Column(name = "trang_thai")
+    private Boolean trangThai;
 }

@@ -22,6 +22,8 @@ public class SanPhamResponse {
     private String tenThuongHieu;
     private String tenDanhMuc;
     private String tenDangSanPham;
+    /** URL ảnh chính (thumbnail) — từ bảng anh_san_pham */
+    private String anhChinhUrl;
 
     public SanPhamResponse(SanPham sp) {
         this.id = sp.getId();

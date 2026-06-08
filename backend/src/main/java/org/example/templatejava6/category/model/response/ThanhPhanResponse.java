@@ -13,6 +13,7 @@ public class ThanhPhanResponse {
     private String ten;
     private String loai;
     private String moTa;
+    private Boolean trangThai;
 
     public ThanhPhanResponse(ThanhPhan t) {
         this.id = t.getId();
@@ -20,5 +21,6 @@ public class ThanhPhanResponse {
         this.ten = t.getTen();
         this.loai = t.getLoai();
         this.moTa = t.getMoTa();
+        this.trangThai = t.getTrangThai();
     }
 }

@@ -6,7 +6,9 @@ import org.example.templatejava6.product.model.response.SanPhamDetailResponse;
 import org.example.templatejava6.product.model.response.SanPhamResponse;
 import org.example.templatejava6.product.service.SanPhamService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -38,18 +40,27 @@ public class SanPhamController {
         return sanPhamService.timKiem(keyword);
     }
 
-    @PostMapping("add")
-    public void add(@Valid @RequestBody SanPhamRequest request) {
-        sanPhamService.add(request);
+    @PostMapping(value = "add", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public void add(@RequestPart("data") @Valid SanPhamRequest request,
+                    @RequestPart(value = "files", required = false) List<MultipartFile> files) {
+        sanPhamService.add(request, files);
     }
 
-    @PutMapping("update/{id}")
-    public void update(@Valid @RequestBody SanPhamRequest request, @PathVariable("id") Integer id) {
-        sanPhamService.update(id, request);
+    @PostMapping(value = "update/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public void update(@RequestPart("data") @Valid SanPhamRequest request,
+                       @PathVariable("id") Integer id,
+                       @RequestPart(value = "files", required = false) List<MultipartFile> files) {
+        sanPhamService.update(id, request, files);
     }
 
     @DeleteMapping("delete")
     public void delete(@RequestParam("id") Integer id) {
         sanPhamService.delete(id);
+    }
+
+    @PutMapping("trang-thai")
+    public void capNhatTrangThai(@RequestParam("id") Integer id,
+                                   @RequestParam("trangThai") Boolean trangThai) {
+        sanPhamService.updateTrangThai(id, trangThai);
     }
 }
