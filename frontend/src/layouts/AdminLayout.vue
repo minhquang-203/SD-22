@@ -20,8 +20,12 @@ const title = computed(() => route.meta.title || 'SUNOVA Admin')
         :breadcrumb="breadcrumb"
         @toggle-sidebar="collapsed = !collapsed"
       />
-      <main class="flex-1 overflow-auto p-4 md:p-5">
-        <router-view />
+      <main class="admin-main-content flex-1 overflow-auto">
+        <router-view v-slot="{ Component }">
+          <transition name="admin-page-fade" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
       </main>
     </div>
   </div>

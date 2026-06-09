@@ -24,6 +24,7 @@ const productDetail = ref(null)
 const filter = reactive({
   keyword: '',
   idMauSac: null,
+  dungTichMl: null,
   priceMin: null,
   priceMax: null,
 })
@@ -47,16 +48,28 @@ const variants = computed(() => {
   })
 })
 
+const dungTichOptions = computed(() => {
+  const values = variants.value
+    .map((v) => v.dungTichMl)
+    .filter((v) => v != null && v !== '')
+    .map((v) => Number(v))
+  return [...new Set(values)].sort((a, b) => a - b)
+})
+
 const filteredVariants = computed(() => {
   let rows = [...variants.value]
   const kw = filter.keyword.trim().toLowerCase()
   if (kw) {
     rows = rows.filter((r) =>
-      [r.sku, r.tenMauSac].some((v) => String(v || '').toLowerCase().includes(kw)),
+      [r.sku, r.tenMauSac, r.dungTichMl != null ? `${r.dungTichMl} ml` : '']
+        .some((v) => String(v || '').toLowerCase().includes(kw)),
     )
   }
   if (filter.idMauSac) {
     rows = rows.filter((r) => r.idMauSac === filter.idMauSac)
+  }
+  if (filter.dungTichMl != null && filter.dungTichMl !== '') {
+    rows = rows.filter((r) => Number(r.dungTichMl) === Number(filter.dungTichMl))
   }
   if (filter.priceMin != null && filter.priceMin !== '') {
     rows = rows.filter((r) => Number(r.giaBan) >= Number(filter.priceMin))
@@ -134,6 +147,7 @@ async function loadProductDetail() {
 function resetFilter() {
   filter.keyword = ''
   filter.idMauSac = null
+  filter.dungTichMl = null
   filter.priceMin = null
   filter.priceMax = null
 }
@@ -197,6 +211,7 @@ async function handleToggleStatus(row) {
 }
 
 watch(selectedProductId, (id) => {
+  filter.dungTichMl = null
   syncProductIdToUrl(id)
   loadProductDetail()
 })
@@ -266,6 +281,13 @@ onMounted(async () => {
           <select v-model="filter.idMauSac" class="admin-select">
             <option :value="null">Tất cả</option>
             <option v-for="m in mauSacOptions" :key="m.id" :value="m.id">{{ m.ten }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="admin-label">Dung tích</label>
+          <select v-model="filter.dungTichMl" class="admin-select">
+            <option :value="null">Tất cả</option>
+            <option v-for="dt in dungTichOptions" :key="dt" :value="dt">{{ dt }} ml</option>
           </select>
         </div>
         <div>

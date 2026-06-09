@@ -1,8 +1,9 @@
 <script setup>
 import { NPopover } from 'naive-ui'
+import { Icon } from '@iconify/vue'
 import { formatDate } from '@/utils/format'
 import { resolveProductImageUrl } from '@/utils/productForm'
-import AdminSwitch from '@/components/admin/AdminSwitch.vue'
+import StatusDot from '@/components/ui/StatusDot.vue'
 
 defineProps({
   products: { type: Array, default: () => [] },
@@ -12,24 +13,33 @@ defineProps({
 })
 
 const emit = defineEmits(['edit', 'toggle-status', 'manage'])
+
+function formatLoaiChongNang(value) {
+  const map = {
+    VAT_LY: 'Vật lý',
+    HOA_HOC: 'Hóa học',
+    LAI: 'Lai',
+  }
+  return map[value] || value
+}
 </script>
 
 <template>
   <div class="overflow-x-auto">
-    <table class="admin-table admin-table--striped admin-table--products">
+    <table class="soleil-table soleil-table--product admin-table--soleil">
       <thead>
         <tr>
           <th>STT</th>
           <th>Mã SP</th>
-          <th class="product-thumb-cell">Ảnh</th>
+          <th>Ảnh</th>
           <th>Tên sản phẩm</th>
           <th>Thương hiệu</th>
           <th>Danh mục</th>
           <th>Dạng SP</th>
           <th>SPF / PA</th>
           <th>Ngày tạo</th>
-          <th class="text-center">Trạng thái</th>
-          <th class="text-center">Thao tác</th>
+          <th>Trạng thái</th>
+          <th />
         </tr>
       </thead>
       <tbody>
@@ -44,11 +54,11 @@ const emit = defineEmits(['edit', 'toggle-status', 'manage'])
           </td>
         </tr>
         <tr v-for="(item, index) in products" :key="item.id">
-          <td>{{ (page - 1) * pageSize + index + 1 }}</td>
+          <td class="text-[rgba(30,21,16,0.45)]">{{ (page - 1) * pageSize + index + 1 }}</td>
           <td>
-            <span class="font-semibold text-[var(--admin-primary)]">{{ item.maSanPham }}</span>
+            <span class="soleil-sp-code">{{ item.maSanPham }}</span>
           </td>
-          <td class="product-thumb-cell">
+          <td>
             <NPopover
               v-if="item.anhChinhUrl"
               trigger="hover"
@@ -61,7 +71,7 @@ const emit = defineEmits(['edit', 'toggle-status', 'manage'])
                 <img
                   :src="resolveProductImageUrl(item.anhChinhUrl)"
                   :alt="item.ten"
-                  class="product-thumb cursor-zoom-in"
+                  class="product-thumb--table cursor-zoom-in"
                 />
               </template>
               <img
@@ -70,55 +80,64 @@ const emit = defineEmits(['edit', 'toggle-status', 'manage'])
                 class="product-thumb-popover"
               />
             </NPopover>
-            <div v-else class="product-thumb--empty">
-              Chưa có ảnh
+            <div v-else class="product-thumb--table-empty">Chưa có ảnh</div>
+          </td>
+          <td class="max-w-[260px]">
+            <div class="font-medium text-[var(--ink)]">{{ item.ten }}</div>
+            <div v-if="item.loaiChongNang" class="text-xs text-[rgba(30,21,16,0.45)] mt-0.5">
+              {{ formatLoaiChongNang(item.loaiChongNang) }}
             </div>
           </td>
-          <td class="max-w-[240px]">
-            <div class="font-medium">{{ item.ten }}</div>
-            <div v-if="item.loaiChongNang" class="text-xs text-[var(--admin-muted)]">
-              {{ item.loaiChongNang }}
-            </div>
-          </td>
-          <td>{{ item.tenThuongHieu || '—' }}</td>
-          <td>{{ item.tenDanhMuc || '—' }}</td>
-          <td>{{ item.tenDangSanPham || '—' }}</td>
           <td>
-            <div>{{ item.chiSoSpf || '—' }}</div>
-            <div class="text-xs text-[var(--admin-muted)]">{{ item.chiSoPa || '—' }}</div>
+            <span v-if="item.tenThuongHieu" class="soleil-pill--brand">{{ item.tenThuongHieu }}</span>
+            <span v-else class="text-[rgba(30,21,16,0.35)]">—</span>
           </td>
-          <td>{{ formatDate(item.ngayTao) }}</td>
-          <td class="text-center">
-            <div class="flex flex-col items-center gap-1">
-              <AdminSwitch
-                :model-value="item.trangThai !== false"
-                @update:model-value="emit('toggle-status', item)"
+          <td>
+            <span v-if="item.tenDanhMuc" class="soleil-pill--category">{{ item.tenDanhMuc }}</span>
+            <span v-else class="text-[rgba(30,21,16,0.35)]">—</span>
+          </td>
+          <td>
+            <span v-if="item.tenDangSanPham" class="soleil-pill--form">{{ item.tenDangSanPham }}</span>
+            <span v-else class="text-[rgba(30,21,16,0.35)]">—</span>
+          </td>
+          <td>
+            <div class="flex flex-wrap gap-1">
+              <span v-if="item.chiSoSpf" class="soleil-pill--spf">{{ item.chiSoSpf }}</span>
+              <span v-if="item.chiSoPa" class="soleil-pill--spf">{{ item.chiSoPa }}</span>
+              <span v-if="!item.chiSoSpf && !item.chiSoPa" class="text-[rgba(30,21,16,0.35)]">—</span>
+            </div>
+          </td>
+          <td class="text-xs text-[rgba(30,21,16,0.55)]">{{ formatDate(item.ngayTao) }}</td>
+          <td>
+            <button
+              type="button"
+              class="soleil-status-toggle"
+              :title="item.trangThai !== false ? 'Nhấn để ngưng hoạt động' : 'Nhấn để kích hoạt'"
+              @click="emit('toggle-status', item)"
+            >
+              <StatusDot
+                :status="item.trangThai !== false ? 'active' : 'expired'"
+                :label="item.trangThai !== false ? 'Đang hoạt động' : 'Ngưng hoạt động'"
               />
-              <span
-                class="text-xs"
-                :class="item.trangThai !== false ? 'text-[var(--admin-primary)]' : 'text-[var(--admin-muted)]'"
-              >
-                {{ item.trangThai !== false ? 'Hoạt động' : 'Ngưng' }}
-              </span>
-            </div>
+            </button>
           </td>
           <td>
-            <div class="flex items-center justify-center gap-2">
+            <div class="soleil-actions-cell">
               <button
                 type="button"
-                class="admin-btn admin-btn-default !px-2.5 !py-2"
-                title="Quản lý biến thể (SKU, giá, tồn)"
+                class="soleil-act-btn-round"
+                title="Quản lý biến thể"
                 @click="emit('manage', item)"
               >
-                📦
+                <Icon icon="icon-park-outline:box" />
               </button>
               <button
                 type="button"
-                class="admin-btn admin-btn-default !px-2.5 !py-2"
+                class="soleil-act-btn-round"
                 title="Sửa"
                 @click="emit('edit', item)"
               >
-                ✏️
+                <Icon icon="icon-park-outline:edit" />
               </button>
             </div>
           </td>

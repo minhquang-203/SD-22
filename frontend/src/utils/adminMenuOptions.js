@@ -1,5 +1,4 @@
 import { h } from 'vue'
-import { RouterLink } from 'vue-router'
 import { NIcon } from 'naive-ui'
 import { Icon } from '@iconify/vue'
 
@@ -36,16 +35,7 @@ export function buildAdminMenuOptions(items, collapsed = false) {
       disabled: !!item.disabled && !item.path && !item.children?.length,
     }
 
-    if (item.path && !item.disabled) {
-      option.label = () =>
-        h(
-          RouterLink,
-          { to: item.path, class: 'admin-menu-router-link' },
-          { default: () => item.label },
-        )
-    } else {
-      option.label = item.label
-    }
+    option.label = item.label
 
     if (item.children?.length) {
       option.children = buildAdminMenuOptions(item.children, collapsed)

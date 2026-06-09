@@ -1,9 +1,12 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { Icon } from '@iconify/vue'
 import ProductFilter from '@/components/products/ProductFilter.vue'
 import ProductTable from '@/components/products/ProductTable.vue'
 import ProductFormModal from '@/components/products/ProductFormModal.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import StatCard from '@/components/ui/StatCard.vue'
 import {
   addProduct,
   getProductDetail,
@@ -21,6 +24,7 @@ import {
   getThanhPhanList,
   getThuongHieuList,
 } from '@/api/danhMucApi'
+
 const router = useRouter()
 
 const loading = ref(false)
@@ -99,6 +103,27 @@ const pagedProducts = computed(() => {
   return filteredProducts.value.slice(start, start + pageSize.value)
 })
 
+const statTotal = computed(() => allProducts.value.length)
+
+const statActive = computed(
+  () => allProducts.value.filter((p) => p.trangThai !== false).length,
+)
+
+const statInactive = computed(
+  () => allProducts.value.filter((p) => p.trangThai === false).length,
+)
+
+const statAddedThisMonth = computed(() => {
+  const now = new Date()
+  const month = now.getMonth()
+  const year = now.getFullYear()
+  return allProducts.value.filter((p) => {
+    if (!p.ngayTao) return false
+    const d = new Date(p.ngayTao)
+    return d.getMonth() === month && d.getFullYear() === year
+  }).length
+})
+
 function showMessage(text, type = 'success') {
   message.value = text
   messageType.value = type
@@ -129,9 +154,7 @@ async function loadProducts() {
   loading.value = true
   try {
     const keyword = filters.value.keyword?.trim()
-    const res = keyword
-      ? await searchProducts(keyword)
-      : await getProducts()
+    const res = keyword ? await searchProducts(keyword) : await getProducts()
     allProducts.value = res.data || []
     page.value = 1
   } catch (err) {
@@ -240,20 +263,18 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div class="admin-page-header flex-col sm:flex-row sm:items-center">
-      <div class="admin-page-header__icon">☀️</div>
-      <div class="flex-1 min-w-0">
-        <h1 class="admin-page-title">Quản lý sản phẩm</h1>
-        <p class="admin-page-subtitle">
-          SUNOVA — sản phẩm chống nắng ({{ filteredProducts.length }} sản phẩm)
-        </p>
-      </div>
-      <button type="button" class="admin-fab-btn admin-fab-btn--primary group shrink-0" @click="openCreateModal">
-        <span>＋</span>
-        <span class="admin-fab-btn__label">Thêm sản phẩm</span>
-      </button>
-    </div>
+  <div class="space-y-6">
+    <PageHeader
+      title="Quản lý sản phẩm"
+      :description="`SUNOVA — sản phẩm chống nắng (${filteredProducts.length} sản phẩm)`"
+    >
+      <template #actions>
+        <button type="button" class="soleil-btn-primary" @click="openCreateModal">
+          <Icon icon="icon-park-outline:plus" />
+          Thêm sản phẩm
+        </button>
+      </template>
+    </PageHeader>
 
     <div
       v-if="message"
@@ -261,6 +282,41 @@ onMounted(async () => {
       :class="messageType === 'error' ? 'admin-alert-error' : 'admin-alert-success'"
     >
       {{ message }}
+    </div>
+
+    <div class="soleil-stat-grid">
+      <StatCard
+        label="Tổng sản phẩm"
+        :value="statTotal"
+        :trend="`${filteredProducts.length} đang hiển thị`"
+        trend-type="neutral"
+        icon="icon-park-outline:box"
+        icon-tone="gold"
+      />
+      <StatCard
+        label="Đang hoạt động"
+        :value="statActive"
+        trend="Hiển thị trên cửa hàng"
+        trend-type="up"
+        icon="icon-park-outline:check-one"
+        icon-tone="sage"
+      />
+      <StatCard
+        label="Ngưng hoạt động"
+        :value="statInactive"
+        trend="Ẩn khỏi danh sách"
+        trend-type="down"
+        icon="icon-park-outline:close-one"
+        icon-tone="coral"
+      />
+      <StatCard
+        label="Thêm tháng này"
+        :value="statAddedThisMonth"
+        trend="Theo ngày tạo"
+        trend-type="neutral"
+        icon="icon-park-outline:add-one"
+        icon-tone="sky"
+      />
     </div>
 
     <ProductFilter
@@ -272,16 +328,14 @@ onMounted(async () => {
       @reset="resetFilters"
     />
 
-    <div class="admin-card admin-card--rounded">
-      <div class="admin-card-header">
-        <h3>Danh sách sản phẩm</h3>
-        <div class="flex items-center gap-2">
-          <span class="text-sm text-gray-500 hidden sm:inline">Trang {{ page }} / {{ totalPages }}</span>
-          <button type="button" class="admin-fab-btn admin-fab-btn--info group" @click="loadProducts">
-            <span>⟳</span>
-            <span class="admin-fab-btn__label">Tải lại</span>
-          </button>
-        </div>
+    <div class="soleil-table-card">
+      <div class="soleil-table-card__head">
+        <span class="soleil-label" style="margin: 0">Danh sách sản phẩm</span>
+        <button type="button" class="soleil-btn-outline" style="margin-left: auto" @click="loadProducts">
+          <Icon icon="icon-park-outline:refresh" />
+          Tải lại
+        </button>
+        <span class="text-xs text-[rgba(30,21,16,0.45)]">Trang {{ page }} / {{ totalPages }}</span>
       </div>
 
       <ProductTable
@@ -294,29 +348,27 @@ onMounted(async () => {
         @manage="handleManage"
       />
 
-      <div
-        class="px-4 py-3 border-t flex items-center justify-between gap-3"
-        style="border-color: var(--admin-border)"
-      >
-        <div class="text-sm text-[var(--admin-muted)]">
+      <div class="soleil-pagination">
+        <span class="soleil-pagination__info">
           Hiển thị {{ pagedProducts.length }} / {{ filteredProducts.length }} sản phẩm
-        </div>
-        <div class="flex items-center gap-2">
+        </span>
+        <div class="soleil-pagination__btns">
           <button
             type="button"
-            class="admin-btn admin-btn-default"
+            class="soleil-page-btn"
             :disabled="page <= 1"
             @click="page--"
           >
-            ‹ Trước
+            <Icon icon="icon-park-outline:left" />
           </button>
+          <button type="button" class="soleil-page-btn soleil-page-btn--active">{{ page }}</button>
           <button
             type="button"
-            class="admin-btn admin-btn-default"
+            class="soleil-page-btn"
             :disabled="page >= totalPages"
             @click="page++"
           >
-            Sau ›
+            <Icon icon="icon-park-outline:right" />
           </button>
         </div>
       </div>
