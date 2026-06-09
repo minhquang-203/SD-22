@@ -8,8 +8,28 @@ function renderMenuIcon(icon) {
   return () => h(NIcon, { size: 18 }, { default: () => h(Icon, { icon }) })
 }
 
-export function buildAdminMenuOptions(items) {
+function renderGroupLabel(label, collapsed) {
+  if (collapsed) {
+    return () =>
+      h('span', {
+        class: 'admin-menu-group-divider',
+        'aria-hidden': 'true',
+      })
+  }
+  return label
+}
+
+export function buildAdminMenuOptions(items, collapsed = false) {
   return items.map((item) => {
+    if (item.type === 'group') {
+      return {
+        type: 'group',
+        key: item.key,
+        label: renderGroupLabel(item.label, collapsed),
+        children: buildAdminMenuOptions(item.children || [], collapsed),
+      }
+    }
+
     const option = {
       key: item.path || item.key,
       icon: renderMenuIcon(item.icon),
@@ -28,7 +48,7 @@ export function buildAdminMenuOptions(items) {
     }
 
     if (item.children?.length) {
-      option.children = buildAdminMenuOptions(item.children)
+      option.children = buildAdminMenuOptions(item.children, collapsed)
     }
 
     return option

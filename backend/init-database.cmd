@@ -18,7 +18,8 @@ if errorlevel 1 (
   exit /b 1
 )
 
-sqlcmd -S %SERVER% -U %USER% -P %PASS% -i "%SQL_FILE%"
+REM -f 65001: doc file SQL UTF-8 dung — tranh loi tieng Viet (mojibake) khi INSERT NVARCHAR
+sqlcmd -S %SERVER% -U %USER% -P %PASS% -i "%SQL_FILE%" -f 65001
 if errorlevel 1 (
   echo.
   echo [SUNOVA] Nap database THAT BAI. Kiem tra SQL Server dang chay va mat khau sa.

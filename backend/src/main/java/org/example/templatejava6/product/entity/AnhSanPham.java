@@ -23,6 +23,11 @@ public class AnhSanPham {
     @JoinColumn(name = "id_san_pham")
     private SanPham sanPham;
 
+    /** NULL = ảnh chung sản phẩm; có giá trị = ảnh gắn biến thể cụ thể */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_chi_tiet_san_pham")
+    private ChiTietSanPham chiTietSanPham;
+
     @Column(name = "url", length = 255)
     private String url;
 
