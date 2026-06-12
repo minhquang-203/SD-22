@@ -141,7 +141,22 @@ export const ADMIN_MENU = [
         key: 'discounts',
         label: 'Khuyến mãi & Voucher',
         icon: 'carbon:ticket',
-        path: '/admin/discounts',
+        children: [
+          {
+            key: 'voucher',
+            label: 'Phiếu giảm giá',
+            icon: 'mdi:ticket-percent',
+            path: '/admin/voucher',
+            roles: MANAGER_ONLY,
+          },
+          {
+            key: 'sale',
+            label: 'Đợt giảm giá',
+            icon: 'tabler:discount-2',
+            path: '/admin/sale',
+            roles: MANAGER_ONLY,
+          },
+        ],
         roles: MANAGER_ONLY,
       },
       RECOMMENDATION_MENU,
