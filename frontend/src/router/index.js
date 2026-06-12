@@ -12,6 +12,21 @@ const router = createRouter({
 
     { path: '/', redirect: '/admin/products' },
 
+    // =======================================================
+    // 1. ROUTE KHÁCH HÀNG (STOREFRONT) - GIAO DIỆN QUIZ NÂU GOLD
+    // =======================================================
+    {
+      path: "/quiz",
+      name: "SkinQuiz",
+      // Đã trỏ đúng vào thư mục storefront
+      component: () => import("@/views/storefront/SkinQuiz.vue"),
+      meta: { title: "Tìm chân ái chống nắng - SUNOVA" },
+    },
+
+    // =======================================================
+    // 2. ROUTE QUẢN TRỊ (ADMIN)
+    // =======================================================
+
     {
 
       path: '/admin',
@@ -235,4 +250,3 @@ const router = createRouter({
 
 
 export default router
-
