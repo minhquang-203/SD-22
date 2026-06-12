@@ -69,6 +69,9 @@ public class SanPham {
     @Column(name = "trang_thai")
     private Boolean trangThai;
 
+    @Column(name = "noi_bat")
+    private Boolean noiBat;
+
     @Column(name = "ngay_tao")
     private LocalDateTime ngayTao;
 }

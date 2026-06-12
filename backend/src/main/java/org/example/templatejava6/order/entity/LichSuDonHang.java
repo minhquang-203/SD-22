@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.example.templatejava6.common.entity.NhanVien;
-import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.Nationalized;
 
@@ -27,10 +26,10 @@ public class LichSuDonHang {
     @JoinColumn(name = "id_hoa_don", nullable = false)
     private HoaDon idHoaDon;
 
-    @Enumerated(EnumType.STRING)
+    @Size(max = 30)
     @NotNull
     @Column(name = "trang_thai", nullable = false, length = 30)
-    private TrangThaiDonHang trangThai;
+    private String trangThai;
 
     @Size(max = 255)
     @Nationalized

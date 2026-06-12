@@ -37,6 +37,7 @@ public class SanPhamRequest {
     private String chiSoPa;
     private String loaiChongNang;
     private Boolean khangNuoc;
+    private Boolean noiBat;
     private String moTa;
 
     @Valid

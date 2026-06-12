@@ -12,6 +12,7 @@ import org.example.templatejava6.product.model.request.ChiTietSanPhamRequest;
 import org.example.templatejava6.product.model.request.SanPhamRequest;
 import org.example.templatejava6.product.model.response.*;
 import org.example.templatejava6.product.repository.*;
+import org.example.templatejava6.product.repository.ChiTietSanPhamRepository.VariantAgg;
 import org.example.templatejava6.review.repository.DanhGiaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -45,25 +46,33 @@ public class SanPhamService {
 
     @Transactional(readOnly = true)
     public List<SanPhamResponse> getAll() {
-        return sanPhamRepository.findAll().stream().map(this::toListResponse).toList();
+        Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
+        return sanPhamRepository.findAll().stream()
+                .map(sp -> toListResponse(sp, variantAggMap))
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public Page<SanPhamResponse> phanTrang(Integer pageNo, Integer pageSize) {
         Pageable pageable = PageRequest.of(pageNo, pageSize);
-        return sanPhamRepository.findAll(pageable).map(this::toListResponse);
+        Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
+        return sanPhamRepository.findAll(pageable).map(sp -> toListResponse(sp, variantAggMap));
     }
 
     @Transactional(readOnly = true)
     public List<SanPhamResponse> timKiem(String keyword) {
+        Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
         return sanPhamRepository.findByTenContainingIgnoreCase(keyword)
-                .stream().map(this::toListResponse).toList();
+                .stream()
+                .map(sp -> toListResponse(sp, variantAggMap))
+                .toList();
     }
 
     public Page<SanPhamResponse> timKiemPhanTrang(String keyword, Integer pageNo, Integer pageSize) {
         Pageable pageable = PageRequest.of(pageNo, pageSize);
+        Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
         return sanPhamRepository.findByTenContainingIgnoreCase(keyword, pageable)
-                .map(this::toListResponse);
+                .map(sp -> toListResponse(sp, variantAggMap));
     }
 
     @Transactional(readOnly = true)
@@ -86,6 +95,9 @@ public class SanPhamService {
         sp.setNgayTao(LocalDateTime.now());
         if (sp.getKhangNuoc() == null) {
             sp.setKhangNuoc(false);
+        }
+        if (sp.getNoiBat() == null) {
+            sp.setNoiBat(false);
         }
         sp = sanPhamRepository.save(sp);
 
@@ -129,6 +141,14 @@ public class SanPhamService {
         sanPhamRepository.save(sp);
     }
 
+    @Transactional
+    public void updateNoiBat(Integer id, Boolean noiBat) {
+        SanPham sp = sanPhamRepository.findById(id)
+                .orElseThrow(() -> new ApiException("Không tìm thấy sản phẩm", "NOT_FOUND"));
+        sp.setNoiBat(noiBat);
+        sanPhamRepository.save(sp);
+    }
+
     public SanPham getSanPhamOrThrow(Integer id) {
         return sanPhamRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Không tìm thấy sản phẩm", "NOT_FOUND"));
@@ -151,9 +171,29 @@ public class SanPhamService {
         return response;
     }
 
-    private SanPhamResponse toListResponse(SanPham sp) {
+    private Map<Integer, VariantAgg> loadVariantAggMap() {
+        Map<Integer, VariantAgg> map = new HashMap<>();
+        for (VariantAgg agg : chiTietSanPhamRepository.aggregateActiveVariants()) {
+            map.put(agg.getSpId(), agg);
+        }
+        return map;
+    }
+
+    private SanPhamResponse toListResponse(SanPham sp, Map<Integer, VariantAgg> variantAggMap) {
         SanPhamResponse response = new SanPhamResponse(sp);
         response.setAnhChinhUrl(resolveMainImageUrl(sp.getId()));
+        VariantAgg agg = variantAggMap.get(sp.getId());
+        if (agg != null) {
+            response.setGiaMin(agg.getGiaMin());
+            response.setGiaMax(agg.getGiaMax());
+            response.setTongTon(agg.getTongTon());
+            response.setSoBienThe(agg.getSoBienThe());
+        } else {
+            response.setGiaMin(null);
+            response.setGiaMax(null);
+            response.setTongTon(0L);
+            response.setSoBienThe(0L);
+        }
         return response;
     }
 

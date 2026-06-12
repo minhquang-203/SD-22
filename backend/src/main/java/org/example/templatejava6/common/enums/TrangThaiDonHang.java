@@ -4,6 +4,7 @@ import lombok.Getter;
 
 @Getter
 public enum TrangThaiDonHang {
+    CHO(-2, "Đơn chờ tại quầy"),
     CHO_XAC_NHAN(0, "Chờ xác nhận"),
     DA_XAC_NHAN(1, "Đã xác nhận"),
     DANG_CHUAN_BI(2, "Đang chuẩn bị hàng"),

@@ -7,6 +7,7 @@ import { getMauSacList } from '@/api/danhMucApi'
 import { getProductDetail, getProducts } from '@/api/sanPhamApi'
 import { addChiTiet, hideChiTiet, updateChiTiet } from '@/api/sanPhamApi'
 import { formatCurrency } from '@/utils/format'
+import { confirm } from '@/composables/useConfirm'
 
 const route = useRoute()
 const router = useRouter()
@@ -166,6 +167,13 @@ function openEdit(row) {
 }
 
 async function handleSubmit(payload) {
+  const isCreate = modalMode.value === 'create'
+  const ok = await confirm({
+    title: isCreate ? 'Thêm biến thể' : 'Cập nhật biến thể',
+    message: isCreate ? 'Thêm biến thể mới cho sản phẩm?' : 'Cập nhật biến thể này?',
+    confirmText: isCreate ? 'Thêm' : 'Cập nhật',
+  })
+  if (!ok) return
   saving.value = true
   try {
     if (modalMode.value === 'add') {
@@ -186,7 +194,13 @@ async function handleSubmit(payload) {
 
 async function handleToggleStatus(row) {
   const isActive = row.trangThai !== false
-  if (!confirm(`Bạn có chắc muốn ${isActive ? 'ngưng' : 'kích hoạt'} biến thể "${row.sku}"?`)) return
+  const ok = await confirm({
+    title: isActive ? 'Ngưng biến thể' : 'Kích hoạt biến thể',
+    message: `Bạn có chắc muốn ${isActive ? 'ngưng' : 'kích hoạt'} biến thể "${row.sku}"?`,
+    confirmText: isActive ? 'Ngưng' : 'Kích hoạt',
+    danger: isActive,
+  })
+  if (!ok) return
   try {
     if (isActive) {
       await hideChiTiet(row.id)
@@ -242,13 +256,15 @@ onMounted(async () => {
     <div class="admin-page-header">
       <div class="admin-page-header__icon">📦</div>
       <div class="flex-1 min-w-0">
-        <h1 class="admin-page-title">
-          Quản lý biến thể sản phẩm
-          <span v-if="selectedProduct" class="text-[var(--admin-primary)]">
-            {{ selectedProduct.maSanPham }} - {{ selectedProduct.ten }}
-          </span>
-        </h1>
-        <p class="admin-page-subtitle">Quản lý SKU, giá bán, tồn kho theo từng biến thể (`chi_tiet_san_pham`)</p>
+        <h1 class="admin-page-title truncate">Quản lý biến thể sản phẩm</h1>
+        <p
+          v-if="selectedProduct"
+          class="admin-page-subtitle truncate text-[var(--admin-primary)] font-medium"
+          :title="`${selectedProduct.maSanPham} - ${selectedProduct.ten}`"
+        >
+          {{ selectedProduct.maSanPham }} - {{ selectedProduct.ten }}
+        </p>
+        <p class="admin-page-subtitle">Quản lý SKU, giá bán, tồn kho theo từng biến thể</p>
       </div>
       <select v-model="selectedProductId" class="admin-select !w-full md:!w-[320px] shrink-0">
         <option :value="null">Chọn sản phẩm</option>

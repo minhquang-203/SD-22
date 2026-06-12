@@ -67,7 +67,31 @@ const router = createRouter({
 
           component: () => import('@/views/admin/orders/OrderList.vue'),
 
-          meta: { title: 'Quản lý đơn hàng', breadcrumb: 'Quản lý đơn hàng' },
+          meta: { title: 'Hóa đơn', breadcrumb: 'Hóa đơn' },
+
+        },
+
+        {
+
+          path: 'hoa-don',
+
+          name: 'AdminHoaDonEmpty',
+
+          component: () => import('@/views/admin/orders/HoaDonEmptyPage.vue'),
+
+          meta: { title: 'Chi tiết hóa đơn', breadcrumb: 'Hóa đơn / Chi tiết' },
+
+        },
+
+        {
+
+          path: 'hoa-don/:id',
+
+          name: 'AdminHoaDonDetail',
+
+          component: () => import('@/views/admin/orders/HoaDonDetailPage.vue'),
+
+          meta: { title: 'Chi tiết hóa đơn', breadcrumb: 'Hóa đơn / Chi tiết' },
 
         },
 

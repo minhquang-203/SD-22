@@ -15,6 +15,7 @@ public class HoaDonChiTietResponse {
     private Integer idChiTietSanPham;
     private String sku;
     private String tenSanPham;
+    private String bienThe;
     private Integer soLuong;
     private BigDecimal donGia;
     private BigDecimal thanhTien;
@@ -28,6 +29,19 @@ public class HoaDonChiTietResponse {
                 && ct.getIdChiTietSanPham().getSanPham() != null
                 ? ct.getIdChiTietSanPham().getSanPham().getTen()
                 : null;
+        if (ct.getIdChiTietSanPham() != null) {
+            var cts = ct.getIdChiTietSanPham();
+            String dt = cts.getDungTichMl() != null
+                    ? cts.getDungTichMl().stripTrailingZeros().toPlainString() + "ml" : null;
+            String ms = cts.getMauSac() != null ? cts.getMauSac().getTen() : null;
+            if (dt != null && ms != null) {
+                this.bienThe = dt + " / " + ms;
+            } else if (dt != null) {
+                this.bienThe = dt;
+            } else {
+                this.bienThe = ms;
+            }
+        }
         this.soLuong = ct.getSoLuong();
         this.donGia = ct.getDonGia();
         this.thanhTien = ct.getThanhTien();

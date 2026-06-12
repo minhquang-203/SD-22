@@ -1,7 +1,7 @@
 <script setup>
 import { NPopover } from 'naive-ui'
 import { Icon } from '@iconify/vue'
-import { formatDate } from '@/utils/format'
+import { formatCurrency, formatDate } from '@/utils/format'
 import { resolveProductImageUrl } from '@/utils/productForm'
 import StatusDot from '@/components/ui/StatusDot.vue'
 
@@ -12,7 +12,7 @@ defineProps({
   pageSize: { type: Number, default: 10 },
 })
 
-const emit = defineEmits(['edit', 'toggle-status', 'manage'])
+const emit = defineEmits(['edit', 'toggle-status', 'toggle-noi-bat', 'manage'])
 
 function formatLoaiChongNang(value) {
   const map = {
@@ -21,6 +21,12 @@ function formatLoaiChongNang(value) {
     LAI: 'Lai',
   }
   return map[value] || value
+}
+
+function formatPriceRange(item) {
+  if (!item.soBienThe || item.giaMin == null || item.giaMax == null) return '—'
+  if (Number(item.giaMin) === Number(item.giaMax)) return formatCurrency(item.giaMin)
+  return `${formatCurrency(item.giaMin)} – ${formatCurrency(item.giaMax)}`
 }
 </script>
 
@@ -37,19 +43,22 @@ function formatLoaiChongNang(value) {
           <th>Danh mục</th>
           <th>Dạng SP</th>
           <th>SPF / PA</th>
+          <th>Giá</th>
+          <th>Tồn / Biến thể</th>
           <th>Ngày tạo</th>
           <th>Trạng thái</th>
+          <th>Nổi bật</th>
           <th />
         </tr>
       </thead>
       <tbody>
         <tr v-if="loading">
-          <td colspan="11" class="text-center py-10 text-[var(--admin-muted)]">
+          <td colspan="14" class="text-center py-10 text-[var(--admin-muted)]">
             Đang tải dữ liệu...
           </td>
         </tr>
         <tr v-else-if="products.length === 0">
-          <td colspan="11" class="text-center py-10 text-[var(--admin-muted)]">
+          <td colspan="14" class="text-center py-10 text-[var(--admin-muted)]">
             Không có sản phẩm phù hợp
           </td>
         </tr>
@@ -107,6 +116,12 @@ function formatLoaiChongNang(value) {
               <span v-if="!item.chiSoSpf && !item.chiSoPa" class="text-[rgba(30,21,16,0.35)]">—</span>
             </div>
           </td>
+          <td class="text-sm text-[var(--ink)] whitespace-nowrap">{{ formatPriceRange(item) }}</td>
+          <td>
+            <span class="soleil-pill--form text-xs">
+              {{ item.soBienThe || 0 }} loại · còn {{ item.tongTon || 0 }}
+            </span>
+          </td>
           <td class="text-xs text-[rgba(30,21,16,0.55)]">{{ formatDate(item.ngayTao) }}</td>
           <td>
             <button
@@ -118,6 +133,19 @@ function formatLoaiChongNang(value) {
               <StatusDot
                 :status="item.trangThai !== false ? 'active' : 'expired'"
                 :label="item.trangThai !== false ? 'Đang hoạt động' : 'Ngưng hoạt động'"
+              />
+            </button>
+          </td>
+          <td>
+            <button
+              type="button"
+              class="soleil-status-toggle"
+              :title="item.noiBat ? 'Nhấn để bỏ nổi bật' : 'Nhấn để đánh dấu nổi bật'"
+              @click="emit('toggle-noi-bat', item)"
+            >
+              <StatusDot
+                :status="item.noiBat ? 'upcoming' : 'paused'"
+                :label="item.noiBat ? 'Nổi bật' : 'Thường'"
               />
             </button>
           </td>

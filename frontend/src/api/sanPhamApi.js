@@ -16,6 +16,9 @@ export const updateProduct = (id, formData) =>
 export const updateProductStatus = (id, trangThai) =>
   request.put('/san-pham/trang-thai', null, { params: { id, trangThai } })
 
+export const updateProductNoiBat = (id, noiBat) =>
+  request.put('/san-pham/noi-bat', null, { params: { id, noiBat } })
+
 export const addChiTiet = (payload) =>
   request.post('/chi-tiet-san-pham/add', payload)
 

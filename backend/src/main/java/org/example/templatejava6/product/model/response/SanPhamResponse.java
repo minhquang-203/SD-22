@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.example.templatejava6.product.entity.SanPham;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Getter
@@ -18,12 +19,17 @@ public class SanPhamResponse {
     private String loaiChongNang;
     private Boolean khangNuoc;
     private Boolean trangThai;
+    private Boolean noiBat;
     private LocalDateTime ngayTao;
     private String tenThuongHieu;
     private String tenDanhMuc;
     private String tenDangSanPham;
     /** URL ảnh chính (thumbnail) — từ bảng anh_san_pham */
     private String anhChinhUrl;
+    private BigDecimal giaMin;
+    private BigDecimal giaMax;
+    private Long tongTon;
+    private Long soBienThe;
 
     public SanPhamResponse(SanPham sp) {
         this.id = sp.getId();
@@ -34,6 +40,7 @@ public class SanPhamResponse {
         this.loaiChongNang = sp.getLoaiChongNang();
         this.khangNuoc = sp.getKhangNuoc();
         this.trangThai = sp.getTrangThai();
+        this.noiBat = sp.getNoiBat();
         this.ngayTao = sp.getNgayTao();
         this.tenThuongHieu = sp.getThuongHieu() != null ? sp.getThuongHieu().getTen() : null;
         this.tenDanhMuc = sp.getDanhMuc() != null ? sp.getDanhMuc().getTen() : null;

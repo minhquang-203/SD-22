@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AdminSwitch from '@/components/admin/AdminSwitch.vue'
 import { ATTRIBUTE_TYPES } from '@/constants/attributeConfig'
+import { confirm } from '@/composables/useConfirm'
 
 const route = useRoute()
 
@@ -138,7 +139,13 @@ async function handleSave() {
     formError.value = err
     return
   }
-  if (!confirm(modalMode.value === 'add' ? 'Thêm mới bản ghi này?' : 'Cập nhật bản ghi này?')) return
+  const isAdd = modalMode.value === 'add'
+  const ok = await confirm({
+    title: isAdd ? 'Thêm mới' : 'Cập nhật',
+    message: isAdd ? 'Thêm mới bản ghi này?' : 'Cập nhật bản ghi này?',
+    confirmText: isAdd ? 'Thêm' : 'Cập nhật',
+  })
+  if (!ok) return
 
   saving.value = true
   try {
@@ -170,8 +177,13 @@ function rowToUpdatePayload(row, trangThai) {
 async function handleToggleStatus(row) {
   if (!config.value.hasStatus) return
   const isActive = row.trangThai !== false
-  const action = isActive ? 'ngưng hoạt động' : 'kích hoạt lại'
-  if (!confirm(`Bạn có chắc muốn ${action} "${row.ten}"?`)) return
+  const ok = await confirm({
+    title: isActive ? 'Ngưng hoạt động' : 'Kích hoạt lại',
+    message: `Bạn có chắc muốn ${isActive ? 'ngưng hoạt động' : 'kích hoạt lại'} "${row.ten}"?`,
+    confirmText: isActive ? 'Ngưng' : 'Kích hoạt',
+    danger: isActive,
+  })
+  if (!ok) return
 
   try {
     if (isActive) {

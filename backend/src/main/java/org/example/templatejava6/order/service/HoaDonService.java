@@ -27,6 +27,7 @@ import org.example.templatejava6.order.model.response.HoaDonDetailResponse;
 
 import org.example.templatejava6.order.model.response.HoaDonResponse;
 
+import org.example.templatejava6.customer.repository.KhachHangRepository;
 import org.example.templatejava6.order.repository.*;
 import org.example.templatejava6.voucher.repository.PhieuGiamGiaRepository;
 
@@ -79,6 +80,8 @@ public class HoaDonService {
     @Autowired private PhieuGiamGiaRepository phieuGiamGiaRepository;
 
     @Autowired private ChiTietSanPhamRepository chiTietSanPhamRepository;
+
+    @Autowired private ThanhToanHoaDonRepository thanhToanHoaDonRepository;
 
 
 
@@ -326,7 +329,7 @@ public class HoaDonService {
 
         ls.setIdHoaDon(hoaDon);
 
-        ls.setTrangThai(trangThai);
+        ls.setTrangThai(trangThai.name());
 
         ls.setGhiChu(ghiChu);
 
@@ -347,6 +350,12 @@ public class HoaDonService {
         response.setChiTiets(hoaDonChiTietRepository.findByIdHoaDon(hd)
 
                 .stream().map(HoaDonChiTietResponse::new).toList());
+
+        thanhToanHoaDonRepository.findLatestByHoaDon(hd).ifPresent(tt -> {
+            response.setSoTienKhachDua(tt.getSoTienKhachDua());
+            response.setTienThua(tt.getTienThua());
+            response.setMaGiaoDich(tt.getMaGiaoDich());
+        });
 
         return response;
 

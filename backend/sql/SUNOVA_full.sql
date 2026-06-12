@@ -7,11 +7,12 @@
    - Đã siết khóa ngoại + CHECK chặt chẽ
    - Bảng ảnh gắn rõ ràng vào sản phẩm (và tùy chọn vào biến thể)
    - Mỗi bảng có ~5 dòng dữ liệu mẫu
+   - san_pham.noi_bat: đánh dấu sản phẩm nổi bật (BIT, mặc định 0)
    ============================================================================ */
 
--- Xóa DB cũ để chạy lại từ đầu (chạy qua init-database.cmd)
-IF DB_ID('SUNOVA') IS NOT NULL BEGIN ALTER DATABASE SUNOVA SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE SUNOVA; END
-GO
+-- (Tùy chọn) Xóa DB cũ để chạy lại từ đầu. Bỏ comment nếu cần.
+-- IF DB_ID('SUNOVA') IS NOT NULL BEGIN ALTER DATABASE SUNOVA SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE SUNOVA; END
+-- GO
 
 CREATE DATABASE SUNOVA;
 GO
@@ -109,39 +110,35 @@ CREATE TABLE danh_muc (
 GO
 
 CREATE TABLE dang_san_pham (
-    id         INT IDENTITY(1,1) PRIMARY KEY,
-    ma         VARCHAR(20)  NOT NULL UNIQUE,
-    ten        NVARCHAR(50) NOT NULL,
-    mo_ta      NVARCHAR(255),
-    trang_thai BIT DEFAULT 1
+    id    INT IDENTITY(1,1) PRIMARY KEY,
+    ma    VARCHAR(20)  NOT NULL UNIQUE,
+    ten   NVARCHAR(50) NOT NULL,
+    mo_ta NVARCHAR(255)
 );
 GO
 
 CREATE TABLE cong_dung (
-    id         INT IDENTITY(1,1) PRIMARY KEY,
-    ma         VARCHAR(20)  NOT NULL UNIQUE,
-    ten        NVARCHAR(50) NOT NULL,
-    mo_ta      NVARCHAR(255),
-    trang_thai BIT DEFAULT 1
+    id    INT IDENTITY(1,1) PRIMARY KEY,
+    ma    VARCHAR(20)  NOT NULL UNIQUE,
+    ten   NVARCHAR(50) NOT NULL,
+    mo_ta NVARCHAR(255)
 );
 GO
 
 CREATE TABLE thanh_phan (
-    id         INT IDENTITY(1,1) PRIMARY KEY,
-    ma         VARCHAR(30)  NOT NULL UNIQUE,
-    ten        NVARCHAR(80) NOT NULL,
-    loai       VARCHAR(10),
-    mo_ta      NVARCHAR(255),
-    trang_thai BIT DEFAULT 1
+    id    INT IDENTITY(1,1) PRIMARY KEY,
+    ma    VARCHAR(30)  NOT NULL UNIQUE,
+    ten   NVARCHAR(80) NOT NULL,
+    loai  VARCHAR(10),
+    mo_ta NVARCHAR(255)
 );
 GO
 
 CREATE TABLE mau_sac (
-    id         INT IDENTITY(1,1) PRIMARY KEY,
-    ma         VARCHAR(20)  NOT NULL UNIQUE,
-    ten        NVARCHAR(50) NOT NULL,
-    ma_hex     VARCHAR(7),
-    trang_thai BIT DEFAULT 1
+    id     INT IDENTITY(1,1) PRIMARY KEY,
+    ma     VARCHAR(20)  NOT NULL UNIQUE,
+    ten    NVARCHAR(50) NOT NULL,
+    ma_hex VARCHAR(7)
 );
 GO
 
@@ -162,6 +159,7 @@ CREATE TABLE san_pham (
     khang_nuoc       BIT DEFAULT 0,
     mo_ta            NVARCHAR(MAX),
     trang_thai       BIT DEFAULT 1,
+    noi_bat          BIT NOT NULL DEFAULT 0,
     ngay_tao         DATETIME DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_sp_th   FOREIGN KEY (id_thuong_hieu)   REFERENCES thuong_hieu(id),
     CONSTRAINT fk_sp_dm   FOREIGN KEY (id_danh_muc)      REFERENCES danh_muc(id),
@@ -662,12 +660,12 @@ INSERT INTO mau_sac (ma, ten, ma_hex) VALUES
 GO
 
 -- SẢN PHẨM
-INSERT INTO san_pham (ma_san_pham, ten, id_thuong_hieu, id_danh_muc, id_dang_san_pham, chi_so_spf, chi_so_pa, loai_chong_nang, khang_nuoc, mo_ta) VALUES
-('SP001', N'Anessa Perfect UV Sunscreen Skin Care Milk', 1, 2, 1, 'SPF50+', 'PA++++', 'HOA_HOC', 1, N'Sữa chống nắng kháng nước nổi tiếng của Anessa'),
-('SP002', N'La Roche-Posay Anthelios UVMune 400',        2, 1, 2, 'SPF50+', 'PA++++', 'HOA_HOC', 0, N'Kem chống nắng cho da nhạy cảm'),
-('SP003', N'Skin1004 Madagascar Centella Air-fit Suncream',4, 1, 2, 'SPF50+','PA++++', 'VAT_LY', 0, N'Kem chống nắng chứa rau má, làm dịu da'),
-('SP004', N'Sunplay Skin Aqua UV Spray',                 5, 2, 4, 'SPF50+', 'PA++++', 'HOA_HOC', 1, N'Xịt chống nắng tiện lợi cho cơ thể'),
-('SP005', N'Vichy Capital Soleil UV Age Daily',          3, 3, 2, 'SPF50+', 'PA++++', 'HOA_HOC', 0, N'Kem chống nắng nâng tông, chống lão hóa');
+INSERT INTO san_pham (ma_san_pham, ten, id_thuong_hieu, id_danh_muc, id_dang_san_pham, chi_so_spf, chi_so_pa, loai_chong_nang, khang_nuoc, mo_ta, noi_bat) VALUES
+('SP001', N'Anessa Perfect UV Sunscreen Skin Care Milk', 1, 2, 1, 'SPF50+', 'PA++++', 'HOA_HOC', 1, N'Sữa chống nắng kháng nước nổi tiếng của Anessa', 1),
+('SP002', N'La Roche-Posay Anthelios UVMune 400',        2, 1, 2, 'SPF50+', 'PA++++', 'HOA_HOC', 0, N'Kem chống nắng cho da nhạy cảm', 0),
+('SP003', N'Skin1004 Madagascar Centella Air-fit Suncream',4, 1, 2, 'SPF50+','PA++++', 'VAT_LY', 0, N'Kem chống nắng chứa rau má, làm dịu da', 0),
+('SP004', N'Sunplay Skin Aqua UV Spray',                 5, 2, 4, 'SPF50+', 'PA++++', 'HOA_HOC', 1, N'Xịt chống nắng tiện lợi cho cơ thể', 0),
+('SP005', N'Vichy Capital Soleil UV Age Daily',          3, 3, 2, 'SPF50+', 'PA++++', 'HOA_HOC', 0, N'Kem chống nắng nâng tông, chống lão hóa', 0);
 GO
 
 -- SẢN PHẨM - LOẠI DA

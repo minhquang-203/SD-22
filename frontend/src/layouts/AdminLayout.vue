@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import AdminSidebar from '@/components/admin/AdminSidebar.vue'
 import AdminHeader from '@/components/admin/AdminHeader.vue'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 
 const collapsed = ref(false)
 const route = useRoute()
@@ -28,5 +29,6 @@ const title = computed(() => route.meta.title || 'SUNOVA Admin')
         </router-view>
       </main>
     </div>
+    <ConfirmDialog />
   </div>
 </template>

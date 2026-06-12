@@ -14,6 +14,7 @@ import VoucherTable from "@/components/voucher/VoucherTable.vue";
 import VoucherToolBar from "@/components/voucher/VoucherToolBar.vue";
 import Pagination from "@/components/voucher/Pagination.vue";
 import VoucherCreateModal from "@/components/voucher/VoucherCreateModal.vue";
+import { confirm } from "@/composables/useConfirm";
 
 /* ================= STATE ================= */
 const showModal = ref(false);
@@ -94,7 +95,13 @@ const chonTatCa = (checked) => {
 
 /* ================= DELETE ================= */
 const xacNhanXoa = async (phieu) => {
-  if (!confirm(`Xóa phiếu "${phieu.ma}"?`)) return;
+  const ok = await confirm({
+    title: "Xóa phiếu giảm giá",
+    message: `Xóa phiếu "${phieu.ma}"?`,
+    confirmText: "Xóa",
+    danger: true,
+  });
+  if (!ok) return;
 
   try {
     dangTai.value = true;
@@ -110,6 +117,12 @@ const xacNhanXoa = async (phieu) => {
 
 /* ================= CREATE ================= */
 const handleCreate = async (payload) => {
+  const ok = await confirm({
+    title: "Tạo phiếu giảm giá",
+    message: "Lưu phiếu giảm giá mới?",
+    confirmText: "Tạo",
+  });
+  if (!ok) return;
   try {
     await createVoucher(payload);
     alert("Tạo voucher thành công");
@@ -122,6 +135,12 @@ const handleCreate = async (payload) => {
 
 /* ================= UPDATE ================= */
 const handleUpdate = async (payload) => {
+  const ok = await confirm({
+    title: "Cập nhật phiếu",
+    message: "Cập nhật phiếu giảm giá này?",
+    confirmText: "Cập nhật",
+  });
+  if (!ok) return;
   try {
     await updateVoucher(payload.id, payload);
     alert("Cập nhật thành công");

@@ -12,10 +12,12 @@ import {
   getProductDetail,
   getProducts,
   updateProductStatus,
+  updateProductNoiBat,
   searchProducts,
   updateProduct,
 } from '@/api/sanPhamApi'
 import { formToFormData } from '@/utils/productForm'
+import { confirm } from '@/composables/useConfirm'
 import {
   getCongDungList,
   getDanhMucList,
@@ -207,8 +209,14 @@ function handleManage(product) {
 
 async function handleToggleStatus(product) {
   const isActive = product.trangThai !== false
-  const action = isActive ? 'ngưng hoạt động' : 'kích hoạt lại'
-  if (!confirm(`Bạn có chắc muốn ${action} sản phẩm "${product.ten}"?`)) return
+  const action = isActive ? 'ẩn' : 'hiện'
+  const ok = await confirm({
+    title: isActive ? 'Ẩn sản phẩm' : 'Hiện sản phẩm',
+    message: `Bạn có muốn ${action} sản phẩm "${product.ten}" không?`,
+    confirmText: isActive ? 'Ẩn' : 'Hiện',
+    danger: isActive,
+  })
+  if (!ok) return
   try {
     await updateProductStatus(product.id, !isActive)
     showMessage(isActive ? 'Đã chuyển sang ngưng hoạt động' : 'Đã kích hoạt lại sản phẩm')
@@ -218,7 +226,33 @@ async function handleToggleStatus(product) {
   }
 }
 
+async function handleToggleNoiBat(product) {
+  const isFeatured = !!product.noiBat
+  const ok = await confirm({
+    title: isFeatured ? 'Bỏ nổi bật' : 'Đánh dấu nổi bật',
+    message: `Bạn có chắc muốn ${isFeatured ? 'bỏ đánh dấu nổi bật' : 'đánh dấu nổi bật'} sản phẩm "${product.ten}"?`,
+    confirmText: 'Xác nhận',
+  })
+  if (!ok) return
+  try {
+    await updateProductNoiBat(product.id, !isFeatured)
+    showMessage(isFeatured ? 'Đã bỏ nổi bật' : 'Đã đánh dấu nổi bật')
+    await loadProducts()
+  } catch (err) {
+    showMessage(String(err), 'error')
+  }
+}
+
 async function handleSubmit(form) {
+  const isCreate = modalMode.value === 'create'
+  const ok = await confirm({
+    title: isCreate ? 'Tạo sản phẩm' : 'Cập nhật sản phẩm',
+    message: isCreate
+      ? 'Lưu sản phẩm mới vào danh sách?'
+      : 'Cập nhật thông tin sản phẩm này?',
+    confirmText: isCreate ? 'Tạo' : 'Cập nhật',
+  })
+  if (!ok) return
   saving.value = true
   try {
     const formData = formToFormData(form)
@@ -345,6 +379,7 @@ onMounted(async () => {
         :page-size="pageSize"
         @edit="openEditModal"
         @toggle-status="handleToggleStatus"
+        @toggle-noi-bat="handleToggleNoiBat"
         @manage="handleManage"
       />
 

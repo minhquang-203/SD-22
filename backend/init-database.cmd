@@ -5,9 +5,12 @@ cd /d "%~dp0"
 set "SERVER=localhost"
 set "USER=sa"
 set "PASS=123456789"
-set "SQL_FILE=%~dp0sql\SUNOVA_full.sql"
+REM Nguon SQL chinh: DuAnTotNghiep\files\SUNOVA_full.sql (fallback: backend\sql)
+set "SQL_FILE=%~dp0..\..\files\SUNOVA_full.sql"
+if not exist "%SQL_FILE%" set "SQL_FILE=%~dp0sql\SUNOVA_full.sql"
 
 echo [SUNOVA] Dang nap database tu SUNOVA_full.sql ...
+echo [SUNOVA] File: %SQL_FILE%
 echo [SUNOVA] Server: %SERVER%  Database: SUNOVA
 echo.
 

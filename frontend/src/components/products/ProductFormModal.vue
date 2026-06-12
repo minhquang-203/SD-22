@@ -90,7 +90,7 @@ function handleSubmit() {
         <div>
           <h2 class="text-lg font-semibold">{{ title }}</h2>
           <p class="text-sm text-[var(--admin-muted)]">
-            Dữ liệu gửi theo `SanPhamRequest` — backend SUNOVA
+            Điền thông tin sản phẩm chống nắng
           </p>
         </div>
         <button type="button" class="admin-btn admin-btn-default !px-2.5" @click="emit('close')">

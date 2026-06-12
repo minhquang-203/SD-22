@@ -63,4 +63,10 @@ public class SanPhamController {
                                    @RequestParam("trangThai") Boolean trangThai) {
         sanPhamService.updateTrangThai(id, trangThai);
     }
+
+    @PutMapping("noi-bat")
+    public void capNhatNoiBat(@RequestParam("id") Integer id,
+                              @RequestParam("noiBat") Boolean noiBat) {
+        sanPhamService.updateNoiBat(id, noiBat);
+    }
 }

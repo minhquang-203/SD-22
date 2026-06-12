@@ -1,13 +1,10 @@
 package org.example.templatejava6.common.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.validation.constraints.NotNull;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
+import org.example.templatejava6.common.model.VaiTro;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.Nationalized;
 
@@ -18,24 +15,27 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "nhan_vien")
 public class NhanVien {
+
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
     private Integer id;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_vai_tro", nullable = false)
+    private VaiTro vaiTro;
+
     @Size(max = 20)
-    @NotNull
-    @Column(name = "ma_nhan_vien", nullable = false, length = 20)
+    @Column(name = "ma_nhan_vien", length = 20)
     private String maNhanVien;
 
     @Size(max = 100)
-    @NotNull
     @Nationalized
-    @Column(name = "ho_ten", nullable = false, length = 100)
+    @Column(name = "ho_ten", length = 100)
     private String hoTen;
 
     @Size(max = 100)
-    @NotNull
-    @Column(name = "email", nullable = false, length = 100)
+    @Column(name = "email", length = 100)
     private String email;
 
     @Size(max = 15)
@@ -43,8 +43,7 @@ public class NhanVien {
     private String soDienThoai;
 
     @Size(max = 255)
-    @NotNull
-    @Column(name = "mat_khau", nullable = false)
+    @Column(name = "mat_khau", length = 255)
     private String matKhau;
 
     @Size(max = 10)
@@ -58,5 +57,4 @@ public class NhanVien {
     @ColumnDefault("1")
     @Column(name = "trang_thai")
     private Boolean trangThai;
-
 }
