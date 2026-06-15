@@ -79,7 +79,7 @@
                 </div>
                 
                 <div class="flex-1 form-group mb-0">
-                  <label>Tag Nhãn</label>
+                  <label>Tag Nhãn (Loại da)</label>
                   <select v-model="ans.tagId">
                     <option value="" disabled>-- Chọn --</option>
                     <option v-for="tag in availableTags" :key="tag.id" :value="tag.id">{{ tag.name }}</option>
@@ -98,7 +98,6 @@
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -109,11 +108,13 @@ const questions = ref([]);
 const isModalOpen = ref(false);
 const isEditing = ref(false);
 
+// Đã chuẩn hóa ID khớp 100% với file SUNOVA_full.sql của bạn
 const availableTags = ref([
-  { id: 'TAG_DA_DAU', name: 'Da Dầu' },
-  { id: 'TAG_DA_KHO', name: 'Da Khô' },
-  { id: 'TAG_NHAY_CAM', name: 'Da Nhạy Cảm' },
-  { id: 'TAG_HON_HOP', name: 'Da Hỗn Hợp' },
+  { id: 1, name: 'Da Dầu' },      
+  { id: 2, name: 'Da Khô' },
+  { id: 3, name: 'Da Hỗn Hợp' },
+  { id: 4, name: 'Da Thường' },
+  { id: 5, name: 'Da Nhạy Cảm' },
 ]);
 
 const defaultQuestion = {
@@ -124,19 +125,22 @@ const defaultQuestion = {
 
 const currentQuestion = ref(JSON.parse(JSON.stringify(defaultQuestion)));
 
-onMounted(() => {
-  // Dữ liệu mẫu đã được cập nhật thêm trường icon
-  questions.value = [
-    {
-      id: 1,
-      title: 'Làn da của bạn thường cảm thấy thế nào khoảng 1 tiếng sau khi rửa mặt?',
-      answers: [
-        { icon: '💧', label: 'Bóng nhờn', tagId: 'TAG_DA_DAU', scoreValue: 10 },
-        { icon: '🌵', label: 'Khô căng', tagId: 'TAG_DA_KHO', scoreValue: 10 },
-        { icon: '🌗', label: 'Hỗn hợp', tagId: 'TAG_HON_HOP', scoreValue: 10 }
-      ]
+// MÓC NỐI VỚI BACKEND SPRING BOOT
+const API_URL = 'http://localhost:8080/api/admin/quizzes';
+
+const loadQuestions = async () => {
+  try {
+    const response = await fetch(API_URL);
+    if (response.ok) {
+      questions.value = await response.json();
     }
-  ];
+  } catch (error) {
+    console.error("Lỗi kết nối Backend:", error);
+  }
+};
+
+onMounted(() => {
+  loadQuestions();
 });
 
 const getTagName = (tagId) => {
@@ -144,16 +148,15 @@ const getTagName = (tagId) => {
   return t ? t.name : 'Chưa có tag';
 };
 
-// Hàm nhỏ để đổi màu Tag cho đẹp mắt
 const getTagStyle = (tagId) => {
-  if (tagId === 'TAG_DA_DAU') return 'tag-blue';
-  if (tagId === 'TAG_DA_KHO') return 'tag-orange';
-  if (tagId === 'TAG_NHAY_CAM') return 'tag-red';
-  if (tagId === 'TAG_HON_HOP') return 'tag-purple';
-  return 'tag-green'; // Mặc định
+  if (tagId === 1) return 'tag-blue';
+  if (tagId === 2) return 'tag-orange';
+  if (tagId === 5) return 'tag-red';
+  if (tagId === 3) return 'tag-purple';
+  return 'tag-green'; 
 };
 
-// --- CHỨC NĂNG CRUD ---
+// --- CHỨC NĂNG MỞ FORM ---
 const openAddModal = () => {
   isEditing.value = false;
   currentQuestion.value = JSON.parse(JSON.stringify({
@@ -174,39 +177,50 @@ const editQuestion = (q) => {
 };
 
 const closeModal = () => { isModalOpen.value = false; };
+const addAnswer = () => { currentQuestion.value.answers.push({ icon: '✨', label: '', tagId: '', scoreValue: 10 }); };
+const removeAnswer = (index) => { currentQuestion.value.answers.splice(index, 1); };
 
-const addAnswer = () => { 
-  currentQuestion.value.answers.push({ icon: '✨', label: '', tagId: '', scoreValue: 10 }); 
-};
-
-const removeAnswer = (index) => { 
-  currentQuestion.value.answers.splice(index, 1); 
-};
-
-const saveQuestion = () => {
+// --- GỌI API LƯU VÀ XÓA ---
+const saveQuestion = async () => {
   if (!currentQuestion.value.title.trim()) { alert("Vui lòng nhập câu hỏi!"); return; }
+  if (currentQuestion.value.answers.length < 2) { alert("Cần ít nhất 2 đáp án!"); return; }
   
-  if (isEditing.value) {
-    const idx = questions.value.findIndex(q => q.id === currentQuestion.value.id);
-    if (idx !== -1) questions.value[idx] = JSON.parse(JSON.stringify(currentQuestion.value));
-  } else {
-    const newQ = JSON.parse(JSON.stringify(currentQuestion.value));
-    newQ.id = Date.now(); 
-    questions.value.push(newQ);
+  try {
+    if (isEditing.value) {
+      await fetch(`${API_URL}/${currentQuestion.value.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(currentQuestion.value)
+      });
+    } else {
+      await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(currentQuestion.value)
+      });
+    }
+    closeModal();
+    loadQuestions(); // Tải lại bảng ngay lập tức
+  } catch (error) {
+    alert("Có lỗi xảy ra khi lưu: " + error);
   }
-  closeModal();
 };
 
-const deleteQuestion = (id) => {
+const deleteQuestion = async (id) => {
   if (confirm("Xóa câu hỏi này?")) {
-    questions.value = questions.value.filter(q => q.id !== id);
+    try {
+      await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+      loadQuestions(); 
+    } catch (error) {
+      alert("Lỗi khi xóa: " + error);
+    }
   }
 };
 </script>
 
 <style scoped>
 /* =========================================
-   GIAO DIỆN ADMIN CHÍNH (Đã update Icon)
+   GIAO DIỆN ADMIN CHÍNH
    ========================================= */
 .admin-quiz-manager { padding: 30px; background-color: #fcfcfc; min-height: 100vh; font-family: 'Helvetica Neue', sans-serif; }
 
@@ -235,7 +249,6 @@ const deleteQuestion = (id) => {
 .ans-text { font-size: 14px; color: #333; font-weight: 500; }
 .ans-badges { display: flex; gap: 10px; }
 
-/* Phù hiệu điểm & tag có nhiều màu cho sinh động */
 .score-badge { background-color: #eef2ff; color: #5a4bfa; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
 .tag-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
 .tag-blue { background-color: #e0f2fe; color: #0369a1; }
