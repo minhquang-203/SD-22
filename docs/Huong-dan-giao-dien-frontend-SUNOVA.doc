@@ -1,0 +1,356 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+xmlns:w="urn:schemas-microsoft-com:office:word"
+xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8">
+<meta name="ProgId" content="Word.Document">
+<meta name="Generator" content="Microsoft Word 15">
+<title>Hướng dẫn hiểu cách code giao diện Frontend — SUNOVA</title>
+<style>
+body { font-family: 'Times New Roman', serif; font-size: 13pt; line-height: 1.5; margin: 2cm; color: #000; }
+h1 { font-size: 20pt; color: #6b3f1e; text-align: center; border-bottom: 2px solid #c9a96e; padding-bottom: 8px; }
+h2 { font-size: 16pt; color: #6b3f1e; margin-top: 24px; border-left: 4px solid #c9a96e; padding-left: 10px; }
+h3 { font-size: 14pt; color: #9e7340; margin-top: 16px; }
+p { margin: 8px 0; text-align: justify; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th, td { border: 1px solid #ccc; padding: 8px 10px; vertical-align: top; }
+th { background: #f9f5f0; font-weight: bold; }
+code, pre { font-family: Consolas, monospace; font-size: 10pt; background: #f4f0ea; }
+pre { padding: 12px; border: 1px solid #ede5d8; white-space: pre-wrap; margin: 10px 0; }
+.toc { background: #f9f5f0; padding: 16px; border: 1px solid #ede5d8; }
+.meta { text-align: center; color: #666; font-size: 11pt; margin-bottom: 24px; }
+.box { background: #fff8ee; border-left: 4px solid #c9a96e; padding: 12px 16px; margin: 12px 0; }
+ul, ol { margin: 8px 0 8px 24px; }
+li { margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<h1>HƯỚNG DẪN HIỂU CÁCH CODE GIAO DIỆN FRONTEND<br>DỰ ÁN SUNOVA</h1>
+
+<p class="meta">
+<strong>Dự án:</strong> SUNOVA — Hệ thống quản lý cửa hàng mỹ phẩm chống nắng<br>
+<strong>Công nghệ:</strong> Vue 3 + Vue Router + Axios + Tailwind CSS + CSS Soleil<br>
+<strong>Ngày tạo:</strong> 03/06/2026
+</p>
+
+<div class="toc">
+<h3>MỤC LỤC</h3>
+<ol>
+<li>Tổng thể: App chạy như thế nào?</li>
+<li>Cấu trúc thư mục frontend</li>
+<li>Cấu trúc một file .vue</li>
+<li>Khung Admin (AdminLayout)</li>
+<li>Cách gọi API</li>
+<li>Cách làm giao diện (CSS)</li>
+<li>Component — chia nhỏ màn hình</li>
+<li>Ví dụ luồng hoàn chỉnh: POS bán hàng</li>
+<li>So sánh với HTML thuần</li>
+<li>Bảng tra cứu nhanh</li>
+<li>Giải thích cho thầy về phần Admin (chưa phân quyền)</li>
+</ol>
+</div>
+
+<h2>1. TỔNG THỂ: APP CHẠY NHƯ THẾ NÀO?</h2>
+
+<h3>Luồng đơn giản</h3>
+<ol>
+<li>Người dùng mở trình duyệt, ví dụ: <code>localhost:5173/admin/pos</code></li>
+<li><strong>Router</strong> (<code>router/index.js</code>) đọc URL và quyết định load màn hình nào</li>
+<li>Với URL <code>/admin/*</code>, app load <strong>AdminLayout</strong> — khung cố định gồm sidebar + header</li>
+<li>Trong khung đó, vùng <strong>router-view</strong> hiển thị màn hình tương ứng (ví dụ PosPage.vue)</li>
+<li>Màn hình gọi <strong>API</strong> (<code>api/*.js</code>) → backend Spring Boot trả JSON</li>
+<li>Dữ liệu JSON được gán vào biến → giao diện tự cập nhật</li>
+</ol>
+
+<h3>Sơ đồ luồng</h3>
+<pre>
+main.js (khởi động app)
+    ↓
+App.vue (vỏ ngoài cùng)
+    ↓
+router/index.js (điều hướng theo URL)
+    ├── /admin/*  → AdminLayout (sidebar + header + nội dung)
+    │                   └── PosPage, VariantList, OrderList...
+    └── /quiz       → SkinQuiz (giao diện khách hàng)
+                            ↓
+                    api/*.js → Backend /api/...
+</pre>
+
+<h3>File khởi động — main.js</h3>
+<pre>
+import { createApp } from 'vue'
+import App from './App.vue'
+import router from './router'
+import './styles/main.css'
+
+createApp(App).use(router).mount('#app')
+</pre>
+<p><strong>Ý nghĩa:</strong> Tạo app Vue, gắn router (điều hướng), import CSS chung, mount vào thẻ #app trong index.html.</p>
+
+<h2>2. CẤU TRÚC THƯ MỤC FRONTEND</h2>
+
+<table>
+<tr><th>Thư mục / File</th><th>Vai trò</th><th>Ví dụ</th></tr>
+<tr><td>views/</td><td>Màn hình chính — mỗi trang một file</td><td>PosPage.vue, VariantList.vue</td></tr>
+<tr><td>components/</td><td>Khối tái sử dụng — dùng lại nhiều màn</td><td>ProductTable.vue, ConfirmDialog.vue</td></tr>
+<tr><td>layouts/</td><td>Khung bố cục — sidebar, header cố định</td><td>AdminLayout.vue</td></tr>
+<tr><td>router/</td><td>Bảng đường đi — URL map tới màn hình</td><td>/admin/pos → PosPage.vue</td></tr>
+<tr><td>api/</td><td>Gọi backend — tách riêng khỏi view</td><td>banHangApi.js, sanPhamApi.js</td></tr>
+<tr><td>styles/main.css</td><td>Giao diện chung — màu, nút, bảng, POS</td><td>.admin-card, .pos-layout</td></tr>
+<tr><td>constants/</td><td>Cấu hình cố định</td><td>adminMenu.js — menu sidebar</td></tr>
+<tr><td>composables/</td><td>Logic dùng chung</td><td>useConfirm.js — hộp thoại xác nhận</td></tr>
+<tr><td>utils/</td><td>Hàm tiện ích</td><td>format.js — format tiền, ngày</td></tr>
+</table>
+
+<div class="box">
+<strong>Quy tắc nhớ nhanh:</strong><br>
+• Sửa một trang → vào <code>views/</code><br>
+• Sửa menu trái → <code>constants/adminMenu.js</code> + <code>router/index.js</code><br>
+• Sửa màu / nút / card → <code>styles/main.css</code><br>
+• Sửa API gọi server → <code>api/</code>
+</div>
+
+<h2>3. CẤU TRÚC MỘT FILE .VUE</h2>
+
+<p>Mỗi màn hình Vue gồm <strong>2 phần chính</strong>:</p>
+
+<h3>Phần A — &lt;script setup&gt; (Logic / Não)</h3>
+<pre>
+// 1. Import
+import { ref, computed, onMounted } from 'vue'
+import { getProducts } from '@/api/sanPhamApi'
+
+// 2. Khai báo biến
+const loading = ref(false)
+const products = ref([])
+
+// 3. Tính toán tự động
+const filteredVariants = computed(() => { ... })
+
+// 4. Hàm xử lý
+async function loadProducts() {
+  const res = await getProducts()
+  products.value = res.data   // Gán data → UI tự cập nhật
+}
+
+// 5. Chạy khi vào trang
+onMounted(() => loadProducts())
+</pre>
+
+<table>
+<tr><th>Khái niệm</th><th>Ý nghĩa đơn giản</th></tr>
+<tr><td>ref()</td><td>Hộp chứa dữ liệu. Đổi giá trị → màn hình tự render lại</td></tr>
+<tr><td>computed()</td><td>Giá trị tự tính lại khi dữ liệu gốc thay đổi (lọc, tổng tiền...)</td></tr>
+<tr><td>reactive()</td><td>Tương tự ref nhưng cho object nhiều field (bộ lọc)</td></tr>
+<tr><td>onMounted()</td><td>Chạy 1 lần khi mở trang (thường dùng để gọi API)</td></tr>
+<tr><td>watch()</td><td>Theo dõi biến, khi đổi thì chạy hàm (gõ tìm kiếm → gọi API)</td></tr>
+</table>
+
+<h3>Phần B — &lt;template&gt; (Giao diện / Mặt)</h3>
+<pre>
+&lt;div class="admin-card"&gt;
+  &lt;input v-model="filter.keyword" class="admin-input" /&gt;
+  &lt;div v-if="loading"&gt;Đang tải...&lt;/div&gt;
+  &lt;tr v-for="item in pagedVariants" :key="item.id"&gt;
+    &lt;td&gt;{{ item.sku }}&lt;/td&gt;
+    &lt;td&gt;&lt;button @click="openEdit(item)"&gt;Sửa&lt;/button&gt;&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/div&gt;
+</pre>
+
+<table>
+<tr><th>Cú pháp Vue</th><th>Ý nghĩa</th></tr>
+<tr><td>v-model="keyword"</td><td>Ô input ↔ biến keyword (2 chiều)</td></tr>
+<tr><td>v-for="item in list"</td><td>Lặp qua danh sách</td></tr>
+<tr><td>v-if="loading"</td><td>Hiện/ẩn theo điều kiện</td></tr>
+<tr><td>@click="save"</td><td>Bấm nút → gọi hàm save()</td></tr>
+<tr><td>{{ item.ten }}</td><td>In giá trị ra màn hình</td></tr>
+</table>
+
+<div class="box">
+<strong>Nguyên tắc cốt lõi Vue:</strong> Đổi data → UI tự đổi. Không cần thao tác DOM thủ công.
+</div>
+
+<h2>4. KHUNG ADMIN (AdminLayout)</h2>
+
+<p>File: <code>frontend/src/layouts/AdminLayout.vue</code></p>
+
+<pre>
+┌─────────────────┬────────────────────────────────┐
+│                 │  AdminHeader (tiêu đề trang)   │
+│  AdminSidebar   ├────────────────────────────────┤
+│  (menu trái)    │  &lt;router-view&gt;                 │
+│                 │  ← Màn hình thay đổi ở đây     │
+└─────────────────┴────────────────────────────────┘
+         + ConfirmDialog (hộp thoại xác nhận toàn cục)
+</pre>
+
+<ul>
+<li><strong>Sidebar</strong> đọc menu từ <code>constants/adminMenu.js</code></li>
+<li><strong>Header</strong> lấy tiêu đề từ <code>route.meta.title</code></li>
+<li><strong>router-view</strong> là "ô trống" — router thay component khi đổi URL</li>
+<li>Đổi từ /admin/pos sang /admin/orders: sidebar + header giữ nguyên, chỉ nội dung giữa đổi</li>
+</ul>
+
+<h2>5. CÁCH GỌI API</h2>
+
+<h3>3 tầng tách biệt</h3>
+
+<p><strong>Tầng 1 — api/request.js:</strong> Cấu hình Axios chung, baseURL = '/api'</p>
+
+<p><strong>Tầng 2 — api/banHangApi.js:</strong> Mỗi chức năng một hàm</p>
+<pre>
+export function getSanPhamBan(keyword, page) {
+  return request.get('/ban-hang/san-pham', { params: { keyword, page } })
+}
+export function taoDonTaiQuay(payload) {
+  return request.post('/ban-hang/tai-quay', payload)
+}
+</pre>
+
+<p><strong>Tầng 3 — Trong view (PosPage.vue):</strong></p>
+<pre>
+import { getSanPhamBan, taoDonTaiQuay } from '@/api/banHangApi'
+const res = await getSanPhamBan('', 0)
+searchResults.value = res.data
+</pre>
+
+<p><strong>Tại sao tách riêng?</strong> View chỉ lo hiển thị. Đổi URL backend → sửa 1 file API, không sửa 10 màn hình.</p>
+
+<h2>6. CÁCH LÀM GIAO DIỆN (CSS)</h2>
+
+<p>Project dùng <strong>2 lớp CSS song song</strong>:</p>
+
+<h3>Lớp 1 — Class trong styles/main.css</h3>
+<pre>
+&lt;div class="admin-card"&gt;
+  &lt;input class="admin-input" /&gt;
+  &lt;button class="admin-btn admin-btn-primary"&gt;Lưu&lt;/button&gt;
+&lt;/div&gt;
+</pre>
+<p>Màu chủ đạo Soleil: nền kem (#f9f5f0), accent nâu vàng (#c9a96e), chữ đậm (#1e1510).</p>
+
+<h3>Lớp 2 — Tailwind CSS</h3>
+<pre>
+&lt;div class="flex justify-between gap-2 mb-4"&gt;
+</pre>
+<p>Dùng cho layout nhanh: flexbox, margin, padding.</p>
+
+<table>
+<tr><th>Tình huống</th><th>Cách làm</th></tr>
+<tr><td>Nút, card, bảng chuẩn admin</td><td>Class .admin-* trong main.css</td></tr>
+<tr><td>Căn chỉnh nhanh</td><td>Tailwind (flex, mb-4, gap-2...)</td></tr>
+<tr><td>Màn phức tạp (POS, hóa đơn)</td><td>Class riêng .pos-*, .hoa-don-*</td></tr>
+</table>
+
+<h2>7. COMPONENT — CHIA NHỎ MÀN HÌNH</h2>
+
+<pre>
+ProductList.vue              ← Màn chính (điều phối)
+  ├── ProductFilter.vue      ← Khối bộ lọc
+  ├── ProductTable.vue       ← Bảng danh sách
+  └── ProductFormModal.vue   ← Popup thêm/sửa
+</pre>
+
+<table>
+<tr><th>Vai trò</th><th>Trách nhiệm</th></tr>
+<tr><td>View (màn chính)</td><td>Tải data, mở/đóng modal, gọi API lưu/xóa</td></tr>
+<tr><td>Component con</td><td>Hiển thị 1 phần UI, nhận props từ cha, bắn event lên cha</td></tr>
+</table>
+
+<h2>8. VÍ DỤ LUỒNG HOÀN CHỈNH: POS BÁN HÀNG</h2>
+
+<p>File: <code>frontend/src/views/admin/pos/PosPage.vue</code></p>
+
+<table>
+<tr><th>Bước</th><th>Hành động</th><th>Biến liên quan</th></tr>
+<tr><td>1</td><td>Vào /admin/pos</td><td>Router load PosPage</td></tr>
+<tr><td>2</td><td>onMounted chạy</td><td>loadProducts(), loadMeta()</td></tr>
+<tr><td>3</td><td>Hiện lưới sản phẩm</td><td>searchResults</td></tr>
+<tr><td>4</td><td>Click sản phẩm</td><td>addToCart() → cart</td></tr>
+<tr><td>5</td><td>Chọn PTTT, nhập tiền</td><td>selectedPaymentId, cashGiven</td></tr>
+<tr><td>6</td><td>Bấm Thanh toán</td><td>confirm() → checkout() → API</td></tr>
+<tr><td>7</td><td>Thành công</td><td>receipt, showReceipt = true</td></tr>
+<tr><td>8</td><td>Bấm "Bán đơn mới"</td><td>resetSale() → loadProducts()</td></tr>
+</table>
+
+<h2>9. SO SÁNH VỚI HTML THUẦN</h2>
+
+<table>
+<tr><th>HTML / JS thuần</th><th>Vue trong SUNOVA</th></tr>
+<tr><td>Viết HTML tĩnh</td><td>HTML + {{ biến }} động</td></tr>
+<tr><td>document.getElementById()</td><td>ref() + v-model tự đồng bộ</td></tr>
+<tr><td>Fetch API rải rác</td><td>Tập trung trong api/*.js</td></tr>
+<tr><td>Copy header mỗi trang</td><td>AdminLayout dùng chung</td></tr>
+<tr><td>CSS mỗi trang một kiểu</td><td>main.css class chuẩn</td></tr>
+</table>
+
+<h2>10. BẢNG TRA CỨU NHANH</h2>
+
+<table>
+<tr><th>Muốn sửa</th><th>File cần mở</th></tr>
+<tr><td>Thêm menu sidebar</td><td>constants/adminMenu.js + router/index.js</td></tr>
+<tr><td>Màn biến thể</td><td>views/product/VariantList.vue</td></tr>
+<tr><td>Màn POS</td><td>views/admin/pos/PosPage.vue</td></tr>
+<tr><td>Màn hóa đơn</td><td>views/admin/orders/OrderList.vue</td></tr>
+<tr><td>Màu, nút, card</td><td>styles/main.css</td></tr>
+<tr><td>API bán hàng</td><td>api/banHangApi.js</td></tr>
+<tr><td>Hộp thoại xác nhận</td><td>composables/useConfirm.js</td></tr>
+</table>
+
+<div class="box">
+<strong>5 điểm cốt lõi:</strong><br>
+1. Vue = Data + Template — đổi data, UI tự đổi<br>
+2. Router = URL → Màn hình<br>
+3. AdminLayout = Khung cố định, views = Nội dung<br>
+4. api/ = Cầu nối backend<br>
+5. main.css = Giao diện đồng bộ
+</div>
+
+<h2>11. GIẢI THÍCH CHO THẦY VỀ PHẦN ADMIN (CHƯA PHÂN QUYỀN)</h2>
+
+<h3>Câu trả lời ngắn khi demo (30 giây)</h3>
+<div class="box">
+"Em tách hệ thống thành 2 phần: <strong>giao diện quản trị</strong> (/admin) cho nhân viên/cửa hàng; và <strong>giao diện khách</strong> (quiz) cho người mua.<br><br>
+Phần em demo là <strong>nghiệp vụ cửa hàng</strong> nên em ưu tiên admin trước. <strong>Phân quyền đăng nhập</strong> em chưa triển khai xong — database đã có bảng vai_tro, em tập trung hoàn thiện bán hàng, hóa đơn, in biên lai trước. Đây là bước tiếp theo."
+</div>
+
+<h3>Phân biệt "admin" vs "vai trò"</h3>
+<table>
+<tr><th>Trong project</th><th>Ý nghĩa</th></tr>
+<tr><td>/admin</td><td>Khu quản trị / back-office (POS, sản phẩm, hóa đơn)</td></tr>
+<tr><td>QUAN_LY / NHAN_VIEN</td><td>Vai trò trong DB — chưa gắn UI</td></tr>
+<tr><td>KHACH_HANG</td><td>Khách mua online — storefront /quiz</td></tr>
+</table>
+
+<h3>Roadmap 3 bước</h3>
+<ol>
+<li><strong>Đã xong:</strong> POS, hóa đơn, sản phẩm, khách nhanh, in biên lai</li>
+<li><strong>Tiếp theo:</strong> Login + JWT + phân quyền theo vai_tro</li>
+<li><strong>Sau nữa:</strong> Khách đăng nhập, đặt hàng online</li>
+</ol>
+
+<h2>PHỤ LỤC: LỆNH CHẠY DỰ ÁN</h2>
+<pre>
+# Backend
+cd backend
+.\start-backend.cmd
+
+# Frontend
+cd frontend
+npm run dev
+
+# Truy cập
+http://localhost:5173/admin/pos       — Bán hàng
+http://localhost:5173/admin/products  — Sản phẩm
+http://localhost:5173/admin/orders    — Hóa đơn
+http://localhost:5173/quiz            — Quiz khách hàng
+</pre>
+
+<p style="text-align:center; margin-top:40px; color:#888; font-size:11pt;">
+<em>Tài liệu mô tả cách tổ chức và code giao diện frontend dự án SUNOVA.</em>
+</p>
+
+</body>
+</html>

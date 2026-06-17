@@ -9,7 +9,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -33,6 +32,5 @@ public class ChiTietSanPhamRequest {
     private BigDecimal giaBan;
 
     private Integer soLuongTon;
-    private LocalDate hanSuDung;
     private Boolean trangThai;
 }

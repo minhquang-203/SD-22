@@ -3,10 +3,13 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AdminSwitch from '@/components/admin/AdminSwitch.vue'
 import VariantModal from '@/components/products/VariantModal.vue'
+import LoHangListModal from '@/components/products/LoHangListModal.vue'
+import LoHangLotModal from '@/components/products/LoHangLotModal.vue'
 import { getMauSacList } from '@/api/danhMucApi'
-import { getProductDetail, getProducts } from '@/api/sanPhamApi'
+import { getProductDetail } from '@/api/sanPhamApi'
 import { addChiTiet, hideChiTiet, updateChiTiet } from '@/api/sanPhamApi'
-import { formatCurrency } from '@/utils/format'
+import { getLoHangByChiTiet, nhapLoHang } from '@/api/loHangApi'
+import { formatCurrency, formatDate } from '@/utils/format'
 import { confirm } from '@/composables/useConfirm'
 
 const route = useRoute()
@@ -14,16 +17,19 @@ const router = useRouter()
 
 const loading = ref(false)
 const saving = ref(false)
+const lotLoading = ref(false)
 const message = ref('')
 const messageType = ref('success')
 
-const products = ref([])
 const mauSacOptions = ref([])
-const selectedProductId = ref(null)
 const productDetail = ref(null)
 
+const productId = computed(() => {
+  const id = Number(route.params.id)
+  return Number.isNaN(id) ? null : id
+})
+
 const filter = reactive({
-  keyword: '',
   idMauSac: null,
   dungTichMl: null,
   priceMin: null,
@@ -37,9 +43,16 @@ const modalOpen = ref(false)
 const modalMode = ref('add')
 const editingVariant = ref(null)
 
-const selectedProduct = computed(() =>
-  products.value.find((p) => p.id === selectedProductId.value),
-)
+const lotListOpen = ref(false)
+const lotFormOpen = ref(false)
+const activeVariant = ref(null)
+const activeLots = ref([])
+
+const productInfo = computed(() => ({
+  id: productDetail.value?.id,
+  maSanPham: productDetail.value?.maSanPham,
+  ten: productDetail.value?.ten,
+}))
 
 const variants = computed(() => {
   const list = productDetail.value?.chiTiets || []
@@ -59,13 +72,6 @@ const dungTichOptions = computed(() => {
 
 const filteredVariants = computed(() => {
   let rows = [...variants.value]
-  const kw = filter.keyword.trim().toLowerCase()
-  if (kw) {
-    rows = rows.filter((r) =>
-      [r.sku, r.tenMauSac, r.dungTichMl != null ? `${r.dungTichMl} ml` : '']
-        .some((v) => String(v || '').toLowerCase().includes(kw)),
-    )
-  }
   if (filter.idMauSac) {
     rows = rows.filter((r) => r.idMauSac === filter.idMauSac)
   }
@@ -94,48 +100,19 @@ function notify(text, type = 'success') {
   setTimeout(() => { message.value = '' }, 3000)
 }
 
-function applyProductIdFromQuery() {
-  const raw = route.query.productId
-  if (raw == null || raw === '') return false
-  const id = Number(raw)
-  if (Number.isNaN(id)) return false
-  if (products.value.some((p) => p.id === id)) {
-    selectedProductId.value = id
-    return true
-  }
-  return false
-}
-
-async function loadProducts() {
-  const res = await getProducts()
-  products.value = res.data || []
-  if (!applyProductIdFromQuery() && !selectedProductId.value && products.value.length) {
-    selectedProductId.value = products.value[0].id
-  }
-}
-
-function syncProductIdToUrl(id) {
-  const queryId = route.query.productId != null ? Number(route.query.productId) : null
-  if (id && id !== queryId) {
-    router.replace({ path: route.path, query: { productId: id } })
-  } else if (!id && route.query.productId != null) {
-    router.replace({ path: route.path, query: {} })
-  }
-}
-
 async function loadMauSac() {
   const res = await getMauSacList()
   mauSacOptions.value = (res.data || []).filter((m) => m.trangThai !== false)
 }
 
 async function loadProductDetail() {
-  if (!selectedProductId.value) {
+  if (!productId.value) {
     productDetail.value = null
     return
   }
   loading.value = true
   try {
-    const res = await getProductDetail(selectedProductId.value)
+    const res = await getProductDetail(productId.value)
     productDetail.value = res.data
     page.value = 1
   } catch (err) {
@@ -146,15 +123,18 @@ async function loadProductDetail() {
 }
 
 function resetFilter() {
-  filter.keyword = ''
   filter.idMauSac = null
   filter.dungTichMl = null
   filter.priceMin = null
   filter.priceMax = null
 }
 
+function goBack() {
+  router.push('/admin/products')
+}
+
 function openAdd() {
-  if (!selectedProductId.value) return notify('Vui lòng chọn sản phẩm', 'error')
+  if (!productId.value) return
   modalMode.value = 'add'
   editingVariant.value = null
   modalOpen.value = true
@@ -166,8 +146,44 @@ function openEdit(row) {
   modalOpen.value = true
 }
 
+async function openLots(row) {
+  activeVariant.value = row
+  lotListOpen.value = true
+  await loadLots(row.id)
+}
+
+async function loadLots(idChiTiet) {
+  lotLoading.value = true
+  try {
+    const res = await getLoHangByChiTiet(idChiTiet)
+    activeLots.value = res.data || []
+  } catch (err) {
+    notify(String(err), 'error')
+  } finally {
+    lotLoading.value = false
+  }
+}
+
+function openNhapLo() {
+  lotFormOpen.value = true
+}
+
+async function handleNhapLo(payload) {
+  saving.value = true
+  try {
+    await nhapLoHang(payload)
+    notify('Nhập lô thành công')
+    lotFormOpen.value = false
+    await Promise.all([loadLots(activeVariant.value.id), loadProductDetail()])
+  } catch (err) {
+    notify(String(err), 'error')
+  } finally {
+    saving.value = false
+  }
+}
+
 async function handleSubmit(payload) {
-  const isCreate = modalMode.value === 'create'
+  const isCreate = modalMode.value === 'add'
   const ok = await confirm({
     title: isCreate ? 'Thêm biến thể' : 'Cập nhật biến thể',
     message: isCreate ? 'Thêm biến thể mới cho sản phẩm?' : 'Cập nhật biến thể này?',
@@ -176,7 +192,7 @@ async function handleSubmit(payload) {
   if (!ok) return
   saving.value = true
   try {
-    if (modalMode.value === 'add') {
+    if (isCreate) {
       await addChiTiet(payload)
       notify('Thêm biến thể thành công')
     } else {
@@ -207,13 +223,11 @@ async function handleToggleStatus(row) {
       notify('Đã chuyển biến thể sang ngưng hoạt động')
     } else {
       await updateChiTiet(row.id, {
-        idSanPham: selectedProductId.value,
+        idSanPham: productId.value,
         sku: row.sku,
         idMauSac: row.idMauSac,
         dungTichMl: row.dungTichMl,
         giaBan: row.giaBan,
-        soLuongTon: row.soLuongTon,
-        hanSuDung: row.hanSuDung,
         trangThai: true,
       })
       notify('Đã kích hoạt lại biến thể')
@@ -224,26 +238,19 @@ async function handleToggleStatus(row) {
   }
 }
 
-watch(selectedProductId, (id) => {
+watch(productId, () => {
   filter.dungTichMl = null
-  syncProductIdToUrl(id)
   loadProductDetail()
 })
 
-watch(
-  () => route.query.productId,
-  (raw) => {
-    if (raw == null || raw === '') return
-    const id = Number(raw)
-    if (!Number.isNaN(id) && id !== selectedProductId.value) {
-      selectedProductId.value = id
-    }
-  },
-)
-
 onMounted(async () => {
+  if (!productId.value) {
+    notify('Không tìm thấy sản phẩm', 'error')
+    goBack()
+    return
+  }
   try {
-    await Promise.all([loadProducts(), loadMauSac()])
+    await loadMauSac()
     await loadProductDetail()
   } catch (err) {
     notify(String(err), 'error')
@@ -254,24 +261,19 @@ onMounted(async () => {
 <template>
   <div class="space-y-4">
     <div class="admin-page-header">
+      <button type="button" class="admin-btn admin-btn-default shrink-0" @click="goBack">← Danh sách SP</button>
       <div class="admin-page-header__icon">📦</div>
       <div class="flex-1 min-w-0">
-        <h1 class="admin-page-title truncate">Quản lý biến thể sản phẩm</h1>
+        <h1 class="admin-page-title truncate">Biến thể sản phẩm</h1>
         <p
-          v-if="selectedProduct"
+          v-if="productInfo.maSanPham"
           class="admin-page-subtitle truncate text-[var(--admin-primary)] font-medium"
-          :title="`${selectedProduct.maSanPham} - ${selectedProduct.ten}`"
+          :title="`${productInfo.maSanPham} - ${productInfo.ten}`"
         >
-          {{ selectedProduct.maSanPham }} - {{ selectedProduct.ten }}
+          {{ productInfo.maSanPham }} — {{ productInfo.ten }}
         </p>
-        <p class="admin-page-subtitle">Quản lý SKU, giá bán, tồn kho theo từng biến thể</p>
+        <p class="admin-page-subtitle">Quản lý SKU, giá bán, tồn kho theo lô (FEFO khi bán)</p>
       </div>
-      <select v-model="selectedProductId" class="admin-select !w-full md:!w-[320px] shrink-0">
-        <option :value="null">Chọn sản phẩm</option>
-        <option v-for="p in products" :key="p.id" :value="p.id">
-          {{ p.maSanPham }} - {{ p.ten }}
-        </option>
-      </select>
     </div>
 
     <div
@@ -287,11 +289,7 @@ onMounted(async () => {
         <h3>Bộ lọc</h3>
         <button type="button" class="admin-icon-btn admin-icon-btn--success" title="Làm mới" @click="resetFilter">↺</button>
       </div>
-      <div class="p-4 md:p-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div class="md:col-span-2">
-          <label class="admin-label">Tìm kiếm</label>
-          <input v-model="filter.keyword" class="admin-input" placeholder="SKU, màu sắc..." />
-        </div>
+      <div class="p-4 md:p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label class="admin-label">Màu sắc</label>
           <select v-model="filter.idMauSac" class="admin-select">
@@ -306,13 +304,15 @@ onMounted(async () => {
             <option v-for="dt in dungTichOptions" :key="dt" :value="dt">{{ dt }} ml</option>
           </select>
         </div>
-        <div>
-          <label class="admin-label">Giá từ</label>
-          <input v-model.number="filter.priceMin" type="number" class="admin-input" min="0" step="1000" />
-        </div>
-        <div>
-          <label class="admin-label">Giá đến</label>
-          <input v-model.number="filter.priceMax" type="number" class="admin-input" min="0" step="1000" />
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="admin-label">Giá từ</label>
+            <input v-model.number="filter.priceMin" type="number" class="admin-input" min="0" step="1000" />
+          </div>
+          <div>
+            <label class="admin-label">Giá đến</label>
+            <input v-model.number="filter.priceMax" type="number" class="admin-input" min="0" step="1000" />
+          </div>
         </div>
       </div>
     </div>
@@ -322,7 +322,7 @@ onMounted(async () => {
         <div>
           <h3>Danh sách biến thể</h3>
           <p class="text-xs text-[var(--admin-muted)] mt-1 mb-0">
-            Mỗi biến thể là một phiên bản bán ra (vd: 60ml, 90ml). Mỗi biến thể có SKU, giá, tồn kho riêng.
+            Tồn kho = tổng các lô. HSD hiển thị theo lô gần nhất.
           </p>
         </div>
         <div class="flex gap-2 shrink-0">
@@ -347,7 +347,7 @@ onMounted(async () => {
               <th>Dung tích</th>
               <th>Giá bán</th>
               <th>Tồn kho</th>
-              <th>Hạn dùng</th>
+              <th>HSD gần nhất</th>
               <th class="text-center">Trạng thái</th>
               <th class="text-center">Thao tác</th>
             </tr>
@@ -356,14 +356,9 @@ onMounted(async () => {
             <tr v-if="loading">
               <td colspan="9" class="text-center py-10 text-gray-400">Đang tải...</td>
             </tr>
-            <tr v-else-if="!selectedProductId">
-              <td colspan="9" class="text-center py-10 text-[var(--admin-muted)] px-6">
-                Hãy chọn một sản phẩm ở ô trên để xem và thêm các biến thể (dung tích, màu, giá) của sản phẩm đó.
-              </td>
-            </tr>
             <tr v-else-if="pagedVariants.length === 0">
               <td colspan="9" class="text-center py-10 text-[var(--admin-muted)] px-6">
-                Sản phẩm này chưa có biến thể nào. Nhấn <strong>+ Thêm biến thể</strong> để tạo phiên bản bán (vd: 60ml, 90ml) — mỗi biến thể cần SKU, giá và tồn kho riêng.
+                Sản phẩm này chưa có biến thể. Nhấn <strong>+ Thêm biến thể</strong> để tạo.
               </td>
             </tr>
             <tr v-for="(row, index) in pagedVariants" :key="row.id">
@@ -382,7 +377,15 @@ onMounted(async () => {
               <td>{{ row.dungTichMl ? `${row.dungTichMl} ml` : '—' }}</td>
               <td>{{ formatCurrency(row.giaBan) }}</td>
               <td>{{ row.soLuongTon ?? 0 }}</td>
-              <td>{{ row.hanSuDung || '—' }}</td>
+              <td>
+                <span>{{ row.hanSuDungGanNhat ? formatDate(row.hanSuDungGanNhat) : '—' }}</span>
+                <span
+                  v-if="row.sapHetHan"
+                  class="ml-1 inline-block text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800"
+                >
+                  Sắp HH
+                </span>
+              </td>
               <td class="text-center">
                 <div class="flex flex-col items-center gap-1">
                   <AdminSwitch :model-value="row.trangThai !== false" @update:model-value="handleToggleStatus(row)" />
@@ -395,7 +398,12 @@ onMounted(async () => {
                 </div>
               </td>
               <td class="text-center">
-                <button type="button" class="admin-icon-btn admin-icon-btn--warning" @click="openEdit(row)">✏️</button>
+                <div class="flex items-center justify-center gap-1">
+                  <button type="button" class="admin-btn admin-btn-default text-xs !px-2" @click="openLots(row)">
+                    Lô hàng
+                  </button>
+                  <button type="button" class="admin-icon-btn admin-icon-btn--warning" @click="openEdit(row)">✏️</button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -413,12 +421,29 @@ onMounted(async () => {
       :open="modalOpen"
       :mode="modalMode"
       :loading="saving"
-      :product-id="selectedProductId"
-      :ma-san-pham="selectedProduct?.maSanPham"
+      :product-id="productId"
+      :ma-san-pham="productInfo.maSanPham"
       :initial="editingVariant"
       :mau-sac-options="mauSacOptions"
       @close="modalOpen = false"
       @submit="handleSubmit"
+    />
+
+    <LoHangListModal
+      :open="lotListOpen"
+      :loading="lotLoading"
+      :variant="activeVariant"
+      :lots="activeLots"
+      @close="lotListOpen = false"
+      @open-nhap="openNhapLo"
+    />
+
+    <LoHangLotModal
+      :open="lotFormOpen"
+      :loading="saving"
+      :variant="activeVariant"
+      @close="lotFormOpen = false"
+      @submit="handleNhapLo"
     />
   </div>
 </template>

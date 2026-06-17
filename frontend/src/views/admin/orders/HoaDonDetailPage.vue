@@ -106,7 +106,7 @@ function printInvoice() {
 }
 
 function goBack() {
-  router.push('/admin/orders')
+  router.push('/admin/hoa-don')
 }
 
 watch(() => route.params.id, () => loadDetail())

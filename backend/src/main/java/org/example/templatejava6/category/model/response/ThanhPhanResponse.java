@@ -21,6 +21,6 @@ public class ThanhPhanResponse {
         this.ten = t.getTen();
         this.loai = t.getLoai();
         this.moTa = t.getMoTa();
-        this.trangThai = t.getTrangThai();
+        this.trangThai = true;
     }
 }

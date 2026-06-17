@@ -5,7 +5,7 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 
 function goList() {
-  router.push('/admin/orders')
+  router.push('/admin/hoa-don')
 }
 </script>
 

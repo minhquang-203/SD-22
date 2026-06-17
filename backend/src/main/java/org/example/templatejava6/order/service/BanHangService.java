@@ -28,6 +28,7 @@ import org.example.templatejava6.order.repository.PhuongThucThanhToanRepository;
 import org.example.templatejava6.order.repository.ThanhToanHoaDonRepository;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
 import org.example.templatejava6.product.repository.ChiTietSanPhamRepository;
+import org.example.templatejava6.product.service.LoHangService;
 import org.example.templatejava6.voucher.repository.PhieuGiamGiaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
@@ -61,6 +62,7 @@ public class BanHangService {
     @Autowired private PhieuGiamGiaRepository phieuGiamGiaRepository;
     @Autowired private KhachHangRepository khachHangRepository;
     @Autowired private NhanVienRepository nhanVienRepository;
+    @Autowired private LoHangService loHangService;
 
     @Transactional(readOnly = true)
     public List<BienTheBanResponse> danhSachSanPhamBan(String keyword, Integer page) {
@@ -245,9 +247,7 @@ public class BanHangService {
             hdct.setThanhTien(line.thanhTien);
             hdct = hoaDonChiTietRepository.save(hdct);
 
-            ChiTietSanPham cts = line.cts;
-            cts.setSoLuongTon(cts.getSoLuongTon() - line.soLuong);
-            chiTietSanPhamRepository.save(cts);
+            loHangService.truTonTheoFefo(line.cts.getId(), line.soLuong);
 
             lineResponses.add(new BanHangChiTietResponse(hdct));
             ghiNhatKy(hoaDon, "THEM_HANG",
@@ -328,7 +328,7 @@ public class BanHangService {
                 int ton = cts.getSoLuongTon() != null ? cts.getSoLuongTon() : 0;
                 if (ton < soLuong) {
                     throw new ApiException(
-                            "Không đủ tồn kho cho SKU " + cts.getSku() + " (còn " + ton + ").",
+                            "Không đủ tồn cho SKU " + cts.getSku() + " (còn " + ton + ").",
                             "OUT_OF_STOCK");
                 }
             }

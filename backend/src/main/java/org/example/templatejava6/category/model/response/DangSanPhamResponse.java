@@ -19,6 +19,6 @@ public class DangSanPhamResponse {
         this.ma = d.getMa();
         this.ten = d.getTen();
         this.moTa = d.getMoTa();
-        this.trangThai = d.getTrangThai();
+        this.trangThai = true;
     }
 }

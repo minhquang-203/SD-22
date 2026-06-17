@@ -156,7 +156,12 @@ function handleSubmit() {
           </div>
           <div>
             <label class="admin-label">Loại chống nắng</label>
-            <input v-model="form.loaiChongNang" class="admin-input" placeholder="VD: Vật lý, Hóa học" />
+            <select v-model="form.loaiChongNang" class="admin-select">
+              <option value="">— Chọn loại —</option>
+              <option value="VAT_LY">Vật lý</option>
+              <option value="HOA_HOC">Hóa học</option>
+              <option value="LAI">Vật lý và Hóa học</option>
+            </select>
           </div>
           <div>
             <label class="admin-label">Chỉ số SPF</label>

@@ -14,7 +14,6 @@ public class DangSanPhamRequest {
 
     private Integer id;
 
-    @NotBlank(message = "Mã dạng sản phẩm không được để trống")
     private String ma;
 
     @NotBlank(message = "Tên dạng sản phẩm không được để trống")

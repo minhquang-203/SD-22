@@ -19,6 +19,6 @@ public class CongDungResponse {
         this.ma = c.getMa();
         this.ten = c.getTen();
         this.moTa = c.getMoTa();
-        this.trangThai = c.getTrangThai();
+        this.trangThai = true;
     }
 }

@@ -19,8 +19,6 @@ const form = ref({
   idMauSac: null,
   dungTichMl: null,
   giaBan: null,
-  soLuongTon: 0,
-  hanSuDung: '',
 })
 
 watch(
@@ -33,11 +31,9 @@ watch(
         idMauSac: props.initial.idMauSac ?? null,
         dungTichMl: props.initial.dungTichMl ?? null,
         giaBan: props.initial.giaBan ?? null,
-        soLuongTon: props.initial.soLuongTon ?? 0,
-        hanSuDung: props.initial.hanSuDung || '',
       }
     } else {
-      form.value = { sku: '', idMauSac: null, dungTichMl: null, giaBan: null, soLuongTon: 0, hanSuDung: '' }
+      form.value = { sku: '', idMauSac: null, dungTichMl: null, giaBan: null }
     }
   },
   { immediate: true },
@@ -74,9 +70,12 @@ function submit() {
         <button type="button" class="admin-btn admin-btn-default !px-2" @click="emit('close')">✕</button>
       </div>
       <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <p class="md:col-span-2 text-sm text-[var(--admin-muted)]">
+          Tồn kho được quản lý theo lô — sau khi tạo biến thể, dùng nút <strong>Lô hàng</strong> để nhập tồn.
+        </p>
         <div class="md:col-span-2">
           <label class="admin-label">SKU *</label>
-          <input v-model="form.sku" class="admin-input" placeholder="VD: ANESSA-60 (tự gợi ý khi nhập dung tích)" />
+          <input v-model="form.sku" class="admin-input" placeholder="VD: ANESSA-60" />
         </div>
         <div>
           <label class="admin-label">Màu sắc</label>
@@ -89,17 +88,9 @@ function submit() {
           <label class="admin-label">Dung tích (ml)</label>
           <input v-model.number="form.dungTichMl" type="number" class="admin-input" min="0" step="0.1" />
         </div>
-        <div>
+        <div class="md:col-span-2">
           <label class="admin-label">Giá bán *</label>
           <input v-model.number="form.giaBan" type="number" class="admin-input" min="0" step="1000" />
-        </div>
-        <div>
-          <label class="admin-label">Tồn kho</label>
-          <input v-model.number="form.soLuongTon" type="number" class="admin-input" min="0" />
-        </div>
-        <div>
-          <label class="admin-label">Hạn sử dụng</label>
-          <input v-model="form.hanSuDung" type="date" class="admin-input" />
         </div>
       </div>
       <div class="px-5 py-4 border-t flex justify-end gap-3" style="border-color: var(--admin-border)">

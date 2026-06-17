@@ -14,7 +14,6 @@ public class CongDungRequest {
 
     private Integer id;
 
-    @NotBlank(message = "Mã công dụng không được để trống")
     private String ma;
 
     @NotBlank(message = "Tên công dụng không được để trống")

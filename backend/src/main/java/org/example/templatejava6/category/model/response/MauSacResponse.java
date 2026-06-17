@@ -19,6 +19,6 @@ public class MauSacResponse {
         this.ma = m.getMa();
         this.ten = m.getTen();
         this.maHex = m.getMaHex();
-        this.trangThai = m.getTrangThai();
+        this.trangThai = true;
     }
 }

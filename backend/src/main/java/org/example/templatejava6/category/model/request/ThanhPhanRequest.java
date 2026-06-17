@@ -14,7 +14,6 @@ public class ThanhPhanRequest {
 
     private Integer id;
 
-    @NotBlank(message = "Mã thành phần không được để trống")
     private String ma;
 
     @NotBlank(message = "Tên thành phần không được để trống")

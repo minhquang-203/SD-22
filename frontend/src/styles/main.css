@@ -1606,6 +1606,15 @@ h2,
   background: rgba(201, 169, 110, 0.05);
 }
 
+.soleil-table-row--clickable {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.soleil-table-row--clickable:hover {
+  background: rgba(201, 169, 110, 0.08);
+}
+
 .soleil-toolbar--filter {
   margin-bottom: 0;
 }

@@ -63,11 +63,7 @@ const router = createRouter({
 
           path: 'orders',
 
-          name: 'AdminOrders',
-
-          component: () => import('@/views/admin/orders/OrderList.vue'),
-
-          meta: { title: 'Hóa đơn', breadcrumb: 'Hóa đơn' },
+          redirect: '/admin/hoa-don',
 
         },
 
@@ -75,23 +71,35 @@ const router = createRouter({
 
           path: 'hoa-don',
 
-          name: 'AdminHoaDonEmpty',
+          name: 'AdminHoaDonList',
 
-          component: () => import('@/views/admin/orders/HoaDonEmptyPage.vue'),
+          component: () => import('@/views/admin/orders/OrderList.vue'),
 
-          meta: { title: 'Chi tiết hóa đơn', breadcrumb: 'Hóa đơn / Chi tiết' },
+          meta: { title: 'Hóa đơn', breadcrumb: 'Quản lý hóa đơn / Hóa đơn' },
 
         },
 
         {
 
-          path: 'hoa-don/:id',
+          path: 'hoa-don/chi-tiet',
+
+          name: 'AdminHoaDonEmpty',
+
+          component: () => import('@/views/admin/orders/HoaDonEmptyPage.vue'),
+
+          meta: { title: 'Chi tiết hóa đơn', breadcrumb: 'Quản lý hóa đơn / Chi tiết' },
+
+        },
+
+        {
+
+          path: 'hoa-don/chi-tiet/:id',
 
           name: 'AdminHoaDonDetail',
 
           component: () => import('@/views/admin/orders/HoaDonDetailPage.vue'),
 
-          meta: { title: 'Chi tiết hóa đơn', breadcrumb: 'Hóa đơn / Chi tiết' },
+          meta: { title: 'Chi tiết hóa đơn', breadcrumb: 'Quản lý hóa đơn / Chi tiết' },
 
         },
 
@@ -110,6 +118,14 @@ const router = createRouter({
         {
 
           path: 'products/variants',
+
+          redirect: '/admin/products',
+
+        },
+
+        {
+
+          path: 'san-pham/:id/bien-the',
 
           name: 'AdminProductVariants',
 

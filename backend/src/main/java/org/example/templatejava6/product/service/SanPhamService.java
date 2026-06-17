@@ -43,6 +43,7 @@ public class SanPhamService {
     @Autowired private CategoryService categoryService;
     @Autowired private DanhGiaRepository danhGiaRepository;
     @Autowired private ProductFileStorageService productFileStorageService;
+    @Autowired private LoHangService loHangService;
 
     @Transactional(readOnly = true)
     public List<SanPhamResponse> getAll() {
@@ -157,7 +158,12 @@ public class SanPhamService {
     private SanPhamDetailResponse buildDetailResponse(SanPham sp) {
         SanPhamDetailResponse response = new SanPhamDetailResponse(sp);
         response.setChiTiets(chiTietSanPhamRepository.findBySanPham(sp)
-                .stream().map(ChiTietSanPhamResponse::new).toList());
+                .stream().map(ct -> {
+                    ChiTietSanPhamResponse res = new ChiTietSanPhamResponse(ct);
+                    res.setHanSuDungGanNhat(loHangService.nearestExpiry(ct.getId()));
+                    res.setSapHetHan(loHangService.hasSapHetHan(ct.getId()));
+                    return res;
+                }).toList());
         response.setAnhs(anhSanPhamRepository.findBySanPhamOrderByThuTuAsc(sp)
                 .stream().map(AnhSanPhamResponse::new).toList());
         response.setIdLoaiDas(sanPhamLoaiDaRepository.findBySanPham(sp).stream()
@@ -269,8 +275,9 @@ public class SanPhamService {
             ct.setMauSac(categoryService.getMauSacOrNull(ctReq.getIdMauSac()));
             ct.setDungTichMl(ctReq.getDungTichMl());
             ct.setGiaBan(ctReq.getGiaBan());
-            ct.setSoLuongTon(ctReq.getSoLuongTon() != null ? ctReq.getSoLuongTon() : 0);
-            ct.setHanSuDung(ctReq.getHanSuDung());
+            if (ct.getId() == null) {
+                ct.setSoLuongTon(0);
+            }
             ct.setTrangThai(true);
             chiTietSanPhamRepository.save(ct);
         }

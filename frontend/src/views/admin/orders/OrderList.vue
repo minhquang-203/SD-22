@@ -147,7 +147,7 @@ async function loadOrders() {
 }
 
 function openDetail(order) {
-  router.push(`/admin/hoa-don/${order.id}`)
+  router.push(`/admin/hoa-don/chi-tiet/${order.id}`)
 }
 
 function customerDisplay(row) {

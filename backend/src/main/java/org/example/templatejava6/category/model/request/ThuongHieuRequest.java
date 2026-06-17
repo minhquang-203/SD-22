@@ -14,7 +14,6 @@ public class ThuongHieuRequest {
 
     private Integer id;
 
-    @NotBlank(message = "Mã thương hiệu không được để trống")
     private String ma;
 
     @NotBlank(message = "Tên thương hiệu không được để trống")

@@ -28,13 +28,6 @@ const PRODUCTS_MENU = {
       roles: BOTH_ROLES,
     },
     {
-      key: 'product-variants',
-      label: 'Biến thể sản phẩm',
-      icon: 'icon-park-outline:nine-points-connected',
-      path: '/admin/products/variants',
-      roles: BOTH_ROLES,
-    },
-    {
       key: 'attributes',
       label: 'Thuộc tính',
       icon: 'icon-park-outline:setting',
@@ -47,6 +40,29 @@ const PRODUCTS_MENU = {
         { key: 'cong-dung', label: 'Công dụng', icon: 'icon-park-outline:star', path: '/admin/attributes/cong-dung', roles: BOTH_ROLES },
         { key: 'thanh-phan', label: 'Thành phần', icon: 'icon-park-outline:experiment', path: '/admin/attributes/thanh-phan', roles: BOTH_ROLES },
       ],
+    },
+  ],
+}
+
+const HOA_DON_MENU = {
+  key: 'hoa-don-group',
+  label: 'Quản lý hóa đơn',
+  icon: 'icon-park-outline:bill',
+  roles: BOTH_ROLES,
+  children: [
+    {
+      key: 'hoa-don-list',
+      label: 'Hóa đơn',
+      icon: 'icon-park-outline:list',
+      path: '/admin/hoa-don',
+      roles: BOTH_ROLES,
+    },
+    {
+      key: 'hoa-don-detail',
+      label: 'Chi tiết hóa đơn',
+      icon: 'icon-park-outline:doc-detail',
+      path: '/admin/hoa-don/chi-tiet',
+      roles: BOTH_ROLES,
     },
   ],
 }
@@ -94,20 +110,7 @@ export const ADMIN_MENU = [
         path: '/admin/pos',
         roles: BOTH_ROLES,
       },
-      {
-        key: 'hoa-don',
-        label: 'Hóa đơn',
-        icon: 'icon-park-outline:bill',
-        path: '/admin/orders',
-        roles: BOTH_ROLES,
-      },
-      {
-        key: 'hoa-don-detail',
-        label: 'Chi tiết hóa đơn',
-        icon: 'icon-park-outline:doc-detail',
-        path: '/admin/hoa-don',
-        roles: BOTH_ROLES,
-      },
+      HOA_DON_MENU,
       PRODUCTS_MENU,
       {
         key: 'reviews',

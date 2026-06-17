@@ -14,7 +14,6 @@ public class MauSacRequest {
 
     private Integer id;
 
-    @NotBlank(message = "Mã màu sắc không được để trống")
     private String ma;
 
     @NotBlank(message = "Tên màu sắc không được để trống")

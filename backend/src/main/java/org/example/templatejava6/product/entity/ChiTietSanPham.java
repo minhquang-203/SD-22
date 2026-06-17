@@ -9,7 +9,6 @@ import lombok.Setter;
 import org.example.templatejava6.category.entity.MauSac;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -44,9 +43,6 @@ public class ChiTietSanPham {
 
     @Column(name = "so_luong_ton")
     private Integer soLuongTon;
-
-    @Column(name = "han_su_dung")
-    private LocalDate hanSuDung;
 
     @Column(name = "trang_thai")
     private Boolean trangThai;

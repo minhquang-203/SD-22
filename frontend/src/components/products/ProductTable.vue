@@ -1,7 +1,7 @@
 <script setup>
 import { NPopover } from 'naive-ui'
 import { Icon } from '@iconify/vue'
-import { formatCurrency, formatDate } from '@/utils/format'
+import { formatDate } from '@/utils/format'
 import { resolveProductImageUrl } from '@/utils/productForm'
 import StatusDot from '@/components/ui/StatusDot.vue'
 
@@ -18,15 +18,9 @@ function formatLoaiChongNang(value) {
   const map = {
     VAT_LY: 'Vật lý',
     HOA_HOC: 'Hóa học',
-    LAI: 'Lai',
+    LAI: 'Vật lý và Hóa học',
   }
   return map[value] || value
-}
-
-function formatPriceRange(item) {
-  if (!item.soBienThe || item.giaMin == null || item.giaMax == null) return '—'
-  if (Number(item.giaMin) === Number(item.giaMax)) return formatCurrency(item.giaMin)
-  return `${formatCurrency(item.giaMin)} – ${formatCurrency(item.giaMax)}`
 }
 </script>
 
@@ -43,8 +37,6 @@ function formatPriceRange(item) {
           <th>Danh mục</th>
           <th>Dạng SP</th>
           <th>SPF / PA</th>
-          <th>Giá</th>
-          <th>Tồn / Biến thể</th>
           <th>Ngày tạo</th>
           <th>Trạng thái</th>
           <th>Nổi bật</th>
@@ -53,16 +45,21 @@ function formatPriceRange(item) {
       </thead>
       <tbody>
         <tr v-if="loading">
-          <td colspan="14" class="text-center py-10 text-[var(--admin-muted)]">
+          <td colspan="12" class="text-center py-10 text-[var(--admin-muted)]">
             Đang tải dữ liệu...
           </td>
         </tr>
         <tr v-else-if="products.length === 0">
-          <td colspan="14" class="text-center py-10 text-[var(--admin-muted)]">
+          <td colspan="12" class="text-center py-10 text-[var(--admin-muted)]">
             Không có sản phẩm phù hợp
           </td>
         </tr>
-        <tr v-for="(item, index) in products" :key="item.id">
+        <tr
+          v-for="(item, index) in products"
+          :key="item.id"
+          class="soleil-table-row--clickable cursor-pointer"
+          @click="emit('manage', item)"
+        >
           <td class="text-[rgba(30,21,16,0.45)]">{{ (page - 1) * pageSize + index + 1 }}</td>
           <td>
             <span class="soleil-sp-code">{{ item.maSanPham }}</span>
@@ -116,14 +113,8 @@ function formatPriceRange(item) {
               <span v-if="!item.chiSoSpf && !item.chiSoPa" class="text-[rgba(30,21,16,0.35)]">—</span>
             </div>
           </td>
-          <td class="text-sm text-[var(--ink)] whitespace-nowrap">{{ formatPriceRange(item) }}</td>
-          <td>
-            <span class="soleil-pill--form text-xs">
-              {{ item.soBienThe || 0 }} loại · còn {{ item.tongTon || 0 }}
-            </span>
-          </td>
           <td class="text-xs text-[rgba(30,21,16,0.55)]">{{ formatDate(item.ngayTao) }}</td>
-          <td>
+          <td @click.stop>
             <button
               type="button"
               class="soleil-status-toggle"
@@ -136,7 +127,7 @@ function formatPriceRange(item) {
               />
             </button>
           </td>
-          <td>
+          <td @click.stop>
             <button
               type="button"
               class="soleil-status-toggle"
@@ -149,7 +140,7 @@ function formatPriceRange(item) {
               />
             </button>
           </td>
-          <td>
+          <td @click.stop>
             <div class="soleil-actions-cell">
               <button
                 type="button"

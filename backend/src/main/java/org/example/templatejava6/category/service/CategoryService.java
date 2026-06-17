@@ -5,6 +5,7 @@ import org.example.templatejava6.category.model.request.*;
 import org.example.templatejava6.category.model.response.*;
 import org.example.templatejava6.category.repository.*;
 import org.example.templatejava6.common.exception.ApiException;
+import org.example.templatejava6.common.util.MaGenerator;
 import org.example.templatejava6.common.util.MapperUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -33,10 +34,8 @@ public class CategoryService {
     }
 
     public void addDanhMuc(DanhMucRequest request) {
-        if (danhMucRepository.existsByMa(request.getMa())) {
-            throw new ApiException("Mã danh mục đã tồn tại", "DUPLICATE");
-        }
         DanhMuc dm = MapperUtil.map(request, DanhMuc.class);
+        dm.setMa(MaGenerator.nextCode("DM", danhMucRepository.findAll().stream().map(DanhMuc::getMa).toList()));
         dm.setTrangThai(true);
         danhMucRepository.save(dm);
     }
@@ -73,8 +72,8 @@ public class CategoryService {
     }
 
     public void addThuongHieu(ThuongHieuRequest request) {
-        ensureMaUnique(thuongHieuRepository.existsByMa(request.getMa()), "Mã thương hiệu");
         ThuongHieu th = MapperUtil.map(request, ThuongHieu.class);
+        th.setMa(MaGenerator.nextCode("TH", thuongHieuRepository.findAll().stream().map(ThuongHieu::getMa).toList()));
         th.setTrangThai(true);
         thuongHieuRepository.save(th);
     }
@@ -114,28 +113,28 @@ public class CategoryService {
     }
 
     public void addDangSanPham(DangSanPhamRequest request) {
-        ensureMaUnique(dangSanPhamRepository.existsByMa(request.getMa()), "Mã dạng sản phẩm");
         DangSanPham d = MapperUtil.map(request, DangSanPham.class);
-        d.setTrangThai(true);
+        d.setMa(MaGenerator.nextCode("DSP", dangSanPhamRepository.findAll().stream().map(DangSanPham::getMa).toList()));
         dangSanPhamRepository.save(d);
     }
 
     public void updateDangSanPham(Integer id, DangSanPhamRequest request) {
         DangSanPham d = dangSanPhamRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Không tìm thấy dạng sản phẩm", "NOT_FOUND"));
-        ensureMaUnique(dangSanPhamRepository.existsByMaAndIdNot(request.getMa(), id), "Mã dạng sản phẩm");
-        Boolean trangThai = d.getTrangThai();
-        MapperUtil.mapToExisting(request, d);
+        if (request.getMa() != null) {
+            ensureMaUnique(dangSanPhamRepository.existsByMaAndIdNot(request.getMa(), id), "Mã dạng sản phẩm");
+            d.setMa(request.getMa());
+        }
+        d.setTen(request.getTen());
+        d.setMoTa(request.getMoTa());
         d.setId(id);
-        d.setTrangThai(request.getTrangThai() != null ? request.getTrangThai() : trangThai);
         dangSanPhamRepository.save(d);
     }
 
     public void deleteDangSanPham(Integer id) {
         DangSanPham d = dangSanPhamRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Không tìm thấy dạng sản phẩm", "NOT_FOUND"));
-        d.setTrangThai(false);
-        dangSanPhamRepository.save(d);
+        dangSanPhamRepository.delete(d);
     }
 
     public DangSanPham getDangSanPhamOrThrow(Integer id) {
@@ -155,28 +154,28 @@ public class CategoryService {
     }
 
     public void addCongDung(CongDungRequest request) {
-        ensureMaUnique(congDungRepository.existsByMa(request.getMa()), "Mã công dụng");
         CongDung c = MapperUtil.map(request, CongDung.class);
-        c.setTrangThai(true);
+        c.setMa(MaGenerator.nextCode("CD", congDungRepository.findAll().stream().map(CongDung::getMa).toList()));
         congDungRepository.save(c);
     }
 
     public void updateCongDung(Integer id, CongDungRequest request) {
         CongDung c = congDungRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Không tìm thấy công dụng", "NOT_FOUND"));
-        ensureMaUnique(congDungRepository.existsByMaAndIdNot(request.getMa(), id), "Mã công dụng");
-        Boolean trangThai = c.getTrangThai();
-        MapperUtil.mapToExisting(request, c);
+        if (request.getMa() != null) {
+            ensureMaUnique(congDungRepository.existsByMaAndIdNot(request.getMa(), id), "Mã công dụng");
+            c.setMa(request.getMa());
+        }
+        c.setTen(request.getTen());
+        c.setMoTa(request.getMoTa());
         c.setId(id);
-        c.setTrangThai(request.getTrangThai() != null ? request.getTrangThai() : trangThai);
         congDungRepository.save(c);
     }
 
     public void deleteCongDung(Integer id) {
         CongDung c = congDungRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Không tìm thấy công dụng", "NOT_FOUND"));
-        c.setTrangThai(false);
-        congDungRepository.save(c);
+        congDungRepository.delete(c);
     }
 
     public CongDung getCongDungOrThrow(Integer id) {
@@ -196,28 +195,29 @@ public class CategoryService {
     }
 
     public void addThanhPhan(ThanhPhanRequest request) {
-        ensureMaUnique(thanhPhanRepository.existsByMa(request.getMa()), "Mã thành phần");
         ThanhPhan t = MapperUtil.map(request, ThanhPhan.class);
-        t.setTrangThai(true);
+        t.setMa(MaGenerator.nextCode("TP", thanhPhanRepository.findAll().stream().map(ThanhPhan::getMa).toList()));
         thanhPhanRepository.save(t);
     }
 
     public void updateThanhPhan(Integer id, ThanhPhanRequest request) {
         ThanhPhan t = thanhPhanRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Không tìm thấy thành phần", "NOT_FOUND"));
-        ensureMaUnique(thanhPhanRepository.existsByMaAndIdNot(request.getMa(), id), "Mã thành phần");
-        Boolean trangThai = t.getTrangThai();
-        MapperUtil.mapToExisting(request, t);
+        if (request.getMa() != null) {
+            ensureMaUnique(thanhPhanRepository.existsByMaAndIdNot(request.getMa(), id), "Mã thành phần");
+            t.setMa(request.getMa());
+        }
+        t.setTen(request.getTen());
+        t.setLoai(request.getLoai());
+        t.setMoTa(request.getMoTa());
         t.setId(id);
-        t.setTrangThai(request.getTrangThai() != null ? request.getTrangThai() : trangThai);
         thanhPhanRepository.save(t);
     }
 
     public void deleteThanhPhan(Integer id) {
         ThanhPhan t = thanhPhanRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Không tìm thấy thành phần", "NOT_FOUND"));
-        t.setTrangThai(false);
-        thanhPhanRepository.save(t);
+        thanhPhanRepository.delete(t);
     }
 
     public ThanhPhan getThanhPhanOrThrow(Integer id) {
@@ -237,28 +237,28 @@ public class CategoryService {
     }
 
     public void addMauSac(MauSacRequest request) {
-        ensureMaUnique(mauSacRepository.existsByMa(request.getMa()), "Mã màu sắc");
         MauSac m = MapperUtil.map(request, MauSac.class);
-        m.setTrangThai(true);
+        m.setMa(MaGenerator.nextCode("MS", mauSacRepository.findAll().stream().map(MauSac::getMa).toList()));
         mauSacRepository.save(m);
     }
 
     public void updateMauSac(Integer id, MauSacRequest request) {
         MauSac m = mauSacRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Không tìm thấy màu sắc", "NOT_FOUND"));
-        ensureMaUnique(mauSacRepository.existsByMaAndIdNot(request.getMa(), id), "Mã màu sắc");
-        Boolean trangThai = m.getTrangThai();
-        MapperUtil.mapToExisting(request, m);
+        if (request.getMa() != null) {
+            ensureMaUnique(mauSacRepository.existsByMaAndIdNot(request.getMa(), id), "Mã màu sắc");
+            m.setMa(request.getMa());
+        }
+        m.setTen(request.getTen());
+        m.setMaHex(request.getMaHex());
         m.setId(id);
-        m.setTrangThai(request.getTrangThai() != null ? request.getTrangThai() : trangThai);
         mauSacRepository.save(m);
     }
 
     public void deleteMauSac(Integer id) {
         MauSac m = mauSacRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Không tìm thấy màu sắc", "NOT_FOUND"));
-        m.setTrangThai(false);
-        mauSacRepository.save(m);
+        mauSacRepository.delete(m);
     }
 
     public MauSac getMauSacOrNull(Integer id) {

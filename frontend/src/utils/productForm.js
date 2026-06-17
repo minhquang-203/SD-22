@@ -52,8 +52,6 @@ export function detailToForm(detail, mauSacOptions = []) {
       idMauSac: findMauSacId(ct.tenMauSac),
       dungTichMl: ct.dungTichMl ?? null,
       giaBan: ct.giaBan ?? null,
-      soLuongTon: ct.soLuongTon ?? 0,
-      hanSuDung: ct.hanSuDung || '',
     })),
     anhs: (detail.anhs || []).map((img) => ({
       url: img.url || '',
@@ -92,8 +90,7 @@ function buildProductData(form) {
       idMauSac: ct.idMauSac || null,
       dungTichMl: ct.dungTichMl ?? null,
       giaBan: ct.giaBan,
-      soLuongTon: ct.soLuongTon ?? 0,
-      hanSuDung: ct.hanSuDung || null,
+      soLuongTon: 0,
     })),
     anhs,
     idLoaiDas: form.idLoaiDas || [],

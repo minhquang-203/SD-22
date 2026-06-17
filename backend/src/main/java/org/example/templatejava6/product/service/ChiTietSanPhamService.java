@@ -19,6 +19,7 @@ public class ChiTietSanPhamService {
     @Autowired private ChiTietSanPhamRepository chiTietSanPhamRepository;
     @Autowired private SanPhamService sanPhamService;
     @Autowired private CategoryService categoryService;
+    @Autowired private LoHangService loHangService;
 
     @Transactional
     public void add(ChiTietSanPhamRequest request) {
@@ -31,9 +32,7 @@ public class ChiTietSanPhamService {
         ct.setSanPham(sanPhamService.getSanPhamOrThrow(request.getIdSanPham()));
         ct.setMauSac(categoryService.getMauSacOrNull(request.getIdMauSac()));
         ct.setTrangThai(true);
-        if (ct.getSoLuongTon() == null) {
-            ct.setSoLuongTon(0);
-        }
+        ct.setSoLuongTon(0);
         chiTietSanPhamRepository.save(ct);
     }
 
@@ -65,7 +64,14 @@ public class ChiTietSanPhamService {
     public ChiTietSanPhamResponse detail(Integer id) {
         ChiTietSanPham ct = chiTietSanPhamRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Không tìm thấy biến thể sản phẩm", "NOT_FOUND"));
-        return new ChiTietSanPhamResponse(ct);
+        return enrichResponse(ct);
+    }
+
+    private ChiTietSanPhamResponse enrichResponse(ChiTietSanPham ct) {
+        ChiTietSanPhamResponse res = new ChiTietSanPhamResponse(ct);
+        res.setHanSuDungGanNhat(loHangService.nearestExpiry(ct.getId()));
+        res.setSapHetHan(loHangService.hasSapHetHan(ct.getId()));
+        return res;
     }
 
     private void validateGia(BigDecimal giaBan) {

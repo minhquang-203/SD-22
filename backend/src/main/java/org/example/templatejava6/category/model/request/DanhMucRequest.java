@@ -14,7 +14,6 @@ public class DanhMucRequest {
 
     private Integer id;
 
-    @NotBlank(message = "Mã danh mục không được để trống")
     private String ma;
 
     @NotBlank(message = "Tên danh mục không được để trống")

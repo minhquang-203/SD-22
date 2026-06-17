@@ -33,7 +33,4 @@ public class DangSanPham {
     @Nationalized
     @Column(name = "mo_ta", length = 255)
     private String moTa;
-
-    @Column(name = "trang_thai")
-    private Boolean trangThai;
 }

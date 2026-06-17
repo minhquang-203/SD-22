@@ -201,10 +201,7 @@ async function openEditModal(product) {
 }
 
 function handleManage(product) {
-  router.push({
-    path: '/admin/products/variants',
-    query: { productId: product.id },
-  })
+  router.push(`/admin/san-pham/${product.id}/bien-the`)
 }
 
 async function handleToggleStatus(product) {

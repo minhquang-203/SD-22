@@ -20,8 +20,6 @@ function addRow() {
     idMauSac: null,
     dungTichMl: null,
     giaBan: null,
-    soLuongTon: 0,
-    hanSuDung: '',
   })
 }
 
@@ -47,14 +45,12 @@ function removeRow(index) {
             <th>Màu sắc</th>
             <th>Dung tích (ml)</th>
             <th>Giá bán *</th>
-            <th>Tồn kho</th>
-            <th>Hạn dùng</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="rows.length === 0">
-            <td colspan="7" class="text-center py-6 text-[var(--admin-muted)]">
+            <td colspan="5" class="text-center py-6 text-[var(--admin-muted)]">
               Chưa có biến thể — nhấn "Thêm biến thể"
             </td>
           </tr>
@@ -82,12 +78,6 @@ function removeRow(index) {
               <input v-model.number="row.giaBan" type="number" class="admin-input" min="0" step="1000" />
             </td>
             <td>
-              <input v-model.number="row.soLuongTon" type="number" class="admin-input" min="0" />
-            </td>
-            <td>
-              <input v-model="row.hanSuDung" type="date" class="admin-input" />
-            </td>
-            <td>
               <button type="button" class="admin-btn admin-btn-danger !px-2.5" @click="removeRow(index)">
                 ✕
               </button>
@@ -97,7 +87,7 @@ function removeRow(index) {
       </table>
     </div>
     <p class="text-xs text-[var(--admin-muted)] mt-2">
-      Mỗi dòng là một biến thể (vd: 60ml, 90ml). SKU gợi ý theo mã sản phẩm + dung tích khi ô SKU đang trống.
+      Tồn kho và HSD quản lý theo lô sau khi tạo sản phẩm (màn biến thể → Lô hàng).
     </p>
   </div>
 </template>
