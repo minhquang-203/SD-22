@@ -36,3 +36,7 @@ export function updateVoucher(id, data) {
 export function deleteVoucher(id) {
   return request.delete(`/vouchers/${id}`);
 }
+
+export function getVoucherStats() {
+  return request.get("/vouchers/stats");
+}
