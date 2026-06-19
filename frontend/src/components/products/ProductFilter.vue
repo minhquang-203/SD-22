@@ -79,3 +79,13 @@ const emit = defineEmits(['reset'])
     </button>
   </div>
 </template>
+
+<style scoped>
+.soleil-toolbar__field--wide {
+    flex: 1;
+}
+
+.soleil-toolbar__field:not(.soleil-toolbar__field--wide) {
+    flex: 0 0 140px;
+}
+</style>

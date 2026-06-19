@@ -185,6 +185,18 @@ const router = createRouter({
 
         {
 
+          path: 'sale/:id',
+
+          name: 'AdminSaleDetail',
+
+          component: () => import('@/views/admin/voucher/saleDetail.vue'),
+
+          meta: { title: 'Chi tiết đợt giảm giá', breadcrumb: 'Đợt giảm giá / Chi tiết' },
+
+        },
+
+        {
+
           path: 'recommendation/quiz',
 
           name: 'AdminQuiz',

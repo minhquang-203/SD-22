@@ -1,5 +1,6 @@
 package org.example.templatejava6.voucher.model.request;
 
+import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -25,9 +26,12 @@ public class DotGiamGiaRequest {
 
     @NotNull(message = "Phần trăm giảm không được để trống")
     @Positive(message = "Phần trăm giảm phải lớn hơn 0")
+    @DecimalMax(value = "100", message = "Phần trăm giảm không được vượt quá 100")
     private BigDecimal phanTramGiam;
 
+    @NotNull(message = "Ngày bắt đầu không được để trống")
     private LocalDateTime ngayBatDau;
 
+    @NotNull(message = "Ngày kết thúc không được để trống")
     private LocalDateTime ngayKetThuc;
 }

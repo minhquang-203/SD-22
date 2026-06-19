@@ -18,6 +18,8 @@ public class DotGiamGiaResponse {
     private LocalDateTime ngayBatDau;
     private LocalDateTime ngayKetThuc;
     private Boolean trangThai;
+    private String timeStatus;
+    private String timeStatusLabel;
 
     public DotGiamGiaResponse(DotGiamGia dgg) {
         this.id = dgg.getId();
@@ -27,5 +29,27 @@ public class DotGiamGiaResponse {
         this.ngayBatDau = dgg.getNgayBatDau();
         this.ngayKetThuc = dgg.getNgayKetThuc();
         this.trangThai = dgg.getTrangThai();
+        resolveTimeStatus(dgg);
+    }
+
+    private void resolveTimeStatus(DotGiamGia dgg) {
+        if (!Boolean.TRUE.equals(dgg.getTrangThai())) {
+            this.timeStatus = "INACTIVE";
+            this.timeStatusLabel = "Ngừng áp dụng";
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        if (dgg.getNgayBatDau() != null && dgg.getNgayBatDau().isAfter(now)) {
+            this.timeStatus = "UPCOMING";
+            this.timeStatusLabel = "Sắp diễn ra";
+            return;
+        }
+        if (dgg.getNgayKetThuc() != null && dgg.getNgayKetThuc().isBefore(now)) {
+            this.timeStatus = "EXPIRED";
+            this.timeStatusLabel = "Đã kết thúc";
+            return;
+        }
+        this.timeStatus = "ACTIVE";
+        this.timeStatusLabel = "Đang chạy";
     }
 }

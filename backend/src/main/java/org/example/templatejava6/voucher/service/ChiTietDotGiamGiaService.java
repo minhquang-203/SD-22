@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -38,11 +39,37 @@ public class ChiTietDotGiamGiaService {
     }
 
     @Transactional
-    public void add(ChiTietDotGiamGiaRequest request) {
-        if (request.getIdDotGiamGia() == null) {
-            throw new ApiException("Id đợt giảm giá không được để trống", "VALIDATION_ERROR");
+    public void addToDotGiamGia(Integer idDotGiamGia, ChiTietDotGiamGiaRequest request) {
+        if (request == null) {
+            request = new ChiTietDotGiamGiaRequest();
         }
+        request.setIdDotGiamGia(idDotGiamGia);
+        add(request);
+    }
+
+    @Transactional
+    public void updateInDotGiamGia(Integer idDotGiamGia, Integer id, ChiTietDotGiamGiaRequest request) {
+        ChiTietDotGiamGia existing = getChiTietOrThrow(id);
+        validateBelongsToDotGiamGia(existing, idDotGiamGia);
+        if (request == null) {
+            request = new ChiTietDotGiamGiaRequest();
+        }
+        request.setIdDotGiamGia(idDotGiamGia);
+        update(id, request);
+    }
+
+    @Transactional
+    public void deleteInDotGiamGia(Integer idDotGiamGia, Integer id) {
+        ChiTietDotGiamGia existing = getChiTietOrThrow(id);
+        validateBelongsToDotGiamGia(existing, idDotGiamGia);
+        chiTietDotGiamGiaRepository.delete(existing);
+    }
+
+    @Transactional
+    public void add(ChiTietDotGiamGiaRequest request) {
+        validateRequiredIds(request);
         DotGiamGia dgg = dotGiamGiaService.getDotGiamGiaOrThrow(request.getIdDotGiamGia());
+        validateDotGiamGiaDangMo(dgg);
         ChiTietSanPham ctsp = getChiTietSanPhamOrThrow(request.getIdChiTietSanPham());
         validateDuplicate(dgg, ctsp.getId(), null);
 
@@ -56,18 +83,14 @@ public class ChiTietDotGiamGiaService {
     @Transactional
     public void update(Integer id, ChiTietDotGiamGiaRequest request) {
         ChiTietDotGiamGia ct = getChiTietOrThrow(id);
-        DotGiamGia dgg = ct.getIdDotGiamGia();
-        ChiTietSanPham ctsp = ct.getIdChiTietSanPham();
+        validateRequiredIds(request);
+        DotGiamGia dgg = dotGiamGiaService.getDotGiamGiaOrThrow(request.getIdDotGiamGia());
+        validateDotGiamGiaDangMo(dgg);
+        ChiTietSanPham ctsp = getChiTietSanPhamOrThrow(request.getIdChiTietSanPham());
+        validateDuplicate(dgg, ctsp.getId(), id);
 
-        if (request.getIdDotGiamGia() != null) {
-            dgg = dotGiamGiaService.getDotGiamGiaOrThrow(request.getIdDotGiamGia());
-            ct.setIdDotGiamGia(dgg);
-        }
-        if (request.getIdChiTietSanPham() != null) {
-            ctsp = getChiTietSanPhamOrThrow(request.getIdChiTietSanPham());
-            validateDuplicate(dgg, ctsp.getId(), id);
-            ct.setIdChiTietSanPham(ctsp);
-        }
+        ct.setIdDotGiamGia(dgg);
+        ct.setIdChiTietSanPham(ctsp);
         ct.setGiaSauGiam(resolveGiaSauGiam(request, dgg, ctsp));
         ct.setId(id);
         chiTietDotGiamGiaRepository.save(ct);
@@ -99,11 +122,42 @@ public class ChiTietDotGiamGiaService {
         }
     }
 
-    private java.math.BigDecimal resolveGiaSauGiam(
+    private void validateRequiredIds(ChiTietDotGiamGiaRequest request) {
+        if (request == null) {
+            throw new ApiException("Dữ liệu sản phẩm giảm giá không được để trống", "VALIDATION_ERROR");
+        }
+        if (request.getIdDotGiamGia() == null) {
+            throw new ApiException("Đợt giảm giá không được để trống", "VALIDATION_ERROR");
+        }
+        if (request.getIdChiTietSanPham() == null) {
+            throw new ApiException("Chi tiết sản phẩm không được để trống", "VALIDATION_ERROR");
+        }
+    }
+
+    private void validateBelongsToDotGiamGia(ChiTietDotGiamGia ct, Integer idDotGiamGia) {
+        if (ct.getIdDotGiamGia() == null || !ct.getIdDotGiamGia().getId().equals(idDotGiamGia)) {
+            throw new ApiException("Sản phẩm không thuộc đợt giảm giá này", "VALIDATION_ERROR");
+        }
+    }
+
+    private BigDecimal resolveGiaSauGiam(
             ChiTietDotGiamGiaRequest request, DotGiamGia dgg, ChiTietSanPham ctsp) {
         if (request.getGiaSauGiam() != null) {
+            validateGiaSauGiam(request.getGiaSauGiam(), ctsp.getGiaBan());
             return request.getGiaSauGiam();
         }
         return dotGiamGiaService.calculateGiaSauGiam(ctsp.getGiaBan(), dgg.getPhanTramGiam());
+    }
+
+    private void validateDotGiamGiaDangMo(DotGiamGia dgg) {
+        if (!Boolean.TRUE.equals(dgg.getTrangThai())) {
+            throw new ApiException("Đợt giảm giá đã ngừng áp dụng", "VALIDATION_ERROR");
+        }
+    }
+
+    private void validateGiaSauGiam(BigDecimal giaSauGiam, BigDecimal giaBan) {
+        if (giaBan != null && giaSauGiam.compareTo(giaBan) >= 0) {
+            throw new ApiException("Giá sau giảm phải nhỏ hơn giá bán", "VALIDATION_ERROR");
+        }
     }
 }
