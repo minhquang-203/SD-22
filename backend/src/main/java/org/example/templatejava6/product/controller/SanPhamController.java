@@ -1,6 +1,7 @@
 package org.example.templatejava6.product.controller;
 
 import jakarta.validation.Valid;
+import org.example.templatejava6.common.model.response.MaTiepTheoResponse;
 import org.example.templatejava6.product.model.request.SanPhamRequest;
 import org.example.templatejava6.product.model.response.SanPhamDetailResponse;
 import org.example.templatejava6.product.model.response.SanPhamResponse;
@@ -33,6 +34,11 @@ public class SanPhamController {
     @GetMapping("detail")
     public SanPhamDetailResponse detail(@RequestParam("id") Integer id) {
         return sanPhamService.detail(id);
+    }
+
+    @GetMapping("ma-tiep-theo")
+    public MaTiepTheoResponse maTiepTheo() {
+        return sanPhamService.previewMaTiepTheo();
     }
 
     @GetMapping("tim")

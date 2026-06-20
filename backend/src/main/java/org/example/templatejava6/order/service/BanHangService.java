@@ -37,8 +37,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -71,8 +73,18 @@ public class BanHangService {
         return chiTietSanPhamRepository
                 .danhSachBienTheBan(kw, PageRequest.of(pageNo, SAN_PHAM_PAGE_SIZE))
                 .stream()
-                .map(BienTheBanResponse::new)
+                .map(this::toBienTheBanResponse)
                 .toList();
+    }
+
+    private BienTheBanResponse toBienTheBanResponse(ChiTietSanPham cts) {
+        BienTheBanResponse res = new BienTheBanResponse(cts);
+        LocalDate nearest = loHangService.nearestExpiry(cts.getId());
+        res.setHanSuDungGanNhat(nearest);
+        if (nearest != null) {
+            res.setSoNgayConLai((int) ChronoUnit.DAYS.between(LocalDate.now(), nearest));
+        }
+        return res;
     }
 
     @Transactional(readOnly = true)

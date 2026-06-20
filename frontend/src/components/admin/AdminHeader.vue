@@ -1,5 +1,6 @@
 <script setup>
 import { Icon } from '@iconify/vue'
+import AppLogo from '@/components/common/AppLogo.vue'
 
 const props = defineProps({
   title: { type: String, default: 'SUNOVA Admin' },
@@ -22,8 +23,9 @@ const pageLabel = () => (props.title || props.breadcrumb || 'Trang quản trị'
       >
         <Icon icon="icon-park-outline:hamburger-button" />
       </button>
+      <AppLogo variant="light" :size="28" class="shrink-0 hidden sm:flex" />
       <div class="admin-topbar__eyebrow">
-        SUNOVA ADMIN — {{ pageLabel() }}
+        {{ pageLabel() }}
       </div>
     </div>
 

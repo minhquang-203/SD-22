@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import org.example.templatejava6.category.model.request.ThuongHieuRequest;
 import org.example.templatejava6.category.model.response.ThuongHieuResponse;
 import org.example.templatejava6.category.service.CategoryService;
+import org.example.templatejava6.common.model.response.MaTiepTheoResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,6 +25,11 @@ public class ThuongHieuController {
     @GetMapping("detail")
     public ThuongHieuResponse detail(@RequestParam("id") Integer id) {
         return categoryService.detailThuongHieu(id);
+    }
+
+    @GetMapping("ma-tiep-theo")
+    public MaTiepTheoResponse maTiepTheo() {
+        return categoryService.previewMaThuongHieu();
     }
 
     @PostMapping("add")

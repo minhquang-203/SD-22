@@ -104,7 +104,6 @@ export function formToPayload(form) {
 }
 
 export function validateProductForm(form) {
-  if (!form.maSanPham?.trim()) return 'Mã sản phẩm không được để trống'
   if (!form.ten?.trim()) return 'Tên sản phẩm không được để trống'
   if (!form.idThuongHieu) return 'Vui lòng chọn thương hiệu'
   if (!form.idDanhMuc) return 'Vui lòng chọn danh mục'

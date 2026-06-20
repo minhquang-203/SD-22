@@ -5,6 +5,7 @@ import org.example.templatejava6.category.model.request.*;
 import org.example.templatejava6.category.model.response.*;
 import org.example.templatejava6.category.repository.*;
 import org.example.templatejava6.common.exception.ApiException;
+import org.example.templatejava6.common.model.response.MaTiepTheoResponse;
 import org.example.templatejava6.common.util.MaGenerator;
 import org.example.templatejava6.common.util.MapperUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -276,5 +277,33 @@ public class CategoryService {
         if (exists) {
             throw new ApiException(label + " đã tồn tại", "DUPLICATE");
         }
+    }
+
+    public MaTiepTheoResponse previewMaDanhMuc() {
+        return new MaTiepTheoResponse(nextMa("DM", danhMucRepository.findAll().stream().map(DanhMuc::getMa).toList()));
+    }
+
+    public MaTiepTheoResponse previewMaThuongHieu() {
+        return new MaTiepTheoResponse(nextMa("TH", thuongHieuRepository.findAll().stream().map(ThuongHieu::getMa).toList()));
+    }
+
+    public MaTiepTheoResponse previewMaDangSanPham() {
+        return new MaTiepTheoResponse(nextMa("DSP", dangSanPhamRepository.findAll().stream().map(DangSanPham::getMa).toList()));
+    }
+
+    public MaTiepTheoResponse previewMaCongDung() {
+        return new MaTiepTheoResponse(nextMa("CD", congDungRepository.findAll().stream().map(CongDung::getMa).toList()));
+    }
+
+    public MaTiepTheoResponse previewMaThanhPhan() {
+        return new MaTiepTheoResponse(nextMa("TP", thanhPhanRepository.findAll().stream().map(ThanhPhan::getMa).toList()));
+    }
+
+    public MaTiepTheoResponse previewMaMauSac() {
+        return new MaTiepTheoResponse(nextMa("MS", mauSacRepository.findAll().stream().map(MauSac::getMa).toList()));
+    }
+
+    private String nextMa(String prefix, List<String> existing) {
+        return MaGenerator.nextCode(prefix, existing);
     }
 }
