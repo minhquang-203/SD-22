@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import org.example.templatejava6.common.util.PaginationUtil;
 import org.example.templatejava6.voucher.model.request.PhieuGiamGiaRequest;
 import org.example.templatejava6.voucher.model.response.PhieuGiamGiaResponse;
+import org.example.templatejava6.voucher.model.response.PhieuGiamGiaStatsResponse;
 import org.example.templatejava6.voucher.service.PhieuGiamGiaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -24,6 +25,11 @@ public class PhieuGiamGiaController {
             (@RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PaginationUtil.create(page, size);
         return ResponseEntity.ok(phieuGiamGiaService.getAll(pageable));
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<PhieuGiamGiaStatsResponse> getStats() {
+        return ResponseEntity.ok(phieuGiamGiaService.getStats());
     }
 
 

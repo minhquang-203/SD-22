@@ -1,0 +1,597 @@
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&display=swap');
+@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css');
+
+.sale-page {
+  --sale-bg: #F5F4F1;
+  --sale-surface: #FFFFFF;
+  --sale-surface-2: #F0EEE9;
+  --sale-border: #E2E0DA;
+  --sale-text-primary: #1A1916;
+  --sale-text-secondary: #6B6860;
+  --sale-text-muted: #A09D97;
+  --sale-accent: #2D5BE3;
+  --sale-accent-light: #EBF0FF;
+  --sale-accent-text: #1A3DB0;
+  --sale-success: #15803D;
+  --sale-success-bg: #DCFCE7;
+  --sale-warning: #B45309;
+  --sale-warning-bg: #FEF3C7;
+  --sale-danger: #B91C1C;
+  --sale-danger-bg: #FEE2E2;
+  --sale-muted-bg: #F0EEE9;
+  --sale-muted-text: #6B6860;
+  --sale-radius: 8px;
+  --sale-radius-lg: 12px;
+  --sale-radius-xl: 16px;
+  --sale-shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+  --sale-shadow-md: 0 4px 12px rgba(0,0,0,.10);
+  min-height: 100vh;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 32px 36px;
+  background: var(--sale-bg);
+  color: var(--sale-text-primary);
+}
+
+.sale-page,
+.sale-page * ,
+.sale-page *::before,
+.sale-page *::after {
+  box-sizing: border-box;
+}
+
+.sale-page * {
+  margin: 0;
+  padding: 0;
+}
+
+.sale-page .page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+
+.sale-page .page-title {
+  font-size: 42px;
+  /* font-weight: 600; */
+  font-style: italic;
+}
+
+.sale-page .page-sub {
+  font-size: 13px;
+  color: var(--sale-text-secondary);
+  margin-top: 3px;
+}
+
+.sale-page .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: var(--sale-radius);
+  font-size: 13.5px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all .15s;
+  border: 1px solid transparent;
+}
+
+.sale-page .btn-primary {
+  background: var(--sale-text-primary);
+  color: #fff;
+  border-color: var(--sale-accent);
+}
+
+.sale-page .btn-primary:hover {
+  background: #1E4BD8;
+}
+
+.sale-page .btn-secondary {
+  background: var(--sale-surface);
+  color: var(--sale-text-primary);
+  border-color: var(--sale-border);
+}
+
+.sale-page .btn-secondary:hover {
+  background: var(--sale-surface-2);
+}
+
+.sale-page .btn:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+.sale-page .metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.sale-page .metric-card {
+  background: var(--sale-surface);
+  border: 1px solid var(--sale-border);
+  border-radius: var(--sale-radius-lg);
+  padding: 18px 20px;
+  box-shadow: var(--sale-shadow);
+}
+
+.sale-page .metric-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--sale-radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+
+.sale-page .metric-label {
+  font-size: 12px;
+  color: var(--sale-text-secondary);
+  margin-bottom: 4px;
+}
+
+.sale-page .metric-value {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.sale-page .metric-trend {
+  font-size: 12px;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.sale-page .trend-up {
+  color: var(--sale-success);
+}
+
+.sale-page .trend-neutral {
+  color: var(--sale-text-muted);
+}
+
+.sale-page .tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--sale-surface-2);
+  border-radius: var(--sale-radius);
+  padding: 3px;
+  margin-bottom: 16px;
+  width: fit-content;
+}
+
+.sale-page .tab-btn {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-family: inherit;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sale-text-secondary);
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.sale-page .tab-btn.active {
+  background: var(--sale-surface);
+  color: var(--sale-text-primary);
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,.1);
+}
+
+.sale-page .filters-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.sale-page .search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+  max-width: 320px;
+}
+
+.sale-page .search-wrap i {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 15px;
+  color: var(--sale-text-muted);
+  pointer-events: none;
+}
+
+.sale-page .search-wrap input {
+  width: 100%;
+  padding: 8px 10px 8px 34px;
+}
+
+.sale-page .filters-right {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.sale-page input[type="text"],
+.sale-page input[type="date"],
+.sale-page input[type="number"],
+.sale-page select,
+.sale-page textarea {
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-size: 13.5px;
+  background: var(--sale-surface);
+  border: 1px solid var(--sale-border);
+  border-radius: var(--sale-radius);
+  color: var(--sale-text-primary);
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+
+.sale-page input:focus,
+.sale-page select:focus,
+.sale-page textarea:focus {
+  border-color: var(--sale-accent);
+  box-shadow: 0 0 0 3px rgba(45,91,227,.12);
+}
+
+.sale-page select {
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.sale-page .table-card {
+  background: var(--sale-surface);
+  border: 1px solid var(--sale-border);
+  border-radius: var(--sale-radius-lg);
+  box-shadow: var(--sale-shadow);
+  overflow: hidden;
+}
+
+.sale-page table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sale-page thead th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sale-text-muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  background: var(--sale-surface-2);
+  border-bottom: 1px solid var(--sale-border);
+  white-space: nowrap;
+}
+
+.sale-page tbody tr {
+  border-bottom: 1px solid var(--sale-border);
+  transition: background .1s;
+}
+
+.sale-page tbody tr:last-child {
+  border-bottom: none;
+}
+
+.sale-page tbody tr.clickable-row {
+  cursor: pointer;
+}
+
+.sale-page tbody tr:hover {
+  background: #FAFAF8;
+}
+
+.sale-page tbody td {
+  padding: 13px 16px;
+  vertical-align: middle;
+}
+
+.sale-page .campaign-name {
+  font-weight: 500;
+  font-size: 13.5px;
+}
+
+.sale-page .campaign-code {
+  font-size: 11px;
+  color: var(--sale-text-muted);
+  font-family: 'Courier New', monospace;
+  background: var(--sale-surface-2);
+  border: 1px solid var(--sale-border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-top: 3px;
+  display: inline-block;
+}
+
+.sale-page .type-badge {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: var(--sale-radius);
+  border: 1px solid var(--sale-border);
+  background: var(--sale-surface-2);
+  color: var(--sale-text-secondary);
+  white-space: nowrap;
+}
+
+.sale-page .value-cell {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.sale-page .date-range .date-from {
+  font-size: 12.5px;
+}
+
+.sale-page .date-range .date-to {
+  font-size: 11.5px;
+  color: var(--sale-text-muted);
+  margin-top: 1px;
+}
+
+.sale-page .progress-wrap {
+  min-width: 120px;
+}
+
+.sale-page .progress-counts {
+  font-size: 12px;
+  color: var(--sale-text-secondary);
+  margin-bottom: 4px;
+}
+
+.sale-page .progress-bar-bg {
+  height: 5px;
+  background: var(--sale-border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.sale-page .progress-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width .3s;
+}
+
+.sale-page .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.sale-page .badge-active {
+  background: var(--sale-success-bg);
+  color: var(--sale-success);
+}
+
+.sale-page .badge-scheduled {
+  background: var(--sale-accent-light);
+  color: var(--sale-accent-text);
+}
+
+.sale-page .badge-ended {
+  background: var(--sale-muted-bg);
+  color: var(--sale-muted-text);
+}
+
+.sale-page .badge-paused {
+  background: var(--sale-warning-bg);
+  color: var(--sale-warning);
+}
+
+.sale-page .action-btns {
+  display: flex;
+  gap: 5px;
+}
+
+.sale-page .icon-btn {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--sale-border);
+  border-radius: var(--sale-radius);
+  background: transparent;
+  color: var(--sale-text-secondary);
+  font-size: 15px;
+  cursor: pointer;
+  transition: all .15s;
+  font-family: inherit;
+}
+
+.sale-page .icon-btn:hover {
+  background: var(--sale-surface-2);
+  color: var(--sale-text-primary);
+}
+
+.sale-page .icon-btn.danger:hover {
+  background: var(--sale-danger-bg);
+  color: var(--sale-danger);
+  border-color: transparent;
+}
+
+.sale-page .empty-state {
+  padding: 48px;
+  text-align: center;
+  color: var(--sale-text-muted);
+}
+
+.sale-page .empty-state i {
+  font-size: 40px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.sale-page .pagination-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--sale-border);
+}
+
+.sale-page .page-info {
+  font-size: 12.5px;
+  color: var(--sale-text-secondary);
+}
+
+.sale-page .page-btns {
+  display: flex;
+  gap: 6px;
+}
+
+.sale-page .page-btn {
+  min-width: 32px;
+  height: 32px;
+  border: 1px solid var(--sale-border);
+  border-radius: var(--sale-radius);
+  background: var(--sale-surface);
+  color: var(--sale-text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.sale-page .page-btn.active {
+  background: var(--sale-accent);
+  color: #fff;
+  border-color: var(--sale-accent);
+}
+
+.sale-page .page-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.sale-page .modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15,15,15,.45);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+
+.sale-page .modal-overlay.open {
+  display: flex;
+}
+
+.sale-page .modal {
+  background: var(--sale-surface);
+  border-radius: var(--sale-radius-xl);
+  width: 560px;
+  max-width: 95vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--sale-shadow-md);
+  animation: saleSlideUp .2s ease;
+}
+
+@keyframes saleSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sale-page .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--sale-border);
+}
+
+.sale-page .modal-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.sale-page .modal-body {
+  padding: 20px 24px;
+}
+
+.sale-page .modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--sale-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.sale-page .form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.sale-page .form-grid .full {
+  grid-column: 1 / -1;
+}
+
+.sale-page .form-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--sale-text-secondary);
+  margin-bottom: 5px;
+}
+
+.sale-page .form-group input,
+.sale-page .form-group select,
+.sale-page .form-group textarea {
+  width: 100%;
+  padding: 9px 12px;
+}
+
+.sale-page .form-group textarea {
+  resize: vertical;
+  min-height: 72px;
+}
+
+.sale-page .toast {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  background: var(--sale-text-primary);
+  color: #fff;
+  padding: 11px 18px;
+  border-radius: var(--sale-radius-lg);
+  font-size: 13.5px;
+  font-weight: 500;
+  z-index: 999;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all .25s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: var(--sale-shadow-md);
+  pointer-events: none;
+}
+
+.sale-page .toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}

@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Repository
@@ -51,4 +52,20 @@ public interface PhieuGiamGiaRepository extends JpaRepository<PhieuGiamGia, Inte
             @Param("timeStatus") String timeStatus,
             @Param("loai") LoaiPhieuGiamGia loai, Pageable pageable
     );
+
+    @Query("""
+        SELECT COUNT(v) FROM PhieuGiamGia v
+        WHERE v.trangThai = true
+        AND v.ngayBatDau <= CURRENT_TIMESTAMP
+        AND v.ngayKetThuc >= CURRENT_TIMESTAMP
+    """)
+    long countActive();
+
+    @Query("""
+        SELECT COUNT(v) FROM PhieuGiamGia v
+        WHERE v.trangThai = true
+        AND v.ngayKetThuc >= CURRENT_TIMESTAMP
+        AND v.ngayKetThuc <= :deadline
+    """)
+    long countExpiringSoon(@Param("deadline") LocalDateTime deadline);
 }

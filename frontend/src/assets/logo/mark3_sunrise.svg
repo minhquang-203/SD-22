@@ -1,0 +1,7 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#E3C892"/><stop offset="0.5" stop-color="#C9A96E"/><stop offset="1" stop-color="#9E7340"/>
+</linearGradient></defs>
+<polygon points="39.2,66.7 27.5,60.9 40.0,64.8" fill="url(#g)"/><polygon points="44.8,58.1 37.0,47.6 46.3,56.8" fill="url(#g)"/><polygon points="53.7,52.9 51.5,40.0 55.7,52.4" fill="url(#g)"/><polygon points="64.3,52.4 68.5,40.0 66.3,52.9" fill="url(#g)"/><polygon points="73.7,56.8 83.0,47.6 75.2,58.1" fill="url(#g)"/><polygon points="80.0,64.8 92.5,60.9 80.8,66.7" fill="url(#g)"/>
+<path d="M 43 74 A 17 17 0 0 0 77 74 Z" fill="url(#g)"/>
+<line x1="33" y1="74" x2="87" y2="74" stroke="url(#g)" stroke-width="2.4" stroke-linecap="round"/>
+</svg>

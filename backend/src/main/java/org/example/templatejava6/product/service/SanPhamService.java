@@ -5,7 +5,9 @@ import org.example.templatejava6.common.entity.LoaiDa;
 import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.common.repository.LoaiDaRepository;
 import org.example.templatejava6.common.service.ProductFileStorageService;
+import org.example.templatejava6.common.util.MaGenerator;
 import org.example.templatejava6.common.util.MapperUtil;
+import org.example.templatejava6.common.model.response.MaTiepTheoResponse;
 import org.example.templatejava6.product.entity.*;
 import org.example.templatejava6.product.model.request.AnhSanPhamRequest;
 import org.example.templatejava6.product.model.request.ChiTietSanPhamRequest;
@@ -83,12 +85,18 @@ public class SanPhamService {
         return buildDetailResponse(sp);
     }
 
+    @Transactional(readOnly = true)
+    public MaTiepTheoResponse previewMaTiepTheo() {
+        return new MaTiepTheoResponse(
+                MaGenerator.nextCode("SP", sanPhamRepository.findAll().stream().map(SanPham::getMaSanPham).toList()));
+    }
+
     @Transactional
     public void add(SanPhamRequest request, List<MultipartFile> files) {
-        validateMaSanPham(request.getMaSanPham(), null);
         validateChiTiets(request.getChiTiets(), null);
 
         SanPham sp = MapperUtil.map(request, SanPham.class);
+        sp.setMaSanPham(MaGenerator.nextCode("SP", sanPhamRepository.findAll().stream().map(SanPham::getMaSanPham).toList()));
         sp.setThuongHieu(categoryService.getThuongHieuOrThrow(request.getIdThuongHieu()));
         sp.setDanhMuc(categoryService.getDanhMucOrThrow(request.getIdDanhMuc()));
         sp.setDangSanPham(categoryService.getDangSanPhamOrThrow(request.getIdDangSanPham()));

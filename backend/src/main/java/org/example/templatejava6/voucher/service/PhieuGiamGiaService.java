@@ -6,12 +6,16 @@ import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.common.util.MapperUtil;
 import org.example.templatejava6.voucher.model.request.PhieuGiamGiaRequest;
 import org.example.templatejava6.voucher.model.response.PhieuGiamGiaResponse;
+import org.example.templatejava6.voucher.model.response.PhieuGiamGiaStatsResponse;
 import org.example.templatejava6.voucher.repository.PhieuGiamGiaRepository;
+import org.example.templatejava6.order.repository.HoaDonRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 
 @Service
@@ -22,6 +26,9 @@ public class PhieuGiamGiaService {
 
     @Autowired
     private PhieuGiamGiaRepository phieuGiamGiaRepository;
+
+    @Autowired
+    private HoaDonRepository hoaDonRepository;
 
     @Transactional(readOnly = true)
     public Page<PhieuGiamGiaResponse> getAll(Pageable pageable) {
@@ -87,6 +94,17 @@ public class PhieuGiamGiaService {
 
         Page<PhieuGiamGia> phieuGiamGiaList = phieuGiamGiaRepository.search(keyword, timeStatus, loai, pageable);
         return  phieuGiamGiaList.map(PhieuGiamGiaResponse::new);
+    }
+
+    @Transactional(readOnly = true)
+    public PhieuGiamGiaStatsResponse getStats() {
+        LocalDateTime deadline = LocalDateTime.now().plusDays(7);
+        return new PhieuGiamGiaStatsResponse(
+                phieuGiamGiaRepository.countActive(),
+                hoaDonRepository.countVoucherUsage(),
+                hoaDonRepository.sumVoucherSavings(),
+                phieuGiamGiaRepository.countExpiringSoon(deadline)
+        );
     }
 
 //    public Page<PhieuGiamGiaResponse> paginition(return null)

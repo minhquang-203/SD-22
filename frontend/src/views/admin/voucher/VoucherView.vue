@@ -45,6 +45,11 @@ const voucherPage = ref({
   last: true,
 });
 
+const statsRefreshKey = ref(0);
+const refreshStats = () => {
+  statsRefreshKey.value += 1;
+};
+
 /* ================= LOAD DATA ================= */
 const loadData = async (page = 1) => {
   dangTai.value = true;
@@ -107,6 +112,7 @@ const xacNhanXoa = async (phieu) => {
     dangTai.value = true;
     await deleteVoucher(phieu.id);
     await loadData(trangHienTai.value);
+    refreshStats();
   } catch (e) {
     alert("Xóa thất bại");
     console.error(e);
@@ -127,6 +133,7 @@ const handleCreate = async (payload) => {
     await createVoucher(payload);
     alert("Tạo voucher thành công");
     await loadData(1);
+    refreshStats();
   } catch (e) {
     console.error(e);
     alert("Tạo thất bại");
@@ -145,6 +152,7 @@ const handleUpdate = async (payload) => {
     await updateVoucher(payload.id, payload);
     alert("Cập nhật thành công");
     await loadData(trangHienTai.value);
+    refreshStats();
   } catch (e) {
     console.error(e);
     alert("Cập nhật thất bại");
@@ -198,7 +206,7 @@ const handleExport = () => console.log("export");
     />
 
     <!-- STATS -->
-    <DashboardStat />
+    <DashboardStat :refresh-key="statsRefreshKey" />
 
     <!-- TOOLBAR -->
     <VoucherToolBar

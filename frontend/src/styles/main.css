@@ -1796,6 +1796,35 @@ h2,
   margin-top: 6px;
 }
 
+.pos-product-card__hsd {
+  font-size: 11px;
+  color: rgba(30, 21, 16, 0.55);
+  margin-top: 4px;
+}
+
+.pos-product-card__badge-expiry {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.pos-product-card__badge-expiry--danger {
+  background: #fde8e8;
+  color: #b42318;
+  border: 1px solid #f5c2c2;
+}
+
+.pos-product-card__badge-expiry--warn {
+  background: #fff3e6;
+  color: #c46a00;
+  border: 1px solid #f5d4a8;
+}
+
 .pos-create-invoice-btn {
   flex: 1;
   padding: 18px 24px;

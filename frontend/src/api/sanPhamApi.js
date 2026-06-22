@@ -2,6 +2,8 @@ import request from './request'
 
 export const getProducts = () => request.get('/san-pham')
 
+export const getMaTiepTheo = () => request.get('/san-pham/ma-tiep-theo')
+
 export const searchProducts = (keyword) =>
   request.get('/san-pham/tim', { params: { keyword } })
 

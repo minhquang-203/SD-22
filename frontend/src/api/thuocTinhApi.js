@@ -4,6 +4,7 @@ function createAttributeApi(basePath) {
   return {
     list: () => request.get(`/${basePath}`),
     detail: (id) => request.get(`/${basePath}/detail`, { params: { id } }),
+    getMaTiepTheo: () => request.get(`/${basePath}/ma-tiep-theo`),
     add: (payload) => request.post(`/${basePath}/add`, payload),
     update: (id, payload) => request.put(`/${basePath}/update/${id}`, payload),
     remove: (id) => request.delete(`/${basePath}/delete`, { params: { id } }),

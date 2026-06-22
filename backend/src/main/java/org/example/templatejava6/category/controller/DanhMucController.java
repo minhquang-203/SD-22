@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import org.example.templatejava6.category.model.request.DanhMucRequest;
 import org.example.templatejava6.category.model.response.DanhMucResponse;
 import org.example.templatejava6.category.service.CategoryService;
+import org.example.templatejava6.common.model.response.MaTiepTheoResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,6 +25,11 @@ public class DanhMucController {
     @GetMapping("detail")
     public DanhMucResponse detail(@RequestParam("id") Integer id) {
         return categoryService.detailDanhMuc(id);
+    }
+
+    @GetMapping("ma-tiep-theo")
+    public MaTiepTheoResponse maTiepTheo() {
+        return categoryService.previewMaDanhMuc();
     }
 
     @PostMapping("add")

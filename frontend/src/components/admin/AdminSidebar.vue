@@ -9,6 +9,7 @@ import {
   getCurrentRole,
 } from '@/constants/adminMenu'
 import { buildAdminMenuOptions } from '@/utils/adminMenuOptions'
+import AppLogo from '@/components/common/AppLogo.vue'
 
 const props = defineProps({
   collapsed: { type: Boolean, default: false },
@@ -63,20 +64,7 @@ watch(
         class="admin-sidebar-naive__brand"
         :class="{ 'admin-sidebar-naive__brand--collapsed': collapsed }"
       >
-        <svg
-          v-if="collapsed"
-          class="admin-sidebar-naive__logo"
-          viewBox="0 0 32 32"
-          fill="none"
-          aria-hidden="true"
-        >
-          <path d="M16 3L6 8.5V20.5L16 26l10-5.5V8.5L16 3z" fill="#C9A96E" />
-          <path d="M16 8l5.5 3v6L16 20l-5.5-3v-6L16 8z" fill="#fff" fill-opacity="0.35" />
-        </svg>
-        <div v-else class="admin-sidebar-naive__brand-text">
-          <div class="admin-sidebar-naive__title">SUNOVA</div>
-          <div class="admin-sidebar-naive__tagline">Chống nắng &amp; chăm sóc da</div>
-        </div>
+        <AppLogo variant="dark" :size="40" :collapsed="collapsed" class="max-w-full" />
       </div>
 
       <div class="admin-sidebar-naive__menu">

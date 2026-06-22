@@ -5,6 +5,7 @@ import lombok.Setter;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -17,6 +18,8 @@ public class BienTheBanResponse {
     private String tenMauSac;
     private BigDecimal giaBan;
     private Integer soLuongTon;
+    private LocalDate hanSuDungGanNhat;
+    private Integer soNgayConLai;
 
     public BienTheBanResponse(ChiTietSanPham cts) {
         this.idChiTietSanPham = cts.getId();

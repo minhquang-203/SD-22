@@ -14,7 +14,7 @@ import {
   layDonCho,
   huyDonCho,
 } from '@/api/banHangApi'
-import { formatCurrency } from '@/utils/format'
+import { formatCurrency, formatMonthYear } from '@/utils/format'
 import { confirm } from '@/composables/useConfirm'
 
 const loading = ref(false)
@@ -124,6 +124,13 @@ function productInitial(name) {
 
 function isOutOfStock(product) {
   return !product.soLuongTon || product.soLuongTon <= 0
+}
+
+function posExpiryBadge(product) {
+  if (product.soNgayConLai == null || !product.hanSuDungGanNhat) return null
+  if (product.soNgayConLai <= 0) return 'expired'
+  if (product.soNgayConLai <= 30) return 'warning'
+  return null
 }
 
 function addToCart(product) {
@@ -569,6 +576,24 @@ onMounted(async () => {
             <p class="pos-product-card__stock">
               {{ isOutOfStock(item) ? 'Hết hàng' : `Còn ${item.soLuongTon}` }}
             </p>
+            <p
+              v-if="item.hanSuDungGanNhat && !isOutOfStock(item)"
+              class="pos-product-card__hsd"
+            >
+              HSD: {{ formatMonthYear(item.hanSuDungGanNhat) }}
+            </p>
+            <span
+              v-if="posExpiryBadge(item) === 'expired' && !isOutOfStock(item)"
+              class="pos-product-card__badge-expiry pos-product-card__badge-expiry--danger"
+            >
+              Hết hạn
+            </span>
+            <span
+              v-else-if="posExpiryBadge(item) === 'warning' && !isOutOfStock(item)"
+              class="pos-product-card__badge-expiry pos-product-card__badge-expiry--warn"
+            >
+              Sắp hết hạn
+            </span>
           </button>
         </div>
       </div>

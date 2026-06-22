@@ -2,12 +2,19 @@
 import { computed, ref, watch } from 'vue'
 import ProductSkuTable from './ProductSkuTable.vue'
 import ProductImageManager from './ProductImageManager.vue'
+import AttributeChipGroup from '@/components/ui/AttributeChipGroup.vue'
+import SearchableSelect from '@/components/ui/SearchableSelect.vue'
 import { LOAI_DA_OPTIONS } from '@/constants/loaiDa'
 import {
   createEmptyProductForm,
   detailToForm,
   validateProductForm,
 } from '@/utils/productForm'
+import { getMaTiepTheo } from '@/api/sanPhamApi'
+
+function mapSelectOptions(list) {
+  return (list || []).map((item) => ({ value: item.id, label: item.ten }))
+}
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -33,6 +40,10 @@ const title = computed(() =>
   props.mode === 'create' ? 'Thêm sản phẩm mới' : 'Cập nhật sản phẩm',
 )
 
+const thuongHieuSelectOptions = computed(() => mapSelectOptions(props.thuongHieuOptions))
+const danhMucSelectOptions = computed(() => mapSelectOptions(props.danhMucOptions))
+const dangSanPhamSelectOptions = computed(() => mapSelectOptions(props.dangSanPhamOptions))
+
 const tabs = [
   { key: 'basic', label: 'Thông tin cơ bản' },
   { key: 'attributes', label: 'Thuộc tính' },
@@ -42,7 +53,7 @@ const tabs = [
 
 watch(
   () => [props.open, props.initialDetail, props.mode],
-  () => {
+  async () => {
     if (!props.open) return
     activeTab.value = 'basic'
     error.value = ''
@@ -50,24 +61,21 @@ watch(
       form.value = detailToForm(props.initialDetail, props.mauSacOptions)
     } else {
       form.value = createEmptyProductForm()
+      await loadPreviewMaSanPham()
     }
   },
   { immediate: true },
 )
 
-function toggleMultiSelect(field, id) {
-  const list = form.value[field] || []
-  const index = list.indexOf(id)
-  if (index >= 0) {
-    list.splice(index, 1)
-  } else {
-    list.push(id)
+async function loadPreviewMaSanPham() {
+  if (props.mode !== 'create') return
+  form.value.maSanPham = '...'
+  try {
+    const res = await getMaTiepTheo()
+    form.value.maSanPham = res.data?.ma || ''
+  } catch {
+    form.value.maSanPham = ''
   }
-  form.value[field] = [...list]
-}
-
-function isSelected(field, id) {
-  return (form.value[field] || []).includes(id)
 }
 
 function handleSubmit() {
@@ -120,8 +128,16 @@ function handleSubmit() {
 
         <div v-show="activeTab === 'basic'" class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label class="admin-label">Mã sản phẩm *</label>
-            <input v-model="form.maSanPham" class="admin-input" placeholder="VD: SP001" />
+            <label class="admin-label">Mã sản phẩm</label>
+            <input
+              v-model="form.maSanPham"
+              class="admin-input bg-[var(--mist)] text-[var(--admin-muted)] cursor-not-allowed font-mono"
+              readonly
+              placeholder="Đang tải mã..."
+            />
+            <p v-if="mode === 'create'" class="text-xs text-[var(--admin-muted)] mt-1">
+              Mã dự kiến — backend tự sinh khi lưu
+            </p>
           </div>
           <div>
             <label class="admin-label">Tên sản phẩm *</label>
@@ -129,30 +145,27 @@ function handleSubmit() {
           </div>
           <div>
             <label class="admin-label">Thương hiệu *</label>
-            <select v-model="form.idThuongHieu" class="admin-select">
-              <option :value="null">Chọn thương hiệu</option>
-              <option v-for="item in thuongHieuOptions" :key="item.id" :value="item.id">
-                {{ item.ten }}
-              </option>
-            </select>
+            <SearchableSelect
+              v-model="form.idThuongHieu"
+              :options="thuongHieuSelectOptions"
+              placeholder="Chọn thương hiệu"
+            />
           </div>
           <div>
             <label class="admin-label">Danh mục *</label>
-            <select v-model="form.idDanhMuc" class="admin-select">
-              <option :value="null">Chọn danh mục</option>
-              <option v-for="item in danhMucOptions" :key="item.id" :value="item.id">
-                {{ item.ten }}
-              </option>
-            </select>
+            <SearchableSelect
+              v-model="form.idDanhMuc"
+              :options="danhMucSelectOptions"
+              placeholder="Chọn danh mục"
+            />
           </div>
           <div>
             <label class="admin-label">Dạng sản phẩm *</label>
-            <select v-model="form.idDangSanPham" class="admin-select">
-              <option :value="null">Chọn dạng</option>
-              <option v-for="item in dangSanPhamOptions" :key="item.id" :value="item.id">
-                {{ item.ten }}
-              </option>
-            </select>
+            <SearchableSelect
+              v-model="form.idDangSanPham"
+              :options="dangSanPhamSelectOptions"
+              placeholder="Chọn dạng"
+            />
           </div>
           <div>
             <label class="admin-label">Loại chống nắng</label>
@@ -183,54 +196,22 @@ function handleSubmit() {
           </div>
         </div>
 
-        <div v-show="activeTab === 'attributes'" class="space-y-5">
-          <div>
-            <h4 class="font-semibold text-sm mb-2">Loại da phù hợp</h4>
-            <div class="flex flex-wrap gap-2">
-              <button
-                v-for="item in LOAI_DA_OPTIONS"
-                :key="item.id"
-                type="button"
-                class="admin-btn"
-                :class="isSelected('idLoaiDas', item.id) ? 'admin-btn-primary' : 'admin-btn-default'"
-                @click="toggleMultiSelect('idLoaiDas', item.id)"
-              >
-                {{ item.ten }}
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <h4 class="font-semibold text-sm mb-2">Công dụng</h4>
-            <div class="flex flex-wrap gap-2">
-              <button
-                v-for="item in congDungOptions"
-                :key="item.id"
-                type="button"
-                class="admin-btn"
-                :class="isSelected('idCongDungs', item.id) ? 'admin-btn-primary' : 'admin-btn-default'"
-                @click="toggleMultiSelect('idCongDungs', item.id)"
-              >
-                {{ item.ten }}
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <h4 class="font-semibold text-sm mb-2">Thành phần</h4>
-            <div class="flex flex-wrap gap-2">
-              <button
-                v-for="item in thanhPhanOptions"
-                :key="item.id"
-                type="button"
-                class="admin-btn"
-                :class="isSelected('idThanhPhans', item.id) ? 'admin-btn-primary' : 'admin-btn-default'"
-                @click="toggleMultiSelect('idThanhPhans', item.id)"
-              >
-                {{ item.ten }}
-              </button>
-            </div>
-          </div>
+        <div v-show="activeTab === 'attributes'" class="space-y-6">
+          <AttributeChipGroup
+            v-model="form.idLoaiDas"
+            title="Loại da phù hợp"
+            :options="LOAI_DA_OPTIONS"
+          />
+          <AttributeChipGroup
+            v-model="form.idCongDungs"
+            title="Công dụng"
+            :options="congDungOptions"
+          />
+          <AttributeChipGroup
+            v-model="form.idThanhPhans"
+            title="Thành phần"
+            :options="thanhPhanOptions"
+          />
         </div>
 
         <div v-show="activeTab === 'sku'">

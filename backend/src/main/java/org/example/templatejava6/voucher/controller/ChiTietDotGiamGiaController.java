@@ -21,10 +21,10 @@ public class ChiTietDotGiamGiaController {
         return chiTietDotGiamGiaService.getByDotGiamGia(idDotGiamGia);
     }
 
-//    @GetMapping("detail")
-//    public ChiTietDotGiamGiaResponse detail(@RequestParam("id") Integer id) {
-//        return chiTietDotGiamGiaService.detail(id);
-//    }
+    @GetMapping("/{id}")
+    public ChiTietDotGiamGiaResponse detail(@PathVariable("id") Integer id) {
+        return chiTietDotGiamGiaService.detail(id);
+    }
 
     @PostMapping()
     public void add(@Valid @RequestBody ChiTietDotGiamGiaRequest request) {
