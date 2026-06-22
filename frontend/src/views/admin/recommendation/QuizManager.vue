@@ -1,101 +1,103 @@
 <template>
   <div class="admin-quiz-manager">
-    <div class="page-header">
-      <div>
+    
+    <div class="builder-container">
+      
+      <div class="header-section">
         <h1 class="page-title">Quản lý Quiz Loại Da</h1>
-      </div>
-      <button class="btn-primary" @click="openAddModal">
-        + Thêm Câu Hỏi Mới
-      </button>
-    </div>
-
-    <div class="question-list">
-      <div v-if="questions.length === 0" class="empty-state card">
-        Chưa có câu hỏi nào. Hãy bấm thêm mới!
+        <p class="subtitle">Thiết lập câu hỏi và luật tính điểm cho hệ thống gợi ý tự động.</p>
       </div>
 
-      <div v-for="(q, index) in questions" :key="q.id" class="question-card">
-        <div class="q-header">
-          <h3 class="q-title">Câu {{ index + 1 }}: {{ q.title }}</h3>
-          <div class="q-actions">
-            <button class="btn-icon edit" @click="editQuestion(q)" title="Sửa">✏️</button>
-            <button class="btn-icon delete" @click="deleteQuestion(q.id)" title="Xóa">🗑️</button>
-          </div>
+      <div class="questions-section">
+        <div class="section-title">
+          <span>Cấu trúc bài trắc nghiệm</span>
         </div>
 
-        <div class="q-body">
-          <p class="ans-label-text">Các đáp án:</p>
-          <div class="answers-container">
-            <div v-for="(ans, aIndex) in q.answers" :key="aIndex" class="answer-row">
-              <div class="ans-left">
-                <span class="ans-icon">{{ ans.icon || '✨' }}</span>
-                <span class="ans-text">{{ ans.label }}</span>
+        <div v-for="(q, index) in questions" :key="q.id" class="question-box">
+          
+          <div v-if="editingId === q.id" class="edit-mode">
+            <div class="box-header edit-header">
+              <h4>Cập nhật Câu {{ index + 1 }}</h4>
+            </div>
+            
+            <div class="form-group">
+              <input type="text" v-model="currentQuestion.title" class="input-title-edit" placeholder="Nhập câu hỏi (VD: Làn da của bạn...)">
+            </div>
+
+            <div class="answers-edit-list">
+              <p class="label-sm">Các đáp án:</p>
+              <div v-for="(ans, aIndex) in currentQuestion.answers" :key="aIndex" class="inline-answer-row">
+                <input type="text" v-model="ans.label" placeholder="Nội dung đáp án" class="flex-2">
+                <input type="number" v-model="ans.scoreValue" placeholder="Điểm" class="flex-1 text-center">
+                <select v-model="ans.tagId" class="flex-1">
+                  <option value="" disabled>-- Loại Da --</option>
+                  <option v-for="tag in availableTags" :key="tag.id" :value="tag.id">{{ tag.name }}</option>
+                </select>
+                <button class="btn-remove-ans" @click="removeAnswer(aIndex)" title="Xóa đáp án">✖</button>
               </div>
-              <div class="ans-badges">
-                <span class="score-badge">Điểm: {{ ans.scoreValue }}</span>
-                <span class="tag-badge" :class="getTagStyle(ans.tagId)">{{ getTagName(ans.tagId) }}</span>
+              <button class="btn-text" @click="addAnswer">+ Thêm đáp án</button>
+            </div>
+
+            <div class="action-footer">
+              <button class="btn-cancel" @click="cancelEdit">Hủy</button>
+              <button class="btn-save" @click="saveQuestion">Lưu thay đổi</button>
+            </div>
+          </div>
+
+          <div v-else class="view-mode">
+            <div class="box-header">
+              <h4 class="drag-handle">⠿ Câu {{ index + 1 }}</h4>
+              <div class="actions">
+               <label class="required-check">
+                   <input type="checkbox" v-model="q.batBuoc" @change="saveQuestionInline(q)"> Bắt buộc
+               </label>
+                <button class="btn-icon" @click="startEdit(q)" title="Sửa câu này">✏️</button>
+                <button class="btn-icon delete" @click="deleteQuestion(q.id)" title="Xóa">🗑️</button>
+              </div>
+            </div>
+            <div class="box-body">
+              <p class="q-title-display">{{ q.title }}</p>
+              <div class="ans-badges-preview">
+                <span v-for="(ans, aIndex) in q.answers" :key="aIndex" class="preview-badge">
+                  {{ ans.label }} ({{ ans.scoreValue }}đ)
+                </span>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
 
-    <div v-if="isModalOpen" class="modal-overlay" @click.self="closeModal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>{{ isEditing ? 'Cập Nhật Câu Hỏi' : 'Thêm Câu Hỏi Mới' }}</h2>
-          <button class="btn-close" @click="closeModal">×</button>
         </div>
 
-        <div class="modal-body">
+        <div v-if="editingId === 'new'" class="question-box edit-mode new-box">
+          <div class="box-header edit-header">
+            <h4>Thêm Câu Hỏi Mới</h4>
+          </div>
           <div class="form-group">
-            <label>Nội dung câu hỏi <span class="required">*</span></label>
-            <input type="text" v-model="currentQuestion.title" placeholder="VD: Làn da của bạn thường cảm thấy thế nào sau khi rửa mặt?">
+            <input type="text" v-model="currentQuestion.title" class="input-title-edit" placeholder="Nhập câu hỏi mới...">
           </div>
-
-          <div class="answers-section">
-            <div class="section-header">
-              <h3>Các đáp án lựa chọn</h3>
-              <button class="btn-sm btn-outline" @click="addAnswer">+ Thêm đáp án</button>
+          <div class="answers-edit-list">
+            <div v-for="(ans, aIndex) in currentQuestion.answers" :key="aIndex" class="inline-answer-row">
+              <input type="text" v-model="ans.label" placeholder="Nội dung đáp án" class="flex-2">
+              <input type="number" v-model="ans.scoreValue" placeholder="Điểm" class="flex-1 text-center">
+              <select v-model="ans.tagId" class="flex-1">
+                <option value="" disabled>-- Chọn --</option>
+                <option v-for="tag in availableTags" :key="tag.id" :value="tag.id">{{ tag.name }}</option>
+              </select>
+              <button class="btn-remove-ans" @click="removeAnswer(aIndex)">✖</button>
             </div>
-
-            <div v-for="(ans, index) in currentQuestion.answers" :key="index" class="answer-edit-box">
-              <div class="ans-row-edit">
-                
-                <div class="flex-none form-group mb-0 icon-input-group">
-                  <label>Icon</label>
-                  <input type="text" v-model="ans.icon" placeholder="💧" class="text-center">
-                </div>
-
-                <div class="flex-2 form-group mb-0">
-                  <label>Nội dung đáp án</label>
-                  <input type="text" v-model="ans.label" placeholder="VD: Bóng nhờn">
-                </div>
-                
-                <div class="flex-1 form-group mb-0">
-                  <label>Điểm</label>
-                  <input type="number" v-model="ans.scoreValue" placeholder="10">
-                </div>
-                
-                <div class="flex-1 form-group mb-0">
-                  <label>Tag Nhãn (Loại da)</label>
-                  <select v-model="ans.tagId">
-                    <option value="" disabled>-- Chọn --</option>
-                    <option v-for="tag in availableTags" :key="tag.id" :value="tag.id">{{ tag.name }}</option>
-                  </select>
-                </div>
-                
-                <button class="btn-icon delete-ans mt-20" @click="removeAnswer(index)">✖</button>
-              </div>
-            </div>
+            <button class="btn-text" @click="addAnswer">+ Thêm đáp án</button>
+          </div>
+          <div class="action-footer">
+            <button class="btn-cancel" @click="cancelEdit">Hủy</button>
+            <button class="btn-save" @click="saveQuestion">Lưu câu hỏi</button>
           </div>
         </div>
 
-        <div class="modal-footer">
-          <button class="btn-outline" @click="closeModal">Hủy bỏ</button>
-          <button class="btn-primary" @click="saveQuestion">Lưu Câu Hỏi</button>
+        <div class="add-btn-wrapper" v-if="editingId !== 'new'">
+          <button class="btn-add-outline" @click="addNewInline">
+            + Thêm câu hỏi trắc nghiệm
+          </button>
         </div>
+
       </div>
     </div>
   </div>
@@ -105,10 +107,9 @@
 import { ref, onMounted } from 'vue';
 
 const questions = ref([]);
-const isModalOpen = ref(false);
-const isEditing = ref(false);
+const editingId = ref(null); 
+const currentQuestion = ref(null);
 
-// Đã chuẩn hóa ID khớp 100% với file SUNOVA_full.sql của bạn
 const availableTags = ref([
   { id: 1, name: 'Da Dầu' },      
   { id: 2, name: 'Da Khô' },
@@ -117,15 +118,6 @@ const availableTags = ref([
   { id: 5, name: 'Da Nhạy Cảm' },
 ]);
 
-const defaultQuestion = {
-  id: null,
-  title: '',
-  answers: []
-};
-
-const currentQuestion = ref(JSON.parse(JSON.stringify(defaultQuestion)));
-
-// MÓC NỐI VỚI BACKEND SPRING BOOT
 const API_URL = 'http://localhost:8080/api/admin/quizzes';
 
 const loadQuestions = async () => {
@@ -139,54 +131,39 @@ const loadQuestions = async () => {
   }
 };
 
-onMounted(() => {
-  loadQuestions();
-});
+onMounted(() => loadQuestions());
 
-const getTagName = (tagId) => {
-  const t = availableTags.value.find(x => x.id === tagId);
-  return t ? t.name : 'Chưa có tag';
+const startEdit = (q) => {
+  editingId.value = q.id;
+  currentQuestion.value = JSON.parse(JSON.stringify(q));
 };
 
-const getTagStyle = (tagId) => {
-  if (tagId === 1) return 'tag-blue';
-  if (tagId === 2) return 'tag-orange';
-  if (tagId === 5) return 'tag-red';
-  if (tagId === 3) return 'tag-purple';
-  return 'tag-green'; 
-};
-
-// --- CHỨC NĂNG MỞ FORM ---
-const openAddModal = () => {
-  isEditing.value = false;
-  currentQuestion.value = JSON.parse(JSON.stringify({
+const addNewInline = () => {
+  editingId.value = 'new';
+  currentQuestion.value = {
     id: null,
     title: '',
     answers: [
-      { icon: '✨', label: '', tagId: '', scoreValue: 10 },
-      { icon: '✨', label: '', tagId: '', scoreValue: 10 }
+      { label: '', tagId: '', scoreValue: 10 },
+      { label: '', tagId: '', scoreValue: 10 }
     ]
-  }));
-  isModalOpen.value = true;
+  };
 };
 
-const editQuestion = (q) => {
-  isEditing.value = true;
-  currentQuestion.value = JSON.parse(JSON.stringify(q));
-  isModalOpen.value = true;
+const cancelEdit = () => {
+  editingId.value = null;
+  currentQuestion.value = null;
 };
 
-const closeModal = () => { isModalOpen.value = false; };
-const addAnswer = () => { currentQuestion.value.answers.push({ icon: '✨', label: '', tagId: '', scoreValue: 10 }); };
+const addAnswer = () => { currentQuestion.value.answers.push({ label: '', tagId: '', scoreValue: 10 }); };
 const removeAnswer = (index) => { currentQuestion.value.answers.splice(index, 1); };
 
-// --- GỌI API LƯU VÀ XÓA ---
 const saveQuestion = async () => {
   if (!currentQuestion.value.title.trim()) { alert("Vui lòng nhập câu hỏi!"); return; }
   if (currentQuestion.value.answers.length < 2) { alert("Cần ít nhất 2 đáp án!"); return; }
   
   try {
-    if (isEditing.value) {
+    if (editingId.value !== 'new') {
       await fetch(`${API_URL}/${currentQuestion.value.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -199,8 +176,8 @@ const saveQuestion = async () => {
         body: JSON.stringify(currentQuestion.value)
       });
     }
-    closeModal();
-    loadQuestions(); // Tải lại bảng ngay lập tức
+    cancelEdit();
+    loadQuestions(); 
   } catch (error) {
     alert("Có lỗi xảy ra khi lưu: " + error);
   }
@@ -219,72 +196,78 @@ const deleteQuestion = async (id) => {
 </script>
 
 <style scoped>
-/* =========================================
-   GIAO DIỆN ADMIN CHÍNH
-   ========================================= */
-.admin-quiz-manager { padding: 30px; background-color: #fcfcfc; min-height: 100vh; font-family: 'Helvetica Neue', sans-serif; }
+.admin-quiz-manager { 
+  background-color: #f3f4f6; 
+  padding: 40px 20px; 
+  min-height: 100vh; 
+  font-family: 'Inter', 'Helvetica Neue', sans-serif; 
+  display: flex;
+  justify-content: center;
+}
 
-.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-.page-title { font-size: 22px; font-weight: normal; color: #1a1a1a; font-style: italic; font-family: serif; }
+.builder-container {
+  background-color: #ffffff; 
+  width: 100%;
+  max-width: 850px;
+  border-radius: 12px;
+  padding: 40px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+}
 
-.btn-primary { background-color: #5a4bfa; color: white; border: none; padding: 12px 20px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: 0.2s; }
-.btn-primary:hover { background-color: #4a3ae0; }
+.header-section { margin-bottom: 30px; }
+.page-title { font-size: 24px; font-weight: 700; color: #111; margin: 0 0 8px 0; }
+.subtitle { font-size: 14px; color: #6b7280; margin: 0; }
 
-.question-list { display: flex; flex-direction: column; gap: 24px; }
-.question-card { background: white; border-radius: 10px; border: 1px solid #eaeaea; box-shadow: 0 4px 12px rgba(0,0,0,0.03); overflow: hidden; }
+.section-title { background: #f9fafb; padding: 12px 16px; border-radius: 8px; margin-bottom: 24px; font-size: 14px; font-weight: 600; color: #374151; }
 
-.q-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid #f0f0f0; }
-.q-title { margin: 0; font-size: 16px; font-weight: 600; color: #222; }
+.question-box {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  margin-bottom: 20px; 
+  background: #ffffff;
+  transition: all 0.2s;
+}
+.question-box:hover { border-color: #d1d5db; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
 
-.btn-icon { background: none; border: none; font-size: 16px; cursor: pointer; padding: 4px; opacity: 0.5; transition: 0.2s; }
-.btn-icon:hover { opacity: 1; }
+.box-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #f3f4f6; }
+.drag-handle { margin: 0; font-size: 14px; font-weight: 600; color: #111; display: flex; align-items: center; gap: 8px; cursor: grab; }
+.drag-handle::before { color: #9ca3af; }
 
-.q-body { padding: 20px 24px; }
-.ans-label-text { font-size: 14px; color: #666; margin-top: 0; margin-bottom: 12px; }
-.answers-container { display: flex; flex-direction: column; gap: 10px; }
+.actions { display: flex; align-items: center; gap: 12px; }
+.required-check { font-size: 13px; color: #4b5563; display: flex; align-items: center; gap: 6px; }
+.btn-icon { background: none; border: none; cursor: pointer; color: #6b7280; font-size: 14px; opacity: 0.7; transition: 0.2s; }
+.btn-icon:hover { opacity: 1; color: #111; }
+.btn-icon.delete:hover { color: #ef4444; }
 
-.answer-row { display: flex; justify-content: space-between; align-items: center; background-color: #f8f9fa; padding: 14px 20px; border-radius: 8px; }
-.ans-left { display: flex; align-items: center; gap: 12px; }
-.ans-icon { font-size: 20px; background: white; width: 36px; height: 36px; display: flex; justify-content: center; align-items: center; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-.ans-text { font-size: 14px; color: #333; font-weight: 500; }
-.ans-badges { display: flex; gap: 10px; }
+.box-body { padding: 20px; }
+.q-title-display { font-size: 15px; color: #1f2937; margin: 0 0 16px 0; font-weight: 500; }
+.ans-badges-preview { display: flex; flex-wrap: wrap; gap: 8px; }
+.preview-badge { background: #f3f4f6; color: #4b5563; font-size: 12px; padding: 6px 12px; border-radius: 20px; border: 1px solid #e5e7eb; }
 
-.score-badge { background-color: #eef2ff; color: #5a4bfa; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-.tag-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-.tag-blue { background-color: #e0f2fe; color: #0369a1; }
-.tag-orange { background-color: #ffedd5; color: #c2410c; }
-.tag-red { background-color: #fee2e2; color: #b91c1c; }
-.tag-purple { background-color: #f3e8ff; color: #7e22ce; }
-.tag-green { background-color: #dcfce7; color: #15803d; }
+.edit-mode { border: 1px solid #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+.edit-header h4 { margin: 0; color: #2563eb; font-size: 14px; }
+.input-title-edit { width: 100%; border: none; border-bottom: 2px solid #e5e7eb; padding: 12px 20px; font-size: 16px; outline: none; transition: 0.2s; background: transparent; }
+.input-title-edit:focus { border-bottom-color: #3b82f6; }
 
-/* =========================================
-   MODAL FORM
-   ========================================= */
-.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); display: flex; justify-content: center; align-items: flex-start; padding-top: 5vh; z-index: 1000; }
-.modal-content { background: white; width: 700px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); display: flex; flex-direction: column; max-height: 90vh; }
-.modal-header { padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-.modal-header h2 { margin: 0; font-size: 18px; }
-.btn-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #999; }
-.modal-body { padding: 20px; overflow-y: auto; }
-.modal-footer { padding: 20px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; gap: 10px; background: #fafafa; border-radius: 0 0 10px 10px; }
+.answers-edit-list { padding: 20px; background: #fafafa; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; }
+.label-sm { font-size: 13px; font-weight: 600; color: #4b5563; margin-top: 0; margin-bottom: 12px; }
 
-.form-group { margin-bottom: 15px; }
-.form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: #444; }
-.form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-family: inherit; }
+.inline-answer-row { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
+.inline-answer-row input, .inline-answer-row select { padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; outline: none; }
+.inline-answer-row input:focus, .inline-answer-row select:focus { border-color: #3b82f6; }
+.flex-2 { flex: 2; } .flex-1 { flex: 1; }
+.text-center { text-align: center; }
 
-.answers-section { margin-top: 25px; border-top: 1px dashed #ddd; padding-top: 20px; }
-.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-.section-header h3 { margin: 0; font-size: 15px; }
-.btn-outline { background: white; border: 1px solid #ccc; padding: 8px 15px; border-radius: 6px; cursor: pointer; }
+.btn-remove-ans { background: #fee2e2; color: #ef4444; border: none; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; }
+.btn-remove-ans:hover { background: #fecaca; }
+.btn-text { background: none; border: none; color: #3b82f6; font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; margin-top: 8px; }
 
-.answer-edit-box { background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #eee; }
-.ans-row-edit { display: flex; gap: 12px; align-items: flex-start; }
-.flex-none { flex: none; }
-.icon-input-group { width: 60px; }
-.text-center { text-align: center; font-size: 18px !important; }
-.flex-1 { flex: 1; } .flex-2 { flex: 2; }
-.mb-0 { margin-bottom: 0; }
-.mt-20 { margin-top: 28px; }
-.delete-ans { color: red; font-size: 18px; padding: 0 5px; }
-.required { color: red; }
+.action-footer { display: flex; justify-content: flex-end; gap: 12px; padding: 16px 20px; border-top: 1px solid #e5e7eb; background: #fff; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; }
+.btn-cancel { background: white; border: 1px solid #d1d5db; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; color: #374151; }
+.btn-save { background: #111827; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; }
+.btn-save:hover { background: #374151; }
+
+.add-btn-wrapper { text-align: center; margin-top: 20px; }
+.btn-add-outline { background: transparent; border: 2px dashed #d1d5db; color: #6b7280; width: 100%; padding: 16px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+.btn-add-outline:hover { border-color: #9ca3af; color: #374151; background: #f9fafb; }
 </style>

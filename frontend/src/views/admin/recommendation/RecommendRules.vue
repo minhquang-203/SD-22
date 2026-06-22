@@ -23,8 +23,8 @@
           <thead>
             <tr>
               <th style="width: 22%">Tên Quy Tắc Hệ Thống</th>
-              <th style="width: 40%">Mô tả Điều Kiện Gộp (IF)</th>
-              <th style="width: 23%">Tag Sản Phẩm Đề Xuất (THEN)</th>
+              <th style="width: 40%">Mô tả Điều Kiện Gộp </th>
+              <th style="width: 23%">Tag Sản Phẩm Đề Xuất</th>
               <th style="width: 10%">Trạng thái</th>
               <th class="actions-col" style="width: 5%">Thao tác</th>
             </tr>
@@ -116,7 +116,7 @@
 
           <div class="logic-section result-section">
             <div class="section-header">
-              <h3>Vùng 2: Định Hướng Gợi Ý Sản Phẩm (THEN)</h3>
+              <h3>Vùng 2: Định Hướng Gợi Ý Sản Phẩm</h3>
             </div>
             <p class="help-text">Nếu thỏa mãn các điều kiện điểm số trên, hệ thống tự động lọc các sản phẩm có các nhãn (Tag) dưới đây:</p>
             
