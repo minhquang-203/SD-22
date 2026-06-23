@@ -30,6 +30,14 @@ function humanizeMessage(text) {
     return raw.includes('SQL') ? 'Mã đã tồn tại. Vui lòng kiểm tra lại.' : raw
   }
 
+  if (lower.includes('forbidden') || lower === 'access denied') {
+    return 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại'
+  }
+
+  if (lower.includes('unauthorized')) {
+    return 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại'
+  }
+
   if (raw.includes('insert into') || raw.includes('SQL [')) {
     return 'Không thể lưu dữ liệu. Vui lòng kiểm tra lại thông tin.'
   }
