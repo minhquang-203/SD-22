@@ -3,6 +3,7 @@ package org.example.templatejava6.common.exception;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -37,6 +38,24 @@ public class GlobalExceptionHandler {
         res.put("code", ex.getCode());
         res.put("message", ex.getMessage());
         return new ResponseEntity<>(res, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<?> handleUnauthorized(UnauthorizedException ex) {
+        Map<String, Object> res = new HashMap<>();
+        res.put("status", "FAILED");
+        res.put("code", ex.getCode());
+        res.put("message", ex.getMessage());
+        return new ResponseEntity<>(res, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<?> handleAccessDenied(AccessDeniedException ex) {
+        Map<String, Object> res = new HashMap<>();
+        res.put("status", "FAILED");
+        res.put("code", "FORBIDDEN");
+        res.put("message", "Bạn không có quyền truy cập tài nguyên này");
+        return new ResponseEntity<>(res, HttpStatus.FORBIDDEN);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

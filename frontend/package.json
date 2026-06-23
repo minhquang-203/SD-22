@@ -12,7 +12,7 @@
     "@iconify/vue": "^5.0.1",
     "@tailwindcss/vite": "^4.3.0",
     "axios": "^1.16.1",
-    "bootstrap": "^5.3.8",
+    "bootstrap": "^5.3.3",
     "icons": "^1.0.0",
     "naive-ui": "^2.44.1",
     "tailwindcss": "^4.3.0",
