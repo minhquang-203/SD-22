@@ -16,6 +16,19 @@ public interface KhachHangRepository extends JpaRepository<KhachHang, Integer> {
 
     Optional<KhachHang> findBySoDienThoai(String soDienThoai);
 
+    Optional<KhachHang> findByEmailIgnoreCase(String email);
+
+    boolean existsByEmailIgnoreCase(String email);
+
+    boolean existsBySoDienThoai(String soDienThoai);
+
+    boolean existsByEmailIgnoreCaseAndIdNot(String email, Integer id);
+
+    boolean existsBySoDienThoaiAndIdNot(String soDienThoai, Integer id);
+
+    @Query("SELECT k FROM KhachHang k WHERE LOWER(k.email) = LOWER(:taiKhoan) OR k.soDienThoai = :taiKhoan")
+    Optional<KhachHang> findByEmailOrSoDienThoai(@Param("taiKhoan") String taiKhoan);
+
     boolean existsByMaKhachHang(String maKhachHang);
 
     @Query("SELECT k FROM KhachHang k WHERE "
