@@ -48,11 +48,8 @@
             <div class="box-header">
               <h4 class="drag-handle">⠿ Câu {{ index + 1 }}</h4>
               <div class="actions">
-               <label class="required-check">
-                   <input type="checkbox" v-model="q.batBuoc" @change="saveQuestionInline(q)"> Bắt buộc
-               </label>
                 <button class="btn-icon" @click="startEdit(q)" title="Sửa câu này">✏️</button>
-                <button class="btn-icon delete" @click="deleteQuestion(q.id)" title="Xóa">🗑️</button>
+                <button class="btn-icon delete" @click="openDeleteModal(q.id)" title="Xóa">🗑️</button>
               </div>
             </div>
             <div class="box-body">
@@ -100,6 +97,32 @@
 
       </div>
     </div>
+
+    <div v-if="showDeleteModal" class="custom-modal-overlay" @click.self="closeDeleteModal">
+      <div class="custom-modal-box">
+        
+        <div class="modal-icon-wrapper">
+          <div class="sparkles">✦ ✧ ✦</div>
+          <svg class="trash-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 7H18L17.2 19.5C17.1 20.3 16.3 21 15.4 21H8.6C7.7 21 6.9 20.3 6.8 19.5L6 7Z" fill="#ea4d5c"/>
+            <path d="M9 7V4C9 3.4 9.4 3 10 3H14C14.6 3 15 3.4 15 4V7" fill="#ea4d5c"/>
+            <path d="M4 7H20" stroke="#ea4d5c" stroke-width="2" stroke-linecap="round"/>
+            <path d="M10 11V17" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            <path d="M14 11V17" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+
+        <h3 class="modal-title">Xác nhận xóa câu hỏi?</h3>
+        <p class="modal-desc">Bạn có chắc chắn muốn xóa câu hỏi này không?<br>Hành động này không thể hoàn tác.</p>
+        
+        <div class="modal-buttons">
+          <button class="btn-pill-cancel" @click="closeDeleteModal">Hủy bỏ</button>
+          <button class="btn-pill-delete" @click="confirmDeleteQuestion">Xóa</button>
+        </div>
+
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -109,6 +132,10 @@ import { ref, onMounted } from 'vue';
 const questions = ref([]);
 const editingId = ref(null); 
 const currentQuestion = ref(null);
+
+// Khai báo biến cho Modal Xóa
+const showDeleteModal = ref(false);
+const questionIdToDelete = ref(null);
 
 const availableTags = ref([
   { id: 1, name: 'Da Dầu' },      
@@ -183,19 +210,33 @@ const saveQuestion = async () => {
   }
 };
 
-const deleteQuestion = async (id) => {
-  if (confirm("Xóa câu hỏi này?")) {
-    try {
-      await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
-      loadQuestions(); 
-    } catch (error) {
-      alert("Lỗi khi xóa: " + error);
-    }
+// --- LOGIC CHO CUSTOM MODAL XÓA ---
+const openDeleteModal = (id) => {
+  questionIdToDelete.value = id;
+  showDeleteModal.value = true;
+};
+
+const closeDeleteModal = () => {
+  showDeleteModal.value = false;
+  questionIdToDelete.value = null;
+};
+
+const confirmDeleteQuestion = async () => {
+  if (!questionIdToDelete.value) return;
+  try {
+    await fetch(`${API_URL}/${questionIdToDelete.value}`, { method: 'DELETE' });
+    closeDeleteModal(); 
+    loadQuestions();    
+  } catch (error) {
+    alert("Lỗi khi xóa: " + error);
   }
 };
 </script>
 
 <style scoped>
+/* =========================================
+   UI QUẢN LÝ CÂU HỎI
+   ========================================= */
 .admin-quiz-manager { 
   background-color: #f3f4f6; 
   padding: 40px 20px; 
@@ -217,16 +258,9 @@ const deleteQuestion = async (id) => {
 .header-section { margin-bottom: 30px; }
 .page-title { font-size: 24px; font-weight: 700; color: #111; margin: 0 0 8px 0; }
 .subtitle { font-size: 14px; color: #6b7280; margin: 0; }
-
 .section-title { background: #f9fafb; padding: 12px 16px; border-radius: 8px; margin-bottom: 24px; font-size: 14px; font-weight: 600; color: #374151; }
 
-.question-box {
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  margin-bottom: 20px; 
-  background: #ffffff;
-  transition: all 0.2s;
-}
+.question-box { border: 1px solid #e5e7eb; border-radius: 10px; margin-bottom: 20px; background: #ffffff; transition: all 0.2s; }
 .question-box:hover { border-color: #d1d5db; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
 
 .box-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #f3f4f6; }
@@ -234,7 +268,6 @@ const deleteQuestion = async (id) => {
 .drag-handle::before { color: #9ca3af; }
 
 .actions { display: flex; align-items: center; gap: 12px; }
-.required-check { font-size: 13px; color: #4b5563; display: flex; align-items: center; gap: 6px; }
 .btn-icon { background: none; border: none; cursor: pointer; color: #6b7280; font-size: 14px; opacity: 0.7; transition: 0.2s; }
 .btn-icon:hover { opacity: 1; color: #111; }
 .btn-icon.delete:hover { color: #ef4444; }
@@ -270,4 +303,111 @@ const deleteQuestion = async (id) => {
 .add-btn-wrapper { text-align: center; margin-top: 20px; }
 .btn-add-outline { background: transparent; border: 2px dashed #d1d5db; color: #6b7280; width: 100%; padding: 16px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; }
 .btn-add-outline:hover { border-color: #9ca3af; color: #374151; background: #f9fafb; }
+
+/* =========================================
+   CSS CHO MODAL XÓA (PILL-SHAPE DESIGN)
+   ========================================= */
+.custom-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4); 
+  backdrop-filter: blur(2px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.custom-modal-box {
+  background: #ffffff;
+  width: 420px;
+  border-radius: 24px;
+  padding: 40px 30px;
+  text-align: center;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  animation: modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Icon Thùng rác nghiêng và tia sáng */
+.modal-icon-wrapper {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 20px;
+}
+
+.trash-icon {
+  width: 64px;
+  height: 64px;
+  transform: rotate(-10deg);
+}
+
+.sparkles {
+  position: absolute;
+  top: -15px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 18px;
+  color: #333;
+  letter-spacing: 4px;
+  opacity: 0.7;
+}
+
+.modal-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 12px 0;
+}
+
+.modal-desc {
+  font-size: 15px;
+  color: #4b5563;
+  margin: 0 0 32px 0;
+  line-height: 1.5;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.btn-pill-cancel {
+  flex: 1;
+  background: #ffffff;
+  color: #ea4d5c;
+  border: 2px solid #ea4d5c;
+  padding: 12px 0;
+  border-radius: 30px; /* Hình viên thuốc */
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.btn-pill-cancel:hover {
+  background: #fff5f5;
+}
+
+.btn-pill-delete {
+  flex: 1;
+  background: #ea4d5c;
+  color: white;
+  border: 2px solid #ea4d5c;
+  padding: 12px 0;
+  border-radius: 30px; 
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+  box-shadow: 0 4px 10px rgba(234, 77, 92, 0.3); /* Bóng đổ màu đỏ */
+}
+.btn-pill-delete:hover {
+  background: #d63d4c;
+  border-color: #d63d4c;
+}
 </style>

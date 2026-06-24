@@ -1,4 +1,4 @@
-<template>
+<!-- <template>
   <div class="sunova-quiz-wrapper">
     
     <div class="quiz-header">
@@ -253,4 +253,4 @@ const submitQuiz = () => {
 
 .loader-icon { font-size: 80px; margin-bottom: 30px; animation: spin 2s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-</style>
+</style> -->
