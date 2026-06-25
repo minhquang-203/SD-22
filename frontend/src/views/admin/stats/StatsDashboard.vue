@@ -93,7 +93,7 @@
           </div>
         </div>
         <div class="chart-container">
-          <apexchart :type="currentChartType" height="320" :options="barOptions" :series="barSeries"></apexchart>
+          <apexchart :key="chartKey" :type="currentChartType" height="450" :options="barOptions" :series="barSeries"></apexchart>
         </div>
       </div>
 
@@ -149,13 +149,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import VueApexCharts from 'vue3-apexcharts';
-import axios from 'axios';
+import request from '@/api/request';
 
 const apexchart = VueApexCharts;
 const currentChartType = ref('bar'); 
-const activeFilter = ref('Năm nay'); 
+const activeFilter = ref('Năm nay');
+const chartKey = ref(0); 
 
 const fromDate = ref('');
 const toDate = ref('');
@@ -173,15 +174,17 @@ const summaryMetrics = ref({
 const paymentStats = ref({ transferPercent: 0, cashPercent: 0 });
 const rawChartData = ref([]);
 
+// Hàm này giữ lại để cho tooltips biểu đồ và các khu vực có diện tích nhỏ
 const formatMoney = (amount) => {
-  if (!amount || amount === 0) return '0đ';
+  if (!amount || amount === 0) return '0 đ';
   if (amount >= 1000000000) return (amount / 1000000000).toFixed(2).replace('.', ',') + ' Tỷ';
   if (amount >= 1000000) return Math.round(amount / 1000000) + ' Tr';
   return amount.toLocaleString('vi-VN') + ' đ';
 };
 
+// Hàm này sẽ dùng cho các thẻ Tổng quan để hiển thị số cực kỳ chi tiết
 const formatMoneyFull = (amount) => {
-  if (!amount || amount === 0) return '0đ';
+  if (!amount || amount === 0) return '0 đ';
   return Math.round(amount).toLocaleString('vi-VN') + ' đ';
 };
 
@@ -253,23 +256,21 @@ const fetchRealData = async () => {
   const endStr = `${toDate.value}T23:59:59`;
 
   const config = { params: { fromDate: startStr, toDate: endStr } };
-  const BASE_URL = 'http://localhost:8080/api/statistic';
-
   try {
     const [resSum, resTop, resFlow, resChart, resVoucher, resQuiz] = await Promise.all([
-      axios.get(`${BASE_URL}/summary`, config),
-      axios.get(`${BASE_URL}/top-products`, config),
-      axios.get(`${BASE_URL}/payment-flow`, config),
-      axios.get(`${BASE_URL}/chart`, config),
-      axios.get(`${BASE_URL}/voucher`, config),
-      axios.get(`${BASE_URL}/quiz`, config)
+      request.get('/statistic/summary', config),
+      request.get('/statistic/top-products', config),
+      request.get('/statistic/payment-flow', config),
+      request.get('/statistic/chart', config),
+      request.get('/statistic/voucher', config),
+      request.get('/statistic/quiz', config)
     ]);
 
     // 1. DATA TỔNG QUAN
     const dSum = resSum.data;
-    summaryMetrics.value.totalRevenue = formatMoney(dSum.totalRevenue);
-    summaryMetrics.value.actualRevenue = formatMoney(dSum.actualRevenue);
-    summaryMetrics.value.expectedRevenue = formatMoney(dSum.expectedRevenue);
+    summaryMetrics.value.totalRevenue = formatMoneyFull(dSum.totalRevenue);
+    summaryMetrics.value.actualRevenue = formatMoneyFull(dSum.actualRevenue);
+    summaryMetrics.value.expectedRevenue = formatMoneyFull(dSum.expectedRevenue);
     summaryMetrics.value.totalOrders = dSum.totalOrders ? dSum.totalOrders.toLocaleString('vi-VN') : '0';
     summaryMetrics.value.webOrders = dSum.webOrders || 0;
     summaryMetrics.value.posOrders = dSum.posOrders || 0;
@@ -302,21 +303,18 @@ const fetchRealData = async () => {
     }
 
     // 4. DATA BIỂU ĐỒ CHÍNH
-    rawChartData.value = resChart.data; 
-    const labels = []; const revenues = []; 
-    resChart.data.forEach(item => {
-        labels.push(item.name || item.NAME); 
-        revenues.push(item.value || item.VALUE);
-    });
-    barOptions.value = { ...barOptions.value, xaxis: { ...barOptions.value.xaxis, categories: labels } };
-    barSeries.value = [{ name: 'Doanh Thu Thực Tế', data: revenues }];
+    rawChartData.value = resChart.data;
+    chartCategories.value = resChart.data.map(item => item.name || item.NAME);
+    chartRevenues.value = resChart.data.map(item => item.value || item.VALUE);
+    chartKey.value++;
 
     // 5. DATA VOUCHER
     if(resVoucher.data && resVoucher.data.length > 0) {
         const vData = resVoucher.data[0];
         const tDiscount = vData.totalDiscount || vData.TOTALDISCOUNT || 0;
         const tUsage = vData.totalUsage || vData.TOTALUSAGE || 0;
-        summaryMetrics.value.voucherDiscount = formatMoney(tDiscount);
+        // Dùng formatMoneyFull ở đây nếu muốn số Voucher cũng chính xác từng đồng
+        summaryMetrics.value.voucherDiscount = formatMoneyFull(tDiscount);
         summaryMetrics.value.voucherUsage = tUsage;
     }
 
@@ -372,40 +370,69 @@ const pieOptions = ref({
 });
 
 // ===============================================
-// CẤU HÌNH BIỂU ĐỒ CHÍNH
+// CẤU HÌNH BIỂU ĐỒ CHÍNH (computed — formatter luôn hoạt động)
 // ===============================================
-const barSeries = ref([]);
-const barOptions = ref({
-  chart: { toolbar: { show: false }, fontFamily: 'Inter' },
-  colors: ['#8c6b4a'], 
-  plotOptions: { bar: { horizontal: false, columnWidth: '35%', borderRadius: 4 } },
-  dataLabels: { enabled: false },
-  stroke: { show: true, width: 3, curve: 'smooth', colors: ['transparent'] },
-  xaxis: { categories: [], labels: { style: { colors: '#8c6b4a', fontWeight: 600 } } },
-  yaxis: {
-    min: 0,
-    labels: {
-      style: { colors: '#8c6b4a', fontSize: '13px', fontWeight: 600 },
-      formatter: function(value) {
-        if (!value || value === 0) return "0";
-        if (value >= 1000000000) return (value / 1000000000).toFixed(1).replace('.0', '').replace('.', ',') + " Tỷ";
-        if (value >= 1000000) return Math.round(value / 1000000) + " Tr";
-        return Math.round(value).toLocaleString('vi-VN') + " đ";
-      }
-    }
-  },
-  tooltip: {
-    y: { formatter: function (val) { return formatMoney(val); } }
+const chartCategories = ref([]);
+const chartRevenues = ref([]);
+
+function formatYAxis(value) {
+  if (!value || value === 0) return '0';
+  if (value >= 1000000000) return (value / 1000000000).toFixed(1).replace('.0', '').replace('.', ',') + ' Tỷ';
+  if (value >= 1000000) return (value / 1000000).toFixed(1).replace('.0', '') + ' Tr';
+  if (value >= 1000) return Math.round(value / 1000) + 'K';
+  return Math.round(value).toLocaleString('vi-VN') + 'đ';
+}
+
+const barSeries = computed(() => {
+  const cats = chartCategories.value;
+  const revs = chartRevenues.value;
+  // Biểu đồ sóng mà chỉ có 1 điểm → thêm padding để vẽ được đường
+  if (currentChartType.value === 'area' && cats.length === 1) {
+    return [{ name: 'Doanh Thu Thực Tế', data: [0, revs[0], 0] }];
   }
+  return [{ name: 'Doanh Thu Thực Tế', data: revs }];
+});
+
+const barOptions = computed(() => {
+  const cats = chartCategories.value;
+  const isArea = currentChartType.value === 'area';
+  const colWidth = cats.length <= 1 ? '20%' : cats.length <= 3 ? '35%' : '50%';
+
+  // Nếu area + 1 điểm → thêm label trống 2 bên
+  let xCategories = cats;
+  if (isArea && cats.length === 1) {
+    xCategories = ['', cats[0], ''];
+  }
+
+  return {
+    chart: { toolbar: { show: false }, fontFamily: 'Inter', animations: { enabled: true, easing: 'easeinout', speed: 600 } },
+    colors: ['#8c6b4a'],
+    fill: isArea ? { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05, stops: [0, 90, 100] } } : {},
+    plotOptions: { bar: { horizontal: false, columnWidth: colWidth, borderRadius: 6 } },
+    dataLabels: { enabled: false },
+    stroke: isArea
+      ? { show: true, width: 3, curve: 'smooth', colors: ['#8c6b4a'] }
+      : { show: true, width: 2, colors: ['transparent'] },
+    markers: { size: cats.length <= 3 ? 6 : 0, colors: ['#8c6b4a'], strokeColors: '#fff', strokeWidth: 2 },
+    xaxis: { categories: xCategories, labels: { style: { colors: '#8c6b4a', fontWeight: 600, fontSize: '12px' } } },
+    yaxis: {
+      min: 0,
+      forceNiceScale: true,
+      labels: {
+        style: { colors: '#8c6b4a', fontSize: '13px', fontWeight: 600 },
+        formatter: formatYAxis
+      }
+    },
+    tooltip: {
+      y: { formatter: function (val) { return formatMoneyFull(val); } }
+    },
+    grid: { borderColor: '#e6dcd3', strokeDashArray: 4 }
+  };
 });
 
 const toggleChartType = (type) => {
   currentChartType.value = type;
-  if (type === 'area') {
-    barOptions.value = { ...barOptions.value, stroke: { show: true, width: 3, curve: 'smooth', colors: ['#8c6b4a'] } };
-  } else {
-    barOptions.value = { ...barOptions.value, stroke: { show: true, width: 2, colors: ['transparent'] } };
-  }
+  chartKey.value++;
 };
 
 // ===============================================

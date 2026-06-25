@@ -11,14 +11,9 @@
   "dependencies": {
     "@iconify/vue": "^5.0.1",
     "@tailwindcss/vite": "^4.3.0",
-<<<<<<< HEAD
     "apexcharts": "^5.15.2",
     "axios": "^1.18.1",
     "bootstrap": "^5.3.8",
-=======
-    "axios": "^1.16.1",
-    "bootstrap": "^5.3.3",
->>>>>>> eaa142328cc0f1eff38e27ccb869f2097e0b918f
     "icons": "^1.0.0",
     "naive-ui": "^2.44.1",
     "tailwindcss": "^4.3.0",

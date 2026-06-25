@@ -23,9 +23,6 @@ public class CauHoiQuiz {
     @Column(name = "trang_thai")
     private Boolean trangThai = true;
 
-    @Column(name = "bat_buoc")
-    private Boolean batBuoc = true;
-
     // CascadeType.ALL: Khi xóa câu hỏi, tự động xóa sạch các đáp án thuộc về nó
     @OneToMany(mappedBy = "cauHoi", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<DapAnQuiz> dapAns;
