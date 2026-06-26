@@ -81,14 +81,13 @@ const router = createRouter({
           meta: { title: 'Đơn hàng — SUNOVA', requiresAuth: true },
         },
         ...infoRoutes,
+        {
+          path: 'quiz',
+          name: 'QuizPlaceholder',
+          component: () => import('@/views/storefront/QuizPlaceholder.vue'),
+          meta: { title: 'Quiz da — SUNOVA' },
+        },
       ],
-    },
-
-    {
-      path: '/quiz',
-      name: 'QuizPlaceholder',
-      component: () => import('@/views/storefront/QuizPlaceholder.vue'),
-      meta: { title: 'Quiz da — SUNOVA' },
     },
 
     // =======================================================
