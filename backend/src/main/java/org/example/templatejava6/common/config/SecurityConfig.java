@@ -40,6 +40,7 @@ public class SecurityConfig {
             http.authorizeHttpRequests(auth -> auth
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                     .requestMatchers("/api/auth/khach/**").permitAll()
+                    .requestMatchers("/api/khach/quiz/**").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/auth/nhan-vien/dang-nhap").permitAll()
                     .requestMatchers(HttpMethod.GET,
                             "/api/san-pham/**",

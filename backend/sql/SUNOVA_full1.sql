@@ -1,18 +1,11 @@
 /* ============================================================================
    SUNOVA - Hệ thống quản lý cửa hàng kem chống nắng
-   SQL Server - Schema đầy đủ + dữ liệu mẫu
-   ----------------------------------------------------------------------------
-   - 3 vai trò: Quản lý, Nhân viên, Khách hàng
-   - Bán hàng cả 2 kênh: ONLINE + TẠI QUẦY
-   - Đã siết khóa ngoại + CHECK chặt chẽ
-   - Bảng ảnh gắn rõ ràng vào sản phẩm (và tùy chọn vào biến thể)
-   - Mỗi bảng có ~5 dòng dữ liệu mẫu
-   - san_pham.noi_bat: đánh dấu sản phẩm nổi bật (BIT, mặc định 0)
+   SQL Server - Schema đầy đủ + dữ liệu mẫu (Đã chuẩn hóa Quiz)
    ============================================================================ */
 
--- (Tùy chọn) Xóa DB cũ để chạy lại từ đầu. Bỏ comment nếu cần.
--- IF DB_ID('SUNOVA') IS NOT NULL BEGIN ALTER DATABASE SUNOVA SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE SUNOVA; END
--- GO
+-- Xóa DB cũ để chạy lại từ đầu (Đảm bảo không bao giờ lỗi khóa ngoại hay ID)
+IF DB_ID('SUNOVA') IS NOT NULL BEGIN ALTER DATABASE SUNOVA SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE SUNOVA; END
+GO
 
 CREATE DATABASE SUNOVA;
 GO
@@ -155,7 +148,7 @@ CREATE TABLE san_pham (
     id_dang_san_pham INT NOT NULL,
     chi_so_spf       VARCHAR(10),
     chi_so_pa        VARCHAR(6),
-    loai_chong_nang  VARCHAR(10),          -- VAT_LY / HOA_HOC / LAI
+    loai_chong_nang  VARCHAR(10),          
     khang_nuoc       BIT DEFAULT 0,
     mo_ta            NVARCHAR(MAX),
     trang_thai       BIT DEFAULT 1,
@@ -167,7 +160,6 @@ CREATE TABLE san_pham (
 );
 GO
 
--- Bảng nối: 1 sản phẩm phù hợp nhiều loại da
 CREATE TABLE san_pham_loai_da (
     id          INT IDENTITY(1,1) PRIMARY KEY,
     id_san_pham INT NOT NULL,
@@ -178,7 +170,6 @@ CREATE TABLE san_pham_loai_da (
 );
 GO
 
--- Bảng nối: 1 sản phẩm có nhiều công dụng
 CREATE TABLE san_pham_cong_dung (
     id           INT IDENTITY(1,1) PRIMARY KEY,
     id_san_pham  INT NOT NULL,
@@ -189,7 +180,6 @@ CREATE TABLE san_pham_cong_dung (
 );
 GO
 
--- Bảng nối: 1 sản phẩm có nhiều thành phần
 CREATE TABLE san_pham_thanh_phan (
     id            INT IDENTITY(1,1) PRIMARY KEY,
     id_san_pham   INT NOT NULL,
@@ -200,7 +190,6 @@ CREATE TABLE san_pham_thanh_phan (
 );
 GO
 
--- Biến thể: GIÁ + TỒN KHO nằm ở đây
 CREATE TABLE chi_tiet_san_pham (
     id           INT IDENTITY(1,1) PRIMARY KEY,
     id_san_pham  INT NOT NULL,
@@ -209,7 +198,6 @@ CREATE TABLE chi_tiet_san_pham (
     dung_tich_ml DECIMAL(6,1),
     gia_ban      DECIMAL(12,0) NOT NULL,
     so_luong_ton INT DEFAULT 0,
-    han_su_dung  DATE,
     trang_thai   BIT DEFAULT 1,
     CONSTRAINT fk_cts_sp FOREIGN KEY (id_san_pham) REFERENCES san_pham(id),
     CONSTRAINT fk_cts_ms FOREIGN KEY (id_mau_sac)  REFERENCES mau_sac(id),
@@ -218,10 +206,22 @@ CREATE TABLE chi_tiet_san_pham (
 );
 GO
 
-/* Ảnh sản phẩm — ĐÃ SIẾT CHẶT:
-   - Luôn gắn với 1 sản phẩm (id_san_pham, bắt buộc).
-   - Có thể gắn thêm 1 biến thể cụ thể (id_chi_tiet_san_pham, tùy chọn)
-     để hiển thị ảnh riêng cho từng màu/dung tích. NULL = ảnh chung sản phẩm. */
+CREATE TABLE lo_hang (
+    id                   INT IDENTITY(1,1) PRIMARY KEY,
+    id_chi_tiet_san_pham INT NOT NULL,
+    so_lo                VARCHAR(40) NOT NULL,        
+    ngay_nhap            DATE NOT NULL,
+    han_su_dung          DATE,                        
+    so_luong_nhap        INT NOT NULL,                
+    so_luong_con         INT NOT NULL,                
+    ghi_chu              NVARCHAR(255),
+    trang_thai           BIT DEFAULT 1,
+    CONSTRAINT fk_lo_cts FOREIGN KEY (id_chi_tiet_san_pham) REFERENCES chi_tiet_san_pham(id),
+    CONSTRAINT ck_lo_sln CHECK (so_luong_nhap >= 0),
+    CONSTRAINT ck_lo_slc CHECK (so_luong_con >= 0)
+);
+GO
+
 CREATE TABLE anh_san_pham (
     id                   INT IDENTITY(1,1) PRIMARY KEY,
     id_san_pham          INT NOT NULL,
@@ -295,7 +295,7 @@ GO
 CREATE TABLE tin_nhan_chat_ai (
     id                INT IDENTITY(1,1) PRIMARY KEY,
     id_phien          INT NOT NULL,
-    nguoi_gui         VARCHAR(10) NOT NULL,      -- KHACH / AI
+    nguoi_gui         VARCHAR(10) NOT NULL,      
     noi_dung          NVARCHAR(MAX) NOT NULL,
     id_san_pham_goi_y INT,
     thoi_gian         DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -313,7 +313,7 @@ CREATE TABLE du_lieu_uv (
     tinh_thanh         NVARCHAR(50) NOT NULL,
     ngay               DATE NOT NULL,
     chi_so_uv          DECIMAL(4,1) NOT NULL,
-    muc_do             VARCHAR(15) NOT NULL,     -- THAP / TRUNG_BINH / CAO / RAT_CAO
+    muc_do             VARCHAR(15) NOT NULL,     
     spf_khuyen_nghi    VARCHAR(10),
     nguon_du_lieu      VARCHAR(50),
     thoi_gian_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -339,7 +339,7 @@ CREATE TABLE lich_su_hanh_vi (
     id            INT IDENTITY(1,1) PRIMARY KEY,
     id_khach_hang INT NOT NULL,
     id_san_pham   INT,
-    loai_hanh_vi  VARCHAR(10) NOT NULL,          -- XEM / THEM_GIO / MUA / QUIZ / YEU_THICH
+    loai_hanh_vi  VARCHAR(10) NOT NULL,          
     thoi_gian     DATETIME DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_hv_kh FOREIGN KEY (id_khach_hang) REFERENCES khach_hang(id),
     CONSTRAINT fk_hv_sp FOREIGN KEY (id_san_pham)   REFERENCES san_pham(id)
@@ -389,7 +389,7 @@ CREATE TABLE danh_gia (
     id_san_pham   INT NOT NULL,
     so_sao        TINYINT NOT NULL,
     noi_dung      NVARCHAR(500),
-    trang_thai    VARCHAR(15) DEFAULT 'CHO_DUYET',   -- CHO_DUYET / DA_DUYET / TU_CHOI
+    trang_thai    VARCHAR(15) DEFAULT 'CHO_DUYET',   
     ngay_tao      DATETIME DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_dg_kh FOREIGN KEY (id_khach_hang) REFERENCES khach_hang(id),
     CONSTRAINT fk_dg_sp FOREIGN KEY (id_san_pham)   REFERENCES san_pham(id),
@@ -457,7 +457,7 @@ CREATE TABLE phieu_giam_gia (
     id                    INT IDENTITY(1,1) PRIMARY KEY,
     ma                    VARCHAR(30)  NOT NULL UNIQUE,
     ten                   NVARCHAR(100),
-    loai                  VARCHAR(10) NOT NULL,     -- PHAN_TRAM / TIEN_MAT
+    loai                  VARCHAR(10) NOT NULL,     
     gia_tri               DECIMAL(12,0) NOT NULL,
     gia_tri_don_toi_thieu DECIMAL(12,0) DEFAULT 0,
     giam_toi_da           DECIMAL(12,0),
@@ -469,20 +469,20 @@ CREATE TABLE phieu_giam_gia (
 GO
 
 /* ===========================================================================
-   10. NHÓM HÓA ĐƠN / ĐƠN HÀNG  (đã tích hợp người nhận + thanh toán)
+   10. NHÓM HÓA ĐƠN / ĐƠN HÀNG
    =========================================================================== */
 
 CREATE TABLE hoa_don (
     id                        INT IDENTITY(1,1) PRIMARY KEY,
     ma_hoa_don                VARCHAR(30) NOT NULL UNIQUE,
-    id_khach_hang             INT,                    -- NULL = khách lẻ tại quầy
-    id_nhan_vien              INT,                    -- nhân viên lập đơn (POS)
-    id_phuong_thuc_thanh_toan INT,                    -- phương thức chính
+    id_khach_hang             INT,                    
+    id_nhan_vien              INT,                    
+    id_phuong_thuc_thanh_toan INT,                    
     id_phieu_giam_gia         INT,
-    loai_don       VARCHAR(10) DEFAULT 'ONLINE',      -- ONLINE / TAI_QUAY
+    loai_don       VARCHAR(10) DEFAULT 'ONLINE',      
     trang_thai     VARCHAR(15) DEFAULT 'CHO_XAC_NHAN',
-    ten_nguoi_nhan NVARCHAR(100),                     -- cho đơn ONLINE
-    sdt_nguoi_nhan VARCHAR(15),                        -- cho đơn ONLINE
+    ten_nguoi_nhan NVARCHAR(100),                     
+    sdt_nguoi_nhan VARCHAR(15),                        
     dia_chi_giao   NVARCHAR(255),
     tong_tien      DECIMAL(12,0) DEFAULT 0,
     tien_giam_gia  DECIMAL(12,0) DEFAULT 0,
@@ -510,8 +510,6 @@ CREATE TABLE hoa_don_chi_tiet (
 );
 GO
 
-/* Thanh toán chi tiết: 1 hóa đơn có thể có nhiều lần trả (tiền mặt + chuyển khoản),
-   lưu tiền khách đưa / tiền thối (POS) và mã giao dịch (online). */
 CREATE TABLE thanh_toan_hoa_don (
     id                        INT IDENTITY(1,1) PRIMARY KEY,
     id_hoa_don                INT NOT NULL,
@@ -549,7 +547,7 @@ CREATE TABLE thong_bao (
     noi_dung      NVARCHAR(500),
     id_khach_hang INT,
     id_nhan_vien  INT,
-    loai          VARCHAR(15) DEFAULT 'HE_THONG',   -- DON_HANG / KHUYEN_MAI / UV / HE_THONG
+    loai          VARCHAR(15) DEFAULT 'HE_THONG',   
     da_doc        BIT DEFAULT 0,
     thoi_gian     DATETIME DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_tb_kh FOREIGN KEY (id_khach_hang) REFERENCES khach_hang(id),
@@ -559,8 +557,6 @@ GO
 
 /* ============================================================================
    ============================  DỮ LIỆU MẪU  =================================
-   Ghi chú: mật khẩu để dạng '123456' cho dễ test. Khi tích hợp Spring Security
-   nhớ thay bằng chuỗi đã mã hóa BCrypt.
    ============================================================================ */
 
 -- 3 VAI TRÒ
@@ -579,7 +575,7 @@ INSERT INTO loai_da (ma, ten, mo_ta) VALUES
 ('DA_NHAY_CAM', N'Da nhạy cảm',  N'Da dễ kích ứng');
 GO
 
--- NHÂN VIÊN (1 quản lý + 4 nhân viên)
+-- NHÂN VIÊN
 INSERT INTO nhan_vien (id_vai_tro, ma_nhan_vien, ho_ten, email, so_dien_thoai, mat_khau, gioi_tinh, ngay_vao_lam) VALUES
 (1, 'NV01', N'Nguyễn Văn An',   'an.nv@sunova.vn',   '0901000001', '123456', 'Nam', '2024-01-15'),
 (2, 'NV02', N'Trần Thị Bình',   'binh.nv@sunova.vn', '0901000002', '123456', N'Nữ', '2024-03-01'),
@@ -588,7 +584,7 @@ INSERT INTO nhan_vien (id_vai_tro, ma_nhan_vien, ho_ten, email, so_dien_thoai, m
 (2, 'NV05', N'Hoàng Văn Em',    'em.nv@sunova.vn',   '0901000005', '123456', 'Nam', '2025-01-05');
 GO
 
--- KHÁCH HÀNG (vai trò 3)
+-- KHÁCH HÀNG
 INSERT INTO khach_hang (id_vai_tro, ma_khach_hang, ho_ten, email, so_dien_thoai, mat_khau, gioi_tinh, ngay_sinh, id_loai_da, diem_tich_luy) VALUES
 (3, 'KH01', N'Đỗ Thị Hoa',    'hoa@gmail.com',   '0911000001', '123456', N'Nữ', '1998-04-12', 1, 120),
 (3, 'KH02', N'Vũ Văn Khánh',  'khanh@gmail.com', '0911000002', '123456', 'Nam', '1995-09-23', 2, 80),
@@ -639,7 +635,9 @@ INSERT INTO cong_dung (ma, ten, mo_ta) VALUES
 ('CD02', N'Cấp ẩm',    N'Bổ sung độ ẩm'),
 ('CD03', N'Nâng tông', N'Làm sáng tông da'),
 ('CD04', N'Kháng nước',N'Chịu nước, mồ hôi'),
-('CD05', N'Làm dịu',   N'Làm dịu da kích ứng');
+('CD05', N'Làm dịu',   N'Làm dịu da kích ứng'),
+('CD06', N'Chống tia UVA/UVB', N'Bảo vệ da khỏi tia cực tím'),
+('CD07', N'Chống lão hóa',     N'Ngăn lão hóa do ánh nắng');
 GO
 
 -- THÀNH PHẦN
@@ -685,15 +683,26 @@ INSERT INTO san_pham_thanh_phan (id_san_pham, id_thanh_phan) VALUES
 GO
 
 -- BIẾN THỂ (CHI TIẾT SẢN PHẨM)
-INSERT INTO chi_tiet_san_pham (id_san_pham, id_mau_sac, sku, dung_tich_ml, gia_ban, so_luong_ton, han_su_dung) VALUES
-(1, 1, 'SP001-MILK-60',  60, 520000, 80,  '2027-06-30'),
-(2, 1, 'SP002-CREAM-50', 50, 495000, 60,  '2027-03-31'),
-(3, 1, 'SP003-CREAM-50', 50, 350000, 100, '2027-09-30'),
-(4, 1, 'SP004-SPRAY-70', 70, 180000, 120, '2026-12-31'),
-(5, 2, 'SP005-CREAM-40', 40, 610000, 45,  '2027-05-31');
+INSERT INTO chi_tiet_san_pham (id_san_pham, id_mau_sac, sku, dung_tich_ml, gia_ban, so_luong_ton) VALUES
+(1, 1, 'SP001-MILK-60',  60, 520000, 80),
+(2, 1, 'SP002-CREAM-50', 50, 495000, 60),
+(3, 1, 'SP003-CREAM-50', 50, 350000, 100),
+(4, 1, 'SP004-SPRAY-70', 70, 180000, 120),
+(5, 2, 'SP005-CREAM-40', 40, 610000, 45);
 GO
 
--- ẢNH SẢN PHẨM (gắn sản phẩm; 2 dòng gắn thêm biến thể cụ thể)
+-- LÔ HÀNG
+INSERT INTO lo_hang (id_chi_tiet_san_pham, so_lo, ngay_nhap, han_su_dung, so_luong_nhap, so_luong_con) VALUES
+(1, 'LO001', '2024-11-15', '2026-11-30', 30, 30),
+(1, 'LO002', '2025-03-01', '2027-06-30', 50, 50),
+(2, 'LO003', '2025-04-01', '2027-03-31', 60, 60),
+(3, 'LO004', '2025-05-01', '2027-09-30', 100, 100),
+(4, 'LO005', '2025-02-01', '2026-12-31', 80, 80),
+(4, 'LO006', '2025-07-01', '2027-08-08', 40, 40),
+(5, 'LO007', '2025-05-15', '2027-05-31', 45, 45);
+GO
+
+-- ẢNH SẢN PHẨM
 INSERT INTO anh_san_pham (id_san_pham, id_chi_tiet_san_pham, url, la_anh_chinh, thu_tu) VALUES
 (1, 1,    'https://cdn.sunova.vn/sp001.jpg', 1, 1),
 (2, NULL, 'https://cdn.sunova.vn/sp002.jpg', 1, 1),
@@ -702,28 +711,63 @@ INSERT INTO anh_san_pham (id_san_pham, id_chi_tiet_san_pham, url, la_anh_chinh, 
 (5, NULL, 'https://cdn.sunova.vn/sp005.jpg', 1, 1);
 GO
 
--- CÂU HỎI QUIZ
-INSERT INTO cau_hoi_quiz (noi_dung, thu_tu) VALUES
-(N'Làn da của bạn vào cuối ngày thường như thế nào?', 1),
-(N'Vùng chữ T (trán, mũi, cằm) của bạn có dễ bóng dầu không?', 2),
-(N'Da bạn có bị khô căng sau khi rửa mặt không?', 3),
-(N'Da bạn có dễ bị mẩn đỏ, kích ứng không?', 4),
-(N'Lỗ chân lông vùng má của bạn ra sao?', 5);
+/* ===========================================================================
+   12. BỘ CÂU HỎI QUIZ CHUẨN (SUPERGOOP INSPIRED) - ĐÃ DỌN DẸP EMOJI
+   =========================================================================== */
+
+-- CÂU HỎI QUIZ (Đã chuẩn hóa)
+INSERT INTO cau_hoi_quiz (noi_dung, thu_tu, trang_thai) VALUES
+(N'Làn da của bạn thường có biểu hiện gì vào thời điểm giữa ngày hoặc cuối ngày?', 1, 1),
+(N'Hiệu ứng bề mặt (Finish) bạn mong muốn nhất sau khi thoa kem chống nắng là gì?', 2, 1),
+(N'Bạn dự định sử dụng sản phẩm chống nắng chủ yếu trong môi trường hoặc hoạt động nào?', 3, 1),
+(N'Ngoài việc bảo vệ khỏi tia UV, bạn muốn kem chống nắng hỗ trợ thêm vấn đề gì cho da?', 4, 1),
+(N'Kết cấu sản phẩm (Format) nào mang lại cảm giác thoải mái nhất cho bạn khi thoa?', 5, 1);
 GO
 
--- ĐÁP ÁN QUIZ (gắn câu hỏi + loại da + điểm)
-INSERT INTO dap_an_quiz (id_cau_hoi, noi_dung, id_loai_da, diem) VALUES
-(1, N'Bóng dầu toàn mặt',        1, 2),
-(1, N'Khô căng, bong tróc',      2, 2),
-(2, N'Có, rất bóng dầu',         1, 2),
-(3, N'Có, thường xuyên khô căng',2, 2),
-(4, N'Có, da rất dễ kích ứng',   5, 2);
+-- ĐÁP ÁN QUIZ (Đã chuẩn hóa - Không dùng Emoji)
+-- Câu 1 (ID = 1)
+INSERT INTO dap_an_quiz (id_cau_hoi, noi_dung, id_loai_da, diem, icon) VALUES
+(1, N'Bóng dầu diện rộng, đặc biệt là vùng trán, mũi và cằm', 1, 3, NULL), 
+(1, N'Khô ráp, có cảm giác căng cức nhẹ, đôi khi bong tróc', 2, 3, NULL), 
+(1, N'Chỉ đổ dầu vùng chữ T (trán, mũi), hai bên má lại khô ráp', 3, 3, NULL), 
+(1, N'Bề mặt thông thoáng, mềm mịn, không quá dầu hay khô', 4, 3, NULL), 
+(1, N'Dễ bị đỏ ửng, châm chích hoặc ngứa rát khi đổi mỹ phẩm', 5, 3, NULL); 
+
+-- Câu 2 (ID = 2)
+INSERT INTO dap_an_quiz (id_cau_hoi, noi_dung, id_loai_da, diem, icon) VALUES
+(2, N'Kiềm dầu hoàn toàn, tạo bề mặt lì mịn, mỏng nhẹ (Matte)', 1, 2, NULL),
+(2, N'Căng bóng, mọng nước, tạo hiệu ứng căng mướt (Glowy)', 2, 2, NULL),
+(2, N'Tự nhiên như không bôi gì, thoáng da tàng hình (Unseen)', 4, 2, NULL),
+(2, N'Lớp nền mịn màng, làm dịu da và che mẩn đỏ nhẹ', 5, 2, NULL);
+
+-- Câu 3 (ID = 3)
+INSERT INTO dap_an_quiz (id_cau_hoi, noi_dung, id_loai_da, diem, icon) VALUES
+(3, N'Làm việc văn phòng, đi học, ngồi điều hòa thời gian dài', 2, 1, NULL),
+(3, N'Hoạt động ngoài trời nhiều, chơi thể thao hoặc đi bơi', 1, 1, NULL),
+(3, N'Sử dụng hằng ngày như một lớp lót mịn dưới lớp trang điểm', 3, 1, NULL);
+
+-- Câu 4 (ID = 4)
+INSERT INTO dap_an_quiz (id_cau_hoi, noi_dung, id_loai_da, diem, icon) VALUES
+(4, N'Nâng tông trắng hồng tự nhiên, làm sáng vùng da xỉn màu', 4, 1, NULL),
+(4, N'Thành phần lành tính, phục hồi và làm dịu kích ứng', 5, 2, NULL),
+(4, N'Kiểm soát bã nhờn tối đa, ngăn ngừa bít tắc sinh mụn', 1, 2, NULL),
+(4, N'Cấp ẩm sâu, chống oxy hóa và ngăn ngừa lão hóa sớm', 2, 2, NULL);
+
+-- Câu 5 (ID = 5)
+INSERT INTO dap_an_quiz (id_cau_hoi, noi_dung, id_loai_da, diem, icon) VALUES
+(5, N'Dạng sữa hoặc gel lỏng, thấm siêu nhanh và mát da', 1, 1, NULL),
+(5, N'Dạng kem đặc mịn màng, tạo màng ẩm mượt lâu dài', 2, 1, NULL),
+(5, N'Dạng xịt phun sương hoặc thỏi lăn tiện lợi dặm lại', 4, 1, NULL);
 GO
 
--- KẾT QUẢ QUIZ
+-- KẾT QUẢ QUIZ 
 INSERT INTO ket_qua_quiz (id_khach_hang, id_loai_da_ket_qua, tong_diem) VALUES
 (1, 1, 8), (2, 2, 7), (3, 3, 6), (4, 4, 5), (5, 5, 9);
 GO
+
+/* ===========================================================================
+   13. CÁC DỮ LIỆU CÒN LẠI (Tương tác, Đơn hàng, Voucher...)
+   =========================================================================== */
 
 -- CÂU HỎI THƯỜNG GẶP
 INSERT INTO cau_hoi_thuong_gap (cau_hoi, tra_loi, chu_de) VALUES
@@ -861,7 +905,7 @@ INSERT INTO phieu_giam_gia (ma, ten, loai, gia_tri, gia_tri_don_toi_thieu, giam_
 ('VIP20',    N'VIP giảm 20%',      'PHAN_TRAM', 20,    1000000, 200000, 30,  '2026-06-01', '2026-12-31');
 GO
 
--- HÓA ĐƠN (2 đơn ONLINE, 2 đơn TẠI QUẦY, 1 đơn online chờ xác nhận)
+-- HÓA ĐƠN
 INSERT INTO hoa_don (ma_hoa_don, id_khach_hang, id_nhan_vien, id_phuong_thuc_thanh_toan, id_phieu_giam_gia, loai_don, trang_thai, ten_nguoi_nhan, sdt_nguoi_nhan, dia_chi_giao, tong_tien, tien_giam_gia, phi_van_chuyen, thanh_tien) VALUES
 ('HD001', 1, NULL, 3, 1,    'ONLINE',   'HOAN_THANH',   N'Đỗ Thị Hoa',   '0911000001', N'số 1 Trần Thái Tông, Cầu Giấy, Hà Nội', 1040000, 104000, 30000, 966000),
 ('HD002', 2, NULL, 5, NULL, 'ONLINE',   'DANG_GIAO',    N'Vũ Văn Khánh', '0911000002', N'12 Lê Lợi, Quận 1, TP.HCM',              350000,  0,      30000, 380000),
@@ -879,7 +923,7 @@ INSERT INTO hoa_don_chi_tiet (id_hoa_don, id_chi_tiet_san_pham, so_luong, don_gi
 (5, 2, 1, 495000, 495000);
 GO
 
--- THANH TOÁN HÓA ĐƠN (online có mã GD; tại quầy có tiền đưa + tiền thối)
+-- THANH TOÁN HÓA ĐƠN
 INSERT INTO thanh_toan_hoa_don (id_hoa_don, id_phuong_thuc_thanh_toan, so_tien, so_tien_khach_dua, tien_thua, ma_giao_dich) VALUES
 (1, 3, 966000, NULL,   NULL,  'VNP100001'),
 (2, 5, 380000, NULL,   NULL,  NULL),
@@ -904,7 +948,4 @@ INSERT INTO thong_bao (tieu_de, noi_dung, id_khach_hang, id_nhan_vien, loai) VAL
 (N'Khuyến mãi hè rực rỡ',    N'Giảm đến 25% nhiều sản phẩm chống nắng.',3, NULL, 'KHUYEN_MAI'),
 (N'Cảnh báo UV cao',         N'Chỉ số UV hôm nay rất cao, nhớ chống nắng!', 4, NULL, 'UV'),
 (N'Bảo trì hệ thống',        N'Hệ thống bảo trì lúc 23h hôm nay.',     NULL, 2, 'HE_THONG');
-GO
-
-PRINT N'>>> Đã tạo xong database SUNOVA với dữ liệu mẫu.';
 GO

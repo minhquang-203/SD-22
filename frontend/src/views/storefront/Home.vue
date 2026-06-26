@@ -209,16 +209,16 @@ onUnmounted(() => {
       </div>
     </section>
 
-    <!-- Quiz CTA placeholder -->
+    <!-- Quiz CTA -->
     <section class="sf-section">
       <div class="sf-container">
         <div class="sf-quiz-banner sf-quiz-banner--contrast">
           <div>
-            <p class="sf-quiz-banner__eyebrow">Sắp ra mắt</p>
-            <h2 class="sf-quiz-banner__title">Quiz phân tích loại da</h2>
-            <p class="sf-quiz-banner__desc">Tính năng đang phát triển — khám phá sản phẩm phù hợp với làn da bạn.</p>
+            <p class="sf-quiz-banner__eyebrow">Trắc nghiệm da</p>
+            <h2 class="sf-quiz-banner__title">Tìm sản phẩm chống nắng phù hợp với bạn</h2>
+            <p class="sf-quiz-banner__desc">Trả lời vài câu hỏi ngắn — hệ thống SUNOVA sẽ phân tích làn da và gợi ý sản phẩm hoàn hảo dành riêng cho bạn.</p>
           </div>
-          <RouterLink to="/quiz" class="sf-quiz-banner__btn">Tìm hiểu thêm</RouterLink>
+          <RouterLink to="/quiz" class="sf-quiz-banner__btn">Làm Quiz Ngay</RouterLink>
         </div>
       </div>
     </section>

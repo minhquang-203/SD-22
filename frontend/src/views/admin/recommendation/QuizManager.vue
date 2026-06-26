@@ -128,6 +128,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import request from '@/api/request';
 
 const questions = ref([]);
 const editingId = ref(null); 
@@ -145,14 +146,10 @@ const availableTags = ref([
   { id: 5, name: 'Da Nhạy Cảm' },
 ]);
 
-const API_URL = 'http://localhost:8080/api/admin/quizzes';
-
 const loadQuestions = async () => {
   try {
-    const response = await fetch(API_URL);
-    if (response.ok) {
-      questions.value = await response.json();
-    }
+    const response = await request.get('/admin/quizzes');
+    questions.value = response.data;
   } catch (error) {
     console.error("Lỗi kết nối Backend:", error);
   }
@@ -191,17 +188,9 @@ const saveQuestion = async () => {
   
   try {
     if (editingId.value !== 'new') {
-      await fetch(`${API_URL}/${currentQuestion.value.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(currentQuestion.value)
-      });
+      await request.put(`/admin/quizzes/${currentQuestion.value.id}`, currentQuestion.value);
     } else {
-      await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(currentQuestion.value)
-      });
+      await request.post('/admin/quizzes', currentQuestion.value);
     }
     cancelEdit();
     loadQuestions(); 
@@ -224,7 +213,7 @@ const closeDeleteModal = () => {
 const confirmDeleteQuestion = async () => {
   if (!questionIdToDelete.value) return;
   try {
-    await fetch(`${API_URL}/${questionIdToDelete.value}`, { method: 'DELETE' });
+    await request.delete(`/admin/quizzes/${questionIdToDelete.value}`);
     closeDeleteModal(); 
     loadQuestions();    
   } catch (error) {
