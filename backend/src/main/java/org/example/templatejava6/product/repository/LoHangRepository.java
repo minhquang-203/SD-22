@@ -27,6 +27,8 @@ public interface LoHangRepository extends JpaRepository<LoHang, Integer> {
             """)
     List<LoHang> findAvailableForFefo(@Param("idCts") Integer idChiTietSanPham);
 
+    List<LoHang> findByChiTietSanPham_IdAndTrangThaiTrueOrderByIdDesc(Integer idChiTietSanPham);
+
     @Query("""
             SELECT COALESCE(SUM(l.soLuongCon), 0) FROM LoHang l
             WHERE l.chiTietSanPham.id = :idCts AND l.trangThai = true

@@ -3,7 +3,7 @@ import { formatApiError } from '@/utils/apiError'
 import { getAdminToken } from '@/composables/useAdminAuth'
 import { getCustomerToken } from '@/composables/useAuth'
 
-const CUSTOMER_API_PREFIXES = ['/yeu-thich', '/khach-hang/toi']
+const CUSTOMER_API_PREFIXES = ['/yeu-thich', '/khach-hang/toi', '/gio-hang', '/online']
 
 const request = axios.create({
   baseURL: '/api',

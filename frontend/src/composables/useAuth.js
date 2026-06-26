@@ -3,9 +3,26 @@ import { dangKyKhach, dangNhapKhach } from '@/api/authApi'
 
 const STORAGE_KEY = 'sunova_customer_auth'
 
+const id = ref(null)
 const token = ref(null)
 const hoTen = ref('')
 const vaiTro = ref('')
+
+function decodeTokenSubject(jwt) {
+  try {
+    const payload = JSON.parse(atob(String(jwt).split('.')[1] || ''))
+    const sub = Number(payload.sub)
+    return Number.isFinite(sub) ? sub : null
+  } catch {
+    return null
+  }
+}
+
+function notifyAuthChanged(loggedIn) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('sunova-customer-auth-changed', { detail: { loggedIn } }))
+  }
+}
 
 function loadFromStorage() {
   try {
@@ -13,6 +30,7 @@ function loadFromStorage() {
     if (!raw) return
     const data = JSON.parse(raw)
     token.value = data.token || null
+    id.value = Number(data.id) || decodeTokenSubject(data.token) || null
     hoTen.value = data.hoTen || ''
     vaiTro.value = data.vaiTro || ''
   } catch {
@@ -28,6 +46,7 @@ function persist() {
   localStorage.setItem(
     STORAGE_KEY,
     JSON.stringify({
+      id: id.value,
       token: token.value,
       hoTen: hoTen.value,
       vaiTro: vaiTro.value,
@@ -36,6 +55,7 @@ function persist() {
 }
 
 function clearStorage() {
+  id.value = null
   token.value = null
   hoTen.value = ''
   vaiTro.value = ''
@@ -44,9 +64,11 @@ function clearStorage() {
 
 function applyAuth(data) {
   token.value = data.token
+  id.value = Number(data.id) || decodeTokenSubject(data.token) || null
   hoTen.value = data.hoTen || ''
   vaiTro.value = data.vaiTro || 'KHACH_HANG'
   persist()
+  notifyAuthChanged(true)
 }
 
 loadFromStorage()
@@ -68,6 +90,7 @@ export function useAuth() {
 
   function dangXuat() {
     clearStorage()
+    notifyAuthChanged(false)
   }
 
   function updateHoTen(name) {
@@ -76,6 +99,7 @@ export function useAuth() {
   }
 
   return {
+    id,
     token,
     hoTen,
     vaiTro,
@@ -97,4 +121,10 @@ export function getCustomerToken() {
   if (token.value) return token.value
   loadFromStorage()
   return token.value
+}
+
+export function getCustomerId() {
+  if (id.value) return id.value
+  loadFromStorage()
+  return id.value
 }
