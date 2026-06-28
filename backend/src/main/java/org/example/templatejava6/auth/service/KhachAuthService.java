@@ -85,7 +85,7 @@ public class KhachAuthService {
     private AuthResponse buildAuthResponse(KhachHang kh) {
         String vaiTro = kh.getVaiTro() != null ? kh.getVaiTro().getMaVaiTro() : MA_VAI_TRO_KHACH;
         String token = jwtTokenProvider.createToken(kh.getId(), kh.getHoTen(), vaiTro);
-        return new AuthResponse(token, kh.getHoTen(), vaiTro);
+        return new AuthResponse(kh.getId(), token, kh.getHoTen(), vaiTro);
     }
 
     private boolean matchesPassword(String raw, String stored) {

@@ -86,36 +86,43 @@ function selectVariant(v) {
   selectedVariantId.value = v.id
 }
 
-function addToCart() {
+async function addToCart() {
   const v = selectedVariant.value
   if (!v) {
     showToast('Vui lòng chọn biến thể')
-    return
+    return false
   }
   if (!v.soLuongTon || v.soLuongTon <= 0) {
     showToast('Biến thể đã hết hàng')
-    return
+    return false
   }
-  addItem({
-    idChiTietSanPham: v.id,
-    idSanPham: product.value.id,
-    tenSanPham: product.value.ten,
-    tenThuongHieu: product.value.tenThuongHieu || '',
-    sku: v.sku,
-    giaBan: Number(v.giaBan),
-    giaGoc: product.value.giaGoc ? Number(product.value.giaGoc) : null,
-    soLuongTon: Number(v.soLuongTon) || 0,
-    soLuong: quantity.value,
-    anhUrl: activeImage.value || product.value.anhChinhUrl,
-    tenMauSac: v.tenMauSac,
-    dungTichMl: v.dungTichMl,
-  })
-  showToast('Đã thêm vào giỏ hàng')
+  try {
+    await addItem({
+      idChiTietSanPham: v.id,
+      idSanPham: product.value.id,
+      tenSanPham: product.value.ten,
+      tenThuongHieu: product.value.tenThuongHieu || '',
+      sku: v.sku,
+      giaBan: Number(v.giaBan),
+      giaGoc: product.value.giaGoc ? Number(product.value.giaGoc) : null,
+      soLuongTon: Number(v.soLuongTon) || 0,
+      soLuong: quantity.value,
+      anhUrl: activeImage.value || product.value.anhChinhUrl,
+      tenMauSac: v.tenMauSac,
+      dungTichMl: v.dungTichMl,
+    })
+    showToast('Đã thêm vào giỏ hàng')
+    return true
+  } catch (error) {
+    showToast(typeof error === 'string' ? error : 'Không thêm được vào giỏ hàng')
+    return false
+  }
 }
 
-function buyNow() {
-  addToCart()
-  router.push('/gio-hang')
+async function buyNow() {
+  if (await addToCart()) {
+    router.push('/gio-hang')
+  }
 }
 
 function formatReviewDate(d) {

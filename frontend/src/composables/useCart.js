@@ -1,31 +1,49 @@
 import { computed, ref } from 'vue'
+import {
+  addGioHangItem,
+  clearGioHang,
+  deleteGioHangItem,
+  fetchGioHang,
+  updateGioHangItem,
+} from '@/api/gioHangApi'
+import { getCustomerId } from '@/composables/useAuth'
 
 const STORAGE_KEY = 'sunova_cart'
 const MAX_PER_LINE = 10
 
 const items = ref([])
+const loading = ref(false)
+let currentLoadPromise = null
+let loadedCustomerId = null
 
-function load() {
+function normalizeLocalLine(line) {
+  return {
+    ...line,
+    selected: line.selected !== false,
+    soLuongTon: Number(line.soLuongTon) || 0,
+    soLuong: Number(line.soLuong) || 1,
+  }
+}
+
+function loadLocal() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     const parsed = raw ? JSON.parse(raw) : []
-    items.value = Array.isArray(parsed)
-      ? parsed.map((line) => ({
-          ...line,
-          selected: line.selected !== false,
-          soLuongTon: Number(line.soLuongTon) || 0,
-        }))
-      : []
+    items.value = Array.isArray(parsed) ? parsed.map(normalizeLocalLine) : []
   } catch {
     items.value = []
   }
 }
 
-function save() {
+function saveLocal() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items.value))
 }
 
-load()
+function clearLocal() {
+  localStorage.removeItem(STORAGE_KEY)
+}
+
+loadLocal()
 
 export function variantLabel(line) {
   const parts = []
@@ -59,7 +77,113 @@ function mergeLine(existing, payload, addQty) {
   existing.soLuong = clampQty(existing, next)
 }
 
+function addLocalItem(payload) {
+  const addQty = Math.max(1, Number(payload.soLuong) || 1)
+  const existing = items.value.find((l) => l.idChiTietSanPham === payload.idChiTietSanPham)
+  if (existing) {
+    mergeLine(existing, payload, addQty)
+  } else {
+    items.value.push({
+      ...payload,
+      soLuong: clampQty(payload, addQty),
+      selected: true,
+    })
+  }
+  saveLocal()
+}
+
+function toCartLine(line) {
+  return normalizeLocalLine({
+    ...line,
+    idChiTietGioHang: line.idChiTietGioHang ?? line.id,
+    anhUrl: line.anhUrl || line.anhChinhUrl || '',
+    giaBan: Number(line.giaBan) || 0,
+    giaGoc: line.giaGoc != null ? Number(line.giaGoc) : null,
+  })
+}
+
+function applyCartResponse(data) {
+  const selectedByVariant = new Map(items.value.map((line) => [line.idChiTietSanPham, line.selected]))
+  items.value = (data?.items || []).map((line) => {
+    const next = toCartLine(line)
+    next.selected = selectedByVariant.get(next.idChiTietSanPham) !== false
+    return next
+  })
+  loadedCustomerId = data?.idKhachHang ?? getCustomerId()
+  clearLocal()
+}
+
+function customerIdOrNull() {
+  return Number(getCustomerId()) || null
+}
+
+async function refreshCart() {
+  const idKhachHang = customerIdOrNull()
+  if (!idKhachHang) {
+    loadedCustomerId = null
+    loadLocal()
+    return null
+  }
+  if (currentLoadPromise && loadedCustomerId === idKhachHang) return currentLoadPromise
+
+  loading.value = true
+  currentLoadPromise = fetchGioHang(idKhachHang)
+    .then((res) => {
+      applyCartResponse(res.data)
+      return res.data
+    })
+    .finally(() => {
+      loading.value = false
+      currentLoadPromise = null
+    })
+  return currentLoadPromise
+}
+
+async function syncCartAfterLogin() {
+  const idKhachHang = customerIdOrNull()
+  if (!idKhachHang) return null
+
+  const localItems = [...items.value]
+  loading.value = true
+  try {
+    for (const line of localItems) {
+      if (!line.idChiTietSanPham || !line.soLuong) continue
+      const res = await addGioHangItem({
+        idKhachHang,
+        idChiTietSanPham: line.idChiTietSanPham,
+        soLuong: line.soLuong,
+      })
+      applyCartResponse(res.data)
+    }
+    if (!localItems.length) {
+      await refreshCart()
+    }
+    clearLocal()
+    return items.value
+  } finally {
+    loading.value = false
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('sunova-customer-auth-changed', (event) => {
+    if (event.detail?.loggedIn) {
+      void syncCartAfterLogin().catch(() => {
+        void refreshCart().catch(() => {})
+      })
+    } else {
+      loadedCustomerId = null
+      loadLocal()
+    }
+  })
+}
+
 export function useCart() {
+  const idKhachHang = customerIdOrNull()
+  if (idKhachHang && loadedCustomerId !== idKhachHang) {
+    void refreshCart()
+  }
+
   const count = computed(() =>
     items.value.reduce((sum, line) => sum + (line.soLuong || 0), 0),
   )
@@ -91,36 +215,64 @@ export function useCart() {
     () => items.value.length > 0 && items.value.every((l) => l.selected),
   )
 
-  function addItem(payload) {
-    const addQty = Math.max(1, payload.soLuong || 1)
-    const existing = items.value.find((l) => l.idChiTietSanPham === payload.idChiTietSanPham)
-    if (existing) {
-      mergeLine(existing, payload, addQty)
-    } else {
-      items.value.push({
-        ...payload,
-        soLuong: clampQty(payload, addQty),
-        selected: true,
-      })
+  async function addItem(payload) {
+    const idKhachHang = customerIdOrNull()
+    if (!idKhachHang) {
+      addLocalItem(payload)
+      return items.value
     }
-    save()
+
+    const res = await addGioHangItem({
+      idKhachHang,
+      idChiTietSanPham: payload.idChiTietSanPham,
+      soLuong: Math.max(1, Number(payload.soLuong) || 1),
+    })
+    applyCartResponse(res.data)
+    return res.data
   }
 
-  function removeItem(idChiTietSanPham) {
-    items.value = items.value.filter((l) => l.idChiTietSanPham !== idChiTietSanPham)
-    save()
+  async function removeItem(idChiTietSanPham) {
+    const idKhachHang = customerIdOrNull()
+    const line = items.value.find((l) => l.idChiTietSanPham === idChiTietSanPham)
+    if (!idKhachHang || !line?.idChiTietGioHang) {
+      items.value = items.value.filter((l) => l.idChiTietSanPham !== idChiTietSanPham)
+      saveLocal()
+      return items.value
+    }
+
+    const res = await deleteGioHangItem(idKhachHang, line.idChiTietGioHang)
+    applyCartResponse(res.data)
+    return res.data
   }
 
-  function removeSelected() {
-    items.value = items.value.filter((l) => !l.selected)
-    save()
+  async function removeSelected() {
+    const selected = items.value.filter((l) => l.selected)
+    const idKhachHang = customerIdOrNull()
+    if (!idKhachHang) {
+      items.value = items.value.filter((l) => !l.selected)
+      saveLocal()
+      return items.value
+    }
+
+    if (selected.length === items.value.length) {
+      return clearCart()
+    }
+
+    let lastResponse = null
+    for (const line of selected) {
+      if (!line.idChiTietGioHang) continue
+      const res = await deleteGioHangItem(idKhachHang, line.idChiTietGioHang)
+      lastResponse = res.data
+      applyCartResponse(res.data)
+    }
+    return lastResponse
   }
 
   function toggleSelect(idChiTietSanPham) {
     const line = items.value.find((l) => l.idChiTietSanPham === idChiTietSanPham)
     if (line) {
       line.selected = !line.selected
-      save()
+      if (!customerIdOrNull()) saveLocal()
     }
   }
 
@@ -128,34 +280,30 @@ export function useCart() {
     items.value.forEach((l) => {
       l.selected = value
     })
-    save()
+    if (!customerIdOrNull()) saveLocal()
   }
 
   /** @returns {'ok'|'min'|'max'} */
-  function decreaseQty(idChiTietSanPham) {
+  async function decreaseQty(idChiTietSanPham) {
     const line = items.value.find((l) => l.idChiTietSanPham === idChiTietSanPham)
     if (!line) return 'ok'
     if (line.soLuong <= 1) return 'min'
-    line.soLuong -= 1
-    save()
-    return 'ok'
+    return setQty(idChiTietSanPham, line.soLuong - 1).then(() => 'ok')
   }
 
   /** @returns {'ok'|'max'} */
-  function increaseQty(idChiTietSanPham) {
+  async function increaseQty(idChiTietSanPham) {
     const line = items.value.find((l) => l.idChiTietSanPham === idChiTietSanPham)
     if (!line) return 'ok'
     const max = maxQtyFor(line)
     if (line.soLuong >= max) return 'max'
-    line.soLuong += 1
-    save()
-    return 'ok'
+    return setQty(idChiTietSanPham, line.soLuong + 1).then(() => 'ok')
   }
 
   /**
    * @returns {{ clamped: number, hitMin: boolean, hitMax: boolean }}
    */
-  function setQty(idChiTietSanPham, soLuong) {
+  async function setQty(idChiTietSanPham, soLuong) {
     const line = items.value.find((l) => l.idChiTietSanPham === idChiTietSanPham)
     if (!line) return { clamped: 1, hitMin: false, hitMax: false }
     const raw = Number(soLuong)
@@ -170,18 +318,34 @@ export function useCart() {
       target = max
       hitMax = true
     }
-    line.soLuong = target
-    save()
+    const idKhachHang = customerIdOrNull()
+    if (!idKhachHang || !line.idChiTietGioHang) {
+      line.soLuong = target
+      saveLocal()
+      return { clamped: target, hitMin, hitMax }
+    }
+
+    const res = await updateGioHangItem(idKhachHang, line.idChiTietGioHang, target)
+    applyCartResponse(res.data)
     return { clamped: target, hitMin, hitMax }
   }
 
-  function clearCart() {
-    items.value = []
-    save()
+  async function clearCart() {
+    const idKhachHang = customerIdOrNull()
+    if (!idKhachHang) {
+      items.value = []
+      saveLocal()
+      return items.value
+    }
+
+    const res = await clearGioHang(idKhachHang)
+    applyCartResponse(res.data)
+    return res.data
   }
 
   return {
     items,
+    loading,
     count,
     total,
     selectedItems,
@@ -198,10 +362,11 @@ export function useCart() {
     increaseQty,
     setQty,
     clearCart,
+    refreshCart,
+    syncCartAfterLogin,
   }
 }
 
 export function getCartCount() {
-  load()
   return items.value.reduce((sum, line) => sum + (line.soLuong || 0), 0)
 }

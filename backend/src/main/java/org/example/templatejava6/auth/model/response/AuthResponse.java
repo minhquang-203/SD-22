@@ -11,6 +11,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class AuthResponse {
 
+    private Integer id;
     private String token;
     private String hoTen;
     private String vaiTro;

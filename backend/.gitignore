@@ -34,3 +34,6 @@ build/
 
 ### Uploads (ảnh sản phẩm upload runtime) ###
 uploads/
+
+### file chứa biến môi trường env
+.env

@@ -47,7 +47,7 @@ public class NhanVienAuthService {
         }
 
         String token = jwtTokenProvider.createToken(nv.getId(), nv.getHoTen(), maVaiTro);
-        return new AuthResponse(token, nv.getHoTen(), maVaiTro);
+        return new AuthResponse(nv.getId(), token, nv.getHoTen(), maVaiTro);
     }
 
     private boolean matchesPassword(String raw, String stored) {

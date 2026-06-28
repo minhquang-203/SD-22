@@ -82,6 +82,23 @@ public class LoHangService {
     }
 
     @Transactional
+    public void hoanTon(Integer idChiTietSanPham, int soLuong) {
+        if (soLuong <= 0) {
+            return;
+        }
+        List<LoHang> lots = loHangRepository.findByChiTietSanPham_IdAndTrangThaiTrueOrderByIdDesc(idChiTietSanPham);
+        if (lots.isEmpty()) {
+            ChiTietSanPham ct = getChiTietOrThrow(idChiTietSanPham);
+            throw new ApiException("Không tìm thấy lô hàng để hoàn tồn cho SKU " + ct.getSku() + ".", "LOT_NOT_FOUND");
+        }
+        LoHang lot = lots.get(0);
+        int current = lot.getSoLuongCon() != null ? lot.getSoLuongCon() : 0;
+        lot.setSoLuongCon(current + soLuong);
+        loHangRepository.save(lot);
+        syncTonKho(idChiTietSanPham);
+    }
+
+    @Transactional
     public void syncTonKho(Integer idChiTietSanPham) {
         ChiTietSanPham ct = getChiTietOrThrow(idChiTietSanPham);
         int total = loHangRepository.sumSoLuongCon(idChiTietSanPham);

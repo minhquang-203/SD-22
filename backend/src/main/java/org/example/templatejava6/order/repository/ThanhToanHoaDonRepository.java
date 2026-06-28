@@ -13,8 +13,17 @@ public interface ThanhToanHoaDonRepository extends JpaRepository<ThanhToanHoaDon
 
     List<ThanhToanHoaDon> findByIdHoaDonOrderByThoiGianDesc(HoaDon hoaDon);
 
+    List<ThanhToanHoaDon> findByIdHoaDonAndTrangThaiOrderByThoiGianDesc(HoaDon hoaDon, String trangThai);
+
+    Optional<ThanhToanHoaDon> findByMaGiaoDich(String maGiaoDich);
+
     default Optional<ThanhToanHoaDon> findLatestByHoaDon(HoaDon hoaDon) {
         List<ThanhToanHoaDon> list = findByIdHoaDonOrderByThoiGianDesc(hoaDon);
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
+
+    default Optional<ThanhToanHoaDon> findLatestByHoaDonAndTrangThai(HoaDon hoaDon, String trangThai) {
+        List<ThanhToanHoaDon> list = findByIdHoaDonAndTrangThaiOrderByThoiGianDesc(hoaDon, trangThai);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 }

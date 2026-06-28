@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { confirm } from '@/composables/useConfirm'
@@ -30,42 +30,73 @@ const {
   decreaseQty,
   increaseQty,
   setQty,
+  refreshCart,
 } = useCart()
 
 const qtyInputs = ref({})
 
-function onDecrease(line) {
-  const result = decreaseQty(line.idChiTietSanPham)
-  if (result === 'min') {
-    toast('Đã đạt số lượng tối thiểu')
+function syncQtyInput(idChiTietSanPham) {
+  const fresh = items.value.find((l) => l.idChiTietSanPham === idChiTietSanPham)
+  if (fresh) {
+    qtyInputs.value[idChiTietSanPham] = fresh.soLuong
+  } else {
+    delete qtyInputs.value[idChiTietSanPham]
   }
-  qtyInputs.value[line.idChiTietSanPham] = line.soLuong
 }
 
-function onIncrease(line) {
-  const result = increaseQty(line.idChiTietSanPham)
-  if (result === 'max') {
-    const stock = line.soLuongTon ?? maxQtyFor(line)
-    toast(`Số lượng đã đạt mức tối đa (còn ${stock} trong kho)`)
+onMounted(() => {
+  void refreshCart().catch((error) => {
+    toast(typeof error === 'string' ? error : 'Không tải được giỏ hàng')
+  })
+})
+
+async function onDecrease(line) {
+  try {
+    const result = await decreaseQty(line.idChiTietSanPham)
+    if (result === 'min') {
+      toast('Đã đạt số lượng tối thiểu')
+    }
+    syncQtyInput(line.idChiTietSanPham)
+  } catch (error) {
+    toast(typeof error === 'string' ? error : 'Không cập nhật được giỏ hàng')
   }
-  qtyInputs.value[line.idChiTietSanPham] = line.soLuong
 }
 
-function onQtyInput(line, e) {
+async function onIncrease(line) {
+  try {
+    const result = await increaseQty(line.idChiTietSanPham)
+    if (result === 'max') {
+      const fresh = items.value.find((l) => l.idChiTietSanPham === line.idChiTietSanPham) ?? line
+      const stock = fresh.soLuongTon ?? maxQtyFor(fresh)
+      toast(`Số lượng đã đạt mức tối đa (còn ${stock} trong kho)`)
+    }
+    syncQtyInput(line.idChiTietSanPham)
+  } catch (error) {
+    toast(typeof error === 'string' ? error : 'Không cập nhật được giỏ hàng')
+  }
+}
+
+async function onQtyInput(line, e) {
   const raw = e.target.value
   qtyInputs.value[line.idChiTietSanPham] = raw
   if (raw === '' || raw === undefined) return
-  const { clamped, hitMin, hitMax } = setQty(line.idChiTietSanPham, raw)
-  qtyInputs.value[line.idChiTietSanPham] = clamped
-  if (hitMin) toast('Đã đạt số lượng tối thiểu')
-  if (hitMax) {
-    const stock = line.soLuongTon ?? maxQtyFor(line)
-    toast(`Số lượng đã đạt mức tối đa (còn ${stock} trong kho)`)
+  try {
+    const { hitMin, hitMax } = await setQty(line.idChiTietSanPham, raw)
+    syncQtyInput(line.idChiTietSanPham)
+    if (hitMin) toast('Đã đạt số lượng tối thiểu')
+    if (hitMax) {
+      const fresh = items.value.find((l) => l.idChiTietSanPham === line.idChiTietSanPham) ?? line
+      const stock = fresh.soLuongTon ?? maxQtyFor(fresh)
+      toast(`Số lượng đã đạt mức tối đa (còn ${stock} trong kho)`)
+    }
+  } catch (error) {
+    syncQtyInput(line.idChiTietSanPham)
+    toast(typeof error === 'string' ? error : 'Không cập nhật được giỏ hàng')
   }
 }
 
 function onQtyBlur(line) {
-  qtyInputs.value[line.idChiTietSanPham] = line.soLuong
+  syncQtyInput(line.idChiTietSanPham)
 }
 
 async function confirmRemoveOne(line) {
@@ -75,7 +106,12 @@ async function confirmRemoveOne(line) {
     confirmText: 'Xóa',
     danger: true,
   })
-  if (ok) removeItem(line.idChiTietSanPham)
+  if (!ok) return
+  try {
+    await removeItem(line.idChiTietSanPham)
+  } catch (error) {
+    toast(typeof error === 'string' ? error : 'Không xóa được sản phẩm')
+  }
 }
 
 async function confirmRemoveSelected() {
@@ -87,7 +123,12 @@ async function confirmRemoveSelected() {
     confirmText: 'Xóa',
     danger: true,
   })
-  if (ok) removeSelected()
+  if (!ok) return
+  try {
+    await removeSelected()
+  } catch (error) {
+    toast(typeof error === 'string' ? error : 'Không xóa được sản phẩm đã chọn')
+  }
 }
 
 function toggleAll() {
