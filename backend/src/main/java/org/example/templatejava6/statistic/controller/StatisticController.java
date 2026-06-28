@@ -62,4 +62,9 @@ public class StatisticController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate) {
         return ResponseEntity.ok(statisticRepository.getQuizStats(fromDate, toDate));
     }
+
+    @GetMapping("/low-stock")
+    public ResponseEntity<?> getLowStock() {
+        return ResponseEntity.ok(statisticRepository.getLowStockProducts());
+    }
 }

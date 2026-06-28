@@ -136,52 +136,73 @@
         </div>
 
         <div v-else class="sg-result" key="result">
-          <div class="sg-result__hero">
-            <h2 class="sg-result__title">KẾT QUẢ PHÂN TÍCH DA CỦA BẠN</h2>
-          </div>
-
-          <div class="sg-result__skin-card">
-            <h3 class="sg-result__skin-name">{{ resultData.skinName }}</h3>
-            <p class="sg-result__skin-desc">{{ resultData.description }}</p>
-          </div>
-
-          <div class="sg-result__scores">
-            <h4 class="sg-result__scores-title">Phân bố điểm loại da</h4>
-            <div class="sg-result__score-list">
-              <div v-for="score in sortedScores" :key="score.id" class="sg-score-row">
-                <span class="sg-score-row__label">{{ score.name }}</span>
-                <div class="sg-score-row__bar">
-                  <div class="sg-score-row__fill" :style="{ width: score.percent + '%' }"></div>
-                </div>
-                <span class="sg-score-row__value">{{ score.points }}đ</span>
+          
+          <!-- LỰA CHỌN CHÂN ÁI (HERO PRODUCT) -->
+          <div class="sg-result__hero-product" v-if="recommendedProducts.length > 0">
+            <h2 class="sg-result__hero-label">SẢN PHẨM CHÂN ÁI CỦA BẠN</h2>
+            <div class="sg-hero-card" @click="goToProduct(recommendedProducts[0].id)">
+              <div class="sg-hero-card__img">
+                <img v-if="recommendedProducts[0].hinhAnh" :src="getImageUrl(recommendedProducts[0].hinhAnh)" :alt="recommendedProducts[0].ten" />
+                <div v-else class="sg-hero-card__placeholder">SUNOVA</div>
+              </div>
+              <div class="sg-hero-card__info">
+                <h3 class="sg-hero-card__name">{{ recommendedProducts[0].ten }}</h3>
+                <p class="sg-hero-card__price">{{ (recommendedProducts[0].giaMin || recommendedProducts[0].gia) ? formatPrice(recommendedProducts[0].giaMin || recommendedProducts[0].gia) : 'Khám phá ngay ➔' }}</p>
+                <p class="sg-hero-card__desc">Sản phẩm hoàn hảo nhất đáp ứng các nhu cầu về làn da của bạn. Công thức mỏng nhẹ, bảo vệ tối ưu dưới tác động của tia UV.</p>
+                <button class="sg-btn-buy">XEM CHI TIẾT</button>
               </div>
             </div>
           </div>
 
-          <div class="sg-result__products" v-if="recommendedProducts.length > 0">
-            <h3 class="sg-result__products-title">Sản phẩm được gợi ý cho bạn</h3>
-            <div class="sg-product-grid">
+          <!-- GIẢI THÍCH KẾT QUẢ -->
+          <div class="sg-result__explanation">
+            <div class="sg-explanation-col">
+              <h4>Tại sao chúng tôi gợi ý sản phẩm này?</h4>
+              <p>Gợi ý được đưa ra dựa trên phân tích chuyên sâu về tình trạng và loại da thực tế của bạn.</p>
+            </div>
+            <div class="sg-explanation-col">
+              <h4>LOẠI DA CỦA BẠN</h4>
+              <p class="sg-skin-highlight">✔️ {{ resultData.skinName }}</p>
+              <p class="sg-skin-desc">{{ resultData.description }}</p>
+            </div>
+            <div class="sg-explanation-col">
+              <h4>PHÂN BỐ ĐIỂM DA</h4>
+              <div class="sg-result__score-list">
+                <div v-for="score in sortedScores.slice(0,3)" :key="score.id" class="sg-score-row">
+                  <span class="sg-score-row__label">{{ score.name }}</span>
+                  <div class="sg-score-row__bar">
+                    <div class="sg-score-row__fill" :style="{ width: score.percent + '%' }"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- BÁN CHÉO ROUTINE (SẢN PHẨM DÙNG KÈM) -->
+          <div class="sg-result__routine" v-if="recommendedProducts.length > 1">
+            <h3 class="sg-result__routine-title">HOÀN THIỆN QUY TRÌNH CỦA BẠN</h3>
+            <p class="sg-result__routine-subtitle">Kết hợp cùng các sản phẩm sau để bảo vệ da toàn diện suốt cả ngày dài.</p>
+            <div class="sg-routine-grid">
               <div
-                v-for="product in recommendedProducts"
+                v-for="(product, index) in recommendedProducts.slice(1)"
                 :key="product.id"
-                class="sg-product-card"
+                class="sg-routine-card"
                 @click="goToProduct(product.id)"
               >
-                <div class="sg-product-card__img">
+                <div class="sg-routine-step">BƯỚC {{ index + 1 }}</div>
+                <div class="sg-routine-card__img">
                   <img v-if="product.hinhAnh" :src="getImageUrl(product.hinhAnh)" :alt="product.ten" />
-                  <div v-else class="sg-product-card__placeholder">SUNOVA</div>
+                  <div v-else class="sg-routine-card__placeholder">SUNOVA</div>
                 </div>
-                <h4 class="sg-product-card__name">{{ product.ten }}</h4>
-                <p class="sg-product-card__price" :class="{ 'price-cta': !product.giaMin && !product.gia }">
-                  {{ (product.giaMin || product.gia) ? formatPrice(product.giaMin || product.gia) : 'Khám phá ngay ➔' }}
-                </p>
+                <h4 class="sg-routine-card__name">{{ product.ten }}</h4>
+                <a class="sg-routine-card__link">XEM THÊM</a>
               </div>
             </div>
           </div>
 
           <div class="sg-result__actions">
-            <button class="sg-btn-primary" @click="retakeQuiz">LÀM LẠI QUIZ</button>
-            <button class="sg-btn-outline" @click="goToProducts">KHÁM PHÁ TẤT CẢ SẢN PHẨM</button>
+            <button class="sg-btn-outline" @click="retakeQuiz">LÀM LẠI QUIZ</button>
+            <button class="sg-btn-primary" @click="goToProducts">KHÁM PHÁ TẤT CẢ SẢN PHẨM</button>
           </div>
         </div>
 
@@ -390,9 +411,10 @@ const handleNext = () => {
 
 const calculateResult = () => {
   const scores = {};
+
   Object.values(selectedAnswers.value).forEach(answer => {
-    const tagId = answer.tagId;
-    const points = answer.scoreValue || 0;
+    const tagId = answer.tagId || answer.idLoaiDa;
+    const points = answer.scoreValue || answer.diem || 0;
     if (tagId) {
       if (!scores[tagId]) {
         const info = LOAI_DA_INFO[tagId] || { name: `Loại da #${tagId}` };
@@ -403,36 +425,74 @@ const calculateResult = () => {
   });
   scoreMap.value = scores;
 
-  let topId = null, topPoints = 0;
-  Object.entries(scores).forEach(([id, data]) => {
-    if (data.points > topPoints) { topPoints = data.points; topId = Number(id); }
+  let topPoints = 0;
+  // Tìm điểm cao nhất
+  Object.values(scores).forEach(data => {
+    if (data.points > topPoints) { topPoints = data.points; }
   });
 
-  const info = LOAI_DA_INFO[topId] || { name: 'Da Thường', desc: 'Kết quả phân tích chung.' };
-  resultData.value = { skinName: info.name, description: info.desc };
-  recommendProducts(topId);
+  // Tìm TẤT CẢ các loại da đạt điểm cao nhất (xử lý hòa điểm)
+  const topSkinTypes = [];
+  Object.entries(scores).forEach(([id, data]) => {
+    if (data.points === topPoints && topPoints > 0) {
+      topSkinTypes.push(Number(id));
+    }
+  });
+
+  // Fallback nếu không có điểm nào
+  if (topSkinTypes.length === 0) topSkinTypes.push(5);
+
+  // Hiển thị tên kết hợp (VD: "Da Dầu & Da Nhạy Cảm")
+  const skinNames = topSkinTypes.map(id => LOAI_DA_INFO[id].name).join(' & ');
+  
+  // Hiển thị mô tả
+  let skinDesc = '';
+  if (topSkinTypes.length === 1) {
+    skinDesc = LOAI_DA_INFO[topSkinTypes[0]].desc;
+  } else {
+    skinDesc = 'Làn da của bạn có sự kết hợp của nhiều yếu tố. ' + topSkinTypes.map(id => LOAI_DA_INFO[id].desc).join(' ');
+  }
+
+  resultData.value = { skinName: skinNames, description: skinDesc };
+  recommendProducts(); 
 
   setTimeout(() => { analyzing.value = false; showResult.value = true; }, 2500);
 };
 
-const recommendProducts = (topId) => {
-  let candidates = allProducts.value;
-  
-  if (topId) {
-    // Lọc các sản phẩm có chứa ID loại da tương ứng (idLoaiDas là mảng ID loại da của sản phẩm)
-    const suitableProducts = allProducts.value.filter(p => 
-      p.idLoaiDas && p.idLoaiDas.includes(topId)
-    );
+const recommendProducts = () => {
+  // THUẬT TOÁN MATCH SCORE CHÍNH THỨC
+  const scoredProducts = allProducts.value.map(product => {
+    let matchScore = 0;
     
-    // Nếu có sản phẩm phù hợp, ưu tiên dùng sản phẩm đó
-    if (suitableProducts.length > 0) {
-      candidates = suitableProducts;
+    // Nếu sản phẩm có danh sách loại da hỗ trợ
+    if (product.idLoaiDas && Array.isArray(product.idLoaiDas)) {
+      product.idLoaiDas.forEach(loaiDaId => {
+        // Cộng dồn điểm tương ứng từ kết quả làm bài của khách
+        if (scoreMap.value[loaiDaId]) {
+          matchScore += scoreMap.value[loaiDaId].points;
+        }
+      });
     }
+
+    return {
+      ...product,
+      matchScore: matchScore
+    };
+  });
+
+  // Lọc bỏ các sản phẩm 0 điểm
+  let suitableProducts = scoredProducts.filter(p => p.matchScore > 0);
+
+  // Fallback nếu không có sản phẩm nào hợp
+  if (suitableProducts.length === 0) {
+    suitableProducts = scoredProducts;
   }
 
-  // Xáo trộn ngẫu nhiên danh sách đã lọc
-  const shuffled = [...candidates].sort(() => 0.5 - Math.random());
-  recommendedProducts.value = shuffled.slice(0, 4);
+  // Sắp xếp theo điểm tương thích (Match Score) từ cao xuống thấp
+  suitableProducts.sort((a, b) => b.matchScore - a.matchScore);
+
+  // Lấy 4 sản phẩm top đầu
+  recommendedProducts.value = suitableProducts.slice(0, 4);
 };
 
 // ============================================
@@ -699,47 +759,64 @@ const retakeQuiz = () => {
 @keyframes dot-b { 0%,80%,100% { transform: scale(0.6); opacity: 0.3; } 40% { transform: scale(1); opacity: 1; } }
 
 /* ============================================
-   RESULT
+   RESULT - HERO PRODUCT
    ============================================ */
-.sg-result { width: 100%; max-width: 800px; display: flex; flex-direction: column; align-items: center; }
-.sg-result__hero { text-align: center; margin-bottom: 28px; }
-.sg-result__title { font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 600; color: var(--sq-cream); margin: 0; }
+.sg-result { width: 100%; max-width: 900px; display: flex; flex-direction: column; align-items: center; }
 
-.sg-result__skin-card { background: var(--sq-cream); border-radius: 16px; padding: 40px 36px; text-align: center; width: 100%; max-width: 480px; margin-bottom: 36px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
-.sg-result__skin-name { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; color: var(--sq-espresso); margin: 0 0 12px; }
-.sg-result__skin-desc { font-size: 15px; color: #6b5e53; line-height: 1.7; margin: 0; }
+.sg-result__hero-product { width: 100%; margin-bottom: 40px; text-align: center; }
+.sg-result__hero-label { font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 700; color: var(--sq-cream); margin: 0 0 24px; letter-spacing: 1px; }
 
-.sg-result__scores { width: 100%; max-width: 480px; margin-bottom: 40px; }
-.sg-result__scores-title { font-size: 14px; font-weight: 700; color: var(--sq-gold); letter-spacing: 1px; margin: 0 0 16px; text-align: center; text-transform: uppercase;}
-.sg-score-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.sg-score-row__label { width: 85px; text-align: right; font-size: 13px; color: var(--sq-cream); font-weight: 500; flex-shrink: 0; opacity: 0.9; }
-.sg-score-row__bar { flex: 1; height: 8px; background: rgba(249,245,240,0.12); border-radius: 4px; overflow: hidden; }
-.sg-score-row__fill { height: 100%; background: linear-gradient(90deg, var(--sq-gold-dark), var(--sq-gold)); border-radius: 4px; transition: width 0.8s ease-out; }
-.sg-score-row__value { width: 40px; font-size: 13px; color: var(--sq-gold); font-weight: 700; }
-
-.sg-result__products { width: 100%; margin-bottom: 36px; }
-.sg-result__products-title { font-size: 20px; font-weight: 700; color: var(--sq-cream); margin: 0 0 20px; text-align: center; }
-.sg-product-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-.sg-product-card { background: var(--sq-cream); border-radius: 12px; overflow: hidden; cursor: pointer; transition: all 0.25s; box-shadow: 0 2px 12px rgba(0,0,0,0.15); }
-.sg-product-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
-.sg-product-card__img { width: 100%; aspect-ratio: 1; background: var(--sq-sand); display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.sg-product-card__img img { width: 100%; height: 100%; object-fit: cover; }
-.sg-product-card__placeholder { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: var(--sq-espresso); letter-spacing: 2px; }
-.sg-product-card__name { font-size: 13px; font-weight: 600; color: var(--sq-espresso); margin: 0; padding: 10px 12px 4px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.sg-product-card__price { font-size: 14px; font-weight: 700; color: var(--sq-gold-dark); margin: 0; padding: 0 12px 12px; }
-
-/* CSS XỬ LÝ LỖI GIÁ BẰNG 0 (NÚT KHÁM PHÁ NGAY) */
-.price-cta {
-  font-size: 13px !important;
-  color: var(--sq-gold) !important;
-  text-decoration: underline;
-  cursor: pointer;
+.sg-hero-card {
+  display: flex; background: var(--sq-cream); border-radius: 16px; overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.3); cursor: pointer; transition: transform 0.3s;
+  text-align: left;
 }
-.price-cta:hover {
-  color: var(--sq-gold-dark) !important;
-}
+.sg-hero-card:hover { transform: translateY(-5px); }
 
-.sg-result__actions { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-top: 8px; margin-bottom: 20px; }
+.sg-hero-card__img { flex: 0 0 50%; aspect-ratio: 1; background: var(--sq-sand); display: flex; align-items: center; justify-content: center; }
+.sg-hero-card__img img { width: 100%; height: 100%; object-fit: cover; }
+.sg-hero-card__placeholder { font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 700; color: var(--sq-espresso); letter-spacing: 2px; opacity: 0.5; }
+
+.sg-hero-card__info { flex: 1; padding: 40px; display: flex; flex-direction: column; justify-content: center; }
+.sg-hero-card__name { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; color: var(--sq-espresso); margin: 0 0 12px; line-height: 1.2; }
+.sg-hero-card__price { font-size: 18px; font-weight: 700; color: var(--sq-gold-dark); margin: 0 0 20px; }
+.sg-hero-card__desc { font-size: 14px; color: #5a4f46; line-height: 1.7; margin: 0 0 30px; }
+.sg-btn-buy { background: var(--sq-gold); color: var(--sq-espresso); border: none; padding: 16px 32px; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; border-radius: 8px; cursor: pointer; transition: background 0.3s; align-self: flex-start; }
+.sg-btn-buy:hover { background: var(--sq-gold-dark); color: var(--sq-cream); }
+
+/* GIẢI THÍCH KẾT QUẢ (HOW WE FORMULATE) */
+.sg-result__explanation {
+  width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+  background: var(--sq-cream); border-radius: 12px; padding: 30px; margin-bottom: 60px;
+}
+.sg-explanation-col h4 { font-size: 12px; font-weight: 800; letter-spacing: 1.5px; color: var(--sq-espresso); margin: 0 0 12px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 8px; }
+.sg-explanation-col p { font-size: 13px; color: #5a4f46; line-height: 1.6; margin: 0; }
+.sg-skin-highlight { font-weight: 700; color: var(--sq-gold-dark) !important; margin-bottom: 6px !important; }
+
+/* PHÂN BỐ ĐIỂM Ở TRONG EXPLANATION */
+.sg-result__score-list { display: flex; flex-direction: column; gap: 8px; }
+.sg-score-row { display: flex; align-items: center; gap: 8px; }
+.sg-score-row__label { width: 80px; font-size: 12px; color: var(--sq-espresso); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sg-score-row__bar { flex: 1; height: 6px; background: rgba(0,0,0,0.06); border-radius: 4px; }
+.sg-score-row__fill { height: 100%; background: var(--sq-gold); border-radius: 4px; }
+
+/* ROUTINE CHÉO */
+.sg-result__routine { width: 100%; margin-bottom: 50px; text-align: center; }
+.sg-result__routine-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; color: var(--sq-cream); margin: 0 0 8px; }
+.sg-result__routine-subtitle { font-size: 14px; color: var(--sq-text-muted); margin: 0 0 30px; }
+
+.sg-routine-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.sg-routine-card { background: var(--sq-cream); border-radius: 12px; padding: 20px; cursor: pointer; transition: transform 0.3s; position: relative; }
+.sg-routine-card:hover { transform: translateY(-5px); }
+.sg-routine-step { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--sq-gold); color: var(--sq-espresso); font-size: 11px; font-weight: 800; padding: 4px 12px; border-radius: 20px; letter-spacing: 1px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); z-index: 2; }
+.sg-routine-card__img { width: 100%; aspect-ratio: 1; margin-bottom: 16px; display: flex; align-items: center; justify-content: center; }
+.sg-routine-card__img img { width: 100%; height: 100%; object-fit: contain; }
+.sg-routine-card__placeholder { font-weight: 700; opacity: 0.3; }
+.sg-routine-card__name { font-size: 13px; font-weight: 600; color: var(--sq-espresso); margin: 0 0 12px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sg-routine-card__link { font-size: 12px; font-weight: 700; color: var(--sq-gold-dark); text-decoration: none; border-bottom: 1px solid var(--sq-gold-dark); padding-bottom: 2px; }
+
+/* ACTIONS */
+.sg-result__actions { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-top: 10px; margin-bottom: 20px; }
 .sg-btn-primary { background: var(--sq-gold); color: var(--sq-espresso); border: none; padding: 14px 36px; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; border-radius: 8px; cursor: pointer; transition: all 0.25s; }
 .sg-btn-primary:hover { background: var(--sq-gold-dark); color: var(--sq-cream); transform: translateY(-2px); }
 .sg-btn-outline { background: transparent; border: 2px solid var(--sq-cream); color: var(--sq-cream); padding: 14px 36px; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; border-radius: 8px; cursor: pointer; transition: all 0.25s; }

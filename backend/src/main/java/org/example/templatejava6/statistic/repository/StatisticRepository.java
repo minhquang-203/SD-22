@@ -97,4 +97,16 @@ public interface StatisticRepository extends JpaRepository<HoaDon, Integer> {
         ORDER BY value DESC
     """, nativeQuery = true)
     List<Map<String, Object>> getQuizStats(@Param("fromDate") LocalDateTime fromDate, @Param("toDate") LocalDateTime toDate);
+
+    // 7. LẤY SẢN PHẨM SẮP HẾT HÀNG (Tồn kho <= 15)
+    @Query(value = """
+        SELECT TOP 5 sp.ten AS name, ISNULL(SUM(ct.so_luong_ton), 0) AS value
+        FROM chi_tiet_san_pham ct
+        JOIN san_pham sp ON ct.id_san_pham = sp.id
+        WHERE ct.trang_thai = 1
+        GROUP BY sp.id, sp.ten
+        HAVING SUM(ct.so_luong_ton) <= 15
+        ORDER BY value ASC
+    """, nativeQuery = true)
+    List<Map<String, Object>> getLowStockProducts();
 }

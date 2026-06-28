@@ -368,6 +368,12 @@ public class BanHangService {
             hdct.setDonGia(line.donGia);
             hdct.setThanhTien(line.thanhTien);
             hoaDonChiTietRepository.save(hdct);
+
+            // Cập nhật lại số lượng tồn kho sau khi bán
+            if (line.cts.getSoLuongTon() != null) {
+                line.cts.setSoLuongTon(line.cts.getSoLuongTon() - line.soLuong);
+                chiTietSanPhamRepository.save(line.cts);
+            }
         }
     }
 
