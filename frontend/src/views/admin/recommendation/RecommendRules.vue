@@ -205,8 +205,8 @@ const fetchRules = () => {
       id: 1,
       name: 'Luật 1: Da dầu mụn làm việc văn phòng',
       conditions: [
-        { tagId: 'TAG_DA_DAU', operator: '>=', value: 10 },
-        { tagId: 'TAG_MUN', operator: '>=', value: 5 },
+        { tagId: 'TAG_DA_DAU', operator: '>=', value: 4 },
+        { tagId: 'TAG_MUN', operator: '>=', value: 1 },
         { tagId: 'TAG_VAN_PHONG', operator: '==', value: 1 }
       ],
       resultTags: ['RES_KIEM_DAU', 'RES_ANH_SANG_XANH', 'RES_MONG_NHE'],
@@ -216,8 +216,8 @@ const fetchRules = () => {
       id: 2,
       name: 'Luật 2: Da khô lão hóa ngoài trời',
       conditions: [
-        { tagId: 'TAG_DA_KHO', operator: '>=', value: 10 },
-        { tagId: 'TAG_LAO_HOA', operator: '>=', value: 5 },
+        { tagId: 'TAG_DA_KHO', operator: '>=', value: 4 },
+        { tagId: 'TAG_LAO_HOA', operator: '>=', value: 1 },
         { tagId: 'TAG_NGOAI_TROI', operator: '==', value: 1 }
       ],
       resultTags: ['RES_DUONG_AM', 'RES_PHO_RONG'],
@@ -227,7 +227,7 @@ const fetchRules = () => {
       id: 3,
       name: 'Luật 3: Da nhạy cảm chơi thể thao, dã ngoại',
       conditions: [
-        { tagId: 'TAG_NHAY_CAM', operator: '>=', value: 10 },
+        { tagId: 'TAG_NHAY_CAM', operator: '>=', value: 4 },
         { tagId: 'TAG_THE_THAO', operator: '==', value: 1 }
       ],
       resultTags: ['RES_KHANG_NUOC', 'RES_VAT_LY_LANH'],
@@ -237,8 +237,8 @@ const fetchRules = () => {
       id: 4,
       name: 'Luật 4: Khách hàng thích nâng tone thay makeup',
       conditions: [
-        { tagId: 'TAG_WANT_TINTED', operator: '>=', value: 5 },
-        { tagId: 'TAG_THAM_NAM', operator: '>=', value: 5 }
+        { tagId: 'TAG_WANT_TINTED', operator: '>=', value: 1 },
+        { tagId: 'TAG_THAM_NAM', operator: '>=', value: 1 }
       ],
       resultTags: ['RES_NANG_TONE', 'RES_KIEM_DAU'],
       isActive: true
@@ -247,10 +247,41 @@ const fetchRules = () => {
       id: 5,
       name: 'Luật 5: Da hỗn hợp thích căng bóng mọng nước',
       conditions: [
-        { tagId: 'TAG_HON_HOP', operator: '>=', value: 10 },
-        { tagId: 'TAG_WANT_GLOWY', operator: '>=', value: 5 }
+        { tagId: 'TAG_HON_HOP', operator: '>=', value: 4 },
+        { tagId: 'TAG_WANT_GLOWY', operator: '>=', value: 1 }
       ],
       resultTags: ['RES_DUONG_AM', 'RES_MONG_NHE'],
+      isActive: true
+    },
+    {
+      id: 6,
+      name: 'Luật 6: Da đang Treatment/Thâm nám đi nắng gắt',
+      conditions: [
+        { tagId: 'TAG_THAM_NAM', operator: '>=', value: 1 },
+        { tagId: 'TAG_LAO_HOA', operator: '>=', value: 1 },
+        { tagId: 'TAG_NGOAI_TROI', operator: '==', value: 1 }
+      ],
+      resultTags: ['RES_PHO_RONG', 'RES_DUONG_AM'],
+      isActive: true
+    },
+    {
+      id: 7,
+      name: 'Luật 7: Da nhạy cảm dễ nổi mụn kích ứng',
+      conditions: [
+        { tagId: 'TAG_NHAY_CAM', operator: '>=', value: 4 },
+        { tagId: 'TAG_MUN', operator: '>=', value: 1 }
+      ],
+      resultTags: ['RES_VAT_LY_LANH', 'RES_KIEM_DAU'],
+      isActive: true
+    },
+    {
+      id: 8,
+      name: 'Luật 8: Da dầu bơi lội, hoạt động ngoài trời gắt',
+      conditions: [
+        { tagId: 'TAG_DA_DAU', operator: '>=', value: 4 },
+        { tagId: 'TAG_NGOAI_TROI', operator: '==', value: 1 }
+      ],
+      resultTags: ['RES_KIEM_DAU', 'RES_KHANG_NUOC', 'RES_PHO_RONG'],
       isActive: true
     }
   ];

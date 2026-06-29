@@ -729,20 +729,45 @@ GO
 
 -- CÂU HỎI QUIZ
 INSERT INTO cau_hoi_quiz (noi_dung, thu_tu) VALUES
-(N'Làn da của bạn vào cuối ngày thường như thế nào?', 1),
-(N'Vùng chữ T (trán, mũi, cằm) của bạn có dễ bóng dầu không?', 2),
-(N'Da bạn có bị khô căng sau khi rửa mặt không?', 3),
-(N'Da bạn có dễ bị mẩn đỏ, kích ứng không?', 4),
-(N'Lỗ chân lông vùng má của bạn ra sao?', 5);
+(N'Làn da của bạn thường có biểu hiện gì vào thời điểm giữa ngày hoặc cuối ngày?', 1),
+(N'Hiệu ứng bề mặt (Finish) bạn mong muốn nhất sau khi thoa kem chống nắng là gì?', 2),
+(N'Bạn dự định sử dụng sản phẩm chống nắng chủ yếu trong môi trường hoặc hoạt động nào?', 3),
+(N'Ngoài việc bảo vệ khỏi tia UV, bạn muốn kem chống nắng hỗ trợ thêm vấn đề gì cho da?', 4),
+(N'Kết cấu sản phẩm (Format) nào mang lại cảm giác thoải mái nhất cho bạn khi thoa?', 5),
+(N'Cảm giác trên da của bạn sau khi rửa mặt khoảng 30 phút (không bôi thêm gì) là như thế nào?', 6);
 GO
 
 -- ĐÁP ÁN QUIZ (gắn câu hỏi + loại da + điểm)
 INSERT INTO dap_an_quiz (id_cau_hoi, noi_dung, id_loai_da, diem) VALUES
-(1, N'Bóng dầu toàn mặt',        1, 2),
-(1, N'Khô căng, bong tróc',      2, 2),
-(2, N'Có, rất bóng dầu',         1, 2),
-(3, N'Có, thường xuyên khô căng',2, 2),
-(4, N'Có, da rất dễ kích ứng',   5, 2);
+-- Câu 1
+(1, N'Bóng dầu diện rộng, đặc biệt là vùng trán, mũi và cằm', 1, 3), 
+(1, N'Khô ráp, có cảm giác căng cức nhẹ, đôi khi bong tróc', 2, 3), 
+(1, N'Chỉ đổ dầu vùng chữ T (trán, mũi), hai bên má lại khô ráp', 3, 3), 
+(1, N'Bề mặt thông thoáng, mềm mịn, không quá dầu hay khô', 4, 3), 
+(1, N'Dễ bị đỏ ửng, châm chích hoặc ngứa rát khi đổi mỹ phẩm', 5, 3), 
+-- Câu 2
+(2, N'Kiềm dầu hoàn toàn, tạo bề mặt lì mịn, mỏng nhẹ (Matte)', 1, 2),
+(2, N'Căng bóng, mọng nước, tạo hiệu ứng căng mướt (Glowy)', 2, 2),
+(2, N'Tự nhiên như không bôi gì, thoáng da tàng hình (Unseen)', 4, 2),
+(2, N'Lớp nền mịn màng, làm dịu da và che mẩn đỏ nhẹ', 5, 2),
+-- Câu 3
+(3, N'Làm việc văn phòng, đi học, ngồi điều hòa thời gian dài', 2, 1),
+(3, N'Hoạt động ngoài trời nhiều, chơi thể thao hoặc đi bơi', 1, 1),
+(3, N'Sử dụng hằng ngày như một lớp lót mịn dưới lớp trang điểm', 3, 1),
+-- Câu 4
+(4, N'Nâng tông trắng hồng tự nhiên, làm sáng vùng da xỉn màu', 4, 1),
+(4, N'Thành phần lành tính, phục hồi và làm dịu kích ứng', 5, 2),
+(4, N'Kiểm soát bã nhờn tối đa, ngăn ngừa bít tắc sinh mụn', 1, 2),
+(4, N'Cấp ẩm sâu, chống oxy hóa và ngăn ngừa lão hóa sớm', 2, 2),
+-- Câu 5
+(5, N'Dạng sữa hoặc gel lỏng, thấm siêu nhanh và mát da', 1, 1),
+(5, N'Dạng kem đặc mịn màng, tạo màng ẩm mượt lâu dài', 2, 1),
+(5, N'Dạng xịt phun sương hoặc thỏi lăn tiện lợi dặm lại', 4, 1),
+-- Câu 6
+(6, N'Cảm thấy khô căng, hơi rát, đôi khi có vảy sừng nhỏ', 2, 3),
+(6, N'Đổ dầu bóng loáng trên toàn bộ khuôn mặt', 1, 3),
+(6, N'Trán và mũi đổ dầu nhờn, nhưng hai bên má lại khô căng', 3, 3),
+(6, N'Mềm mại, thoải mái, không quá dầu cũng không quá khô', 4, 3);
 GO
 
 -- KẾT QUẢ QUIZ
