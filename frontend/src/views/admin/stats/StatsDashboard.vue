@@ -141,6 +141,13 @@
             <apexchart type="pie" height="360" :options="pieOptions" :series="pieSeries"></apexchart>
           </div>
         </div>
+
+        <div class="panel insight-panel">
+          <div class="panel-header"><h3>Tỷ Lệ Đơn Hàng (Online)</h3><span class="dots">⋮</span></div>
+          <div class="pie-chart-container" style="padding-top: 10px;">
+            <apexchart type="donut" height="360" :options="funnelOptions" :series="funnelSeries"></apexchart>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -331,14 +338,15 @@ const fetchRealData = async () => {
 
   const config = { params: { fromDate: startStr, toDate: endStr } };
   try {
-    const [resSum, resTop, resFlow, resChart, resVoucher, resQuiz, resLowStock] = await Promise.all([
+    const [resSum, resTop, resFlow, resChart, resVoucher, resQuiz, resLowStock, resFunnel] = await Promise.all([
       request.get('/statistic/summary', config),
       request.get('/statistic/top-products', config),
       request.get('/statistic/payment-flow', config),
       request.get('/statistic/chart', config),
       request.get('/statistic/voucher', config),
       request.get('/statistic/quiz', config),
-      request.get('/statistic/low-stock').catch(() => ({ data: [] }))
+      request.get('/statistic/low-stock').catch(() => ({ data: [] })),
+      request.get('/statistic/order-funnel', config)
     ]);
 
     // 1. DATA TỔNG QUAN
@@ -435,6 +443,42 @@ const fetchRealData = async () => {
         summaryMetrics.value.quizAdvice = "Cần khuyến khích khách làm Quiz...";
     }
 
+    // 7. DATA ORDER FUNNEL (ONLINE)
+    if(resFunnel.data && resFunnel.data.length > 0) {
+        // Ánh xạ Tên Trạng Thái và Màu Sắc chuẩn
+        const statusMap = {
+            'CHO_XAC_NHAN': { label: 'Chờ xác nhận', color: '#f59e0b' }, 
+            'DA_XAC_NHAN': { label: 'Đã đóng gói', color: '#3b82f6' }, 
+            'DANG_GIAO': { label: 'Đang giao hàng', color: '#f97316' }, 
+            'HOAN_THANH': { label: 'Giao Thành Công', color: '#10b981' }, 
+            'DA_HUY': { label: 'Đã Hủy (Boom hàng)', color: '#ef4444' } 
+        };
+
+        const mappedLabels = [];
+        const mappedColors = [];
+        const mappedSeries = [];
+
+        resFunnel.data.forEach(item => {
+            const rawName = item.name || item.NAME;
+            const val = item.value || item.VALUE;
+            
+            const mapping = statusMap[rawName] || { label: rawName, color: '#9ca3af' };
+            mappedLabels.push(mapping.label);
+            mappedColors.push(mapping.color);
+            mappedSeries.push(val);
+        });
+
+        funnelOptions.value = { 
+            ...funnelOptions.value, 
+            labels: mappedLabels,
+            colors: mappedColors
+        };
+        funnelSeries.value = mappedSeries;
+    } else {
+        funnelOptions.value = { ...funnelOptions.value, labels: [] };
+        funnelSeries.value = [];
+    }
+
   } catch (error) {
     console.error("LỖI GỌI API THỐNG KÊ:", error);
   }
@@ -445,7 +489,7 @@ onMounted(() => {
 });
 
 // ===============================================
-// CẤU HÌNH BIỂU ĐỒ TRÒN
+// CẤU HÌNH BIỂU ĐỒ TRÒN (TOP SẢN PHẨM)
 // ===============================================
 const pieSeries = ref([]);
 const pieOptions = ref({
@@ -460,6 +504,37 @@ const pieOptions = ref({
   },
   dataLabels: { enabled: true, formatter: function (val) { return Math.round(val) + "%"; } },
   legend: { show: true, position: 'bottom' }
+});
+
+// ===============================================
+// CẤU HÌNH BIỂU ĐỒ TRÒN (ORDER FUNNEL ONLINE)
+// ===============================================
+const funnelSeries = ref([]);
+const funnelOptions = ref({
+  chart: { type: 'donut', fontFamily: 'Inter' },
+  labels: [],
+  // Màu sắc: Hoàn thành (xanh lá), Đã hủy (đỏ), Chờ xác nhận (vàng), Đang giao (cam)
+  colors: ['#10b981', '#ef4444', '#f59e0b', '#f97316', '#3b82f6'],
+  noData: { 
+    text: "Chưa có đơn hàng Online", 
+    align: 'center', 
+    verticalAlign: 'middle', 
+    style: { color: '#8c6b4a', fontSize: '14px', fontFamily: 'Inter' } 
+  },
+  dataLabels: { enabled: true, formatter: function (val) { return Math.round(val) + "%"; } },
+  legend: { show: true, position: 'bottom' },
+  plotOptions: {
+    pie: {
+      donut: {
+        labels: {
+          show: true,
+          name: { show: true, fontSize: '12px' },
+          value: { show: true, fontSize: '16px', fontWeight: 'bold' },
+          total: { show: true, showAlways: true, label: 'Tổng Đơn', color: '#374151' }
+        }
+      }
+    }
+  }
 });
 
 // ===============================================

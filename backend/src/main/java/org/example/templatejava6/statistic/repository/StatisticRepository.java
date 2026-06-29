@@ -109,4 +109,14 @@ public interface StatisticRepository extends JpaRepository<HoaDon, Integer> {
         ORDER BY value ASC
     """, nativeQuery = true)
     List<Map<String, Object>> getLowStockProducts();
+
+    // 8. TỶ LỆ TRẠNG THÁI ĐƠN HÀNG ONLINE (Funnel)
+    @Query(value = """
+        SELECT trang_thai AS name, COUNT(id) AS value
+        FROM hoa_don
+        WHERE ngay_tao >= :fromDate AND ngay_tao <= :toDate
+        AND loai_don = 'ONLINE'
+        GROUP BY trang_thai
+    """, nativeQuery = true)
+    List<Map<String, Object>> getOrderStatusFunnel(@Param("fromDate") LocalDateTime fromDate, @Param("toDate") LocalDateTime toDate);
 }

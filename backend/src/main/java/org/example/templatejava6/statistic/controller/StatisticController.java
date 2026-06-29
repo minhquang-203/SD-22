@@ -67,4 +67,11 @@ public class StatisticController {
     public ResponseEntity<?> getLowStock() {
         return ResponseEntity.ok(statisticRepository.getLowStockProducts());
     }
+
+    @GetMapping("/order-funnel")
+    public ResponseEntity<?> getOrderStatusFunnel(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate) {
+        return ResponseEntity.ok(statisticService.getOrderStatusFunnel(fromDate, toDate));
+    }
 }

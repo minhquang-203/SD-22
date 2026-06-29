@@ -56,4 +56,8 @@ public class StatisticService {
                 .posOrders(posOrders)
                 .build();
     }
+
+    public java.util.List<java.util.Map<String, Object>> getOrderStatusFunnel(LocalDateTime fromDate, LocalDateTime toDate) {
+        return statisticRepository.getOrderStatusFunnel(fromDate, toDate);
+    }
 }
