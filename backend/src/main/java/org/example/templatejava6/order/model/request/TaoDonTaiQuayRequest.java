@@ -10,9 +10,8 @@ import java.util.List;
 @Setter
 public class TaoDonTaiQuayRequest {
 
-    private List<ItemRequest> items;
+    private List<TaoDonTaiQuayRequest.ItemRequest> items;
     private Integer idKhachHang;
-    private Integer idNhanVien;
     private String maPhieuGiamGia;
     private Integer idPhuongThucThanhToan;
     private BigDecimal soTienKhachDua;

@@ -1,79 +1,81 @@
 /** Vai trò admin — đồng bộ mã backend (vai_tro.ma) khi có login */
 export const ADMIN_ROLES = {
+  CHU: "CHU",
   QUAN_LY: "QUAN_LY",
   NHAN_VIEN: "NHAN_VIEN",
 };
 
-/**
- * Tạm thời: đổi 'QUAN_LY' | 'NHAN_VIEN' để thử phân quyền menu.
- * Sau này thay bằng vai trò từ login (localStorage / auth store).
- */
-export const CURRENT_ROLE = ADMIN_ROLES.QUAN_LY;
+/** Cấp thứ bậc: CHU > QUAN_LY > NHAN_VIEN */
+export const ROLE_RANK = {
+  [ADMIN_ROLES.NHAN_VIEN]: 1,
+  [ADMIN_ROLES.QUAN_LY]: 2,
+  [ADMIN_ROLES.CHU]: 3,
+};
 
-const BOTH_ROLES = [ADMIN_ROLES.QUAN_LY, ADMIN_ROLES.NHAN_VIEN];
-const MANAGER_ONLY = [ADMIN_ROLES.QUAN_LY];
+const ALL_STAFF_ROLES = [ADMIN_ROLES.CHU, ADMIN_ROLES.QUAN_LY, ADMIN_ROLES.NHAN_VIEN];
+const MANAGER_AND_OWNER = [ADMIN_ROLES.CHU, ADMIN_ROLES.QUAN_LY];
 
 /** Cấu trúc menu giống routes.static.ts trong FE mẫu (nova-admin) */
 const PRODUCTS_MENU = {
   key: "products",
   label: "Quản lý sản phẩm",
   icon: "icon-park-outline:box",
-  roles: BOTH_ROLES,
+  roles: ALL_STAFF_ROLES,
   children: [
     {
       key: "product-list",
       label: "Danh sách sản phẩm",
       icon: "icon-park-outline:list",
       path: "/admin/products",
-      roles: BOTH_ROLES,
+      roles: ALL_STAFF_ROLES,
     },
     {
       key: "attributes",
       label: "Thuộc tính",
       icon: "icon-park-outline:setting",
-      roles: BOTH_ROLES,
+      roles: ALL_STAFF_ROLES,
       children: [
         {
           key: "thuong-hieu",
           label: "Thương hiệu",
           icon: "carbon:carbon-ui-builder",
           path: "/admin/attributes/thuong-hieu",
-          roles: BOTH_ROLES,
+          roles: ALL_STAFF_ROLES,
         },
         {
           key: "danh-muc",
           label: "Danh mục",
           icon: "icon-park-outline:category-management",
           path: "/admin/attributes/danh-muc",
-          roles: BOTH_ROLES,
+          roles: ALL_STAFF_ROLES,
         },
         {
           key: "dang-san-pham",
           label: "Dạng sản phẩm",
           icon: "icon-park-outline:ad-product",
           path: "/admin/attributes/dang-san-pham",
-          roles: BOTH_ROLES,
+          roles: ALL_STAFF_ROLES,
         },
         {
           key: "mau-sac",
           label: "Màu sắc",
           icon: "icon-park-outline:platte",
           path: "/admin/attributes/mau-sac",
-          roles: BOTH_ROLES,
+          roles: ALL_STAFF_ROLES,
         },
         {
           key: "cong-dung",
           label: "Công dụng",
           icon: "icon-park-outline:star",
           path: "/admin/attributes/cong-dung",
-          roles: BOTH_ROLES,
+          roles: ALL_STAFF_ROLES,
         },
         {
           key: "thanh-phan",
           label: "Thành phần",
           icon: "icon-park-outline:experiment",
           path: "/admin/attributes/thanh-phan",
-          roles: BOTH_ROLES,
+          roles: ALL_STAFF_ROLES,
         },
       ],
     },
@@ -84,21 +86,21 @@ const HOA_DON_MENU = {
   key: "hoa-don-group",
   label: "Quản lý hóa đơn",
   icon: "icon-park-outline:bill",
-  roles: BOTH_ROLES,
+  roles: ALL_STAFF_ROLES,
   children: [
     {
       key: "hoa-don-list",
       label: "Hóa đơn",
       icon: "icon-park-outline:list",
       path: "/admin/hoa-don",
-      roles: BOTH_ROLES,
+      roles: ALL_STAFF_ROLES,
     },
     {
       key: "hoa-don-detail",
       label: "Chi tiết hóa đơn",
       icon: "icon-park-outline:doc-detail",
       path: "/admin/hoa-don/chi-tiet",
-      roles: BOTH_ROLES,
+      roles: ALL_STAFF_ROLES,
     },
   ],
 };
@@ -107,28 +109,28 @@ const RECOMMENDATION_MENU = {
   key: "recommendation",
   label: "Gợi ý & Cá nhân hóa",
   icon: "icon-park-outline:brain",
-  roles: MANAGER_ONLY,
+  roles: MANAGER_AND_OWNER,
   children: [
     {
       key: "quiz",
       label: "Quiz loại da",
       icon: "icon-park-outline:list-checkbox", // ĐÃ SỬA ICON Ở ĐÂY ĐỂ TRÁNH LỖI TÀNG HÌNH
       path: "/admin/recommendation/quiz",
-      roles: MANAGER_ONLY,
+      roles: MANAGER_AND_OWNER,
     },
     {
       key: "rules",
       label: "Luật gợi ý",
       icon: "icon-park-outline:lightning",
       path: "/admin/recommendation/rules",
-      roles: MANAGER_ONLY,
+      roles: MANAGER_AND_OWNER,
     },
     {
       key: "routine",
       label: "Routine chống nắng",
       icon: "icon-park-outline:sun",
       path: "/admin/recommendation/routine",
-      roles: MANAGER_ONLY,
+      roles: MANAGER_AND_OWNER,
     },
   ],
 };
@@ -144,7 +146,7 @@ export const ADMIN_MENU = [
         label: "Bán hàng tại quầy",
         icon: "icon-park-outline:shopping-cart",
         path: "/admin/pos",
-        roles: BOTH_ROLES,
+        roles: ALL_STAFF_ROLES,
       },
       HOA_DON_MENU,
       PRODUCTS_MENU,
@@ -153,14 +155,14 @@ export const ADMIN_MENU = [
         label: "Quản lý đánh giá",
         icon: "icon-park-outline:star",
         path: "/admin/reviews",
-        roles: MANAGER_ONLY,
+        roles: MANAGER_AND_OWNER,
       },
       {
         key: "support",
         label: "Hỗ trợ khách hàng",
         icon: "icon-park-outline:headset-one",
         path: "/admin/support",
-        roles: BOTH_ROLES,
+        roles: ALL_STAFF_ROLES,
       },
     ],
   },
@@ -174,14 +176,14 @@ export const ADMIN_MENU = [
         label: "Thống kê",
         icon: "icon-park-outline:analysis",
         path: "/admin/stats",
-        roles: MANAGER_ONLY,
+        roles: MANAGER_AND_OWNER,
       },
       {
         key: "reports",
         label: "Báo cáo",
         icon: "icon-park-outline:file-excel",
         path: "/admin/reports",
-        roles: MANAGER_ONLY,
+        roles: MANAGER_AND_OWNER,
       },
       {
         key: "discounts",
@@ -193,17 +195,17 @@ export const ADMIN_MENU = [
             label: "Phiếu giảm giá",
             icon: "mdi:ticket-percent",
             path: "/admin/voucher",
-            roles: MANAGER_ONLY,
+            roles: MANAGER_AND_OWNER,
           },
           {
             key: "sale",
             label: "Đợt giảm giá",
             icon: "tabler:discount-2",
             path: "/admin/sale",
-            roles: MANAGER_ONLY,
+            roles: MANAGER_AND_OWNER,
           },
         ],
-        roles: MANAGER_ONLY,
+        roles: MANAGER_AND_OWNER,
       },
       RECOMMENDATION_MENU,
       {
@@ -211,29 +213,35 @@ export const ADMIN_MENU = [
         label: "UV & Thời tiết",
         icon: "icon-park-outline:cloudy",
         path: "/admin/uv",
-        roles: MANAGER_ONLY,
+        roles: MANAGER_AND_OWNER,
       },
       {
         key: "users",
         label: "Quản lý người dùng",
         icon: "icon-park-outline:people",
         path: "/admin/users",
-        roles: MANAGER_ONLY,
+        roles: MANAGER_AND_OWNER,
+      },
+      {
+        key: "staff",
+        label: "Quản lý nhân viên",
+        icon: "icon-park-outline:user-business",
+        path: "/admin/staff",
+        roles: MANAGER_AND_OWNER,
       },
       {
         key: "config",
         label: "Cấu hình hệ thống",
         icon: "icon-park-outline:setting-config",
         path: "/admin/config",
-        roles: MANAGER_ONLY,
+        roles: MANAGER_AND_OWNER,
       },
     ],
   },
 ];
 
 /**
- * Lấy vai trò hiện tại. Ưu tiên localStorage (sau login), fallback CURRENT_ROLE.
- * Lưu ý: ẩn menu chỉ là UX — phân quyền thật phải chặn ở backend API.
+ * Lấy vai trò hiện tại từ localStorage (đồng bộ useAdminAuth).
  */
 export function getCurrentRole() {
   try {
@@ -244,7 +252,7 @@ export function getCurrentRole() {
   } catch {
     // ignore (SSR / private mode)
   }
-  return CURRENT_ROLE;
+  return ADMIN_ROLES.NHAN_VIEN;
 }
 
 function isRoleAllowed(item, role) {

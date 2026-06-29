@@ -30,30 +30,6 @@ const { visible, options } = useConfirmState()
 </template>
 
 <style scoped>
-.confirm-dialog-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-}
-.confirm-dialog-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(20, 14, 10, 0.5);
-}
-.confirm-dialog-panel {
-  position: relative;
-  width: 100%;
-  max-width: 26rem;
-  background: var(--cream, #faf6f0);
-  border: 1px solid var(--admin-border, rgba(30, 21, 16, 0.12));
-  border-radius: 1rem;
-  padding: 1.5rem 1.75rem;
-  box-shadow: 0 20px 40px rgba(30, 21, 16, 0.2);
-}
 .confirm-dialog-title {
   font-family: var(--font-serif, Georgia, serif);
   font-size: 1.2rem;

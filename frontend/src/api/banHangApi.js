@@ -9,8 +9,6 @@ export const timSanPham = (keyword) =>
 
 export const getPhuongThuc = () => request.get('/phuong-thuc-thanh-toan')
 
-export const getNhanVien = () => request.get('/nhan-vien')
-
 export const timKhachTheoSdt = (sdt) =>
   request.get('/khach-hang/theo-sdt', { params: { sdt } })
 

@@ -1,6 +1,10 @@
 <script setup>
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import AppLogo from '@/components/common/AppLogo.vue'
+import { useAdminAuth } from '@/composables/useAdminAuth'
+import { getRoleLabel } from '@/utils/adminAuth'
 
 const props = defineProps({
   title: { type: String, default: 'SUNOVA Admin' },
@@ -9,7 +13,21 @@ const props = defineProps({
 
 const emit = defineEmits(['toggle-sidebar'])
 
+const router = useRouter()
+const { hoTen, vaiTro, dangXuat } = useAdminAuth()
+
 const pageLabel = () => (props.title || props.breadcrumb || 'Trang quản trị').toUpperCase()
+const roleLabel = computed(() => getRoleLabel(vaiTro.value))
+const displayName = computed(() => hoTen.value || 'Quản trị viên')
+const avatarLetter = computed(() => {
+  const name = displayName.value.trim()
+  return name ? name.charAt(0).toUpperCase() : 'A'
+})
+
+async function handleLogout() {
+  dangXuat()
+  await router.push('/admin/dang-nhap')
+}
 </script>
 
 <template>
@@ -30,13 +48,17 @@ const pageLabel = () => (props.title || props.breadcrumb || 'Trang quản trị'
     </div>
 
     <div class="admin-topbar__actions">
-      <button type="button" class="admin-topbar__btn-icon" aria-label="Thông báo">
-        <Icon icon="icon-park-outline:remind" />
+      <div class="admin-topbar__user hidden md:flex">
+        <div class="admin-topbar__user-text">
+          <span class="admin-topbar__user-name">{{ displayName }}</span>
+          <span class="admin-topbar__user-role">{{ roleLabel }}</span>
+        </div>
+      </div>
+      <button type="button" class="admin-topbar__btn-logout" @click="handleLogout">
+        <Icon icon="icon-park-outline:logout" />
+        <span class="hidden sm:inline">Đăng xuất</span>
       </button>
-      <button type="button" class="admin-topbar__btn-icon" aria-label="Trợ giúp">
-        <Icon icon="icon-park-outline:help" />
-      </button>
-      <div class="admin-topbar__avatar" title="Quản trị viên">A</div>
+      <div class="admin-topbar__avatar" :title="displayName">{{ avatarLetter }}</div>
     </div>
   </header>
 </template>

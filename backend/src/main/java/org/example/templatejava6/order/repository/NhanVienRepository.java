@@ -14,6 +14,26 @@ public interface NhanVienRepository extends JpaRepository<NhanVien, Integer> {
 
     List<NhanVien> findByTrangThaiTrue();
 
+    @Query("SELECT n FROM NhanVien n JOIN FETCH n.vaiTro WHERE n.trangThai = true ORDER BY n.hoTen")
+    List<NhanVien> findActiveWithVaiTro();
+
+    @Query("SELECT n FROM NhanVien n LEFT JOIN FETCH n.vaiTro ORDER BY n.id DESC")
+    List<NhanVien> findAllWithVaiTro();
+
+    @Query("SELECT n FROM NhanVien n LEFT JOIN FETCH n.vaiTro WHERE n.id = :id")
+    Optional<NhanVien> findByIdWithVaiTro(@Param("id") Integer id);
+
+    @Query("SELECT n.maNhanVien FROM NhanVien n WHERE n.maNhanVien IS NOT NULL")
+    List<String> findAllMaNhanVien();
+
+    boolean existsByEmailIgnoreCase(String email);
+
+    boolean existsBySoDienThoai(String soDienThoai);
+
+    boolean existsByEmailIgnoreCaseAndIdNot(String email, Integer id);
+
+    boolean existsBySoDienThoaiAndIdNot(String soDienThoai, Integer id);
+
     @Query("SELECT n FROM NhanVien n WHERE LOWER(n.email) = LOWER(:taiKhoan) OR n.soDienThoai = :taiKhoan")
     Optional<NhanVien> findByEmailOrSoDienThoai(@Param("taiKhoan") String taiKhoan);
 }

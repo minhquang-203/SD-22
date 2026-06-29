@@ -32,6 +32,11 @@
   --admin-border: var(--sand);
   --admin-text: var(--ink);
   --admin-muted: #8a7b6a;
+
+  /* Thang z-index admin — modal < confirm < toast */
+  --admin-z-modal: 5000;
+  --admin-z-confirm: 6000;
+  --admin-z-toast: 7000;
 }
 
 * {
@@ -928,7 +933,7 @@ h2,
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--admin-z-modal);
   padding: 24px;
 }
 
@@ -2059,14 +2064,25 @@ h2,
   margin-top: 8px;
 }
 
-.pos-staff-select {
-  min-width: 200px;
+.pos-current-staff {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 160px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-card);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--admin-text);
+  white-space: nowrap;
 }
 
 .pos-receipt-overlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: var(--admin-z-modal);
   background: rgba(30, 21, 16, 0.4);
   display: flex;
   align-items: center;
@@ -2546,5 +2562,344 @@ h2,
 
   #hoa-don-print-area .hoa-don-print-brand {
     display: block !important;
+  }
+}
+
+/* ── Admin login ── */
+.admin-login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(ellipse at top right, rgba(201, 169, 110, 0.18), transparent 55%),
+    linear-gradient(160deg, var(--cream) 0%, #f3ebe0 45%, var(--warm-tan) 100%);
+}
+
+.admin-login-card {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  border: 1px solid var(--sand);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 60px rgba(30, 21, 16, 0.08);
+  padding: 32px 28px;
+}
+
+.admin-login-card__brand {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.admin-login-card__eyebrow {
+  margin-top: 12px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--bronze);
+}
+
+.admin-login-card__title {
+  margin: 8px 0 0;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  color: var(--ink);
+}
+
+.admin-login-card__subtitle {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: rgba(30, 21, 16, 0.55);
+}
+
+.admin-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-login-field label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: rgba(30, 21, 16, 0.7);
+}
+
+.admin-login-password {
+  position: relative;
+}
+
+.admin-login-password__toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: rgba(30, 21, 16, 0.45);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 4px;
+}
+
+.admin-login-alert {
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.admin-login-alert--error {
+  background: rgba(181, 74, 58, 0.08);
+  color: #8f3d30;
+  border: 1px solid rgba(181, 74, 58, 0.18);
+}
+
+.admin-login-alert--warn {
+  background: rgba(201, 169, 110, 0.12);
+  color: #6b5630;
+  border: 1px solid rgba(201, 169, 110, 0.28);
+}
+
+.admin-login-submit {
+  margin-top: 4px;
+  width: 100%;
+  justify-content: center;
+}
+
+.admin-topbar__user {
+  align-items: center;
+  gap: 10px;
+  padding-right: 8px;
+  border-right: 1px solid var(--sand);
+  margin-right: 4px;
+}
+
+.admin-topbar__user-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+}
+
+.admin-topbar__user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.admin-topbar__user-role {
+  font-size: 11px;
+  color: var(--bronze);
+}
+
+.admin-topbar__btn-logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--sand);
+  background: transparent;
+  color: rgba(30, 21, 16, 0.65);
+  border-radius: var(--radius-md);
+  padding: 7px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.admin-topbar__btn-logout:hover {
+  border-color: var(--warm-tan);
+  color: var(--bronze);
+  background: rgba(201, 169, 110, 0.06);
+}
+
+.admin-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--admin-z-modal);
+  background: rgba(30, 21, 16, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.admin-modal {
+  width: 100%;
+  max-width: 560px;
+  background: #fff;
+  border: 1px solid var(--sand);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 50px rgba(30, 21, 16, 0.12);
+}
+
+.admin-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--sand);
+}
+
+.admin-modal__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  color: var(--ink);
+}
+
+.admin-modal__body {
+  padding: 20px;
+}
+
+.admin-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+.staff-role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.staff-role-badge--owner {
+  background: rgba(107, 63, 30, 0.12);
+  color: var(--sienna);
+  border-color: rgba(107, 63, 30, 0.25);
+}
+
+.staff-role-badge--manager {
+  background: rgba(201, 169, 110, 0.18);
+  color: #6b5630;
+  border: 1px solid rgba(201, 169, 110, 0.35);
+}
+
+.staff-role-badge--staff {
+  background: rgba(91, 143, 168, 0.12);
+  color: #3d6278;
+  border: 1px solid rgba(91, 143, 168, 0.22);
+}
+
+.staff-temp-pw-box {
+  background: rgba(201, 169, 110, 0.1);
+  border: 1px solid rgba(201, 169, 110, 0.35);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+}
+
+.staff-temp-pw-box__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bronze);
+  margin: 0 0 8px;
+}
+
+.staff-temp-pw-box__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.staff-temp-pw-box__code {
+  flex: 1;
+  min-width: 140px;
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+  padding: 8px 12px;
+  background: #fff;
+  border: 1px solid var(--sand);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+}
+
+.staff-temp-pw-box__hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: rgba(30, 21, 16, 0.55);
+  line-height: 1.45;
+}
+
+/* —— Confirm dialog (luôn trên modal admin) —— */
+.confirm-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--admin-z-confirm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.confirm-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 14, 10, 0.55);
+}
+
+.confirm-dialog-panel {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 26rem;
+  background: var(--cream, #faf6f0);
+  border: 1px solid var(--admin-border, rgba(30, 21, 16, 0.12));
+  border-radius: 1rem;
+  padding: 1.5rem 1.75rem;
+  box-shadow: 0 24px 48px rgba(30, 21, 16, 0.28);
+}
+
+/* —— Toast admin (góc trên phải, trên mọi lớp) —— */
+.admin-toast-stack {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  z-index: var(--admin-z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: min(380px, calc(100vw - 40px));
+  pointer-events: none;
+}
+
+.admin-toast-item {
+  pointer-events: auto;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  box-shadow: 0 10px 28px rgba(30, 21, 16, 0.14);
+  animation: admin-toast-in 0.22s ease;
+  cursor: pointer;
+  background: #fff;
+  border: 1px solid var(--sand);
+  color: var(--ink);
+}
+
+.admin-toast-item--warn {
+  border-left: 4px solid #b44a4a;
+  background: #fff8f6;
+}
+
+.admin-toast-item--info {
+  border-left: 4px solid var(--warm-tan);
+  background: #fffdf9;
+}
+
+@keyframes admin-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }

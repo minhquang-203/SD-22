@@ -112,6 +112,7 @@
 
 <script setup>
 import { ref } from 'vue';
+import { confirm } from '@/composables/useConfirm';
 
 const routines = ref([
   {
@@ -161,10 +162,15 @@ const saveRoutine = () => {
   closeModal();
 };
 
-const deleteRoutine = (id) => {
-  if(confirm('Xóa combo này?')) {
-    routines.value = routines.value.filter(r => r.id !== id);
-  }
+const deleteRoutine = async (id) => {
+  const ok = await confirm({
+    title: 'Xóa combo',
+    message: 'Xóa combo routine này?',
+    confirmText: 'Xóa',
+    danger: true,
+  });
+  if (!ok) return;
+  routines.value = routines.value.filter(r => r.id !== id);
 };
 </script>
 
@@ -201,7 +207,7 @@ const deleteRoutine = (id) => {
 .btn-icon:hover { opacity: 1; background: #f3f4f6; border-radius: 4px; }
 
 /* MODAL */
-.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: flex-start; justify-content: center; padding-top: 50px; z-index: 1000; }
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: flex-start; justify-content: center; padding-top: 50px; z-index: var(--admin-z-modal, 5000); }
 .modal-content { background: white; border-radius: 8px; width: 500px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
 .modal-header { padding: 16px 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; }
 .modal-body { padding: 20px; }

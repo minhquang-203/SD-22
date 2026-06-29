@@ -1,0 +1,8 @@
+# Sao chép thành application-local.properties và điền Gmail App Password (16 ký tự).
+# KHÔNG commit file application-local.properties lên git.
+
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=your-16-char-app-password
+
+spring.mail.username=${MAIL_USERNAME}
+spring.mail.password=${MAIL_PASSWORD}

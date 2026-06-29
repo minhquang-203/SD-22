@@ -38,7 +38,7 @@ public class NhanVienAuthService {
         }
 
         String maVaiTro = nv.getVaiTro().getMaVaiTro();
-        if (!"NHAN_VIEN".equals(maVaiTro) && !"QUAN_LY".equals(maVaiTro)) {
+        if (!"NHAN_VIEN".equals(maVaiTro) && !"QUAN_LY".equals(maVaiTro) && !"CHU".equals(maVaiTro)) {
             throw new ApiException("Tài khoản không có quyền truy cập hệ thống quản trị", "AUTH_FAILED");
         }
 

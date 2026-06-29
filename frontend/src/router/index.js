@@ -1,6 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { isCustomerLoggedIn } from '@/composables/useAuth'
 import { useAuthModal } from '@/composables/useAuthModal'
+import { isAdminLoggedIn, useAdminAuth } from '@/composables/useAdminAuth'
+import { ADMIN_ROLES } from '@/constants/adminMenu'
+import { isManagerOrOwner } from '@/utils/adminAuth'
+import { getAdminHomePath } from '@/utils/adminAuth'
+import { toast } from '@/composables/useToast'
 import { INFO_PAGES } from '@/constants/storefrontInfo'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import StorefrontLayout from '@/layouts/StorefrontLayout.vue'
@@ -100,14 +105,26 @@ const router = createRouter({
     // ADMIN
     // =======================================================
     {
+      path: '/admin/dang-nhap',
+      name: 'AdminLogin',
+      component: () => import('@/views/admin/AdminLogin.vue'),
+      meta: { title: 'Đăng nhập quản trị — SUNOVA', guestOnlyAdmin: true },
+    },
+    {
       path: '/admin',
       component: AdminLayout,
+      meta: { requiresAdmin: true },
       children: [
+        {
+          path: '',
+          name: 'AdminRoot',
+          redirect: () => getAdminHomePath(useAdminAuth().vaiTro.value),
+        },
         {
           path: 'stats',
           name: 'AdminStats',
           component: () => import('@/views/admin/stats/StatsDashboard.vue'),
-          meta: { title: 'Thống kê', breadcrumb: 'Thống kê' },
+          meta: { title: 'Thống kê', breadcrumb: 'Thống kê', role: ADMIN_ROLES.QUAN_LY },
         },
         {
           path: 'pos',
@@ -163,55 +180,61 @@ const router = createRouter({
           path: 'reviews',
           name: 'AdminReviews',
           component: () => import('@/views/admin/review/ReviewList.vue'),
-          meta: { title: 'Quản lý đánh giá', breadcrumb: 'Quản lý đánh giá' },
+          meta: { title: 'Quản lý đánh giá', breadcrumb: 'Quản lý đánh giá', role: ADMIN_ROLES.QUAN_LY },
         },
         {
           path: 'voucher',
           name: 'AdminVoucher',
           component: () => import('@/views/admin/voucher/VoucherView.vue'),
-          meta: { title: 'Phiếu giảm giá', breadcrumb: 'Phiếu giảm giá' },
+          meta: { title: 'Phiếu giảm giá', breadcrumb: 'Phiếu giảm giá', role: ADMIN_ROLES.QUAN_LY },
         },
         {
           path: 'sale',
           name: 'AdminSale',
           component: () => import('@/views/admin/voucher/SaleView.vue'),
-          meta: { title: 'Đợt giảm giá', breadcrumb: 'Đợt giảm giá' },
+          meta: { title: 'Đợt giảm giá', breadcrumb: 'Đợt giảm giá', role: ADMIN_ROLES.QUAN_LY },
         },
         {
           path: 'sale/:id',
           name: 'AdminSaleDetail',
           component: () => import('@/views/admin/voucher/saleDetail.vue'),
-          meta: { title: 'Chi tiết đợt giảm giá', breadcrumb: 'Đợt giảm giá / Chi tiết' },
+          meta: { title: 'Chi tiết đợt giảm giá', breadcrumb: 'Đợt giảm giá / Chi tiết', role: ADMIN_ROLES.QUAN_LY },
         },
         {
           path: 'recommendation/quiz',
           name: 'AdminQuiz',
           component: () => import('@/views/admin/recommendation/QuizManager.vue'),
-          meta: { title: 'Quiz loại da', breadcrumb: 'Gợi ý & Cá nhân hóa / Quiz loại da' },
+          meta: { title: 'Quiz loại da', breadcrumb: 'Gợi ý & Cá nhân hóa / Quiz loại da', role: ADMIN_ROLES.QUAN_LY },
         },
         {
           path: 'recommendation/rules',
           name: 'AdminRecommendRules',
           component: () => import('@/views/admin/recommendation/RecommendRules.vue'),
-          meta: { title: 'Luật gợi ý', breadcrumb: 'Gợi ý & Cá nhân hóa / Luật gợi ý' },
+          meta: { title: 'Luật gợi ý', breadcrumb: 'Gợi ý & Cá nhân hóa / Luật gợi ý', role: ADMIN_ROLES.QUAN_LY },
         },
         {
           path: 'recommendation/routine',
           name: 'AdminRoutine',
           component: () => import('@/views/admin/recommendation/RoutineManager.vue'),
-          meta: { title: 'Routine chống nắng', breadcrumb: 'Gợi ý & Cá nhân hóa / Routine chống nắng' },
+          meta: { title: 'Routine chống nắng', breadcrumb: 'Gợi ý & Cá nhân hóa / Routine chống nắng', role: ADMIN_ROLES.QUAN_LY },
         },
         {
           path: 'uv',
           name: 'AdminUv',
           component: () => import('@/views/admin/uv/UVConfig.vue'),
-          meta: { title: 'UV & Thời tiết', breadcrumb: 'UV & Thời tiết' },
+          meta: { title: 'UV & Thời tiết', breadcrumb: 'UV & Thời tiết', role: ADMIN_ROLES.QUAN_LY },
         },
         {
           path: 'users',
           name: 'AdminUsers',
           component: () => import('@/views/admin/users/UserList.vue'),
-          meta: { title: 'Quản lý người dùng', breadcrumb: 'Quản lý người dùng' },
+          meta: { title: 'Quản lý người dùng', breadcrumb: 'Quản lý người dùng', role: ADMIN_ROLES.QUAN_LY },
+        },
+        {
+          path: 'staff',
+          name: 'AdminStaff',
+          component: () => import('@/views/admin/staff/StaffList.vue'),
+          meta: { title: 'Quản lý nhân viên', breadcrumb: 'Quản lý nhân viên', role: ADMIN_ROLES.QUAN_LY },
         },
         {
           path: 'support',
@@ -223,13 +246,13 @@ const router = createRouter({
           path: 'reports',
           name: 'AdminReports',
           component: () => import('@/views/admin/report/ReportPage.vue'),
-          meta: { title: 'Báo cáo', breadcrumb: 'Báo cáo' },
+          meta: { title: 'Báo cáo', breadcrumb: 'Báo cáo', role: ADMIN_ROLES.QUAN_LY },
         },
         {
           path: 'config',
           name: 'AdminConfig',
           component: () => import('@/views/admin/config/SystemConfig.vue'),
-          meta: { title: 'Cấu hình hệ thống', breadcrumb: 'Cấu hình hệ thống' },
+          meta: { title: 'Cấu hình hệ thống', breadcrumb: 'Cấu hình hệ thống', role: ADMIN_ROLES.QUAN_LY },
         },
       ],
     },
@@ -245,6 +268,22 @@ router.beforeEach((to) => {
 
   if (to.meta.guestOnly && isCustomerLoggedIn()) {
     return { path: '/' }
+  }
+
+  if (to.meta.guestOnlyAdmin && isAdminLoggedIn()) {
+    return { path: getAdminHomePath(useAdminAuth().vaiTro.value) }
+  }
+
+  if (to.matched.some((record) => record.meta.requiresAdmin) && !isAdminLoggedIn()) {
+    return {
+      path: '/admin/dang-nhap',
+      query: { redirect: to.fullPath },
+    }
+  }
+
+  if (to.meta.role === ADMIN_ROLES.QUAN_LY && !isManagerOrOwner(useAdminAuth().vaiTro.value)) {
+    toast('Không đủ quyền truy cập trang này', 'warn')
+    return { path: '/admin/pos', query: { denied: '1' } }
   }
 
   if (to.meta.title) {

@@ -268,12 +268,6 @@
         </div>
       </div>
     </Teleport>
-
-    <!-- Toast -->
-    <div class="sd-toast" :class="{ show: toastVisible }">
-      <i class="ti ti-check"></i>
-      <span>{{ toastMsg }}</span>
-    </div>
   </div>
 </template>
 
@@ -283,6 +277,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { getSaleById, getSaleProducts, addSaleProduct, deleteSaleProduct } from '@/api/saleApi'
 import { getSanPhamBan } from '@/api/banHangApi'
 import { formatCurrency, formatDate } from '@/utils/format'
+import { confirm } from '@/composables/useConfirm'
+import { toast } from '@/composables/useToast'
 
 const route = useRoute()
 const router = useRouter()
@@ -452,7 +448,7 @@ async function loadProducts() {
     const res = await getSaleProducts(saleId.value)
     products.value = (res.data || []).map(mapProduct)
   } catch (err) {
-    showToast(normalizeError(err) || 'Không tải được danh sách sản phẩm')
+    toast(normalizeError(err) || 'Không tải được danh sách sản phẩm', 'warn')
   } finally {
     loadingProducts.value = false
   }
@@ -468,7 +464,7 @@ async function loadAvailableProducts() {
     )
   } catch (err) {
     availableProducts.value = []
-    showToast(normalizeError(err) || 'Không tìm được sản phẩm')
+    toast(normalizeError(err) || 'Không tìm được sản phẩm', 'warn')
   } finally {
     loadingAvailable.value = false
   }
@@ -481,24 +477,30 @@ async function handleAddProducts() {
     for (const idChiTietSanPham of selectedIds.value) {
       await addSaleProduct(saleId.value, { idChiTietSanPham })
     }
-    showToast(`Đã thêm ${selectedIds.value.length} sản phẩm`)
+    toast(`Đã thêm ${selectedIds.value.length} sản phẩm`, 'info')
     closeModal()
     await loadProducts()
   } catch (err) {
-    showToast(normalizeError(err) || 'Thêm sản phẩm thất bại')
+    toast(normalizeError(err) || 'Thêm sản phẩm thất bại', 'warn')
   } finally {
     adding.value = false
   }
 }
 
 async function removeProduct(product) {
-  if (!confirm(`Xóa "${product.name}" khỏi đợt giảm giá?`)) return
+  const ok = await confirm({
+    title: 'Xóa sản phẩm',
+    message: `Xóa "${product.name}" khỏi đợt giảm giá?`,
+    confirmText: 'Xóa',
+    danger: true,
+  })
+  if (!ok) return
   try {
     await deleteSaleProduct(saleId.value, product.id)
-    showToast('Đã xóa sản phẩm khỏi đợt')
+    toast('Đã xóa sản phẩm khỏi đợt', 'info')
     await loadProducts()
   } catch (err) {
-    showToast(normalizeError(err) || 'Xóa thất bại')
+    toast(normalizeError(err) || 'Xóa thất bại', 'warn')
   }
 }
 
@@ -506,19 +508,6 @@ function closeModal() {
   showModal.value = false
   selectedIds.value = []
   modalSearch.value = ''
-}
-
-const toastMsg = ref('')
-const toastVisible = ref(false)
-let toastTimer
-
-function showToast(msg) {
-  toastMsg.value = msg
-  toastVisible.value = true
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => {
-    toastVisible.value = false
-  }, 2800)
 }
 
 let modalSearchTimer

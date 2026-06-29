@@ -1,6 +1,7 @@
 import axios from 'axios'
+import router from '@/router'
 import { formatApiError } from '@/utils/apiError'
-import { getAdminToken } from '@/composables/useAdminAuth'
+import { getAdminToken, useAdminAuth } from '@/composables/useAdminAuth'
 import { getCustomerToken } from '@/composables/useAuth'
 
 const CUSTOMER_API_PREFIXES = ['/yeu-thich', '/khach-hang/toi', '/gio-hang', '/online', '/hoa-don/cua-toi']
@@ -20,6 +21,10 @@ function attachBearer(config, token) {
   return config
 }
 
+function isCustomerApiUrl(url) {
+  return CUSTOMER_API_PREFIXES.some((prefix) => url.includes(prefix))
+}
+
 request.interceptors.request.use((config) => {
   if (config.data instanceof FormData) {
     if (config.headers?.set) {
@@ -30,7 +35,7 @@ request.interceptors.request.use((config) => {
   }
 
   const url = String(config.url || '')
-  const isCustomerApi = CUSTOMER_API_PREFIXES.some((prefix) => url.includes(prefix))
+  const isCustomerApi = isCustomerApiUrl(url)
 
   if (isCustomerApi) {
     attachBearer(config, getCustomerToken())
@@ -60,9 +65,27 @@ request.interceptors.response.use(
 
     const status = error.response.status
     const url = String(error.config?.url || '')
-    const isCustomerApi = CUSTOMER_API_PREFIXES.some((prefix) => url.includes(prefix))
+    const isCustomerApi = isCustomerApiUrl(url)
+    const isAdminLoginRequest = url.includes('/auth/nhan-vien/dang-nhap')
+    const isKhachAuthRequest = url.includes('/auth/khach/')
+
     if (isCustomerApi && (status === 401 || status === 403)) {
       return Promise.reject('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại')
+    }
+
+    if (!isCustomerApi && !isAdminLoginRequest && !isKhachAuthRequest && getAdminToken() && (status === 401 || status === 403)) {
+      useAdminAuth().dangXuat()
+      const currentPath = router.currentRoute.value.path
+      if (currentPath.startsWith('/admin') && currentPath !== '/admin/dang-nhap') {
+        router.push({
+          path: '/admin/dang-nhap',
+          query: {
+            redirect: router.currentRoute.value.fullPath,
+            expired: '1',
+          },
+        })
+      }
+      return Promise.reject('Phiên đăng nhập quản trị đã hết hạn, vui lòng đăng nhập lại')
     }
 
     return Promise.reject(formatApiError(error.response.data))
@@ -70,3 +93,4 @@ request.interceptors.response.use(
 )
 
 export default request
+

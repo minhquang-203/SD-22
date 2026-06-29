@@ -15,6 +15,7 @@ import VoucherToolBar from "@/components/voucher/VoucherToolBar.vue";
 import Pagination from "@/components/voucher/Pagination.vue";
 import VoucherCreateModal from "@/components/voucher/VoucherCreateModal.vue";
 import { confirm } from "@/composables/useConfirm";
+import { toast } from "@/composables/useToast";
 
 /* ================= STATE ================= */
 const showModal = ref(false);
@@ -113,8 +114,9 @@ const xacNhanXoa = async (phieu) => {
     await deleteVoucher(phieu.id);
     await loadData(trangHienTai.value);
     refreshStats();
+    toast(`Đã xóa phiếu "${phieu.ma}"`, "info");
   } catch (e) {
-    alert("Xóa thất bại");
+    toast("Xóa thất bại", "warn");
     console.error(e);
   } finally {
     dangTai.value = false;
@@ -131,12 +133,14 @@ const handleCreate = async (payload) => {
   if (!ok) return;
   try {
     await createVoucher(payload);
-    alert("Tạo voucher thành công");
+    showModal.value = false;
+    editingVoucher.value = null;
+    toast("Tạo phiếu giảm giá thành công", "info");
     await loadData(1);
     refreshStats();
   } catch (e) {
     console.error(e);
-    alert("Tạo thất bại");
+    toast("Tạo thất bại", "warn");
   }
 };
 
@@ -150,12 +154,14 @@ const handleUpdate = async (payload) => {
   if (!ok) return;
   try {
     await updateVoucher(payload.id, payload);
-    alert("Cập nhật thành công");
+    showModal.value = false;
+    editingVoucher.value = null;
+    toast("Cập nhật phiếu giảm giá thành công", "info");
     await loadData(trangHienTai.value);
     refreshStats();
   } catch (e) {
     console.error(e);
-    alert("Cập nhật thất bại");
+    toast("Cập nhật thất bại", "warn");
   }
 };
 

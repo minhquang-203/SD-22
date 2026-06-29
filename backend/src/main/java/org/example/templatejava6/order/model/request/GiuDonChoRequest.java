@@ -11,6 +11,5 @@ public class GiuDonChoRequest {
 
     private List<TaoDonTaiQuayRequest.ItemRequest> items;
     private Integer idKhachHang;
-    private Integer idNhanVien;
     private String ghiChu;
 }

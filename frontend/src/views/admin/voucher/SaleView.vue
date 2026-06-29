@@ -205,12 +205,6 @@
       </div>
     </div>
 
-    <!-- Toast -->
-    <div class="toast" :class="{ show: toastVisible }">
-      <i class="ti ti-check"></i>
-      <span>{{ toastMsg }}</span>
-    </div>
-
   </div>
 </template>
 
@@ -219,6 +213,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { createSale, deleteSale, searchSale, updateSale } from '@/api/saleApi.js'
+import { confirm } from '@/composables/useConfirm'
+import { toast } from '@/composables/useToast'
 
 const router = useRouter()
 
@@ -366,20 +362,26 @@ function goToDetail(id) {
 
 function copyCode(code) {
   navigator.clipboard?.writeText(code).catch(() => {})
-  showToast(`Đã sao chép mã: ${code}`)
+  toast(`Đã sao chép mã: ${code}`, 'info')
 }
 
 async function deleteRow(id) {
   const campaign = campaigns.value.find((item) => item.id === id)
   if (!campaign) return
-  if (!confirm(`Xóa đợt giảm giá "${campaign.name}"?`)) return
+  const ok = await confirm({
+    title: 'Xóa đợt giảm giá',
+    message: `Xóa đợt giảm giá "${campaign.name}"? Hành động này không thể hoàn tác.`,
+    confirmText: 'Xóa',
+    danger: true,
+  })
+  if (!ok) return
 
   try {
     await deleteSale(id)
-    showToast(`Đã xóa: ${campaign.name}`)
+    toast(`Đã xóa: ${campaign.name}`, 'info')
     await Promise.all([loadData(currentPage.value), loadMetrics()])
   } catch (error) {
-    showToast(normalizeError(error) || 'Xóa thất bại')
+    toast(normalizeError(error) || 'Xóa thất bại', 'warn')
   }
 }
 
@@ -426,10 +428,10 @@ async function handleSubmit() {
   try {
     if (editingId.value) {
       await updateSale(editingId.value, payload)
-      showToast('Cập nhật đợt giảm giá thành công')
+      toast('Cập nhật đợt giảm giá thành công', 'info')
     } else {
       await createSale(payload)
-      showToast('Tạo đợt giảm giá thành công')
+      toast('Tạo đợt giảm giá thành công', 'info')
     }
 
     closeModal()
@@ -437,7 +439,7 @@ async function handleSubmit() {
     await Promise.all([loadData(editingId.value ? currentPage.value : 1), loadMetrics()])
     editingId.value = null
   } catch (error) {
-    showToast(normalizeError(error) || 'Lưu thất bại')
+    toast(normalizeError(error) || 'Lưu thất bại', 'warn')
   } finally {
     saving.value = false
   }
@@ -449,12 +451,12 @@ function buildPayload() {
   const value = Number(form.value.value)
 
   if (!code || !name || !form.value.start || !form.value.end || !value) {
-    showToast('Vui lòng nhập đầy đủ thông tin bắt buộc')
+    toast('Vui lòng nhập đầy đủ thông tin bắt buộc', 'warn')
     return null
   }
 
   if (value <= 0 || value > 100) {
-    showToast('Phần trăm giảm phải từ 1 đến 100')
+    toast('Phần trăm giảm phải từ 1 đến 100', 'warn')
     return null
   }
 
@@ -478,19 +480,6 @@ function toDateInput(value) {
 
 function normalizeError(error) {
   return typeof error === 'string' ? error : error?.message
-}
-
-const toastMsg = ref('')
-const toastVisible = ref(false)
-let toastTimer
-
-function showToast(msg) {
-  toastMsg.value = msg
-  toastVisible.value = true
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => {
-    toastVisible.value = false
-  }, 2800)
 }
 
 let searchTimer

@@ -1,26 +1,16 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import AdminSidebar from '@/components/admin/AdminSidebar.vue'
 import AdminHeader from '@/components/admin/AdminHeader.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
-import { isAdminLoggedIn, useAdminAuth } from '@/composables/useAdminAuth'
+import AdminToast from '@/components/admin/AdminToast.vue'
 
 const collapsed = ref(false)
 const route = useRoute()
 
 const breadcrumb = computed(() => route.meta.breadcrumb || 'SUNOVA Admin')
 const title = computed(() => route.meta.title || 'SUNOVA Admin')
-
-onMounted(async () => {
-  if (import.meta.env.DEV && !isAdminLoggedIn()) {
-    try {
-      await useAdminAuth().dangNhap('an.nv@sunova.vn', '123456')
-    } catch {
-      // Dev: admin login page chưa có — bỏ qua nếu auto-login thất bại
-    }
-  }
-})
 </script>
 
 <template>
@@ -41,5 +31,6 @@ onMounted(async () => {
       </main>
     </div>
     <ConfirmDialog />
+    <AdminToast />
   </div>
 </template>

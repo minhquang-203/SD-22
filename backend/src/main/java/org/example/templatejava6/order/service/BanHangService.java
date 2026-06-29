@@ -7,6 +7,7 @@ import org.example.templatejava6.common.entity.PhuongThucThanhToan;
 import org.example.templatejava6.common.enums.LoaiPhieuGiamGia;
 import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.example.templatejava6.common.exception.ApiException;
+import org.example.templatejava6.common.security.SecurityUtils;
 import org.example.templatejava6.customer.repository.KhachHangRepository;
 import org.example.templatejava6.order.entity.HoaDon;
 import org.example.templatejava6.order.entity.HoaDonChiTiet;
@@ -103,7 +104,7 @@ public class BanHangService {
         BigDecimal tongTien = sumTongTien(lines);
 
         KhachHang khachHang = resolveKhachHang(req.getIdKhachHang());
-        NhanVien nhanVien = resolveNhanVien(req.getIdNhanVien());
+        NhanVien nhanVien = currentNhanVien();
 
         LocalDateTime now = LocalDateTime.now();
         HoaDon hoaDon = new HoaDon();
@@ -220,7 +221,7 @@ public class BanHangService {
         }
 
         KhachHang khachHang = resolveKhachHang(req.getIdKhachHang());
-        NhanVien nhanVien = resolveNhanVien(req.getIdNhanVien());
+        NhanVien nhanVien = currentNhanVien();
         LocalDateTime now = LocalDateTime.now();
 
         HoaDon hoaDon;
@@ -318,12 +319,14 @@ public class BanHangService {
                 .orElseThrow(() -> new ApiException("Khách hàng không tồn tại.", "NOT_FOUND"));
     }
 
-    private NhanVien resolveNhanVien(Integer idNhanVien) {
-        if (idNhanVien == null) {
-            return null;
-        }
-        return nhanVienRepository.findById(idNhanVien)
+    private NhanVien currentNhanVien() {
+        Integer id = SecurityUtils.currentNhanVienId();
+        NhanVien nv = nhanVienRepository.findByIdWithVaiTro(id)
                 .orElseThrow(() -> new ApiException("Nhân viên không tồn tại.", "NOT_FOUND"));
+        if (!Boolean.TRUE.equals(nv.getTrangThai())) {
+            throw new ApiException("Tài khoản đã bị khóa", "ACCOUNT_DISABLED");
+        }
+        return nv;
     }
 
     private List<LineCalc> buildLines(Map<Integer, Integer> qtyByVariant, boolean checkStock) {

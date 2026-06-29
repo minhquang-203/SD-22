@@ -4,6 +4,7 @@ import { dangNhapNhanVien } from '@/api/authApi'
 const STORAGE_KEY = 'sunova_admin_auth'
 
 const token = ref(null)
+const nhanVienId = ref(null)
 const hoTen = ref('')
 const vaiTro = ref('')
 
@@ -13,6 +14,7 @@ function loadFromStorage() {
     if (!raw) return
     const data = JSON.parse(raw)
     token.value = data.token || null
+    nhanVienId.value = data.nhanVienId ?? data.id ?? null
     hoTen.value = data.hoTen || ''
     vaiTro.value = data.vaiTro || ''
     if (data.vaiTro) {
@@ -32,6 +34,7 @@ function persist() {
     STORAGE_KEY,
     JSON.stringify({
       token: token.value,
+      nhanVienId: nhanVienId.value,
       hoTen: hoTen.value,
       vaiTro: vaiTro.value,
     }),
@@ -43,6 +46,7 @@ function persist() {
 
 function clearStorage() {
   token.value = null
+  nhanVienId.value = null
   hoTen.value = ''
   vaiTro.value = ''
   localStorage.removeItem(STORAGE_KEY)
@@ -50,6 +54,7 @@ function clearStorage() {
 
 function applyAuth(data) {
   token.value = data.token
+  nhanVienId.value = data.id ?? null
   hoTen.value = data.hoTen || ''
   vaiTro.value = data.vaiTro || ''
   persist()
@@ -73,6 +78,7 @@ export function useAdminAuth() {
 
   return {
     token,
+    nhanVienId,
     hoTen,
     vaiTro,
     isLoggedIn,

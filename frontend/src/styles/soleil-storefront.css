@@ -508,6 +508,47 @@
   margin-bottom: 1rem;
 }
 
+.sf-auth-info {
+  background: rgba(201, 169, 110, 0.12);
+  border: 1px solid rgba(201, 169, 110, 0.35);
+  color: #5c4a2a;
+  border-radius: 8px;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.sf-auth-hint {
+  font-size: 0.88rem;
+  color: var(--sf-charcoal);
+  opacity: 0.75;
+  margin: 0 0 1rem;
+  line-height: 1.5;
+}
+
+.sf-auth-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: none;
+  background: transparent;
+  color: var(--sf-gold-dark);
+  font-size: 0.88rem;
+  cursor: pointer;
+  margin-bottom: 1rem;
+  padding: 0;
+}
+
+.sf-auth-back:hover {
+  color: var(--sf-espresso);
+}
+
+.sf-modal__input--otp {
+  letter-spacing: 0.35em;
+  font-weight: 600;
+  text-align: center;
+}
+
 .sf-auth-links {
   margin-top: 1.25rem;
   font-size: 0.85rem;

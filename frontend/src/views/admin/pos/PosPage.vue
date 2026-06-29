@@ -5,7 +5,6 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import {
   getSanPhamBan,
   getPhuongThuc,
-  getNhanVien,
   timKhachTheoSdt,
   taoKhachNhanh,
   taoDonTaiQuay,
@@ -16,6 +15,9 @@ import {
 } from '@/api/banHangApi'
 import { formatCurrency, formatMonthYear } from '@/utils/format'
 import { confirm } from '@/composables/useConfirm'
+import { useAdminAuth } from '@/composables/useAdminAuth'
+
+const { hoTen: currentStaffName } = useAdminAuth()
 
 const loading = ref(false)
 const paying = ref(false)
@@ -26,9 +28,6 @@ const keyword = ref('')
 const searchResults = ref([])
 const productsLoaded = ref(false)
 const searchInput = ref(null)
-
-const nhanVienList = ref([])
-const selectedNhanVienId = ref(null)
 
 const cart = ref([])
 
@@ -194,12 +193,8 @@ function onSearchEnter() {
 
 async function loadMeta() {
   try {
-    const [nvRes, ptRes] = await Promise.all([getNhanVien(), getPhuongThuc()])
-    nhanVienList.value = nvRes.data || []
+    const ptRes = await getPhuongThuc()
     paymentMethods.value = ptRes.data || []
-    if (nhanVienList.value.length && !selectedNhanVienId.value) {
-      selectedNhanVienId.value = nhanVienList.value[0].id
-    }
     const cash = paymentMethods.value.find((p) => p.ma === 'TIEN_MAT')
     if (cash) selectedPaymentId.value = cash.id
   } catch (err) {
@@ -326,7 +321,6 @@ async function holdCurrentOrder() {
         soLuong: l.soLuong,
       })),
       idKhachHang: selectedCustomer.value?.id ?? null,
-      idNhanVien: selectedNhanVienId.value ?? null,
     })
     if (activeHeldOrderId.value) {
       try {
@@ -429,7 +423,6 @@ async function checkout() {
         soLuong: l.soLuong,
       })),
       idKhachHang: selectedCustomer.value?.id ?? null,
-      idNhanVien: selectedNhanVienId.value ?? null,
       maPhieuGiamGia: appliedVoucher.value || null,
       idPhuongThucThanhToan: selectedPaymentId.value,
       soTienKhachDua: isCash.value ? Number(cashGiven.value) : null,
@@ -515,12 +508,10 @@ onMounted(async () => {
           Đơn chờ
           <span v-if="heldCount > 0" class="pos-held-badge">{{ heldCount }}</span>
         </button>
-        <select v-model="selectedNhanVienId" class="admin-select pos-staff-select">
-          <option :value="null">— Nhân viên —</option>
-          <option v-for="nv in nhanVienList" :key="nv.id" :value="nv.id">
-            {{ nv.maNhanVien }} — {{ nv.hoTen }}
-          </option>
-        </select>
+        <div class="pos-current-staff" title="Nhân viên bán hàng (tài khoản đang đăng nhập)">
+          <Icon icon="icon-park-outline:user" class="text-base opacity-70" />
+          <span>{{ currentStaffName || '—' }}</span>
+        </div>
       </template>
     </PageHeader>
 

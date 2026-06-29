@@ -6,9 +6,9 @@ import {
   ADMIN_MENU,
   findExpandedKeys,
   filterMenuByRole,
-  getCurrentRole,
 } from '@/constants/adminMenu'
 import { buildAdminMenuOptions } from '@/utils/adminMenuOptions'
+import { useAdminAuth } from '@/composables/useAdminAuth'
 import AppLogo from '@/components/common/AppLogo.vue'
 
 const props = defineProps({
@@ -17,9 +17,10 @@ const props = defineProps({
 
 const route = useRoute()
 const router = useRouter()
+const { vaiTro } = useAdminAuth()
+
 const menuOptions = computed(() => {
-  const role = getCurrentRole()
-  const filtered = filterMenuByRole(ADMIN_MENU, role)
+  const filtered = filterMenuByRole(ADMIN_MENU, vaiTro.value)
   return buildAdminMenuOptions(filtered, props.collapsed)
 })
 const activeKey = computed(() => route.path)
@@ -36,12 +37,10 @@ function onMenuSelect(key) {
   }
 }
 
-// Chỉ mở nhánh chứa trang hiện tại; không gán lại nếu không đổi (tránh chớp submenu)
 watch(
-  () => [route.path, props.collapsed, getCurrentRole()],
+  () => [route.path, props.collapsed, vaiTro.value],
   ([path]) => {
-    const role = getCurrentRole()
-    const filtered = filterMenuByRole(ADMIN_MENU, role)
+    const filtered = filterMenuByRole(ADMIN_MENU, vaiTro.value)
     const next = findExpandedKeys(path, filtered)
     if (!expandedKeysEqual(expandedKeys.value, next)) {
       expandedKeys.value = next

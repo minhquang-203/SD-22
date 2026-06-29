@@ -37,7 +37,10 @@ public class GlobalExceptionHandler {
         res.put("status", "FAILED");
         res.put("code", ex.getCode());
         res.put("message", ex.getMessage());
-        return new ResponseEntity<>(res, HttpStatus.BAD_REQUEST);
+        HttpStatus status = "FORBIDDEN".equals(ex.getCode())
+                ? HttpStatus.FORBIDDEN
+                : HttpStatus.BAD_REQUEST;
+        return new ResponseEntity<>(res, status);
     }
 
     @ExceptionHandler(UnauthorizedException.class)

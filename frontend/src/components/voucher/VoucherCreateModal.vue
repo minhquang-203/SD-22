@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="modelValue"
-    class="fixed inset-0 bg-[rgba(30,21,16,0.45)] backdrop-blur-sm z-[999] flex items-center justify-center"
+    class="admin-modal-backdrop backdrop-blur-sm"
     @click.self="close"
   >
     <!-- MODAL BOX -->

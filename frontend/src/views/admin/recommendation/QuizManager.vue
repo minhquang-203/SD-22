@@ -304,7 +304,7 @@ const confirmDeleteQuestion = async () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 9999;
+  z-index: var(--admin-z-modal, 5000);
 }
 
 .custom-modal-box {

@@ -152,6 +152,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import { confirm } from '@/composables/useConfirm';
 
 const rules = ref([]);
 const isModalOpen = ref(false);
@@ -330,10 +331,15 @@ const saveRule = () => {
   closeModal();
 };
 
-const deleteRule = (id) => {
-  if (confirm("Xác nhận xóa luật phân tích này ra khỏi hệ thống cốt lõi?")) {
-    rules.value = rules.value.filter(r => r.id !== id);
-  }
+const deleteRule = async (id) => {
+  const ok = await confirm({
+    title: 'Xóa luật gợi ý',
+    message: 'Xác nhận xóa luật phân tích này ra khỏi hệ thống cốt lõi?',
+    confirmText: 'Xóa',
+    danger: true,
+  });
+  if (!ok) return;
+  rules.value = rules.value.filter(r => r.id !== id);
 };
 </script>
 
@@ -379,7 +385,7 @@ const deleteRule = (id) => {
 .status-badge.inactive { background-color: #f3f4f6; color: #374151; }
 
 /* CSS Modal Form */
-.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(42, 32, 27, 0.4); display: flex; justify-content: center; align-items: flex-start; padding-top: 4vh; z-index: 1000; backdrop-filter: blur(2px); }
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(42, 32, 27, 0.4); display: flex; justify-content: center; align-items: flex-start; padding-top: 4vh; z-index: var(--admin-z-modal, 5000); backdrop-filter: blur(2px); }
 .modal-content { background-color: white; border-radius: 12px; width: 100%; max-width: 750px; max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15); border: 1px solid #eae2d8; }
 .modal-header { padding: 18px 24px; border-bottom: 1px solid #eae2d8; display: flex; justify-content: space-between; align-items: center; background: #faf8f5; border-radius: 12px 12px 0 0; }
 .modal-header h2 { margin: 0; font-size: 18px; color: #2a201b; }

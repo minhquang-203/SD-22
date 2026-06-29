@@ -391,7 +391,7 @@
     inset: 0;
     background: rgba(30, 21, 16, .45);
     backdrop-filter: blur(4px);
-    z-index: 999;
+    z-index: var(--admin-z-modal, 5000);
     display: flex;
     align-items: center;
     justify-content: center;
