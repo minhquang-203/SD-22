@@ -128,6 +128,8 @@ public class OnlineCheckoutService {
         hoaDon.setLoaiDon(LOAI_DON_ONLINE);
         hoaDon.setTrangThai(MA_COD.equals(maPhuongThuc) ? TrangThaiDonHang.DA_XAC_NHAN : TrangThaiDonHang.CHO_XAC_NHAN);
         hoaDon.setDiaChiGiao(request.getDiaChiGiao().trim());
+        hoaDon.setTenNguoiNhan(khachHang.getHoTen());
+        hoaDon.setSdtNguoiNhan(khachHang.getSoDienThoai());
         hoaDon.setTongTien(tongTien);
         hoaDon.setTienGiamGia(tienGiamGia);
         hoaDon.setPhiVanChuyen(phiVanChuyen);

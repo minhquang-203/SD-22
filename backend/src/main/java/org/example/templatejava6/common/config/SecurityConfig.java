@@ -55,11 +55,13 @@ public class SecurityConfig {
                             "/api/phuong-thuc-thanh-toan/**"
                     ).permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/payments/vnpay/callback").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/hoa-don/tra-cuu").permitAll()
                     .requestMatchers("/uploads/**").permitAll()
                     .requestMatchers("/api/khach-hang/toi", "/api/khach-hang/toi/**").hasRole("KHACH_HANG")
                     .requestMatchers("/api/yeu-thich/**").hasRole("KHACH_HANG")
                     .requestMatchers("/api/gio-hang", "/api/gio-hang/**").hasRole("KHACH_HANG")
                     .requestMatchers("/api/online", "/api/online/**").hasRole("KHACH_HANG")
+                    .requestMatchers("/api/hoa-don/cua-toi", "/api/hoa-don/cua-toi/**").hasRole("KHACH_HANG")
                     .requestMatchers("/api/**").hasAnyRole("NHAN_VIEN", "QUAN_LY")
                     .anyRequest().permitAll()
             );

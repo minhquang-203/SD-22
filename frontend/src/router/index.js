@@ -78,7 +78,13 @@ const router = createRouter({
           path: 'don-hang',
           name: 'DonHang',
           component: () => import('@/views/storefront/DonHang.vue'),
-          meta: { title: 'Đơn hàng — SUNOVA', requiresAuth: true },
+          meta: { title: 'Đơn hàng của tôi — SUNOVA', requiresAuth: true },
+        },
+        {
+          path: 'tra-cuu-don',
+          name: 'TraCuuDon',
+          component: () => import('@/views/storefront/TraCuuDon.vue'),
+          meta: { title: 'Tra cứu đơn hàng — SUNOVA' },
         },
         ...infoRoutes,
         {

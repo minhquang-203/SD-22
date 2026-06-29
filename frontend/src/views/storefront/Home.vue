@@ -4,8 +4,9 @@ import { RouterLink } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import ProductCard from '@/components/storefront/ProductCard.vue'
 import HorizontalScroll from '@/components/storefront/HorizontalScroll.vue'
-import { categoryIcon } from '@/utils/categoryIcon'
+import { categoryIcon, brandDisplayName } from '@/utils/categoryIcon'
 import { fetchAllProducts, fetchDanhMucList, fetchThuongHieuList } from '@/api/storefrontApi'
+import { productImageUrl } from '@/utils/productImage'
 
 const loading = ref(true)
 const featured = ref([])
@@ -121,7 +122,7 @@ onUnmounted(() => {
           <RouterLink to="/san-pham" class="sf-link-more">Xem tất cả →</RouterLink>
         </div>
         <div v-if="loading" class="sf-circle-skeleton" />
-        <HorizontalScroll v-else aria-label="Danh mục sản phẩm">
+        <HorizontalScroll v-else aria-label="Danh mục sản phẩm" :item-count="categories.length">
           <RouterLink
             v-for="cat in categories"
             :key="cat.id"
@@ -129,7 +130,13 @@ onUnmounted(() => {
             class="sf-circle-item"
           >
             <span class="sf-circle-item__ring">
-              <Icon :icon="categoryIcon(cat.ten, cat.ma)" width="28" />
+              <img
+                v-if="cat.anhUrl || cat.urlAnh"
+                :src="productImageUrl(cat.anhUrl || cat.urlAnh)"
+                :alt="cat.ten"
+                class="sf-circle-item__img"
+              />
+              <Icon v-else :icon="categoryIcon(cat.ten, cat.ma, cat.id)" width="32" />
             </span>
             <span class="sf-circle-item__label">{{ cat.ten }}</span>
           </RouterLink>
@@ -145,7 +152,7 @@ onUnmounted(() => {
           <RouterLink to="/san-pham" class="sf-link-more">Xem tất cả →</RouterLink>
         </div>
         <div v-if="loading" class="sf-circle-skeleton" />
-        <HorizontalScroll v-else aria-label="Thương hiệu">
+        <HorizontalScroll v-else aria-label="Thương hiệu" :item-count="brands.length">
           <RouterLink
             v-for="brand in brands"
             :key="brand.id"
@@ -153,7 +160,13 @@ onUnmounted(() => {
             class="sf-circle-item"
           >
             <span class="sf-circle-item__ring sf-circle-item__ring--brand">
-              <span class="sf-circle-item__brand-text">{{ brand.ten }}</span>
+              <img
+                v-if="brand.logoUrl || brand.anhUrl"
+                :src="productImageUrl(brand.logoUrl || brand.anhUrl)"
+                :alt="brand.ten"
+                class="sf-circle-item__logo"
+              />
+              <span v-else class="sf-circle-item__brand-text">{{ brandDisplayName(brand.ten) }}</span>
             </span>
             <span class="sf-circle-item__label">{{ brand.ten }}</span>
           </RouterLink>

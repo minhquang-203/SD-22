@@ -90,6 +90,15 @@ public class HoaDon {
     @Column(name = "ngay_tao")
     private LocalDateTime ngayTao;
 
+    @Size(max = 100)
+    @Nationalized
+    @Column(name = "ten_nguoi_nhan")
+    private String tenNguoiNhan;
+
+    @Size(max = 15)
+    @Column(name = "sdt_nguoi_nhan")
+    private String sdtNguoiNhan;
+
     @OneToMany(mappedBy = "idHoaDon", fetch = FetchType.LAZY)
     private Set<LichSuDonHang> lichSuDonHangs = new LinkedHashSet<>();
 

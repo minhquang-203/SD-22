@@ -32,7 +32,13 @@ public interface HoaDonRepository extends JpaRepository<HoaDon, Integer> {
 
     List<HoaDon> findByIdKhachHang_IdAndLoaiDonOrderByNgayTaoDesc(Integer idKhachHang, String loaiDon);
 
+    List<HoaDon> findByIdKhachHang_IdOrderByNgayTaoDesc(Integer idKhachHang);
+
+    Optional<HoaDon> findByIdAndIdKhachHang_Id(Integer id, Integer idKhachHang);
+
     Optional<HoaDon> findByIdAndIdKhachHang_IdAndLoaiDon(Integer id, Integer idKhachHang, String loaiDon);
+
+    Optional<HoaDon> findByMaHoaDonIgnoreCase(String maHoaDon);
 
     @Query("""
             SELECT h FROM HoaDon h

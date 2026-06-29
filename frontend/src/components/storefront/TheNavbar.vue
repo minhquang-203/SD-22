@@ -25,7 +25,7 @@ const navLinks = [
   { to: '/san-pham', label: 'Thương hiệu', hash: 'brands' },
   { to: '/quiz', label: 'Quiz da' },
   { to: '#', label: 'Blog', disabled: true },
-  { to: '/don-hang', label: 'Tra cứu đơn', requiresAuth: true },
+  { to: '/tra-cuu-don', label: 'Tra cứu đơn' },
 ]
 
 onMounted(async () => {
@@ -65,11 +65,7 @@ function openRegister() {
 }
 
 function handleTraCuu() {
-  if (isLoggedIn.value) {
-    router.push('/don-hang')
-  } else {
-    openAuthModal('login', '/don-hang')
-  }
+  router.push('/tra-cuu-don')
 }
 
 function handleNavClick(link, e) {
@@ -85,20 +81,41 @@ function handleNavClick(link, e) {
   if (link.hash === 'brands') {
     e.preventDefault()
     if (route.path === '/') {
+      router.replace({ path: '/', hash: '#sf-brands' })
       document.getElementById('sf-brands')?.scrollIntoView({ behavior: 'smooth' })
     } else {
-      router.push('/#sf-brands')
+      router.push({ path: '/', hash: '#sf-brands' })
     }
   }
 }
 
 function isLinkActive(link) {
-  if (link.exact) return route.path === link.to
-  if (link.to === '/san-pham' && link.label === 'Kem chống nắng') {
-    return route.path === '/san-pham' && !route.query.noiBat
+  const path = route.path
+  const q = route.query
+
+  if (link.exact) return path === '/'
+
+  if (link.label === 'Kem chống nắng') {
+    return path === '/san-pham' && !q.noiBat && !q.thuongHieu && !q.danhMuc
   }
-  if (link.label === 'Khuyến mãi') return route.query.noiBat === '1'
-  return route.path === link.to
+  if (link.label === 'Khuyến mãi') {
+    return path === '/san-pham' && String(q.noiBat) === '1'
+  }
+  if (link.label === 'Thương hiệu') {
+    if (path === '/') return route.hash === '#sf-brands'
+    return path === '/san-pham' && Boolean(q.thuongHieu)
+  }
+  if (link.label === 'Quiz da') {
+    return path === '/quiz'
+  }
+  if (link.to === '/tra-cuu-don') {
+    return path === '/tra-cuu-don'
+  }
+  if (link.to === '/don-hang') {
+    return path === '/don-hang'
+  }
+
+  return path === link.to
 }
 
 function handleLogout() {
@@ -196,6 +213,8 @@ function toggleUser(e) {
               v-if="!link.disabled && !link.requiresAuth"
               :to="link.to"
               class="sf-header__link"
+              active-class=""
+              exact-active-class=""
               :class="{ active: isLinkActive(link) }"
               @click="handleNavClick(link, $event)"
             >
