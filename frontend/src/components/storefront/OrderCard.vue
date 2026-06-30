@@ -34,6 +34,14 @@ defineProps({
           <p class="sf-order-line__name">{{ line.tenSanPham }}</p>
           <p v-if="line.bienThe" class="sf-order-line__variant">{{ line.bienThe }}</p>
           <p class="sf-order-line__qty">{{ line.soLuong }} × {{ formatVND(line.donGia) }}</p>
+          
+          <button 
+            v-if="order.trangThai === 'HOAN_THANH' || order.trangThai === 'GIAO_THANH_CONG'" 
+            class="sf-btn-review" 
+            @click.stop="$emit('review', line)"
+          >
+            Đánh giá
+          </button>
         </div>
         <strong class="sf-order-line__total">{{ formatVND(line.thanhTien) }}</strong>
       </li>
@@ -73,3 +81,21 @@ defineProps({
     </p>
   </article>
 </template>
+
+<style scoped>
+.sf-btn-review {
+  margin-top: 8px;
+  padding: 6px 12px;
+  background-color: #f59e0b;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.sf-btn-review:hover {
+  background-color: #d97706;
+}
+</style>

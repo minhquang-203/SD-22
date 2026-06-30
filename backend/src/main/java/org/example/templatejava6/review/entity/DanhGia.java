@@ -42,4 +42,22 @@ public class DanhGia {
 
     @Column(name = "ngay_tao")
     private LocalDateTime ngayTao;
+
+    @Nationalized
+    @Column(name = "phan_hoi_cua_shop", length = 500)
+    private String phanHoiCuaShop;
+
+    @Column(name = "hinh_anh_video", length = 1000)
+    private String hinhAnhVideo;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_hoa_don_chi_tiet")
+    private org.example.templatejava6.order.entity.HoaDonChiTiet hoaDonChiTiet;
+
+    @Column(name = "so_luot_thich")
+    private Integer soLuotThich = 0;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_khach_hang", insertable = false, updatable = false)
+    private org.example.templatejava6.common.entity.KhachHang khachHang;
 }
