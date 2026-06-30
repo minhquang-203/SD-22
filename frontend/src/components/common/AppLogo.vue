@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import markSrc from '@/assets/logo/sunova_mark.svg'
+import markSrc from '@/assets/logo/sunova_mark.png'
 
 defineOptions({ inheritAttrs: false })
 
