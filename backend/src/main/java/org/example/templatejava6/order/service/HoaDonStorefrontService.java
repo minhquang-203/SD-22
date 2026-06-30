@@ -34,18 +34,21 @@ public class HoaDonStorefrontService {
     private final LichSuDonHangRepository lichSuDonHangRepository;
     private final KhachHangRepository khachHangRepository;
     private final AnhSanPhamRepository anhSanPhamRepository;
+    private final GhnTrackingService ghnTrackingService;
 
     public HoaDonStorefrontService(
             HoaDonRepository hoaDonRepository,
             HoaDonChiTietRepository hoaDonChiTietRepository,
             LichSuDonHangRepository lichSuDonHangRepository,
             KhachHangRepository khachHangRepository,
-            AnhSanPhamRepository anhSanPhamRepository) {
+            AnhSanPhamRepository anhSanPhamRepository,
+            GhnTrackingService ghnTrackingService) {
         this.hoaDonRepository = hoaDonRepository;
         this.hoaDonChiTietRepository = hoaDonChiTietRepository;
         this.lichSuDonHangRepository = lichSuDonHangRepository;
         this.khachHangRepository = khachHangRepository;
         this.anhSanPhamRepository = anhSanPhamRepository;
+        this.ghnTrackingService = ghnTrackingService;
     }
 
     @Transactional(readOnly = true)
@@ -98,6 +101,7 @@ public class HoaDonStorefrontService {
         r.setTongTien(defaultZero(hd.getTongTien()));
         r.setTienGiamGia(defaultZero(hd.getTienGiamGia()));
         r.setPhiVanChuyen(defaultZero(hd.getPhiVanChuyen()));
+        applyGhnTracking(r, hd);
         r.setThanhTien(defaultZero(hd.getThanhTien()));
         r.setTenNguoiNhan(resolveTenNguoiNhan(hd));
         r.setSdtNguoiNhan(resolveSdtNguoiNhan(hd));
@@ -115,6 +119,20 @@ public class HoaDonStorefrontService {
             r.setCapNhatGanNhatLuc(latest.getThoiGian());
         }
         return r;
+    }
+
+    private void applyGhnTracking(StorefrontOrderDetailResponse r, HoaDon hd) {
+        String maVanDon = normalizeMa(hd.getMaVanDonGhn());
+        if (maVanDon.isBlank()) {
+            return;
+        }
+        r.setDonViVanChuyen("Giao hàng nhanh");
+        r.setMaVanDon(maVanDon);
+        ghnTrackingService.track(maVanDon).ifPresent(info -> {
+            r.setGhnTrangThai(info.status());
+            r.setGhnTrangThaiLabel(info.statusLabel());
+            r.setGhnHenGiao(info.leadtime());
+        });
     }
 
     private StorefrontOrderLineResponse buildLine(HoaDonChiTiet ct) {

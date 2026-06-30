@@ -25,7 +25,7 @@ const navLinks = [
   { to: '/san-pham', label: 'Thương hiệu', hash: 'brands' },
   { to: '/quiz', label: 'Quiz da' },
   { to: '#', label: 'Blog', disabled: true },
-  { to: '/tra-cuu-don', label: 'Tra cứu đơn' },
+  { to: '/tra-cuu-don', label: 'Tra cứu đơn', requiresAuth: true },
 ]
 
 onMounted(async () => {
@@ -65,6 +65,10 @@ function openRegister() {
 }
 
 function handleTraCuu() {
+  if (!isLoggedIn.value) {
+    openAuthModal('login', '/tra-cuu-don')
+    return
+  }
   router.push('/tra-cuu-don')
 }
 
@@ -76,6 +80,10 @@ function handleNavClick(link, e) {
   if (link.requiresAuth && !isLoggedIn.value) {
     e.preventDefault()
     openAuthModal('login', link.to)
+    return
+  }
+  if (link.requiresAuth) {
+    router.push(link.to)
     return
   }
   if (link.hash === 'brands') {
