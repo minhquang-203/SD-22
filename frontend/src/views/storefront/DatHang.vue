@@ -4,10 +4,12 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { createOnlineCheckout } from '@/api/onlineCheckout'
 import { fetchKhachToi } from '@/api/khachHangApi'
+import { calcShippingFee, fetchDistricts, fetchProvinces, fetchWards } from '@/api/shipping'
 import { useAuth } from '@/composables/useAuth'
 import { useCart, variantLabel } from '@/composables/useCart'
 import { toast } from '@/composables/useToast'
 import { formatVND } from '@/utils/formatVND'
+import { getPhoneValidationError, normalizePhoneDigits } from '@/utils/phone'
 import { productImageUrl } from '@/utils/productImage'
 
 const SHIPPING_FEE = 30000
@@ -37,6 +39,9 @@ const form = reactive({
   hoTen: '',
   soDienThoai: '',
   email: '',
+  provinceId: null,
+  districtId: null,
+  wardCode: '',
   tinhThanh: '',
   quanHuyen: '',
   phuongXa: '',
@@ -44,6 +49,16 @@ const form = reactive({
   maPhieuGiamGia: '',
   ghiChu: '',
 })
+
+const provinces = ref([])
+const districts = ref([])
+const wards = ref([])
+const addressLoading = reactive({ provinces: false, districts: false, wards: false })
+
+const ghnFee = ref(null)
+const feeLoading = ref(false)
+const feeNotice = ref('')
+const fieldErrors = reactive({ soDienThoai: '' })
 
 const paymentMethods = [
   {
@@ -60,8 +75,13 @@ const paymentMethods = [
   },
 ]
 
-const shippingFee = computed(() => (selectedSubtotal.value >= FREE_SHIPPING_FROM ? 0 : SHIPPING_FEE))
+const shippingFee = computed(() => {
+  if (selectedSubtotal.value >= FREE_SHIPPING_FROM) return 0
+  if (ghnFee.value != null) return ghnFee.value
+  return SHIPPING_FEE
+})
 const estimatedTotal = computed(() => selectedSubtotal.value + shippingFee.value)
+const isFreeShipping = computed(() => selectedSubtotal.value >= FREE_SHIPPING_FROM)
 const hasSelectedCartItems = computed(() => selectedItems.value.length > 0)
 
 const showCheckoutForm = computed(
@@ -110,6 +130,7 @@ function resetRecipient() {
   form.hoTen = ''
   form.soDienThoai = ''
   form.email = ''
+  fieldErrors.soDienThoai = ''
 }
 
 function useAccountRecipient() {
@@ -131,10 +152,114 @@ async function loadProfile() {
   }
 }
 
+async function loadProvinces() {
+  addressLoading.provinces = true
+  try {
+    const res = await fetchProvinces()
+    provinces.value = res.data || []
+  } catch (error) {
+    toast(typeof error === 'string' ? error : 'Không tải được danh sách tỉnh/thành')
+  } finally {
+    addressLoading.provinces = false
+  }
+}
+
+async function onProvinceChange() {
+  form.districtId = null
+  form.wardCode = ''
+  districts.value = []
+  wards.value = []
+  ghnFee.value = null
+  feeNotice.value = ''
+  const selected = provinces.value.find((p) => p.provinceId === form.provinceId)
+  form.tinhThanh = selected?.provinceName || ''
+  form.quanHuyen = ''
+  form.phuongXa = ''
+  if (!form.provinceId) return
+
+  addressLoading.districts = true
+  try {
+    const res = await fetchDistricts(form.provinceId)
+    districts.value = res.data || []
+  } catch (error) {
+    toast(typeof error === 'string' ? error : 'Không tải được danh sách quận/huyện')
+  } finally {
+    addressLoading.districts = false
+  }
+}
+
+async function onDistrictChange() {
+  form.wardCode = ''
+  wards.value = []
+  ghnFee.value = null
+  feeNotice.value = ''
+  const selected = districts.value.find((d) => d.districtId === form.districtId)
+  form.quanHuyen = selected?.districtName || ''
+  form.phuongXa = ''
+  if (!form.districtId) return
+
+  addressLoading.wards = true
+  try {
+    const res = await fetchWards(form.districtId)
+    wards.value = res.data || []
+  } catch (error) {
+    toast(typeof error === 'string' ? error : 'Không tải được danh sách phường/xã')
+  } finally {
+    addressLoading.wards = false
+  }
+}
+
+async function onWardChange() {
+  const selected = wards.value.find((w) => w.wardCode === form.wardCode)
+  form.phuongXa = selected?.wardName || ''
+  await recalcShippingFee()
+}
+
+async function recalcShippingFee() {
+  if (!form.districtId || !form.wardCode) {
+    ghnFee.value = null
+    feeNotice.value = ''
+    return
+  }
+  feeLoading.value = true
+  try {
+    const res = await calcShippingFee({
+      toDistrictId: form.districtId,
+      toWardCode: form.wardCode,
+      insuranceValue: selectedSubtotal.value,
+    })
+    ghnFee.value = typeof res.data?.total === 'number' ? res.data.total : null
+    feeNotice.value = res.data?.fromGhn ? '' : res.data?.message || ''
+  } catch {
+    ghnFee.value = null
+    feeNotice.value = 'Không tính được phí GHN, tạm áp dụng phí mặc định.'
+  } finally {
+    feeLoading.value = false
+  }
+}
+
+function onPhoneInput(event) {
+  form.soDienThoai = normalizePhoneDigits(event.target.value)
+  fieldErrors.soDienThoai = ''
+}
+
+function validatePhoneField() {
+  fieldErrors.soDienThoai = getPhoneValidationError(form.soDienThoai)
+  return !fieldErrors.soDienThoai
+}
+
 function validateCheckout() {
   if (!hasSelectedCartItems.value) return 'Vui lòng chọn sản phẩm trong giỏ hàng để đặt hàng'
   if (!form.hoTen.trim()) return 'Vui lòng nhập họ tên người nhận'
-  if (!form.soDienThoai.trim()) return 'Vui lòng nhập số điện thoại người nhận'
+  const phoneError = getPhoneValidationError(form.soDienThoai)
+  if (phoneError) {
+    fieldErrors.soDienThoai = phoneError
+    return phoneError
+  }
+  if (!form.provinceId) return 'Vui lòng chọn tỉnh / thành phố'
+  if (!form.districtId) return 'Vui lòng chọn quận / huyện'
+  if (!form.wardCode) return 'Vui lòng chọn phường / xã'
+  if (!form.diaChiCuThe.trim()) return 'Vui lòng nhập địa chỉ cụ thể'
   if (!buildAddress()) return 'Vui lòng nhập địa chỉ giao hàng'
   if (!selectedItems.value.every((line) => line.idChiTietGioHang)) {
     return 'Giỏ hàng chưa đồng bộ. Vui lòng tải lại giỏ hàng rồi thử lại'
@@ -215,6 +340,7 @@ onMounted(() => {
     })
   }
   void loadProfile()
+  void loadProvinces()
 })
 </script>
 
@@ -353,7 +479,20 @@ onMounted(() => {
               </div>
               <div class="sf-checkout-field">
                 <label for="checkout-phone">Số điện thoại</label>
-                <input id="checkout-phone" v-model="form.soDienThoai" type="tel" autocomplete="tel" />
+                <input
+                  id="checkout-phone"
+                  :value="form.soDienThoai"
+                  type="tel"
+                  autocomplete="tel"
+                  inputmode="numeric"
+                  maxlength="10"
+                  pattern="0[35789][0-9]{8}"
+                  placeholder="0xxxxxxxxx"
+                  :class="{ 'is-invalid': fieldErrors.soDienThoai }"
+                  @input="onPhoneInput"
+                  @blur="validatePhoneField"
+                />
+                <span v-if="fieldErrors.soDienThoai" class="sf-field-error">{{ fieldErrors.soDienThoai }}</span>
               </div>
             </div>
 
@@ -365,22 +504,58 @@ onMounted(() => {
             <div class="sf-checkout-form-row">
               <div class="sf-checkout-field">
                 <label for="checkout-city">Tỉnh / Thành phố</label>
-                <input id="checkout-city" v-model="form.tinhThanh" type="text" autocomplete="address-level1" />
+                <select
+                  id="checkout-city"
+                  v-model="form.provinceId"
+                  :disabled="addressLoading.provinces"
+                  @change="onProvinceChange"
+                >
+                  <option :value="null">
+                    {{ addressLoading.provinces ? 'Đang tải...' : 'Chọn tỉnh / thành phố' }}
+                  </option>
+                  <option v-for="p in provinces" :key="p.provinceId" :value="p.provinceId">
+                    {{ p.provinceName }}
+                  </option>
+                </select>
               </div>
               <div class="sf-checkout-field">
                 <label for="checkout-district">Quận / Huyện</label>
-                <input id="checkout-district" v-model="form.quanHuyen" type="text" autocomplete="address-level2" />
+                <select
+                  id="checkout-district"
+                  v-model="form.districtId"
+                  :disabled="!form.provinceId || addressLoading.districts"
+                  @change="onDistrictChange"
+                >
+                  <option :value="null">
+                    {{ addressLoading.districts ? 'Đang tải...' : 'Chọn quận / huyện' }}
+                  </option>
+                  <option v-for="d in districts" :key="d.districtId" :value="d.districtId">
+                    {{ d.districtName }}
+                  </option>
+                </select>
               </div>
             </div>
 
             <div class="sf-checkout-form-row">
               <div class="sf-checkout-field">
                 <label for="checkout-ward">Phường / Xã</label>
-                <input id="checkout-ward" v-model="form.phuongXa" type="text" />
+                <select
+                  id="checkout-ward"
+                  v-model="form.wardCode"
+                  :disabled="!form.districtId || addressLoading.wards"
+                  @change="onWardChange"
+                >
+                  <option value="">
+                    {{ addressLoading.wards ? 'Đang tải...' : 'Chọn phường / xã' }}
+                  </option>
+                  <option v-for="w in wards" :key="w.wardCode" :value="w.wardCode">
+                    {{ w.wardName }}
+                  </option>
+                </select>
               </div>
               <div class="sf-checkout-field">
                 <label for="checkout-address">Địa chỉ cụ thể</label>
-                <input id="checkout-address" v-model="form.diaChiCuThe" type="text" autocomplete="street-address" />
+                <input id="checkout-address" v-model="form.diaChiCuThe" type="text" autocomplete="street-address" placeholder="Số nhà, tên đường..." />
               </div>
             </div>
 
@@ -471,9 +646,14 @@ onMounted(() => {
             <strong>-{{ formatVND(selectedSavings) }}</strong>
           </div>
           <div class="sf-checkout-summary__row">
-            <span>Phí vận chuyển</span>
-            <strong>{{ shippingFee ? formatVND(shippingFee) : 'Miễn phí' }}</strong>
+            <span>Phí vận chuyển (GHN)</span>
+            <strong v-if="feeLoading">Đang tính...</strong>
+            <strong v-else>{{ shippingFee ? formatVND(shippingFee) : 'Miễn phí' }}</strong>
           </div>
+          <p v-if="isFreeShipping" class="sf-checkout-hint">
+            Đơn từ {{ formatVND(FREE_SHIPPING_FROM) }} được miễn phí vận chuyển.
+          </p>
+          <p v-else-if="feeNotice" class="sf-checkout-hint">{{ feeNotice }}</p>
           <div v-if="form.maPhieuGiamGia" class="sf-checkout-summary__row">
             <span>Mã giảm giá</span>
             <strong>{{ form.maPhieuGiamGia }}</strong>

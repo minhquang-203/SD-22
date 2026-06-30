@@ -217,6 +217,7 @@
 }
 
 .sf-checkout-field input,
+.sf-checkout-field select,
 .sf-checkout-field textarea,
 .sf-checkout-voucher input {
   width: 100%;
@@ -236,10 +237,20 @@
 }
 
 .sf-checkout-field input:focus,
+.sf-checkout-field select:focus,
 .sf-checkout-field textarea:focus,
 .sf-checkout-voucher input:focus {
   border-color: var(--sf-gold-dark);
   background: var(--sf-warm-white);
+}
+
+.sf-checkout-field input.is-invalid {
+  border-color: #c45c4a;
+}
+
+.sf-checkout-field select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .sf-checkout-voucher {

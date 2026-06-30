@@ -28,6 +28,7 @@ public class HoaDonRequest {
     private String loaiDon;
     private String diaChiGiao;
     private BigDecimal phiVanChuyen;
+    private String maVanDonGhn;
     private String ghiChu;
 
     @Valid

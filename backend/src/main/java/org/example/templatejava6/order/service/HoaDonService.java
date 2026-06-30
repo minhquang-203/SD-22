@@ -399,6 +399,8 @@ public class HoaDonService {
 
         hd.setPhiVanChuyen(request.getPhiVanChuyen() != null ? request.getPhiVanChuyen() : BigDecimal.ZERO);
 
+        hd.setMaVanDonGhn(normalizeBlankToNull(request.getMaVanDonGhn()));
+
         hd.setGhiChu(request.getGhiChu());
 
     }
@@ -547,6 +549,10 @@ public class HoaDonService {
 
         return discount;
 
+    }
+
+    private String normalizeBlankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
 }
