@@ -56,41 +56,6 @@ function toggleOpen() {
 </script>
 
 <template>
-<<<<<<< HEAD
-  <article v-if="order" class="sf-order-card">
-    <header class="sf-order-card__head">
-      <div>
-        <p class="sf-order-card__code">{{ order.maHoaDon }}</p>
-        <p class="sf-order-card__date">{{ formatOrderDate(order.ngayTao) }}</p>
-      </div>
-      <span
-        class="sf-order-badge"
-        :class="orderStatusClass(order.trangThai)"
-      >
-        {{ order.trangThaiLabel || orderStatusLabel(order.trangThai) }}
-      </span>
-    </header>
-
-    <ul class="sf-order-card__lines">
-      <li v-for="(line, idx) in order.chiTiets || []" :key="idx" class="sf-order-line">
-        <img
-          :src="productImageUrl(line.anhUrl)"
-          :alt="line.tenSanPham"
-          class="sf-order-line__img"
-        />
-        <div class="sf-order-line__body">
-          <p class="sf-order-line__name">{{ line.tenSanPham }}</p>
-          <p v-if="line.bienThe" class="sf-order-line__variant">{{ line.bienThe }}</p>
-          <p class="sf-order-line__qty">{{ line.soLuong }} × {{ formatVND(line.donGia) }}</p>
-          
-          <button 
-            v-if="order.trangThai === 'HOAN_THANH' || order.trangThai === 'GIAO_THANH_CONG'" 
-            class="sf-btn-review" 
-            @click.stop="$emit('review', line)"
-          >
-            Đánh giá
-          </button>
-=======
   <article v-if="order" class="sf-order-card" :class="{ open: isOpen }">
     <button type="button" class="sf-order-card__head" @click="toggleOpen">
       <div class="sf-order-card__head-left">
@@ -103,7 +68,6 @@ function toggleOpen() {
             <span class="sf-order-badge__dot"></span>
             {{ order.trangThaiLabel || orderStatusLabel(order.trangThai) }}
           </span>
->>>>>>> 7d4285de55f5d1d771bc613667bc47cadc6c2be4
         </div>
         <div class="sf-order-card__preview">
           {{ productPreview.first }}
@@ -167,6 +131,14 @@ function toggleOpen() {
             <p class="sf-order-line__name">{{ line.tenSanPham }}</p>
             <p v-if="line.bienThe" class="sf-order-line__variant">{{ line.bienThe }}</p>
             <p class="sf-order-line__qty">x{{ line.soLuong }} · {{ formatVND(line.donGia) }}</p>
+            
+            <button 
+              v-if="order.trangThai === 'HOAN_THANH' || order.trangThai === 'GIAO_THANH_CONG'" 
+              class="sf-btn-review" 
+              @click.stop="$emit('review', line)"
+            >
+              Đánh giá
+            </button>
           </div>
           <strong class="sf-order-line__total">{{ formatVND(line.thanhTien) }}</strong>
         </li>
