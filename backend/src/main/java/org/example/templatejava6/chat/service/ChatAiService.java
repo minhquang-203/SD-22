@@ -148,7 +148,12 @@ public class ChatAiService {
             String responseStr = restTemplate.postForObject(url, request, String.class);
             JsonNode resNode = mapper.readTree(responseStr);
             
-            String aiText = resNode.path("choices").get(0).path("message").path("content").asText();
+            JsonNode choicesNode = resNode.path("choices");
+            if (choicesNode.isMissingNode() || !choicesNode.isArray() || choicesNode.isEmpty()) {
+                throw new RuntimeException("AI API response is empty or invalid: " + responseStr);
+            }
+            
+            String aiText = choicesNode.get(0).path("message").path("content").asText();
             
             SanPham spGoiY = null;
             java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\[PRODUCT_ID:\\s*(\\d+)\\]");
