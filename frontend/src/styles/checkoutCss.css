@@ -217,8 +217,8 @@
 }
 
 .sf-checkout-field input,
-.sf-checkout-field textarea,
-.sf-checkout-voucher input {
+.sf-checkout-field select,
+.sf-checkout-field textarea {
   width: 100%;
   border: 1.5px solid var(--sf-sand);
   border-radius: 10px;
@@ -236,27 +236,74 @@
 }
 
 .sf-checkout-field input:focus,
-.sf-checkout-field textarea:focus,
-.sf-checkout-voucher input:focus {
+.sf-checkout-field select:focus,
+.sf-checkout-field textarea:focus {
   border-color: var(--sf-gold-dark);
   background: var(--sf-warm-white);
+}
+
+.sf-checkout-field input.is-invalid {
+  border-color: #c45c4a;
+}
+
+.sf-checkout-field select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .sf-checkout-voucher {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.2rem 0.85rem 0.2rem 0.95rem;
+  width: 100%;
+  padding: 0.78rem 0.9rem;
   border: 1.5px solid var(--sf-sand);
   border-radius: 12px;
   background: var(--sf-cream);
   color: var(--sf-gold-dark);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
 }
 
-.sf-checkout-voucher input {
+.sf-checkout-voucher:hover,
+.sf-checkout-voucher:focus-visible {
+  border-color: var(--sf-gold-dark);
+  background: var(--sf-warm-white);
+  outline: none;
+}
+
+.sf-checkout-voucher__value {
+  flex: 1;
+  text-align: left;
+  font: inherit;
+  color: var(--sf-charcoal);
+}
+
+.sf-checkout-voucher__value--empty {
+  color: var(--sf-light-mid);
+}
+
+.sf-checkout-voucher__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: transparent;
-  padding-left: 0;
+  color: var(--sf-light-mid);
+  cursor: pointer;
+  padding: 0;
+}
+
+.sf-checkout-voucher__clear:hover {
+  color: #c45c4a;
+}
+
+.sf-checkout-voucher__arrow {
+  color: var(--sf-light-mid);
+}
+
+.sf-checkout-hint--warn {
+  color: #b45309;
 }
 
 .sf-checkout-hint {

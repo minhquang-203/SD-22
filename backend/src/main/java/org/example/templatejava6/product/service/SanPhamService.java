@@ -16,6 +16,10 @@ import org.example.templatejava6.product.model.response.*;
 import org.example.templatejava6.product.repository.*;
 import org.example.templatejava6.product.repository.ChiTietSanPhamRepository.VariantAgg;
 import org.example.templatejava6.review.repository.DanhGiaRepository;
+import org.example.templatejava6.voucher.model.response.VariantSaleInfo;
+import org.example.templatejava6.voucher.repository.ChiTietDotGiamGiaRepository;
+import org.example.templatejava6.voucher.repository.SalePriceAgg;
+import org.example.templatejava6.voucher.service.DotGiamGiaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -46,11 +50,22 @@ public class SanPhamService {
     @Autowired private DanhGiaRepository danhGiaRepository;
     @Autowired private ProductFileStorageService productFileStorageService;
     @Autowired private LoHangService loHangService;
+    @Autowired private ChiTietDotGiamGiaRepository chiTietDotGiamGiaRepository;
+    @Autowired private DotGiamGiaService dotGiamGiaService;
 
     @Transactional(readOnly = true)
     public List<SanPhamResponse> getAll() {
+        return getAll(false);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SanPhamResponse> getAll(Boolean excludeKhuyenMai) {
         Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
+        Set<Integer> saleProductIds = Boolean.TRUE.equals(excludeKhuyenMai)
+                ? loadActiveSaleProductIds()
+                : Set.of();
         return sanPhamRepository.findAll().stream()
+                .filter(sp -> !saleProductIds.contains(sp.getId()))
                 .map(sp -> toListResponse(sp, variantAggMap))
                 .toList();
     }
@@ -64,10 +79,33 @@ public class SanPhamService {
 
     @Transactional(readOnly = true)
     public List<SanPhamResponse> timKiem(String keyword) {
+        return timKiem(keyword, false);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SanPhamResponse> timKiem(String keyword, Boolean excludeKhuyenMai) {
         Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
+        Set<Integer> saleProductIds = Boolean.TRUE.equals(excludeKhuyenMai)
+                ? loadActiveSaleProductIds()
+                : Set.of();
         return sanPhamRepository.findByTenContainingIgnoreCase(keyword)
                 .stream()
+                .filter(sp -> !saleProductIds.contains(sp.getId()))
                 .map(sp -> toListResponse(sp, variantAggMap))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SanPhamResponse> getDangKhuyenMai() {
+        List<Integer> ids = chiTietDotGiamGiaRepository.findSanPhamIdsInActiveSales();
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
+        Map<Integer, SalePriceAgg> salePriceMap = loadActiveSalePriceMap();
+        return sanPhamRepository.findAllById(ids).stream()
+                .filter(sp -> sp.getTrangThai() != Boolean.FALSE)
+                .map(sp -> toSaleListResponse(sp, variantAggMap, salePriceMap.get(sp.getId())))
                 .toList();
     }
 
@@ -164,14 +202,17 @@ public class SanPhamService {
     }
 
     private SanPhamDetailResponse buildDetailResponse(SanPham sp) {
+        Map<Integer, VariantSaleInfo> saleMap = dotGiamGiaService.getActiveSaleByVariantId();
         SanPhamDetailResponse response = new SanPhamDetailResponse(sp);
         response.setChiTiets(chiTietSanPhamRepository.findBySanPham(sp)
                 .stream().map(ct -> {
                     ChiTietSanPhamResponse res = new ChiTietSanPhamResponse(ct);
                     res.setHanSuDungGanNhat(loHangService.nearestExpiry(ct.getId()));
                     res.setSapHetHan(loHangService.hasSapHetHan(ct.getId()));
+                    applyVariantSale(res, saleMap.get(ct.getId()));
                     return res;
                 }).toList());
+        applyProductSaleSummary(response, response.getChiTiets());
         response.setAnhs(anhSanPhamRepository.findBySanPhamOrderByThuTuAsc(sp)
                 .stream().map(AnhSanPhamResponse::new).toList());
         response.setIdLoaiDas(sanPhamLoaiDaRepository.findBySanPham(sp).stream()
@@ -191,6 +232,93 @@ public class SanPhamService {
             map.put(agg.getSpId(), agg);
         }
         return map;
+    }
+
+    private Map<Integer, SalePriceAgg> loadActiveSalePriceMap() {
+        Map<Integer, SalePriceAgg> map = new HashMap<>();
+        for (SalePriceAgg agg : chiTietDotGiamGiaRepository.aggregateActiveSalePrices()) {
+            map.put(agg.getSanPhamId(), agg);
+        }
+        return map;
+    }
+
+    private Set<Integer> loadActiveSaleProductIds() {
+        return new HashSet<>(chiTietDotGiamGiaRepository.findSanPhamIdsInActiveSales());
+    }
+
+    private SanPhamResponse toSaleListResponse(
+            SanPham sp, Map<Integer, VariantAgg> variantAggMap, SalePriceAgg sale) {
+        SanPhamResponse response = toListResponse(sp, variantAggMap);
+        if (sale == null) {
+            return response;
+        }
+        response.setGiaGocMin(sale.getGiaGocMin());
+        response.setGiaGocMax(sale.getGiaGocMax());
+        response.setPhanTramGiam(sale.getPhanTramGiam());
+
+        BigDecimal giaSauGiamMin = sale.getGiaSauGiamMin();
+        BigDecimal giaSauGiamMax = sale.getGiaSauGiamMax();
+        if (giaSauGiamMin == null && sale.getGiaGocMin() != null && sale.getPhanTramGiam() != null) {
+            giaSauGiamMin = dotGiamGiaService.calculateGiaSauGiam(sale.getGiaGocMin(), sale.getPhanTramGiam());
+        }
+        if (giaSauGiamMax == null && sale.getGiaGocMax() != null && sale.getPhanTramGiam() != null) {
+            giaSauGiamMax = dotGiamGiaService.calculateGiaSauGiam(sale.getGiaGocMax(), sale.getPhanTramGiam());
+        }
+        response.setGiaSauGiamMin(giaSauGiamMin);
+        response.setGiaSauGiamMax(giaSauGiamMax);
+        return response;
+    }
+
+    private void applyVariantSale(ChiTietSanPhamResponse variant, VariantSaleInfo sale) {
+        if (variant == null || sale == null) {
+            return;
+        }
+        variant.setGiaGoc(sale.getGiaGoc());
+        variant.setGiaSauGiam(sale.getGiaSauGiam());
+        variant.setPhanTramGiam(sale.getPhanTramGiam());
+    }
+
+    private void applyProductSaleSummary(SanPhamDetailResponse response, List<ChiTietSanPhamResponse> chiTiets) {
+        if (chiTiets == null) {
+            return;
+        }
+        BigDecimal giaGocMin = null;
+        BigDecimal giaGocMax = null;
+        BigDecimal giaSauGiamMin = null;
+        BigDecimal giaSauGiamMax = null;
+        BigDecimal phanTramGiam = null;
+        for (ChiTietSanPhamResponse ct : chiTiets) {
+            if (ct.getGiaSauGiam() == null) {
+                continue;
+            }
+            giaGocMin = min(giaGocMin, ct.getGiaGoc());
+            giaGocMax = max(giaGocMax, ct.getGiaGoc());
+            giaSauGiamMin = min(giaSauGiamMin, ct.getGiaSauGiam());
+            giaSauGiamMax = max(giaSauGiamMax, ct.getGiaSauGiam());
+            phanTramGiam = max(phanTramGiam, ct.getPhanTramGiam());
+        }
+        if (giaSauGiamMin == null) {
+            return;
+        }
+        response.setGiaGocMin(giaGocMin);
+        response.setGiaGocMax(giaGocMax);
+        response.setGiaSauGiamMin(giaSauGiamMin);
+        response.setGiaSauGiamMax(giaSauGiamMax);
+        response.setPhanTramGiam(phanTramGiam);
+    }
+
+    private BigDecimal min(BigDecimal current, BigDecimal value) {
+        if (value == null) {
+            return current;
+        }
+        return current == null || value.compareTo(current) < 0 ? value : current;
+    }
+
+    private BigDecimal max(BigDecimal current, BigDecimal value) {
+        if (value == null) {
+            return current;
+        }
+        return current == null || value.compareTo(current) > 0 ? value : current;
     }
 
     private SanPhamResponse toListResponse(SanPham sp, Map<Integer, VariantAgg> variantAggMap) {

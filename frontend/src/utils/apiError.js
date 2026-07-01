@@ -21,6 +21,12 @@ function humanizeMessage(text) {
   const raw = String(text).trim()
   const lower = raw.toLowerCase()
 
+  // Giu nguyen thong bao loi GHN (vd: "Loi GHN: 401 ... unauthorized") de khong bi
+  // map nham thanh "phien dang nhap het han".
+  if (lower.includes('ghn')) {
+    return raw
+  }
+
   const dupMatch = raw.match(/duplicate key value is \(([^)]+)\)/i)
   if (dupMatch) {
     return `Mã "${dupMatch[1]}" đã tồn tại. Vui lòng dùng mã khác.`

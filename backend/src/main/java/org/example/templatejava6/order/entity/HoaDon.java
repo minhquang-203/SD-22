@@ -14,7 +14,6 @@ import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.Nationalized;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -76,6 +75,17 @@ public class HoaDon {
     @ColumnDefault("0")
     @Column(name = "phi_van_chuyen", precision = 12)
     private BigDecimal phiVanChuyen;
+
+    @Size(max = 50)
+    @Column(name = "ma_van_don_ghn", length = 50)
+    private String maVanDonGhn;
+
+    @Column(name = "ghn_district_id")
+    private Integer ghnDistrictId;
+
+    @Size(max = 20)
+    @Column(name = "ghn_ward_code", length = 20)
+    private String ghnWardCode;
 
     @ColumnDefault("0")
     @Column(name = "thanh_tien", precision = 12)

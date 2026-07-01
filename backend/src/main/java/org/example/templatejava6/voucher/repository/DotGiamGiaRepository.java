@@ -27,12 +27,13 @@ public interface DotGiamGiaRepository extends JpaRepository<DotGiamGia, Integer>
                    OR LOWER(d.ten) LIKE LOWER(CONCAT('%', :keyword, '%')))
               AND (
                    :timeStatus IS NULL OR :timeStatus = ''
-                   OR (:timeStatus = 'ACTIVE'
+                   OR (:timeStatus = 'INACTIVE' AND d.isActive = false)
+                   OR (d.isActive = true AND :timeStatus = 'ACTIVE'
                        AND d.ngayBatDau <= CURRENT_TIMESTAMP
                        AND d.ngayKetThuc >= CURRENT_TIMESTAMP)
-                   OR (:timeStatus = 'UPCOMING'
+                   OR (d.isActive = true AND :timeStatus = 'UPCOMING'
                        AND d.ngayBatDau > CURRENT_TIMESTAMP)
-                   OR (:timeStatus = 'EXPIRED'
+                   OR (d.isActive = true AND :timeStatus = 'EXPIRED'
                        AND d.ngayKetThuc < CURRENT_TIMESTAMP)
               )
             """)

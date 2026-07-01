@@ -32,4 +32,16 @@ public class OnlineCheckoutRequest {
     private BigDecimal phiVanChuyen;
 
     private String ghiChu;
+
+    /** Ten nguoi nhan thuc te (de tao van don GHN). Neu trong se lay theo tai khoan. */
+    private String tenNguoiNhan;
+
+    /** So dien thoai nguoi nhan thuc te. Neu trong se lay theo tai khoan. */
+    private String sdtNguoiNhan;
+
+    /** Ma quan/huyen GHN cua nguoi nhan (to_district_id), dung de tao van don GHN. */
+    private Integer toDistrictId;
+
+    /** Ma phuong/xa GHN cua nguoi nhan (to_ward_code), dung de tao van don GHN. */
+    private String toWardCode;
 }

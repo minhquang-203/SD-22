@@ -19,6 +19,11 @@ public class StorefrontOrderDetailResponse {
     private BigDecimal tongTien;
     private BigDecimal tienGiamGia;
     private BigDecimal phiVanChuyen;
+    private String donViVanChuyen;
+    private String maVanDon;
+    private String ghnTrangThai;
+    private String ghnTrangThaiLabel;
+    private String ghnHenGiao;
     private BigDecimal thanhTien;
     private String tenNguoiNhan;
     private String sdtNguoiNhan;

@@ -40,6 +40,8 @@ public interface HoaDonRepository extends JpaRepository<HoaDon, Integer> {
 
     Optional<HoaDon> findByMaHoaDonIgnoreCase(String maHoaDon);
 
+    List<HoaDon> findByMaVanDonGhnNotNullAndTrangThaiNotIn(java.util.Collection<TrangThaiDonHang> trangThaiKetThuc);
+
     @Query("""
             SELECT h FROM HoaDon h
             WHERE h.loaiDon = 'ONLINE'

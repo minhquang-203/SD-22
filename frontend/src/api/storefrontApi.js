@@ -1,17 +1,24 @@
 import request from './request'
 
-export function fetchAllProducts() {
-  return request.get('/san-pham')
+export function fetchAllProducts(options = {}) {
+  const params = {}
+  if (options.excludeKhuyenMai) params.excludeKhuyenMai = true
+  return request.get('/san-pham', { params })
+}
+
+export function fetchSaleProducts() {
+  return request.get('/san-pham/khuyen-mai')
 }
 
 export function fetchProductsPage(pageNo, pageSize) {
   return request.get('/san-pham/padding', { params: { pageNo, pageSize } })
 }
 
-export function searchProducts(keyword) {
-  return request.get('/san-pham/tim', { params: { keyword } })
+export function searchProducts(keyword, options = {}) {
+  const params = { keyword }
+  if (options.excludeKhuyenMai) params.excludeKhuyenMai = true
+  return request.get('/san-pham/tim', { params })
 }
-
 export function fetchProductDetail(id) {
   return request.get('/san-pham/detail', { params: { id } })
 }

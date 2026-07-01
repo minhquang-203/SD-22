@@ -35,7 +35,7 @@ const heroSlides = [
 
 const sideBanners = [
   { title: 'Sản phẩm nổi bật', desc: 'Được chọn lọc bởi SUNOVA', to: '/san-pham?noiBat=1' },
-  { title: 'Chăm sóc da', desc: 'Dưỡng ẩm & phục hồi', to: '/san-pham' },
+  { title: 'Khuyến mãi', desc: 'Đợt giảm giá đang diễn ra', to: '/san-pham/khuyen-mai' },
 ]
 
 const promises = [

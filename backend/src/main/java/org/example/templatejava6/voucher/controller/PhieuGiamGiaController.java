@@ -58,6 +58,16 @@ public class PhieuGiamGiaController {
         phieuGiamGiaService.delete(id);
     }
 
+    @PutMapping("/{id}/stop")
+    public void stop(@PathVariable Integer id) {
+        phieuGiamGiaService.stop(id);
+    }
+
+    @PutMapping("/{id}/activate")
+    public void activate(@PathVariable Integer id) {
+        phieuGiamGiaService.activate(id);
+    }
+
     @GetMapping("search")
     public ResponseEntity<Page<PhieuGiamGiaResponse>> search(
             @RequestParam(required = false) String keyword,

@@ -11,7 +11,7 @@ import {
   variantLabel,
 } from '@/composables/useCart'
 import { toast } from '@/composables/useToast'
-import { formatVND } from '@/utils/formatVND'
+import { formatDiscountPercent, formatVND } from '@/utils/formatVND'
 import { productImageUrl } from '@/utils/productImage'
 
 const router = useRouter()
@@ -147,7 +147,11 @@ function buySelected() {
 function hasDiscount(line) {
   const goc = Number(line.giaGoc)
   const ban = Number(line.giaBan)
-  return goc > 0 && goc > ban
+  return (goc > 0 && goc > ban) || Boolean(line.phanTramGiam)
+}
+
+function saleLabel(line) {
+  return formatDiscountPercent(line.phanTramGiam)
 }
 </script>
 
@@ -205,7 +209,10 @@ function hasDiscount(line) {
               </RouterLink>
               <p v-if="variantLabel(line)" class="sf-cart-line__variant">{{ variantLabel(line) }}</p>
               <div class="sf-cart-line__prices">
-                <span class="sf-cart-line__price">{{ formatVND(line.giaBan) }}</span>
+                <span v-if="hasDiscount(line) && saleLabel(line)" class="sf-cart-line__sale-badge">{{ saleLabel(line) }}</span>
+                <span class="sf-cart-line__price" :class="{ 'sf-cart-line__price--sale': hasDiscount(line) }">
+                  {{ formatVND(line.giaBan) }}
+                </span>
                 <span v-if="hasDiscount(line)" class="sf-cart-line__price-old">{{ formatVND(line.giaGoc) }}</span>
               </div>
             </div>

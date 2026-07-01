@@ -21,11 +21,16 @@ const categories = ref([])
 const navLinks = [
   { to: '/', label: 'Trang chủ', exact: true },
   { to: '/san-pham', label: 'Kem chống nắng' },
-  { to: '/san-pham?noiBat=1', label: 'Khuyến mãi' },
+  { to: '/san-pham/khuyen-mai', label: 'Khuyến mãi' },
   { to: '/san-pham', label: 'Thương hiệu', hash: 'brands' },
   { to: '/quiz', label: 'Quiz da' },
+<<<<<<< HEAD
   { to: '/blog', label: 'Blog' },
   { to: '/tra-cuu-don', label: 'Tra cứu đơn' },
+=======
+  { to: '#', label: 'Blog', disabled: true },
+  { to: '/tra-cuu-don', label: 'Tra cứu đơn', requiresAuth: true },
+>>>>>>> f95488cec1fc17238371786a11f064eb0a807601
 ]
 
 onMounted(async () => {
@@ -65,6 +70,10 @@ function openRegister() {
 }
 
 function handleTraCuu() {
+  if (!isLoggedIn.value) {
+    openAuthModal('login', '/tra-cuu-don')
+    return
+  }
   router.push('/tra-cuu-don')
 }
 
@@ -76,6 +85,10 @@ function handleNavClick(link, e) {
   if (link.requiresAuth && !isLoggedIn.value) {
     e.preventDefault()
     openAuthModal('login', link.to)
+    return
+  }
+  if (link.requiresAuth) {
+    router.push(link.to)
     return
   }
   if (link.hash === 'brands') {
@@ -99,7 +112,7 @@ function isLinkActive(link) {
     return path === '/san-pham' && !q.noiBat && !q.thuongHieu && !q.danhMuc
   }
   if (link.label === 'Khuyến mãi') {
-    return path === '/san-pham' && String(q.noiBat) === '1'
+    return path === '/san-pham/khuyen-mai'
   }
   if (link.label === 'Thương hiệu') {
     if (path === '/') return route.hash === '#sf-brands'

@@ -7,6 +7,8 @@ import org.example.templatejava6.order.model.response.HoaDonDetailResponse;
 import org.example.templatejava6.order.model.response.HoaDonResponse;
 import org.example.templatejava6.order.model.response.StorefrontOrderDetailResponse;
 import org.example.templatejava6.order.model.response.StorefrontOrderSummaryResponse;
+import org.example.templatejava6.order.service.GhnOrderCreationService;
+import org.example.templatejava6.order.service.GhnOrderSyncService;
 import org.example.templatejava6.order.service.HoaDonService;
 import org.example.templatejava6.order.service.HoaDonStorefrontService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +26,12 @@ public class HoaDonController {
 
     @Autowired
     private HoaDonStorefrontService hoaDonStorefrontService;
+
+    @Autowired
+    private GhnOrderSyncService ghnOrderSyncService;
+
+    @Autowired
+    private GhnOrderCreationService ghnOrderCreationService;
 
     @GetMapping("/tra-cuu")
     public ResponseEntity<StorefrontOrderDetailResponse> traCuu(
@@ -98,6 +106,16 @@ public class HoaDonController {
         );
     }
     
+    @PostMapping("/{id}/dong-bo-ghn")
+    public GhnOrderSyncService.KetQuaDongBo dongBoGhn(@PathVariable Integer id) {
+        return ghnOrderSyncService.dongBoTheoId(id);
+    }
+
+    @PostMapping("/{id}/tao-van-don-ghn")
+    public GhnOrderCreationService.KetQua taoVanDonGhn(@PathVariable Integer id) {
+        return ghnOrderCreationService.taoVanDonTheoId(id);
+    }
+
     @DeleteMapping("/{id}")
     public void delete(@PathVariable Integer id) {
         hoaDonService.delete(id);

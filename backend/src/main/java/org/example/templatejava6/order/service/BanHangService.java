@@ -4,7 +4,6 @@ import org.example.templatejava6.common.entity.KhachHang;
 import org.example.templatejava6.common.entity.NhanVien;
 import org.example.templatejava6.common.entity.PhieuGiamGia;
 import org.example.templatejava6.common.entity.PhuongThucThanhToan;
-import org.example.templatejava6.common.enums.LoaiPhieuGiamGia;
 import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.common.security.SecurityUtils;
@@ -30,6 +29,7 @@ import org.example.templatejava6.order.repository.ThanhToanHoaDonRepository;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
 import org.example.templatejava6.product.repository.ChiTietSanPhamRepository;
 import org.example.templatejava6.product.service.LoHangService;
+import org.example.templatejava6.voucher.model.response.VariantSaleInfo;
 import org.example.templatejava6.voucher.repository.PhieuGiamGiaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
@@ -66,20 +66,26 @@ public class BanHangService {
     @Autowired private KhachHangRepository khachHangRepository;
     @Autowired private NhanVienRepository nhanVienRepository;
     @Autowired private LoHangService loHangService;
+    @Autowired private CheckoutPricingService checkoutPricingService;
 
     @Transactional(readOnly = true)
     public List<BienTheBanResponse> danhSachSanPhamBan(String keyword, Integer page) {
         String kw = keyword != null ? keyword.trim() : "";
         int pageNo = page != null && page >= 0 ? page : 0;
+        Map<Integer, VariantSaleInfo> saleMap = checkoutPricingService.loadActiveSales();
         return chiTietSanPhamRepository
                 .danhSachBienTheBan(kw, PageRequest.of(pageNo, SAN_PHAM_PAGE_SIZE))
                 .stream()
-                .map(this::toBienTheBanResponse)
+                .map(cts -> toBienTheBanResponse(cts, saleMap))
                 .toList();
     }
 
-    private BienTheBanResponse toBienTheBanResponse(ChiTietSanPham cts) {
+    private BienTheBanResponse toBienTheBanResponse(ChiTietSanPham cts, Map<Integer, VariantSaleInfo> saleMap) {
         BienTheBanResponse res = new BienTheBanResponse(cts);
+        BigDecimal donGia = checkoutPricingService.resolveDonGia(cts, saleMap);
+        if (donGia != null) {
+            res.setGiaBan(donGia);
+        }
         LocalDate nearest = loHangService.nearestExpiry(cts.getId());
         res.setHanSuDungGanNhat(nearest);
         if (nearest != null) {
@@ -100,7 +106,8 @@ public class BanHangService {
         }
 
         Map<Integer, Integer> qtyByVariant = mergeItems(req.getItems());
-        List<LineCalc> lines = buildLines(qtyByVariant, false);
+        Map<Integer, VariantSaleInfo> saleMap = checkoutPricingService.loadActiveSales();
+        List<LineCalc> lines = buildLines(qtyByVariant, false, saleMap);
         BigDecimal tongTien = sumTongTien(lines);
 
         KhachHang khachHang = resolveKhachHang(req.getIdKhachHang());
@@ -190,7 +197,8 @@ public class BanHangService {
         }
 
         Map<Integer, Integer> qtyByVariant = mergeItems(req.getItems());
-        List<LineCalc> lines = buildLines(qtyByVariant, true);
+        Map<Integer, VariantSaleInfo> saleMap = checkoutPricingService.loadActiveSales();
+        List<LineCalc> lines = buildLines(qtyByVariant, true, saleMap);
         BigDecimal tongTien = sumTongTien(lines);
 
         PhieuGiamGia phieu = null;
@@ -199,7 +207,10 @@ public class BanHangService {
             phieu = phieuGiamGiaRepository.findByMa(req.getMaPhieuGiamGia().trim())
                     .orElseThrow(() -> new ApiException(
                             "Mã giảm giá \"" + req.getMaPhieuGiamGia() + "\" không tồn tại.", "INVALID_VOUCHER"));
-            tienGiamGia = tinhTienGiam(phieu, tongTien);
+            List<Integer> variantIds = lines.stream()
+                    .map(line -> line.cts.getId())
+                    .toList();
+            tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien, variantIds, saleMap);
         }
 
         BigDecimal thanhTien = tongTien.subtract(tienGiamGia);
@@ -329,7 +340,10 @@ public class BanHangService {
         return nv;
     }
 
-    private List<LineCalc> buildLines(Map<Integer, Integer> qtyByVariant, boolean checkStock) {
+    private List<LineCalc> buildLines(
+            Map<Integer, Integer> qtyByVariant,
+            boolean checkStock,
+            Map<Integer, VariantSaleInfo> saleMap) {
         List<LineCalc> lines = new ArrayList<>();
         for (Map.Entry<Integer, Integer> entry : qtyByVariant.entrySet()) {
             ChiTietSanPham cts = chiTietSanPhamRepository.findById(entry.getKey())
@@ -347,7 +361,10 @@ public class BanHangService {
                             "OUT_OF_STOCK");
                 }
             }
-            BigDecimal donGia = cts.getGiaBan();
+            BigDecimal donGia = checkoutPricingService.resolveDonGia(cts, saleMap);
+            if (donGia == null || donGia.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new ApiException("Giá bán SKU " + cts.getSku() + " không hợp lệ.", "INVALID_PRICE");
+            }
             BigDecimal thanhTienDong = donGia.multiply(BigDecimal.valueOf(soLuong));
             lines.add(new LineCalc(cts, soLuong, donGia, thanhTienDong));
         }
@@ -389,46 +406,6 @@ public class BanHangService {
             map.merge(item.getIdChiTietSanPham(), item.getSoLuong(), Integer::sum);
         }
         return map;
-    }
-
-    private BigDecimal tinhTienGiam(PhieuGiamGia phieu, BigDecimal tongTien) {
-        if (!Boolean.TRUE.equals(phieu.getTrangThai())) {
-            throw new ApiException("Mã giảm giá không còn hiệu lực.", "INVALID_VOUCHER");
-        }
-        LocalDateTime now = LocalDateTime.now();
-        if (phieu.getNgayBatDau() != null && now.isBefore(phieu.getNgayBatDau())) {
-            throw new ApiException("Mã giảm giá chưa đến thời gian áp dụng.", "INVALID_VOUCHER");
-        }
-        if (phieu.getNgayKetThuc() != null && now.isAfter(phieu.getNgayKetThuc())) {
-            throw new ApiException("Mã giảm giá đã hết hạn.", "INVALID_VOUCHER");
-        }
-        if (phieu.getSoLuong() == null || phieu.getSoLuong() <= 0) {
-            throw new ApiException("Mã giảm giá đã hết lượt sử dụng.", "INVALID_VOUCHER");
-        }
-        BigDecimal donToiThieu = phieu.getGiaTriDonToiThieu() != null
-                ? phieu.getGiaTriDonToiThieu() : BigDecimal.ZERO;
-        if (tongTien.compareTo(donToiThieu) < 0) {
-            throw new ApiException(
-                    "Đơn hàng chưa đạt giá trị tối thiểu " + donToiThieu.toPlainString() + "đ.",
-                    "INVALID_VOUCHER");
-        }
-
-        BigDecimal giam;
-        if (phieu.getLoai() == LoaiPhieuGiamGia.PHAN_TRAM) {
-            giam = tongTien.multiply(phieu.getGiaTri())
-                    .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
-            if (phieu.getGiamToiDa() != null && giam.compareTo(phieu.getGiamToiDa()) > 0) {
-                giam = phieu.getGiamToiDa();
-            }
-        } else if (phieu.getLoai() == LoaiPhieuGiamGia.TIEN_MAT) {
-            giam = phieu.getGiaTri();
-        } else {
-            throw new ApiException("Loại mã giảm giá không hợp lệ.", "INVALID_VOUCHER");
-        }
-        if (giam.compareTo(tongTien) > 0) {
-            giam = tongTien;
-        }
-        return giam;
     }
 
     private String sinhMaHoaDon(LocalDateTime now) {

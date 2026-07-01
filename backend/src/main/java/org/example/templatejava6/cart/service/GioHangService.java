@@ -15,12 +15,15 @@ import org.example.templatejava6.product.entity.ChiTietSanPham;
 import org.example.templatejava6.product.entity.AnhSanPham;
 import org.example.templatejava6.product.repository.AnhSanPhamRepository;
 import org.example.templatejava6.product.repository.ChiTietSanPhamRepository;
+import org.example.templatejava6.voucher.model.response.VariantSaleInfo;
+import org.example.templatejava6.voucher.service.DotGiamGiaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class GioHangService {
@@ -30,6 +33,7 @@ public class GioHangService {
     @Autowired private KhachHangRepository khachHangRepository;
     @Autowired private ChiTietSanPhamRepository chiTietSanPhamRepository;
     @Autowired private AnhSanPhamRepository anhSanPhamRepository;
+    @Autowired private DotGiamGiaService dotGiamGiaService;
 
     @Transactional
     public GioHangResponse getByKhachHang(Integer idKhachHang) {
@@ -143,10 +147,18 @@ public class GioHangService {
     }
 
     private GioHangResponse toResponse(GioHang gioHang) {
+        Map<Integer, VariantSaleInfo> saleMap = dotGiamGiaService.getActiveSaleByVariantId();
         List<ChiTietGioHangResponse> items = chiTietGioHangRepository
                 .findByGioHangIdWithDetail(gioHang.getId())
                 .stream()
-                .map(item -> new ChiTietGioHangResponse(item, resolveImageUrl(item.getChiTietSanPham())))
+                .map(item -> {
+                    ChiTietGioHangResponse response = new ChiTietGioHangResponse(
+                            item, resolveImageUrl(item.getChiTietSanPham()));
+                    if (item.getChiTietSanPham() != null) {
+                        response.applySalePrice(saleMap.get(item.getChiTietSanPham().getId()));
+                    }
+                    return response;
+                })
                 .toList();
         return new GioHangResponse(gioHang, items);
     }

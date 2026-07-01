@@ -6,6 +6,7 @@ import TheFooter from '@/components/storefront/TheFooter.vue'
 import AuthModal from '@/components/storefront/AuthModal.vue'
 import CartToast from '@/components/storefront/CartToast.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
+import ChatWidget from '@/components/storefront/ChatWidget.vue'
 </script>
 
 <template>
@@ -18,5 +19,6 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
     <AuthModal />
     <CartToast />
     <ConfirmDialog />
+    <ChatWidget />
   </div>
 </template>

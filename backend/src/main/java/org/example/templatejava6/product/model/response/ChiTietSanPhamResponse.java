@@ -20,6 +20,12 @@ public class ChiTietSanPhamResponse {
     private String tenMauSac;
     private LocalDate hanSuDungGanNhat;
     private Boolean sapHetHan;
+    /** Giá gốc khi biến thể đang trong đợt giảm giá */
+    private BigDecimal giaGoc;
+    /** Giá sau giảm */
+    private BigDecimal giaSauGiam;
+    /** Phần trăm giảm đang áp dụng */
+    private BigDecimal phanTramGiam;
 
     public ChiTietSanPhamResponse(ChiTietSanPham ct) {
         this.id = ct.getId();

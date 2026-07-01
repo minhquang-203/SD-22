@@ -21,6 +21,7 @@ public class HoaDonResponse {
     private BigDecimal tongTien;
     private BigDecimal tienGiamGia;
     private BigDecimal phiVanChuyen;
+    private String maVanDonGhn;
     private BigDecimal thanhTien;
     private String ghiChu;
     private LocalDateTime ngayTao;
@@ -39,6 +40,7 @@ public class HoaDonResponse {
         this.tongTien = hd.getTongTien();
         this.tienGiamGia = hd.getTienGiamGia();
         this.phiVanChuyen = hd.getPhiVanChuyen();
+        this.maVanDonGhn = hd.getMaVanDonGhn();
         this.thanhTien = hd.getThanhTien();
         this.ghiChu = hd.getGhiChu();
         this.ngayTao = hd.getNgayTao();

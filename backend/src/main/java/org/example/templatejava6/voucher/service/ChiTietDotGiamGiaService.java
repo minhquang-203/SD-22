@@ -151,6 +151,9 @@ public class ChiTietDotGiamGiaService {
 
     private void validateDotGiamGiaDangMo(DotGiamGia dgg) {
         if (!Boolean.TRUE.equals(dgg.getTrangThai())) {
+            throw new ApiException("Đợt giảm giá không tồn tại", "NOT_FOUND");
+        }
+        if (!Boolean.TRUE.equals(dgg.getIsActive())) {
             throw new ApiException("Đợt giảm giá đã ngừng áp dụng", "VALIDATION_ERROR");
         }
     }

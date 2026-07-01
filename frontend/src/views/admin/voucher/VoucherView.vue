@@ -6,6 +6,8 @@ import { ref, onMounted, watch } from "vue";
 import {
   searchVoucher,
   deleteVoucher,
+  stopVoucher,
+  activateVoucher,
   createVoucher,
   updateVoucher,
 } from "@/api/voucherApi.js";
@@ -22,8 +24,9 @@ const showModal = ref(false);
 const editingVoucher = ref(null);
 
 const danhSach = ref([]);
-const dangTai = ref(false);
+const taiLanDau = ref(true);
 const loi = ref("");
+const dangXuLyId = ref(null);
 
 const daDuocChon = ref([]);
 
@@ -51,14 +54,62 @@ const refreshStats = () => {
   statsRefreshKey.value += 1;
 };
 
+function resolveVoucherStatus(phieu, isActive) {
+  if (!isActive) {
+    return {
+      ...phieu,
+      isActive: false,
+      timeStatus: "INACTIVE",
+      timeStatusLabel: "Ngừng áp dụng",
+    };
+  }
+
+  const now = new Date();
+  const batDau = new Date(phieu.ngayBatDau || "");
+  const ketThuc = new Date(phieu.ngayKetThuc || "");
+
+  if (now < batDau) {
+    return {
+      ...phieu,
+      isActive: true,
+      timeStatus: "UPCOMING",
+      timeStatusLabel: "Sắp diễn ra",
+    };
+  }
+  if (now > ketThuc) {
+    return {
+      ...phieu,
+      isActive: true,
+      timeStatus: "EXPIRED",
+      timeStatusLabel: "Đã hết hạn",
+    };
+  }
+  return {
+    ...phieu,
+    isActive: true,
+    timeStatus: "ACTIVE",
+    timeStatusLabel: "Đang hoạt động",
+  };
+}
+
+function capNhatPhieuLocal(id, isActive) {
+  danhSach.value = danhSach.value.map((p) =>
+    p.id === id ? resolveVoucherStatus(p, isActive) : p,
+  );
+}
+
 /* ================= LOAD DATA ================= */
-const loadData = async (page = 1) => {
-  dangTai.value = true;
+const loadData = async (page = 1, { silent = false } = {}) => {
+  if (!silent && danhSach.value.length === 0) {
+    taiLanDau.value = true;
+  }
   loi.value = "";
 
   try {
     const statusParam = locTrangThai.value
-      ? locTrangThai.value.toUpperCase()
+      ? locTrangThai.value.toUpperCase() === "INACTIVE"
+        ? "INACTIVE"
+        : locTrangThai.value.toUpperCase()
       : null;
 
     const res = await searchVoucher(
@@ -66,7 +117,7 @@ const loadData = async (page = 1) => {
       statusParam,
       locLoai.value || null,
       page,
-      soDong
+      soDong,
     );
 
     danhSach.value = res.data.content || [];
@@ -74,9 +125,13 @@ const loadData = async (page = 1) => {
     trangHienTai.value = page;
   } catch (e) {
     console.error(e);
-    loi.value = "Không thể tải dữ liệu";
+    if (danhSach.value.length === 0) {
+      loi.value = "Không thể tải dữ liệu";
+    } else {
+      toast("Không thể tải dữ liệu", "warn");
+    }
   } finally {
-    dangTai.value = false;
+    taiLanDau.value = false;
   }
 };
 
@@ -94,9 +149,53 @@ const changePage = (pageIndex) => {
 
 /* ================= SELECTION ================= */
 const chonTatCa = (checked) => {
-  daDuocChon.value = checked
-    ? danhSach.value.map((p) => p.id)
-    : [];
+  daDuocChon.value = checked ? danhSach.value.map((p) => p.id) : [];
+};
+
+/* ================= STOP / ACTIVATE ================= */
+const xacNhanDung = async (phieu) => {
+  const ok = await confirm({
+    title: "Dừng chương trình",
+    message: `Dừng phiếu "${phieu.ma}"? Phiếu sẽ không còn hiệu lực.`,
+    confirmText: "Dừng",
+    danger: true,
+  });
+  if (!ok) return;
+
+  dangXuLyId.value = phieu.id;
+  try {
+    await stopVoucher(phieu.id);
+    capNhatPhieuLocal(phieu.id, false);
+    refreshStats();
+    toast(`Đã dừng phiếu "${phieu.ma}"`, "info");
+  } catch (e) {
+    toast("Dừng chương trình thất bại", "warn");
+    console.error(e);
+  } finally {
+    dangXuLyId.value = null;
+  }
+};
+
+const xacNhanKichHoat = async (phieu) => {
+  const ok = await confirm({
+    title: "Kích hoạt lại",
+    message: `Kích hoạt lại phiếu "${phieu.ma}"?`,
+    confirmText: "Kích hoạt",
+  });
+  if (!ok) return;
+
+  dangXuLyId.value = phieu.id;
+  try {
+    await activateVoucher(phieu.id);
+    capNhatPhieuLocal(phieu.id, true);
+    refreshStats();
+    toast(`Đã kích hoạt phiếu "${phieu.ma}"`, "info");
+  } catch (e) {
+    toast("Kích hoạt thất bại", "warn");
+    console.error(e);
+  } finally {
+    dangXuLyId.value = null;
+  }
 };
 
 /* ================= DELETE ================= */
@@ -109,17 +208,22 @@ const xacNhanXoa = async (phieu) => {
   });
   if (!ok) return;
 
+  dangXuLyId.value = phieu.id;
   try {
-    dangTai.value = true;
     await deleteVoucher(phieu.id);
-    await loadData(trangHienTai.value);
+    danhSach.value = danhSach.value.filter((p) => p.id !== phieu.id);
+    daDuocChon.value = daDuocChon.value.filter((id) => id !== phieu.id);
+    if (voucherPage.value.totalElements > 0) {
+      voucherPage.value.totalElements -= 1;
+      voucherPage.value.numberOfElements = danhSach.value.length;
+    }
     refreshStats();
     toast(`Đã xóa phiếu "${phieu.ma}"`, "info");
   } catch (e) {
     toast("Xóa thất bại", "warn");
     console.error(e);
   } finally {
-    dangTai.value = false;
+    dangXuLyId.value = null;
   }
 };
 
@@ -157,7 +261,7 @@ const handleUpdate = async (payload) => {
     showModal.value = false;
     editingVoucher.value = null;
     toast("Cập nhật phiếu giảm giá thành công", "info");
-    await loadData(trangHienTai.value);
+    await loadData(trangHienTai.value, { silent: true });
     refreshStats();
   } catch (e) {
     console.error(e);
@@ -225,30 +329,31 @@ const handleExport = () => console.log("export");
 
     <!-- TABLE -->
     <div class="table-card">
+      <div v-if="taiLanDau" class="table-loading">Đang tải...</div>
+      <div v-else-if="loi" class="table-error">{{ loi }}</div>
 
-      <div v-if="dangTai">Loading...</div>
-      <div v-else-if="loi">{{ loi }}</div>
+      <template v-else>
+        <VoucherTable
+          :items="danhSach"
+          v-model:selected="daDuocChon"
+          :processing-id="dangXuLyId"
+          @sua="openEdit"
+          @dung="xacNhanDung"
+          @kich-hoat="xacNhanKichHoat"
+          @xoa="xacNhanXoa"
+          @chon-tat-ca="chonTatCa"
+        />
 
-      <VoucherTable
-        v-else
-        :items="danhSach"
-        v-model:selected="daDuocChon"
-        @xem="$emit('xem', $event)"
-        @sua="openEdit"
-        @xoa="xacNhanXoa"
-        @chon-tat-ca="chonTatCa"
-      />
-
-      <!-- PAGINATION -->
-      <Pagination
-        :number="voucherPage.number"
-        :total-pages="voucherPage.totalPages"
-        :total-elements="voucherPage.totalElements"
-        :number-of-elements="voucherPage.numberOfElements"
-        :first="voucherPage.first"
-        :last="voucherPage.last"
-        @page-change="changePage"
-      />
+        <Pagination
+          :number="voucherPage.number"
+          :total-pages="voucherPage.totalPages"
+          :total-elements="voucherPage.totalElements"
+          :number-of-elements="voucherPage.numberOfElements"
+          :first="voucherPage.first"
+          :last="voucherPage.last"
+          @page-change="changePage"
+        />
+      </template>
     </div>
   </div>
 </template>
@@ -256,5 +361,13 @@ const handleExport = () => console.log("export");
 <style scoped>
 .font-display {
   font-family: "Cormorant Garamond", serif;
+}
+
+.table-loading,
+.table-error {
+  padding: 48px 24px;
+  text-align: center;
+  color: rgba(30, 21, 16, 0.55);
+  font-size: 14px;
 }
 </style>

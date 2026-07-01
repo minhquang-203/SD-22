@@ -10,6 +10,7 @@ import org.example.templatejava6.order.repository.HoaDonRepository;
 import org.example.templatejava6.order.repository.LichSuDonHangRepository;
 import org.example.templatejava6.order.repository.PhuongThucThanhToanRepository;
 import org.example.templatejava6.order.repository.ThanhToanHoaDonRepository;
+import org.example.templatejava6.order.service.GhnOrderCreationService;
 import org.example.templatejava6.order.service.OnlineOrderLifecycleService;
 import org.example.templatejava6.payment.gateway.PaymentCallbackResult;
 import org.example.templatejava6.payment.gateway.PaymentCreateCommand;
@@ -44,6 +45,7 @@ public class PaymentService {
     private final PhuongThucThanhToanRepository phuongThucThanhToanRepository;
     private final LichSuDonHangRepository lichSuDonHangRepository;
     private final OnlineOrderLifecycleService onlineOrderLifecycleService;
+    private final GhnOrderCreationService ghnOrderCreationService;
 
     public PaymentService(
             PaymentGatewayRegistry gatewayRegistry,
@@ -51,13 +53,15 @@ public class PaymentService {
             ThanhToanHoaDonRepository thanhToanHoaDonRepository,
             PhuongThucThanhToanRepository phuongThucThanhToanRepository,
             LichSuDonHangRepository lichSuDonHangRepository,
-            OnlineOrderLifecycleService onlineOrderLifecycleService) {
+            OnlineOrderLifecycleService onlineOrderLifecycleService,
+            GhnOrderCreationService ghnOrderCreationService) {
         this.gatewayRegistry = gatewayRegistry;
         this.hoaDonRepository = hoaDonRepository;
         this.thanhToanHoaDonRepository = thanhToanHoaDonRepository;
         this.phuongThucThanhToanRepository = phuongThucThanhToanRepository;
         this.lichSuDonHangRepository = lichSuDonHangRepository;
         this.onlineOrderLifecycleService = onlineOrderLifecycleService;
+        this.ghnOrderCreationService = ghnOrderCreationService;
     }
 
     @Transactional
@@ -148,6 +152,7 @@ public class PaymentService {
             ghiNhatKy(hoaDon, "THANH_TOAN",
                     "Thanh toán " + provider + " thành công"
                             + formatProviderTransaction(callback.getProviderTransactionNo()));
+            ghnOrderCreationService.taoVanDonNeuCan(hoaDon);
             return buildCallbackResponse(callback, provider, hoaDon, true, callback.getMessage());
         }
 

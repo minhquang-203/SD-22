@@ -11,3 +11,13 @@ export function fetchOnlineOrders(idKhachHang) {
 export function fetchOnlineOrderDetail(idKhachHang, idHoaDon) {
   return request.get(`/online/orders/${idHoaDon}`, { params: { idKhachHang } })
 }
+
+export function fetchCheckoutVouchers(keyword = '', page = 1, size = 20) {
+  return request.get('/online/vouchers', {
+    params: {
+      keyword: keyword || undefined,
+      page,
+      size,
+    },
+  })
+}
