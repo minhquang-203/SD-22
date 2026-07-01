@@ -21,8 +21,9 @@ public class SanPhamController {
     private SanPhamService sanPhamService;
 
     @GetMapping
-    public List<SanPhamResponse> hienThiDanhSach() {
-        return sanPhamService.getAll();
+    public List<SanPhamResponse> hienThiDanhSach(
+            @RequestParam(value = "excludeKhuyenMai", required = false) Boolean excludeKhuyenMai) {
+        return sanPhamService.getAll(excludeKhuyenMai);
     }
 
     @GetMapping("padding")
@@ -42,8 +43,15 @@ public class SanPhamController {
     }
 
     @GetMapping("tim")
-    public List<SanPhamResponse> timKiem(@RequestParam("keyword") String keyword) {
-        return sanPhamService.timKiem(keyword);
+    public List<SanPhamResponse> timKiem(
+            @RequestParam("keyword") String keyword,
+            @RequestParam(value = "excludeKhuyenMai", required = false) Boolean excludeKhuyenMai) {
+        return sanPhamService.timKiem(keyword, excludeKhuyenMai);
+    }
+
+    @GetMapping("khuyen-mai")
+    public List<SanPhamResponse> dangKhuyenMai() {
+        return sanPhamService.getDangKhuyenMai();
     }
 
     @PostMapping(value = "add", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

@@ -214,6 +214,22 @@ public class ShippingService {
         return ex.getMessage();
     }
 
+    /** Trich thong bao loi tu body GHN (truong hop HTTP 200 nhung khong co order_code). */
+    private String ghnMessage(JsonNode response) {
+        if (response == null || response.isMissingNode() || response.isNull()) {
+            return "không có phản hồi từ GHN.";
+        }
+        String message = text(response, "message");
+        if (message == null) {
+            message = text(response, "message_display");
+        }
+        Integer code = intOrNull(response, "code");
+        if (message != null) {
+            return code != null ? "code=" + code + ", message=" + message : message;
+        }
+        return response.toString();
+    }
+
     public CreateShippingOrderResponse createOrder(CreateShippingOrderRequest request) {
         if (!properties.isFeeConfigured()) {
             throw new ApiException("Chưa cấu hình ShopId / kho gửi của GHN.", "GHN_NOT_CONFIGURED");
@@ -250,16 +266,20 @@ public class ShippingService {
             JsonNode response = ghnClient.postWithShop("/v2/shipping-order/create", body);
             JsonNode data = response != null ? response.path("data") : null;
             if (data == null || data.isMissingNode() || !data.hasNonNull("order_code")) {
-                throw new ApiException("GHN không trả về mã vận đơn.", "GHN_ERROR");
+                String chiTiet = ghnMessage(response);
+                log.warn("GHN không trả về mã vận đơn (to_district={}, service_id={}): {}",
+                        request.getToDistrictId(), serviceId, chiTiet);
+                throw new ApiException("GHN không trả về mã vận đơn. Phản hồi GHN: " + chiTiet, "GHN_ERROR");
             }
             return new CreateShippingOrderResponse(
                     data.path("order_code").asText(),
                     data.hasNonNull("total_fee") ? data.path("total_fee").asLong() : null,
                     text(data, "expected_delivery_time"));
         } catch (RestClientException ex) {
+            String chiTiet = ghnError(ex);
             log.warn("GHN tạo vận đơn thất bại (to_district={}, service_id={}): {}",
-                    request.getToDistrictId(), serviceId, ghnError(ex));
-            throw new ApiException("Không tạo được vận đơn GHN. Vui lòng thử lại.", "GHN_ERROR");
+                    request.getToDistrictId(), serviceId, chiTiet);
+            throw new ApiException("Không tạo được vận đơn GHN. Lỗi GHN: " + chiTiet, "GHN_ERROR");
         }
     }
 

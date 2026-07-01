@@ -80,6 +80,13 @@ public class HoaDon {
     @Column(name = "ma_van_don_ghn", length = 50)
     private String maVanDonGhn;
 
+    @Column(name = "ghn_district_id")
+    private Integer ghnDistrictId;
+
+    @Size(max = 20)
+    @Column(name = "ghn_ward_code", length = 20)
+    private String ghnWardCode;
+
     @ColumnDefault("0")
     @Column(name = "thanh_tien", precision = 12)
     private BigDecimal thanhTien;

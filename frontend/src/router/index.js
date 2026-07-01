@@ -19,6 +19,11 @@ const infoRoutes = Object.keys(INFO_PAGES).map((slug) => ({
 
 const router = createRouter({
   history: createWebHistory(),
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    if (to.hash) return { el: to.hash, behavior: 'smooth' }
+    return { top: 0, left: 0 }
+  },
   routes: [
     // =======================================================
     // STOREFRONT (khách hàng) — Soleil + Bootstrap
@@ -54,6 +59,12 @@ const router = createRouter({
           name: 'SanPhamList',
           component: () => import('@/views/storefront/ProductList.vue'),
           meta: { title: 'Sản phẩm — SUNOVA' },
+        },
+        {
+          path: 'san-pham/khuyen-mai',
+          name: 'SanPhamKhuyenMai',
+          component: () => import('@/views/storefront/ProductList.vue'),
+          meta: { title: 'Khuyến mãi — SUNOVA', khuyenMai: true },
         },
         {
           path: 'san-pham/:id',

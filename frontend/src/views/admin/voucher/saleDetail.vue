@@ -220,15 +220,14 @@
 
     <!-- MODAL -->
     <Teleport to="body">
-      <div v-if="showModal" class="sd-modal-overlay">
-        <div class="sd-modal-backdrop" @click="closeModal"></div>
-        <div class="sd-modal">
+      <div v-if="showModal" class="sd-modal-overlay" @click.self="closeModal">
+        <div class="sd-modal" role="dialog" aria-modal="true" @click.stop>
           <div class="sd-modal__header">
             <div>
               <div class="sd-modal__eyebrow">Đợt giảm giá — {{ sale?.ten }} · −{{ sale?.phanTramGiam }}%</div>
               <h3 class="sd-modal__title">Thêm sản phẩm</h3>
             </div>
-            <button class="sd-modal__close" @click="closeModal">
+            <button type="button" class="sd-modal__close" aria-label="Đóng" @click="closeModal">
               <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
           </div>
@@ -259,8 +258,8 @@
           <div class="sd-modal__footer">
             <span class="sd-modal__footer-note">{{ selectedIds.length }} sản phẩm được chọn</span>
             <div class="sd-modal__footer-actions">
-              <button class="sd-btn-cancel" @click="closeModal">Hủy</button>
-              <button class="sd-btn-submit" :disabled="adding || !selectedIds.length" @click="handleAddProducts">
+              <button type="button" class="sd-btn-cancel" @click="closeModal">Hủy</button>
+              <button type="button" class="sd-btn-submit" :disabled="adding || !selectedIds.length" @click="handleAddProducts">
                 {{ adding ? 'Đang thêm...' : 'Thêm vào đợt' }}
               </button>
             </div>
@@ -272,8 +271,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import '@/styles/saleDetailCss.css'
 import { getSaleById, getSaleProducts, addSaleProduct, deleteSaleProduct } from '@/api/saleApi'
 import { getSanPhamBan } from '@/api/banHangApi'
 import { formatCurrency, formatDate } from '@/utils/format'
@@ -510,6 +510,12 @@ function closeModal() {
   modalSearch.value = ''
 }
 
+function onModalKeydown(event) {
+  if (event.key === 'Escape' && showModal.value) {
+    closeModal()
+  }
+}
+
 let modalSearchTimer
 watch(modalSearch, () => {
   if (!showModal.value) return
@@ -520,8 +526,19 @@ watch(modalSearch, () => {
 watch(showModal, (open) => {
   if (open) {
     selectedIds.value = []
+    document.body.style.overflow = 'hidden'
+    document.addEventListener('keydown', onModalKeydown)
     loadAvailableProducts()
+  } else {
+    document.body.style.overflow = ''
+    document.removeEventListener('keydown', onModalKeydown)
   }
+})
+
+onUnmounted(() => {
+  if (modalSearchTimer) clearTimeout(modalSearchTimer)
+  document.body.style.overflow = ''
+  document.removeEventListener('keydown', onModalKeydown)
 })
 
 onMounted(async () => {
@@ -537,7 +554,6 @@ onMounted(async () => {
 })
 </script>
 
-<style scoped>
-@import '@/styles/saleDetailCss.css';
+<style>
 @import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css');
 </style>

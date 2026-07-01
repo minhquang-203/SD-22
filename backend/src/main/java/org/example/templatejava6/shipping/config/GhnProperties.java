@@ -19,7 +19,7 @@ public class GhnProperties {
     private String token;
 
     /** Base URL cua GHN public API. */
-    private String baseUrl = "https://online-gateway.ghn.vn/shiip/public-api";
+    private String baseUrl = "https://dev-online-gateway.ghn.vn/shiip/public-api";
 
     /** ShopId cua cua hang tren he thong GHN. */
     private String shopId;

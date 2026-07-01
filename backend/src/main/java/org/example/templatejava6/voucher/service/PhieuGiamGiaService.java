@@ -53,6 +53,7 @@ public class PhieuGiamGiaService {
             pgg.setGiaTriDonToiThieu(java.math.BigDecimal.ZERO);
         }
         pgg.setTrangThai(true);
+        pgg.setIsActive(true);
         phieuGiamGiaRepository.save(pgg);
     }
 
@@ -71,6 +72,32 @@ public class PhieuGiamGiaService {
     public void delete(Integer id) {
         PhieuGiamGia pgg = getPhieuGiamGiaOrThrow(id);
         pgg.setTrangThai(false);
+        phieuGiamGiaRepository.save(pgg);
+    }
+
+    @Transactional
+    public void stop(Integer id) {
+        PhieuGiamGia pgg = getPhieuGiamGiaOrThrow(id);
+        if (!Boolean.TRUE.equals(pgg.getTrangThai())) {
+            throw new ApiException("Phiếu giảm giá không tồn tại", "NOT_FOUND");
+        }
+        if (!Boolean.TRUE.equals(pgg.getIsActive())) {
+            throw new ApiException("Phiếu giảm giá đã ngừng áp dụng", "ALREADY_INACTIVE");
+        }
+        pgg.setIsActive(false);
+        phieuGiamGiaRepository.save(pgg);
+    }
+
+    @Transactional
+    public void activate(Integer id) {
+        PhieuGiamGia pgg = getPhieuGiamGiaOrThrow(id);
+        if (!Boolean.TRUE.equals(pgg.getTrangThai())) {
+            throw new ApiException("Phiếu giảm giá không tồn tại", "NOT_FOUND");
+        }
+        if (Boolean.TRUE.equals(pgg.getIsActive())) {
+            throw new ApiException("Phiếu giảm giá đang hoạt động", "ALREADY_ACTIVE");
+        }
+        pgg.setIsActive(true);
         phieuGiamGiaRepository.save(pgg);
     }
 
@@ -105,6 +132,13 @@ public class PhieuGiamGiaService {
                 hoaDonRepository.sumVoucherSavings(),
                 phieuGiamGiaRepository.countExpiringSoon(deadline)
         );
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PhieuGiamGiaResponse> listAvailableForCustomer(String keyword, Pageable pageable) {
+        String normalizedKeyword = keyword == null ? null : keyword.trim();
+        return phieuGiamGiaRepository.findAvailableForCustomer(normalizedKeyword, pageable)
+                .map(PhieuGiamGiaResponse::new);
     }
 
 //    public Page<PhieuGiamGiaResponse> paginition(return null)

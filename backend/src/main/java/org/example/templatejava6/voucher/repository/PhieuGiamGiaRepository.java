@@ -30,22 +30,18 @@ public interface PhieuGiamGiaRepository extends JpaRepository<PhieuGiamGia, Inte
            AND (:keyword IS NULL OR :keyword = ''
            OR LOWER(v.ma) LIKE LOWER(CONCAT('%', :keyword, '%'))
            OR LOWER(v.ten) LIKE LOWER(CONCAT('%', :keyword, '%')))
-           
            AND (:loai IS NULL OR v.loai = :loai)
-
-    AND (
-        :timeStatus IS NULL
-
-        OR (:timeStatus = 'ACTIVE'
-            AND v.ngayBatDau <= CURRENT_TIMESTAMP
-            AND v.ngayKetThuc >= CURRENT_TIMESTAMP)
-
-        OR (:timeStatus = 'UPCOMING'
-            AND v.ngayBatDau > CURRENT_TIMESTAMP)
-
-        OR (:timeStatus = 'EXPIRED'
-            AND v.ngayKetThuc < CURRENT_TIMESTAMP)
-    )
+           AND (
+               :timeStatus IS NULL
+               OR (:timeStatus = 'INACTIVE' AND v.isActive = false)
+               OR (v.isActive = true AND :timeStatus = 'ACTIVE'
+                   AND v.ngayBatDau <= CURRENT_TIMESTAMP
+                   AND v.ngayKetThuc >= CURRENT_TIMESTAMP)
+               OR (v.isActive = true AND :timeStatus = 'UPCOMING'
+                   AND v.ngayBatDau > CURRENT_TIMESTAMP)
+               OR (v.isActive = true AND :timeStatus = 'EXPIRED'
+                   AND v.ngayKetThuc < CURRENT_TIMESTAMP)
+           )
 """)
     Page<PhieuGiamGia> search(
             @Param("keyword") String keyword,
@@ -56,6 +52,7 @@ public interface PhieuGiamGiaRepository extends JpaRepository<PhieuGiamGia, Inte
     @Query("""
         SELECT COUNT(v) FROM PhieuGiamGia v
         WHERE v.trangThai = true
+        AND v.isActive = true
         AND v.ngayBatDau <= CURRENT_TIMESTAMP
         AND v.ngayKetThuc >= CURRENT_TIMESTAMP
     """)
@@ -64,8 +61,25 @@ public interface PhieuGiamGiaRepository extends JpaRepository<PhieuGiamGia, Inte
     @Query("""
         SELECT COUNT(v) FROM PhieuGiamGia v
         WHERE v.trangThai = true
+        AND v.isActive = true
         AND v.ngayKetThuc >= CURRENT_TIMESTAMP
         AND v.ngayKetThuc <= :deadline
     """)
     long countExpiringSoon(@Param("deadline") LocalDateTime deadline);
+
+    @Query("""
+        SELECT v FROM PhieuGiamGia v
+        WHERE v.trangThai = true
+          AND v.isActive = true
+          AND v.soLuong > 0
+          AND v.ngayBatDau <= CURRENT_TIMESTAMP
+          AND v.ngayKetThuc >= CURRENT_TIMESTAMP
+          AND (:keyword IS NULL OR :keyword = ''
+              OR LOWER(v.ma) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              OR LOWER(v.ten) LIKE LOWER(CONCAT('%', :keyword, '%')))
+        ORDER BY v.ngayKetThuc ASC
+        """)
+    Page<PhieuGiamGia> findAvailableForCustomer(
+            @Param("keyword") String keyword,
+            Pageable pageable);
 }

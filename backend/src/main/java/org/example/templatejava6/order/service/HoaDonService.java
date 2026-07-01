@@ -83,6 +83,8 @@ public class HoaDonService {
 
     @Autowired private ThanhToanHoaDonRepository thanhToanHoaDonRepository;
 
+    @Autowired private GhnOrderCreationService ghnOrderCreationService;
+
 
 
     @Transactional(readOnly = true)
@@ -228,6 +230,22 @@ public class HoaDonService {
         hoaDonRepository.save(hd);
 
         ghiLichSuTrangThai(hd, trangThaiMoi, ghiChu, idNhanVien);
+
+        if (canTaoVanDonGhn(trangThaiMoi)) {
+
+            ghnOrderCreationService.taoVanDonNeuCan(hd);
+
+        }
+
+    }
+
+    private boolean canTaoVanDonGhn(TrangThaiDonHang trangThai) {
+
+        return trangThai == TrangThaiDonHang.DA_XAC_NHAN
+
+                || trangThai == TrangThaiDonHang.DANG_CHUAN_BI
+
+                || trangThai == TrangThaiDonHang.DANG_GIAO;
 
     }
 

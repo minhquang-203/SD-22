@@ -83,15 +83,31 @@
           </td>
           <td>
             <div class="actions-cell">
-              <button class="act-btn" title="Xem" @click="$emit('xem', phieu)">
-                <Icon icon="mdi:eye"></Icon>
-              </button>
               <button class="act-btn" title="Sửa" @click="$emit('sua', phieu)">
                 <Icon icon="mdi:pencil"></Icon>
               </button>
               <button
+                v-if="dangHoatDong(phieu)"
+                class="act-btn warn"
+                title="Dừng chương trình"
+                :disabled="processingId === phieu.id"
+                @click="$emit('dung', phieu)"
+              >
+                <Icon icon="mdi:pause-circle"></Icon>
+              </button>
+              <button
+                v-else
+                class="act-btn success"
+                title="Kích hoạt lại"
+                :disabled="processingId === phieu.id"
+                @click="$emit('kich-hoat', phieu)"
+              >
+                <Icon icon="mdi:play-circle"></Icon>
+              </button>
+              <button
                 class="act-btn danger"
                 title="Xóa"
+                :disabled="processingId === phieu.id"
                 @click="$emit('xoa', phieu)"
               >
                 <Icon icon="mdi:trash"></Icon>
@@ -111,9 +127,10 @@ import { Icon } from "@iconify/vue";
 const props = defineProps({
   items: { type: Array, required: true, default: () => [] },
   selected: { type: Array, default: () => [] },
+  processingId: { type: Number, default: null },
 });
 
-const emit = defineEmits(["xem", "sua", "xoa", "chon-tat-ca"]);
+const emit = defineEmits(["sua", "dung", "kich-hoat", "xoa", "chon-tat-ca"]);
 
 const toggleSelect = (id, e) => {
   if (e.target.checked) {
@@ -146,6 +163,9 @@ const formatNgay = (chuoi) => {
 };
 
 const tinhTrangThai = (phieu) => {
+  if (phieu.isActive === false || phieu.timeStatus === "INACTIVE") {
+    return "paused";
+  }
   const now = new Date();
   const batDau = new Date(phieu.ngayBatDau || "");
   const ketThuc = new Date(phieu.ngayKetThuc || "");
@@ -155,10 +175,12 @@ const tinhTrangThai = (phieu) => {
 };
 
 const tenTrangThai = (phieu) => {
+  if (phieu.timeStatusLabel) return phieu.timeStatusLabel;
   const map = {
     active: "Đang hoạt động",
     upcoming: "Sắp diễn ra",
     expired: "Đã hết hạn",
+    paused: "Ngừng áp dụng",
   };
   return map[tinhTrangThai(phieu)] || "Không xác định";
 };
@@ -172,6 +194,8 @@ const classStatusDot = (phieu) => {
   };
   return map[tinhTrangThai(phieu)] || "";
 };
+
+const dangHoatDong = (phieu) => phieu.isActive !== false;
 
 const tenLoai = (loai) => {
   const map = {

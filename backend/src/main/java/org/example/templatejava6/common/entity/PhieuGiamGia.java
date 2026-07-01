@@ -61,4 +61,8 @@ public class PhieuGiamGia {
     @Column(name = "trang_thai")
     private Boolean trangThai;
 
+    @ColumnDefault("1")
+    @Column(name = "is_active")
+    private Boolean isActive;
+
 }

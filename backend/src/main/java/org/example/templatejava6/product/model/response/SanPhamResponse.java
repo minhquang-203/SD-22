@@ -30,6 +30,14 @@ public class SanPhamResponse {
     private BigDecimal giaMax;
     private Long tongTon;
     private Long soBienThe;
+    /** Giá gốc min/max khi sản phẩm đang trong đợt giảm giá */
+    private BigDecimal giaGocMin;
+    private BigDecimal giaGocMax;
+    /** Giá sau giảm min/max */
+    private BigDecimal giaSauGiamMin;
+    private BigDecimal giaSauGiamMax;
+    /** Phần trăm giảm của đợt khuyến mãi đang áp dụng */
+    private BigDecimal phanTramGiam;
 
     public SanPhamResponse(SanPham sp) {
         this.id = sp.getId();

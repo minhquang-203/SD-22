@@ -22,6 +22,14 @@ export function deleteSale(id) {
   return request.delete(`/sale/${id}`)
 }
 
+export function stopSale(id) {
+  return request.put(`/sale/${id}/stop`)
+}
+
+export function activateSale(id) {
+  return request.put(`/sale/${id}/activate`)
+}
+
 export function getSaleProducts(id) {
   return request.get(`/sale/${id}/products`)
 }

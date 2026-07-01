@@ -67,6 +67,7 @@ function mergeLine(existing, payload, addQty) {
   existing.tenThuongHieu = payload.tenThuongHieu ?? existing.tenThuongHieu
   existing.giaBan = payload.giaBan ?? existing.giaBan
   existing.giaGoc = payload.giaGoc ?? existing.giaGoc
+  existing.phanTramGiam = payload.phanTramGiam ?? existing.phanTramGiam
   existing.anhUrl = payload.anhUrl ?? existing.anhUrl
   existing.tenMauSac = payload.tenMauSac ?? existing.tenMauSac
   existing.dungTichMl = payload.dungTichMl ?? existing.dungTichMl
@@ -99,6 +100,7 @@ function toCartLine(line) {
     anhUrl: line.anhUrl || line.anhChinhUrl || '',
     giaBan: Number(line.giaBan) || 0,
     giaGoc: line.giaGoc != null ? Number(line.giaGoc) : null,
+    phanTramGiam: line.phanTramGiam != null ? Number(line.phanTramGiam) : null,
   })
 }
 

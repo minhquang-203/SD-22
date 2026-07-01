@@ -19,7 +19,7 @@ import java.util.Optional;
 public class GhnTrackingService {
 
     private static final String GHN_ORDER_DETAIL_URL =
-            "https://online-gateway.ghn.vn/shiip/public-api/v2/shipping-order/detail";
+            "https://dev-online-gateway.ghn.vn/shiip/public-api/v2/shipping-order/detail";
 
     private final RestTemplate restTemplate;
     private final String token;

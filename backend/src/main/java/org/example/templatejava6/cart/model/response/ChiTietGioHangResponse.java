@@ -5,6 +5,7 @@ import lombok.Setter;
 import org.example.templatejava6.cart.entity.ChiTietGioHang;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
 import org.example.templatejava6.product.entity.SanPham;
+import org.example.templatejava6.voucher.model.response.VariantSaleInfo;
 
 import java.math.BigDecimal;
 
@@ -24,6 +25,7 @@ public class ChiTietGioHangResponse {
     private String anhUrl;
     private BigDecimal giaBan;
     private BigDecimal giaGoc;
+    private BigDecimal phanTramGiam;
     private Integer soLuongTon;
     private Integer soLuong;
     private BigDecimal thanhTien;
@@ -59,5 +61,15 @@ public class ChiTietGioHangResponse {
         this.thanhTien = this.giaBan.multiply(BigDecimal.valueOf(this.soLuong != null ? this.soLuong : 0L));
         this.trangThaiBienThe = chiTietSanPham != null ? chiTietSanPham.getTrangThai() : null;
         this.trangThaiSanPham = sanPham != null ? sanPham.getTrangThai() : null;
+    }
+
+    public void applySalePrice(VariantSaleInfo sale) {
+        if (sale == null || sale.getGiaSauGiam() == null) {
+            return;
+        }
+        this.giaGoc = sale.getGiaGoc() != null ? sale.getGiaGoc() : this.giaBan;
+        this.giaBan = sale.getGiaSauGiam();
+        this.phanTramGiam = sale.getPhanTramGiam();
+        this.thanhTien = this.giaBan.multiply(BigDecimal.valueOf(this.soLuong != null ? this.soLuong : 0L));
     }
 }

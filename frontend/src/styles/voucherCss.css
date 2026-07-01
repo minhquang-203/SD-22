@@ -290,6 +290,20 @@
   color: var(--coral);
   background: rgba(212, 98, 74, 0.06);
 }
+.act-btn.warn:hover {
+  border-color: var(--amber, #b45309);
+  color: var(--amber, #b45309);
+  background: rgba(180, 83, 9, 0.06);
+}
+.act-btn.success:hover {
+  border-color: var(--sage, #15803d);
+  color: var(--sage, #15803d);
+  background: rgba(21, 128, 61, 0.06);
+}
+.act-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 /* ── PAGINATION ── */
 .pagination-wrap {

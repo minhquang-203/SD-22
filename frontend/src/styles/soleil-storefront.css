@@ -818,6 +818,11 @@
   color: var(--sf-gold-light);
 }
 
+.sf-product-card__badge--sale {
+  background: #c0392b;
+  color: #fff;
+}
+
 .sf-product-card__badge--spf {
   top: auto;
   bottom: 10px;
@@ -855,6 +860,30 @@
   font-weight: 600;
   color: var(--sf-charcoal);
   margin: 0;
+}
+
+.sf-product-card__prices {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 0.45rem;
+}
+
+.sf-product-card__price--sale {
+  color: #c0392b;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.sf-product-card__price--original {
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--sf-light-mid);
+  text-decoration: line-through;
+  line-height: 1;
+  transform: translateY(2px);
+  opacity: 0.85;
 }
 
 .sf-product-card__quick-add {
@@ -1203,10 +1232,51 @@
   opacity: 0.25;
 }
 
+.sf-pdp__price-wrap {
+  margin: 0 0 1.5rem;
+}
+
+.sf-pdp__sale-badge {
+  display: inline-block;
+  margin-bottom: 0.45rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #c0392b;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.sf-pdp__prices {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 0.55rem;
+}
+
 .sf-pdp__price {
   font-size: 1.5rem;
   font-weight: 700;
   margin: 0 0 1.5rem;
+}
+
+.sf-pdp__price-wrap .sf-pdp__price {
+  margin: 0;
+}
+
+.sf-pdp__price--sale {
+  color: #c0392b;
+}
+
+.sf-pdp__price--original {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--sf-light-mid);
+  text-decoration: line-through;
+  transform: translateY(2px);
+  opacity: 0.85;
 }
 
 .sf-pdp__option {
@@ -2999,7 +3069,17 @@
 .sf-cart-line__prices {
   display: flex;
   align-items: baseline;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0 0.45rem;
+}
+
+.sf-cart-line__sale-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #c0392b;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
 }
 
 .sf-cart-line__price {
@@ -3007,10 +3087,16 @@
   color: var(--sf-espresso);
 }
 
+.sf-cart-line__price--sale {
+  color: #c0392b;
+}
+
 .sf-cart-line__price-old {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: var(--sf-light-mid);
   text-decoration: line-through;
+  transform: translateY(2px);
+  opacity: 0.85;
 }
 
 .sf-cart-line__actions {

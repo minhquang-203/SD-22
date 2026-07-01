@@ -10,6 +10,7 @@ import {
   fetchCongDungList,
   fetchDanhMucList,
   fetchProductDetail,
+  fetchSaleProducts,
   fetchThuongHieuList,
   searchProducts,
 } from '@/api/storefrontApi'
@@ -38,6 +39,7 @@ const priceMaxInput = ref('')
 const appliedPriceMin = ref('')
 const appliedPriceMax = ref('')
 const filterNoiBat = ref(false)
+const isKhuyenMaiPage = computed(() => route.path === '/san-pham/khuyen-mai')
 const sortBy = ref('newest')
 const priceAsc = ref(true)
 const viewMode = ref('grid')
@@ -76,11 +78,14 @@ async function loadMeta() {
 async function loadProducts() {
   loading.value = true
   try {
-    if (searchQuery.value.trim()) {
-      const res = await searchProducts(searchQuery.value.trim())
+    if (isKhuyenMaiPage.value) {
+      const res = await fetchSaleProducts()
+      allProducts.value = activeProducts(res.data || [])
+    } else if (searchQuery.value.trim()) {
+      const res = await searchProducts(searchQuery.value.trim(), { excludeKhuyenMai: true })
       allProducts.value = activeProducts(res.data || [])
     } else {
-      const res = await fetchAllProducts()
+      const res = await fetchAllProducts({ excludeKhuyenMai: true })
       allProducts.value = activeProducts(res.data || [])
     }
   } catch (e) {
@@ -116,6 +121,9 @@ function applyRouteQuery() {
 const keywordFromRoute = computed(() => (route.query.q ? String(route.query.q) : ''))
 
 const pageTitle = computed(() => {
+  if (isKhuyenMaiPage.value) {
+    return 'Sản phẩm khuyến mãi'
+  }
   if (keywordFromRoute.value) {
     return `Kết quả tìm kiếm từ khóa "${keywordFromRoute.value}"`
   }
@@ -229,7 +237,7 @@ function resetFilters() {
   filterNoiBat.value = false
   searchQuery.value = ''
   page.value = 1
-  router.replace({ path: '/san-pham' })
+  router.replace({ path: isKhuyenMaiPage.value ? '/san-pham/khuyen-mai' : '/san-pham' })
 }
 
 watch([selectedCongDung, selectedLoaiDa], () => {
@@ -237,15 +245,16 @@ watch([selectedCongDung, selectedLoaiDa], () => {
 }, { deep: true })
 
 watch(
-  () => route.query,
+  () => [route.path, route.query],
   () => {
     applyRouteQuery()
     page.value = 1
-    if (route.query.q) loadProducts()
+    loadProducts()
   },
 )
 
 watch(searchQuery, () => {
+  if (isKhuyenMaiPage.value) return
   clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
     page.value = 1
@@ -274,7 +283,7 @@ onMounted(async () => {
         <nav class="sf-breadcrumb sf-breadcrumb--light">
           <RouterLink to="/">Trang chủ</RouterLink>
           <span>/</span>
-          <span>Sản phẩm</span>
+          <span>{{ isKhuyenMaiPage ? 'Khuyến mãi' : 'Sản phẩm' }}</span>
         </nav>
         <h1 class="sf-plp__title">{{ pageTitle }}</h1>
         <div class="sf-plp__result-tabs">
@@ -391,7 +400,7 @@ onMounted(async () => {
           />
         </div>
         <div v-else class="sf-empty-state">
-          <p>Không tìm thấy sản phẩm phù hợp.</p>
+          <p>{{ isKhuyenMaiPage ? 'Hiện chưa có sản phẩm trong đợt khuyến mãi đang hoạt động.' : 'Không tìm thấy sản phẩm phù hợp.' }}</p>
           <button type="button" class="btn-soleil-outline" @click="resetFilters">Xóa bộ lọc</button>
         </div>
 

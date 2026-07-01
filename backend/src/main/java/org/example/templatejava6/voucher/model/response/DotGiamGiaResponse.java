@@ -18,6 +18,7 @@ public class DotGiamGiaResponse {
     private LocalDateTime ngayBatDau;
     private LocalDateTime ngayKetThuc;
     private Boolean trangThai;
+    private Boolean isActive;
     private String timeStatus;
     private String timeStatusLabel;
 
@@ -29,11 +30,12 @@ public class DotGiamGiaResponse {
         this.ngayBatDau = dgg.getNgayBatDau();
         this.ngayKetThuc = dgg.getNgayKetThuc();
         this.trangThai = dgg.getTrangThai();
+        this.isActive = dgg.getIsActive();
         resolveTimeStatus(dgg);
     }
 
     private void resolveTimeStatus(DotGiamGia dgg) {
-        if (!Boolean.TRUE.equals(dgg.getTrangThai())) {
+        if (!Boolean.TRUE.equals(dgg.getIsActive())) {
             this.timeStatus = "INACTIVE";
             this.timeStatusLabel = "Ngừng áp dụng";
             return;

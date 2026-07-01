@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
-import { getHoaDonDetail, getLichSu } from '@/api/hoaDonApi'
+import { getHoaDonDetail, getLichSu, taoVanDonGhn, dongBoGhn } from '@/api/hoaDonApi'
 import { formatCurrency } from '@/utils/format'
 
 const route = useRoute()
@@ -13,6 +13,53 @@ const loading = ref(false)
 const error = ref('')
 const detail = ref(null)
 const lichSu = ref([])
+
+const ghnLoading = ref(false)
+const ghnMessage = ref('')
+const ghnMessageType = ref('success')
+
+const TRANG_THAI_KET_THUC = new Set(['HOAN_THANH', 'DA_HUY'])
+
+const coTheTaoVanDon = computed(
+  () =>
+    detail.value &&
+    !detail.value.maVanDonGhn &&
+    !TRANG_THAI_KET_THUC.has(detail.value.trangThai),
+)
+
+function notifyGhn(text, type = 'success') {
+  ghnMessage.value = text
+  ghnMessageType.value = type
+  setTimeout(() => { ghnMessage.value = '' }, 5000)
+}
+
+async function handleTaoVanDon() {
+  if (!orderId.value) return
+  ghnLoading.value = true
+  try {
+    const res = await taoVanDonGhn(orderId.value)
+    notifyGhn(res.data?.thongDiep || 'Đã tạo vận đơn GHN', res.data?.thanhCong ? 'success' : 'error')
+    await loadDetail()
+  } catch (err) {
+    notifyGhn(typeof err === 'string' ? err : 'Không tạo được vận đơn GHN', 'error')
+  } finally {
+    ghnLoading.value = false
+  }
+}
+
+async function handleDongBoGhn() {
+  if (!orderId.value) return
+  ghnLoading.value = true
+  try {
+    const res = await dongBoGhn(orderId.value)
+    notifyGhn(res.data?.thongDiep || 'Đã đồng bộ trạng thái GHN', 'success')
+    await loadDetail()
+  } catch (err) {
+    notifyGhn(typeof err === 'string' ? err : 'Không đồng bộ được trạng thái GHN', 'error')
+  } finally {
+    ghnLoading.value = false
+  }
+}
 
 const orderId = computed(() => {
   const id = route.params.id
@@ -185,6 +232,57 @@ onMounted(() => loadDetail())
             In hóa đơn
           </button>
         </div>
+        </section>
+
+        <section class="soleil-card hoa-don-ghn no-print">
+          <div class="hoa-don-ghn__head">
+            <h2 class="hoa-don-section-title" style="margin: 0">
+              <Icon icon="mdi:truck-delivery-outline" width="18" class="hoa-don-ghn__title-icon" />
+              Vận chuyển (Giao Hàng Nhanh)
+            </h2>
+            <div class="hoa-don-ghn__actions">
+              <button
+                v-if="coTheTaoVanDon"
+                type="button"
+                class="soleil-btn-outline"
+                :disabled="ghnLoading"
+                @click="handleTaoVanDon"
+              >
+                <Icon icon="mdi:package-variant-closed-plus" />
+                {{ ghnLoading ? 'Đang xử lý...' : 'Tạo vận đơn GHN' }}
+              </button>
+              <button
+                v-if="detail.maVanDonGhn"
+                type="button"
+                class="soleil-btn-outline"
+                :disabled="ghnLoading"
+                @click="handleDongBoGhn"
+              >
+                <Icon icon="icon-park-outline:refresh" />
+                {{ ghnLoading ? 'Đang xử lý...' : 'Đồng bộ trạng thái' }}
+              </button>
+            </div>
+          </div>
+
+          <div
+            v-if="ghnMessage"
+            class="admin-alert rounded-lg px-4 py-2 mt-3 text-sm"
+            :class="ghnMessageType === 'error' ? 'admin-alert-error' : 'admin-alert-success'"
+          >
+            {{ ghnMessage }}
+          </div>
+
+          <p v-if="detail.maVanDonGhn" class="hoa-don-ghn__code">
+            Mã vận đơn: <span class="soleil-sp-code">{{ detail.maVanDonGhn }}</span>
+          </p>
+          <p v-else class="hoa-don-ghn__hint">
+            <template v-if="coTheTaoVanDon">
+              Đơn chưa có vận đơn GHN. Bấm "Tạo vận đơn GHN" để gửi sang GHN và lấy mã vận đơn.
+            </template>
+            <template v-else>
+              Đơn ở trạng thái này không thể tạo vận đơn GHN.
+            </template>
+          </p>
         </section>
 
         <div class="hoa-don-detail-grid">
@@ -383,6 +481,35 @@ onMounted(() => loadDetail())
   font-size: 1.75rem;
   font-weight: 600;
   color: var(--bronze, #a67c3d);
+}
+
+.hoa-don-ghn {
+  margin-top: 1.5rem;
+}
+.hoa-don-ghn__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.hoa-don-ghn__title-icon {
+  vertical-align: -3px;
+  margin-right: 0.35rem;
+}
+.hoa-don-ghn__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.hoa-don-ghn__code {
+  margin-top: 0.85rem;
+  font-size: 0.9rem;
+}
+.hoa-don-ghn__hint {
+  margin-top: 0.85rem;
+  font-size: 0.85rem;
+  color: var(--admin-muted);
 }
 
 .hoa-don-detail-grid {

@@ -60,6 +60,16 @@ public class DotGiamGiaController {
         dotGiamGiaService.delete(id);
     }
 
+    @PutMapping("/{id}/stop")
+    public void stop(@PathVariable("id") Integer id) {
+        dotGiamGiaService.stop(id);
+    }
+
+    @PutMapping("/{id}/activate")
+    public void activate(@PathVariable("id") Integer id) {
+        dotGiamGiaService.activate(id);
+    }
+
     @GetMapping("/{id}/products")
     public List<ChiTietDotGiamGiaResponse> getProducts(@PathVariable("id") Integer id) {
         return chiTietDotGiamGiaService.getByDotGiamGia(id);

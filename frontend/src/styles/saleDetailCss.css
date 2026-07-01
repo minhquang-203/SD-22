@@ -971,8 +971,19 @@
   margin: 0.75rem 0 0;
 }
 
-/* Modal */
+/* Modal — Teleport ra body nên khai báo token tại overlay */
 .sd-modal-overlay {
+  --sd-cream: #f9f5f0;
+  --sd-ivoire: #F7F4EF;
+  --sd-navy: #1A1A2E;
+  --sd-navy-light: #2D2D4A;
+  --sd-or-sable: #C8A96E;
+  --sd-beige: #E8DDD0;
+  --sd-corail: #D4624A;
+  --sd-or-pale: #F0E8D8;
+  --sd-font-display: 'Cormorant Garamond', Georgia, serif;
+  --sd-font-body: 'Inter', system-ui, sans-serif;
+
   position: fixed;
   inset: 0;
   z-index: var(--admin-z-modal, 5000);
@@ -980,24 +991,30 @@
   align-items: center;
   justify-content: center;
   padding: 1rem;
-}
-
-.sd-modal-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(26, 26, 46, 0.4);
+  background: rgba(26, 26, 46, 0.45);
   backdrop-filter: blur(4px);
+  font-family: var(--sd-font-body);
+  font-size: 14px;
+  color: var(--sd-navy);
+  -webkit-font-smoothing: antialiased;
 }
 
 .sd-modal {
   position: relative;
+  z-index: 1;
   background: #fff;
+  border: 1px solid var(--sd-beige);
   border-radius: 1rem;
   width: 100%;
   max-width: 36rem;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  max-height: min(90vh, 720px);
+  display: flex;
+  flex-direction: column;
+  box-shadow:
+    0 4px 24px rgba(26, 26, 46, 0.08),
+    0 25px 50px -12px rgba(0, 0, 0, 0.25);
   overflow: hidden;
-  animation: sdFadeIn 0.4s ease forwards;
+  animation: sdFadeIn 0.35s ease forwards;
 }
 
 .sd-modal__header {
@@ -1019,9 +1036,10 @@
 .sd-modal__title {
   font-family: var(--sd-font-display);
   font-size: 1.25rem;
-  font-weight: 300;
+  font-weight: 400;
   color: var(--sd-ivoire);
   margin: 0;
+  letter-spacing: 0.01em;
 }
 
 .sd-modal__close {
@@ -1043,10 +1061,14 @@
 }
 
 .sd-modal__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  background: #fff;
 }
 
 .sd-form-label {
@@ -1124,9 +1146,9 @@
 }
 
 .sd-product-picker__list {
-  max-height: 12rem;
+  max-height: 16rem;
   overflow-y: auto;
-  scrollbar-width: none;
+  scrollbar-width: thin;
 }
 
 .sd-product-picker__list::-webkit-scrollbar {
@@ -1185,10 +1207,14 @@
 }
 
 .sd-modal__footer {
-  padding: 0 1.5rem 1.5rem;
+  flex-shrink: 0;
+  padding: 1rem 1.5rem 1.5rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid var(--sd-beige);
+  background: var(--sd-ivoire);
 }
 
 .sd-modal__footer-note {

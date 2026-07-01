@@ -37,6 +37,14 @@ export function deleteVoucher(id) {
   return request.delete(`/vouchers/${id}`);
 }
 
+export function stopVoucher(id) {
+  return request.put(`/vouchers/${id}/stop`);
+}
+
+export function activateVoucher(id) {
+  return request.put(`/vouchers/${id}/activate`);
+}
+
 export function getVoucherStats() {
   return request.get("/vouchers/stats");
 }

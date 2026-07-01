@@ -11,6 +11,7 @@ import { toast } from '@/composables/useToast'
 import { formatVND } from '@/utils/formatVND'
 import { getPhoneValidationError, normalizePhoneDigits } from '@/utils/phone'
 import { productImageUrl } from '@/utils/productImage'
+import CheckoutVoucherModal from '@/components/storefront/CheckoutVoucherModal.vue'
 
 const SHIPPING_FEE = 30000
 const FREE_SHIPPING_FROM = 500000
@@ -59,6 +60,7 @@ const ghnFee = ref(null)
 const feeLoading = ref(false)
 const feeNotice = ref('')
 const fieldErrors = reactive({ soDienThoai: '' })
+const showVoucherModal = ref(false)
 
 const paymentMethods = [
   {
@@ -83,6 +85,7 @@ const shippingFee = computed(() => {
 const estimatedTotal = computed(() => selectedSubtotal.value + shippingFee.value)
 const isFreeShipping = computed(() => selectedSubtotal.value >= FREE_SHIPPING_FROM)
 const hasSelectedCartItems = computed(() => selectedItems.value.length > 0)
+const hasSaleItemsInCart = computed(() => selectedSavings.value > 0)
 
 const showCheckoutForm = computed(
   () => !showSuccess.value && !showFailure.value,
@@ -226,7 +229,6 @@ async function recalcShippingFee() {
     const res = await calcShippingFee({
       toDistrictId: form.districtId,
       toWardCode: form.wardCode,
-      insuranceValue: selectedSubtotal.value,
     })
     ghnFee.value = typeof res.data?.total === 'number' ? res.data.total : null
     feeNotice.value = res.data?.fromGhn ? '' : res.data?.message || ''
@@ -265,6 +267,18 @@ function validateCheckout() {
     return 'Giỏ hàng chưa đồng bộ. Vui lòng tải lại giỏ hàng rồi thử lại'
   }
   return ''
+}
+
+function openVoucherModal() {
+  showVoucherModal.value = true
+}
+
+function onVoucherSelected(code) {
+  form.maPhieuGiamGia = code || ''
+}
+
+function clearVoucher() {
+  form.maPhieuGiamGia = ''
 }
 
 function parsePaymentCallback() {
@@ -313,6 +327,10 @@ async function submitCheckout() {
       diaChiGiao,
       phiVanChuyen: shippingFee.value,
       ghiChu: compactText(noteParts.join(' | ')),
+      tenNguoiNhan: form.hoTen.trim(),
+      sdtNguoiNhan: form.soDienThoai.trim(),
+      toDistrictId: form.districtId,
+      toWardCode: form.wardCode,
     })
 
     orderResult.value = res.data
@@ -574,17 +592,45 @@ onMounted(() => {
               <span><Icon icon="solar:ticket-sale-linear" width="18" /></span>
               Mã giảm giá
             </h2>
-            <label class="sf-checkout-voucher">
+            <div
+              role="button"
+              tabindex="0"
+              class="sf-checkout-voucher"
+              @click="openVoucherModal"
+              @keydown.enter.prevent="openVoucherModal"
+              @keydown.space.prevent="openVoucherModal"
+            >
               <Icon icon="solar:ticket-linear" width="18" />
-              <input
-                v-model.trim="form.maPhieuGiamGia"
-                type="text"
-                placeholder="Nhập mã voucher nếu có"
-                autocomplete="off"
-              />
-            </label>
-            <p class="sf-checkout-hint">Mã giảm giá sẽ được hệ thống kiểm tra khi đặt hàng.</p>
+              <span
+                class="sf-checkout-voucher__value"
+                :class="{ 'sf-checkout-voucher__value--empty': !form.maPhieuGiamGia }"
+              >
+                {{ form.maPhieuGiamGia || 'Chọn hoặc tìm mã voucher' }}
+              </span>
+              <button
+                v-if="form.maPhieuGiamGia"
+                type="button"
+                class="sf-checkout-voucher__clear"
+                aria-label="Bỏ mã giảm giá"
+                @click.stop="clearVoucher"
+              >
+                <Icon icon="solar:close-circle-linear" width="18" />
+              </button>
+              <Icon icon="solar:alt-arrow-right-linear" width="16" class="sf-checkout-voucher__arrow" />
+            </div>
+            <p v-if="hasSaleItemsInCart" class="sf-checkout-hint sf-checkout-hint--warn">
+              Đơn có sản phẩm đang giảm giá nên không thể áp dụng mã voucher.
+            </p>
+            <p v-else class="sf-checkout-hint">Chọn voucher từ danh sách hoặc tìm theo mã. Mã sẽ được kiểm tra khi đặt hàng.</p>
           </section>
+
+          <CheckoutVoucherModal
+            v-model:visible="showVoucherModal"
+            :selected-code="form.maPhieuGiamGia"
+            :subtotal="selectedSubtotal"
+            :has-sale-items="hasSaleItemsInCart"
+            @select="onVoucherSelected"
+          />
 
           <section class="sf-checkout-card">
             <h2 class="sf-checkout-card__title">

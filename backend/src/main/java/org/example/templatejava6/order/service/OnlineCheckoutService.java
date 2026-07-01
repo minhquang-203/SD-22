@@ -7,7 +7,6 @@ import org.example.templatejava6.cart.repository.GioHangRepository;
 import org.example.templatejava6.common.entity.KhachHang;
 import org.example.templatejava6.common.entity.PhieuGiamGia;
 import org.example.templatejava6.common.entity.PhuongThucThanhToan;
-import org.example.templatejava6.common.enums.LoaiPhieuGiamGia;
 import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.customer.repository.KhachHangRepository;
@@ -31,12 +30,12 @@ import org.example.templatejava6.payment.model.response.TaoThanhToanResponse;
 import org.example.templatejava6.payment.service.PaymentService;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
 import org.example.templatejava6.product.service.LoHangService;
+import org.example.templatejava6.voucher.model.response.VariantSaleInfo;
 import org.example.templatejava6.voucher.repository.PhieuGiamGiaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
@@ -67,6 +66,8 @@ public class OnlineCheckoutService {
     private final LoHangService loHangService;
     private final PaymentService paymentService;
     private final OnlineOrderLifecycleService onlineOrderLifecycleService;
+    private final GhnOrderCreationService ghnOrderCreationService;
+    private final CheckoutPricingService checkoutPricingService;
 
     public OnlineCheckoutService(
             GioHangRepository gioHangRepository,
@@ -80,7 +81,9 @@ public class OnlineCheckoutService {
             PhieuGiamGiaRepository phieuGiamGiaRepository,
             LoHangService loHangService,
             PaymentService paymentService,
-            OnlineOrderLifecycleService onlineOrderLifecycleService) {
+            OnlineOrderLifecycleService onlineOrderLifecycleService,
+            GhnOrderCreationService ghnOrderCreationService,
+            CheckoutPricingService checkoutPricingService) {
         this.gioHangRepository = gioHangRepository;
         this.chiTietGioHangRepository = chiTietGioHangRepository;
         this.khachHangRepository = khachHangRepository;
@@ -93,6 +96,8 @@ public class OnlineCheckoutService {
         this.loHangService = loHangService;
         this.paymentService = paymentService;
         this.onlineOrderLifecycleService = onlineOrderLifecycleService;
+        this.ghnOrderCreationService = ghnOrderCreationService;
+        this.checkoutPricingService = checkoutPricingService;
     }
 
     @Transactional
@@ -108,11 +113,18 @@ public class OnlineCheckoutService {
         GioHang gioHang = gioHangRepository.findFirstByKhachHang_IdOrderByIdAsc(khachHang.getId())
                 .orElseThrow(() -> new ApiException("Khách hàng chưa có giỏ hàng.", "EMPTY_CART"));
         List<ChiTietGioHang> selectedItems = resolveSelectedCartItems(gioHang, request.getIdsChiTietGioHang());
-        List<LineCalc> lines = buildLines(selectedItems);
+        Map<Integer, VariantSaleInfo> saleMap = checkoutPricingService.loadActiveSales();
+        List<LineCalc> lines = buildLines(selectedItems, saleMap);
         BigDecimal tongTien = sumTongTien(lines);
 
         PhieuGiamGia phieu = resolvePhieu(request.getMaPhieuGiamGia());
-        BigDecimal tienGiamGia = phieu != null ? tinhTienGiam(phieu, tongTien) : BigDecimal.ZERO;
+        BigDecimal tienGiamGia = BigDecimal.ZERO;
+        if (phieu != null) {
+            List<Integer> variantIds = lines.stream()
+                    .map(line -> line.chiTietSanPham().getId())
+                    .toList();
+            tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien, variantIds, saleMap);
+        }
         BigDecimal phiVanChuyen = request.getPhiVanChuyen() != null ? request.getPhiVanChuyen() : BigDecimal.ZERO;
         BigDecimal thanhTien = tongTien.subtract(tienGiamGia).add(phiVanChuyen);
         if (thanhTien.compareTo(BigDecimal.ZERO) < 0) {
@@ -128,8 +140,10 @@ public class OnlineCheckoutService {
         hoaDon.setLoaiDon(LOAI_DON_ONLINE);
         hoaDon.setTrangThai(MA_COD.equals(maPhuongThuc) ? TrangThaiDonHang.DA_XAC_NHAN : TrangThaiDonHang.CHO_XAC_NHAN);
         hoaDon.setDiaChiGiao(request.getDiaChiGiao().trim());
-        hoaDon.setTenNguoiNhan(khachHang.getHoTen());
-        hoaDon.setSdtNguoiNhan(khachHang.getSoDienThoai());
+        hoaDon.setTenNguoiNhan(coGiaTri(request.getTenNguoiNhan()) ? request.getTenNguoiNhan().trim() : khachHang.getHoTen());
+        hoaDon.setSdtNguoiNhan(coGiaTri(request.getSdtNguoiNhan()) ? request.getSdtNguoiNhan().trim() : khachHang.getSoDienThoai());
+        hoaDon.setGhnDistrictId(request.getToDistrictId());
+        hoaDon.setGhnWardCode(coGiaTri(request.getToWardCode()) ? request.getToWardCode().trim() : null);
         hoaDon.setTongTien(tongTien);
         hoaDon.setTienGiamGia(tienGiamGia);
         hoaDon.setPhiVanChuyen(phiVanChuyen);
@@ -161,6 +175,7 @@ public class OnlineCheckoutService {
         if (MA_COD.equals(maPhuongThuc)) {
             taoThanhToanCod(hoaDon, phuongThuc, now);
             ghiNhatKy(hoaDon, "DA_XAC_NHAN", "Đơn COD đã được ghi nhận, chờ giao hàng");
+            ghnOrderCreationService.taoVanDonNeuCan(hoaDon);
         } else {
             TaoThanhToanRequest paymentRequest = new TaoThanhToanRequest();
             paymentRequest.setIdHoaDon(hoaDon.getId());
@@ -217,7 +232,7 @@ public class OnlineCheckoutService {
         return selected;
     }
 
-    private List<LineCalc> buildLines(List<ChiTietGioHang> cartItems) {
+    private List<LineCalc> buildLines(List<ChiTietGioHang> cartItems, Map<Integer, VariantSaleInfo> saleMap) {
         if (cartItems.isEmpty()) {
             throw new ApiException("Vui lòng chọn ít nhất một sản phẩm để thanh toán.", "EMPTY_SELECTION");
         }
@@ -226,7 +241,10 @@ public class OnlineCheckoutService {
             ChiTietSanPham chiTietSanPham = item.getChiTietSanPham();
             validateChiTietSanPham(chiTietSanPham, item.getSoLuong());
             int soLuong = item.getSoLuong();
-            BigDecimal donGia = chiTietSanPham.getGiaBan();
+            BigDecimal donGia = checkoutPricingService.resolveDonGia(chiTietSanPham, saleMap);
+            if (donGia == null || donGia.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new ApiException("Giá bán SKU " + chiTietSanPham.getSku() + " không hợp lệ.", "INVALID_PRICE");
+            }
             LineCalc existing = lines.get(chiTietSanPham.getId());
             if (existing != null) {
                 soLuong += existing.soLuong();
@@ -278,44 +296,6 @@ public class OnlineCheckoutService {
         }
         return phieuGiamGiaRepository.findByMa(maPhieuGiamGia.trim())
                 .orElseThrow(() -> new ApiException("Mã giảm giá không tồn tại.", "INVALID_VOUCHER"));
-    }
-
-    private BigDecimal tinhTienGiam(PhieuGiamGia phieu, BigDecimal tongTien) {
-        if (!Boolean.TRUE.equals(phieu.getTrangThai())) {
-            throw new ApiException("Mã giảm giá không còn hiệu lực.", "INVALID_VOUCHER");
-        }
-        LocalDateTime now = LocalDateTime.now();
-        if (phieu.getNgayBatDau() != null && now.isBefore(phieu.getNgayBatDau())) {
-            throw new ApiException("Mã giảm giá chưa đến thời gian áp dụng.", "INVALID_VOUCHER");
-        }
-        if (phieu.getNgayKetThuc() != null && now.isAfter(phieu.getNgayKetThuc())) {
-            throw new ApiException("Mã giảm giá đã hết hạn.", "INVALID_VOUCHER");
-        }
-        if (phieu.getSoLuong() == null || phieu.getSoLuong() <= 0) {
-            throw new ApiException("Mã giảm giá đã hết lượt sử dụng.", "INVALID_VOUCHER");
-        }
-        BigDecimal donToiThieu = phieu.getGiaTriDonToiThieu() != null
-                ? phieu.getGiaTriDonToiThieu()
-                : BigDecimal.ZERO;
-        if (tongTien.compareTo(donToiThieu) < 0) {
-            throw new ApiException(
-                    "Đơn hàng chưa đạt giá trị tối thiểu " + donToiThieu.toPlainString() + "đ.",
-                    "INVALID_VOUCHER");
-        }
-
-        BigDecimal giam;
-        if (phieu.getLoai() == LoaiPhieuGiamGia.PHAN_TRAM) {
-            giam = tongTien.multiply(phieu.getGiaTri())
-                    .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
-            if (phieu.getGiamToiDa() != null && giam.compareTo(phieu.getGiamToiDa()) > 0) {
-                giam = phieu.getGiamToiDa();
-            }
-        } else if (phieu.getLoai() == LoaiPhieuGiamGia.TIEN_MAT) {
-            giam = phieu.getGiaTri();
-        } else {
-            throw new ApiException("Loại mã giảm giá không hợp lệ.", "INVALID_VOUCHER");
-        }
-        return giam.compareTo(tongTien) > 0 ? tongTien : giam;
     }
 
     private void taoThanhToanCod(HoaDon hoaDon, PhuongThucThanhToan phuongThuc, LocalDateTime now) {
@@ -374,6 +354,10 @@ public class OnlineCheckoutService {
 
     private String normalize(String value) {
         return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private boolean coGiaTri(String value) {
+        return value != null && !value.isBlank();
     }
 
     private void ghiNhatKy(HoaDon hoaDon, String trangThai, String ghiChu) {

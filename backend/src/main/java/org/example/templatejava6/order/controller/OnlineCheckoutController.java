@@ -2,12 +2,18 @@ package org.example.templatejava6.order.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.example.templatejava6.common.util.PaginationUtil;
 import org.example.templatejava6.order.model.request.HuyDonOnlineRequest;
 import org.example.templatejava6.order.model.request.OnlineCheckoutRequest;
 import org.example.templatejava6.order.model.response.HoaDonDetailResponse;
 import org.example.templatejava6.order.model.response.HoaDonResponse;
 import org.example.templatejava6.order.model.response.OnlineCheckoutResponse;
 import org.example.templatejava6.order.service.OnlineCheckoutService;
+import org.example.templatejava6.voucher.model.response.PhieuGiamGiaResponse;
+import org.example.templatejava6.voucher.service.PhieuGiamGiaService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,9 +30,22 @@ import java.util.List;
 public class OnlineCheckoutController {
 
     private final OnlineCheckoutService onlineCheckoutService;
+    private final PhieuGiamGiaService phieuGiamGiaService;
 
-    public OnlineCheckoutController(OnlineCheckoutService onlineCheckoutService) {
+    public OnlineCheckoutController(
+            OnlineCheckoutService onlineCheckoutService,
+            PhieuGiamGiaService phieuGiamGiaService) {
         this.onlineCheckoutService = onlineCheckoutService;
+        this.phieuGiamGiaService = phieuGiamGiaService;
+    }
+
+    @GetMapping("/vouchers")
+    public ResponseEntity<Page<PhieuGiamGiaResponse>> danhSachVoucher(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Pageable pageable = PaginationUtil.create(page, size);
+        return ResponseEntity.ok(phieuGiamGiaService.listAvailableForCustomer(keyword, pageable));
     }
 
     @PostMapping("/checkout")

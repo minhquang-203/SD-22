@@ -13,5 +13,9 @@ export const getHoaDonDetail = (id) => request.get(`/hoa-don/${id}`)
 export const capNhatTrangThai = (id, payload) =>
   request.patch(`/hoa-don/${id}/status`, payload)
 
+export const taoVanDonGhn = (id) => request.post(`/hoa-don/${id}/tao-van-don-ghn`)
+
+export const dongBoGhn = (id) => request.post(`/hoa-don/${id}/dong-bo-ghn`)
+
 export const getLichSu = (idHoaDon) =>
   request.get('/lich-su-don-hang/hoa-don', { params: { idHoaDon } })

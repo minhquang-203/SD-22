@@ -426,6 +426,23 @@
   border-color: transparent;
 }
 
+.sale-page .icon-btn.warn:hover {
+  background: #fef3c7;
+  color: #b45309;
+  border-color: transparent;
+}
+
+.sale-page .icon-btn.success:hover {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: transparent;
+}
+
+.sale-page .icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .sale-page .empty-state {
   padding: 48px;
   text-align: center;
@@ -479,21 +496,17 @@
   cursor: not-allowed;
 }
 
-.sale-page .modal-overlay {
-  display: none;
+.sale-page .sale-modal-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(15,15,15,.45);
   z-index: var(--admin-z-modal, 5000);
+  display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.sale-page .modal-overlay.open {
-  display: flex;
-}
-
-.sale-page .modal {
+.sale-page .sale-modal {
   background: var(--sale-surface);
   border-radius: var(--sale-radius-xl);
   width: 560px;

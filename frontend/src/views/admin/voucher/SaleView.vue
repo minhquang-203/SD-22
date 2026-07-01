@@ -84,7 +84,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="loading">
+          <tr v-if="initialLoading">
             <td colspan="6">
               <div class="empty-state">
                 <i class="ti ti-loader-2"></i>
@@ -117,10 +117,30 @@
                   <button class="icon-btn" title="Chỉnh sửa" @click.stop="openEdit(c)">
                     <i class="ti ti-edit"></i>
                   </button>
-                  <button class="icon-btn" title="Sao chép mã" @click.stop="copyCode(c.code)">
-                    <i class="ti ti-copy"></i>
+                  <button
+                    v-if="dangHoatDong(c)"
+                    class="icon-btn warn"
+                    title="Dừng chương trình"
+                    :disabled="processingId === c.id"
+                    @click.stop="stopRow(c.id)"
+                  >
+                    <i class="ti ti-player-pause"></i>
                   </button>
-                  <button class="icon-btn danger" title="Xóa" @click.stop="deleteRow(c.id)">
+                  <button
+                    v-else
+                    class="icon-btn success"
+                    title="Kích hoạt lại"
+                    :disabled="processingId === c.id"
+                    @click.stop="activateRow(c.id)"
+                  >
+                    <i class="ti ti-player-play"></i>
+                  </button>
+                  <button
+                    class="icon-btn danger"
+                    title="Xóa"
+                    :disabled="processingId === c.id"
+                    @click.stop="deleteRow(c.id)"
+                  >
                     <i class="ti ti-trash"></i>
                   </button>
                 </div>
@@ -162,8 +182,8 @@
     </div>
 
     <!-- Create Modal -->
-    <div class="modal-overlay" :class="{ open: modalOpen }" @click.self="closeModal">
-      <div class="modal" role="dialog" aria-modal="true">
+    <div v-if="modalOpen" class="sale-modal-backdrop" @click.self="closeModal">
+      <div class="sale-modal" role="dialog" aria-modal="true">
         <div class="modal-header">
           <h2 class="modal-title">{{ editingId ? 'Cập nhật đợt giảm giá' : 'Tạo đợt giảm giá mới' }}</h2>
           <button class="icon-btn" @click="closeModal"><i class="ti ti-x"></i></button>
@@ -192,7 +212,7 @@
             </div>
             <div class="form-group full">
               <label>Ghi chú nội bộ</label>
-              <textarea placeholder="Backend hiện quản lý sản phẩm áp dụng bằng API chi tiết đợt giảm giá."></textarea>
+              <textarea placeholder=""></textarea>
             </div>
           </div>
         </div>
@@ -210,9 +230,11 @@
 
 <script setup>
 
+import '@/styles/saleCss.css'
+
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { createSale, deleteSale, searchSale, updateSale } from '@/api/saleApi.js'
+import { createSale, deleteSale, searchSale, stopSale, activateSale, updateSale } from '@/api/saleApi.js'
 import { confirm } from '@/composables/useConfirm'
 import { toast } from '@/composables/useToast'
 
@@ -221,10 +243,11 @@ const router = useRouter()
 const PAGE_SIZE = 10
 
 const campaigns = ref([])
-const loading = ref(false)
+const initialLoading = ref(true)
 const saving = ref(false)
 const errorMessage = ref('')
 const currentPage = ref(1)
+const processingId = ref(null)
 
 const pageInfo = ref({
   totalElements: 0,
@@ -247,22 +270,24 @@ const tabs = [
   { label: 'Đang chạy', value: 'active' },
   { label: 'Sắp diễn ra', value: 'scheduled' },
   { label: 'Đã kết thúc', value: 'ended' },
+  { label: 'Ngừng áp dụng', value: 'paused' },
 ]
 
 const currentTab = ref('')
 const searchQuery = ref('')
 
 const statusMeta = {
-  active: { cls: 'badge-active', icon: 'ti-circle-check' },
-  scheduled: { cls: 'badge-scheduled', icon: 'ti-clock' },
-  ended: { cls: 'badge-ended', icon: 'ti-circle-x' },
-  paused: { cls: 'badge-paused', icon: 'ti-player-pause' },
+  active: { cls: 'badge-active', icon: 'ti-circle-check', label: 'Đang chạy' },
+  scheduled: { cls: 'badge-scheduled', icon: 'ti-clock', label: 'Sắp diễn ra' },
+  ended: { cls: 'badge-ended', icon: 'ti-circle-x', label: 'Đã kết thúc' },
+  paused: { cls: 'badge-paused', icon: 'ti-player-pause', label: 'Ngừng áp dụng' },
 }
 
 const tabToApiStatus = {
   active: 'ACTIVE',
   scheduled: 'UPCOMING',
   ended: 'EXPIRED',
+  paused: 'INACTIVE',
 }
 
 const apiToUiStatus = {
@@ -297,11 +322,67 @@ function mapSale(item) {
     rawEnd: item.ngayKetThuc,
     status: uiStatus,
     statusLabel: item.timeStatusLabel || statusMeta[uiStatus]?.label || 'Không xác định',
+    isActive: item.isActive,
+    timeStatus: item.timeStatus,
   }
 }
 
-async function loadData(page = 1) {
-  loading.value = true
+function resolveCampaignStatus(campaign, isActive) {
+  if (!isActive) {
+    return {
+      ...campaign,
+      isActive: false,
+      timeStatus: 'INACTIVE',
+      status: 'paused',
+      statusLabel: 'Ngừng áp dụng',
+    }
+  }
+
+  const now = new Date()
+  const batDau = new Date(campaign.rawStart || '')
+  const ketThuc = new Date(campaign.rawEnd || '')
+
+  if (now < batDau) {
+    return {
+      ...campaign,
+      isActive: true,
+      timeStatus: 'UPCOMING',
+      status: 'scheduled',
+      statusLabel: 'Sắp diễn ra',
+    }
+  }
+  if (now > ketThuc) {
+    return {
+      ...campaign,
+      isActive: true,
+      timeStatus: 'EXPIRED',
+      status: 'ended',
+      statusLabel: 'Đã kết thúc',
+    }
+  }
+  return {
+    ...campaign,
+    isActive: true,
+    timeStatus: 'ACTIVE',
+    status: 'active',
+    statusLabel: 'Đang chạy',
+  }
+}
+
+function capNhatCampaignLocal(id, isActive) {
+  campaigns.value = campaigns.value.map((c) =>
+    c.id === id ? resolveCampaignStatus(c, isActive) : c,
+  )
+}
+
+function dangHoatDong(campaign) {
+  return campaign.isActive !== false
+}
+
+async function loadData(page = 1, { silent = false } = {}) {
+  if (!silent && campaigns.value.length === 0) {
+    initialLoading.value = true
+  }
   errorMessage.value = ''
 
   try {
@@ -324,10 +405,14 @@ async function loadData(page = 1) {
     }
     currentPage.value = page
   } catch (error) {
-    campaigns.value = []
-    errorMessage.value = normalizeError(error) || 'Không thể tải dữ liệu'
+    if (campaigns.value.length === 0) {
+      campaigns.value = []
+      errorMessage.value = normalizeError(error) || 'Không thể tải dữ liệu'
+    } else {
+      toast(normalizeError(error) || 'Không thể tải dữ liệu', 'warn')
+    }
   } finally {
-    loading.value = false
+    initialLoading.value = false
   }
 }
 
@@ -360,9 +445,51 @@ function goToDetail(id) {
   router.push(`/admin/sale/${id}`)
 }
 
-function copyCode(code) {
-  navigator.clipboard?.writeText(code).catch(() => {})
-  toast(`Đã sao chép mã: ${code}`, 'info')
+async function stopRow(id) {
+  const campaign = campaigns.value.find((item) => item.id === id)
+  if (!campaign) return
+  const ok = await confirm({
+    title: 'Dừng chương trình',
+    message: `Dừng đợt giảm giá "${campaign.name}"? Đợt giảm giá sẽ không còn hiệu lực.`,
+    confirmText: 'Dừng',
+    danger: true,
+  })
+  if (!ok) return
+
+  processingId.value = id
+  try {
+    await stopSale(id)
+    capNhatCampaignLocal(id, false)
+    loadMetrics()
+    toast(`Đã dừng: ${campaign.name}`, 'info')
+  } catch (error) {
+    toast(normalizeError(error) || 'Dừng chương trình thất bại', 'warn')
+  } finally {
+    processingId.value = null
+  }
+}
+
+async function activateRow(id) {
+  const campaign = campaigns.value.find((item) => item.id === id)
+  if (!campaign) return
+  const ok = await confirm({
+    title: 'Kích hoạt lại',
+    message: `Kích hoạt lại đợt giảm giá "${campaign.name}"?`,
+    confirmText: 'Kích hoạt',
+  })
+  if (!ok) return
+
+  processingId.value = id
+  try {
+    await activateSale(id)
+    capNhatCampaignLocal(id, true)
+    loadMetrics()
+    toast(`Đã kích hoạt: ${campaign.name}`, 'info')
+  } catch (error) {
+    toast(normalizeError(error) || 'Kích hoạt thất bại', 'warn')
+  } finally {
+    processingId.value = null
+  }
 }
 
 async function deleteRow(id) {
@@ -376,12 +503,20 @@ async function deleteRow(id) {
   })
   if (!ok) return
 
+  processingId.value = id
   try {
     await deleteSale(id)
+    campaigns.value = campaigns.value.filter((item) => item.id !== id)
+    if (pageInfo.value.totalElements > 0) {
+      pageInfo.value.totalElements -= 1
+      pageInfo.value.numberOfElements = campaigns.value.length
+    }
+    loadMetrics()
     toast(`Đã xóa: ${campaign.name}`, 'info')
-    await Promise.all([loadData(currentPage.value), loadMetrics()])
   } catch (error) {
     toast(normalizeError(error) || 'Xóa thất bại', 'warn')
+  } finally {
+    processingId.value = null
   }
 }
 
@@ -436,7 +571,7 @@ async function handleSubmit() {
 
     closeModal()
     form.value = emptyForm()
-    await Promise.all([loadData(editingId.value ? currentPage.value : 1), loadMetrics()])
+    await Promise.all([loadData(editingId.value ? currentPage.value : 1, { silent: true }), loadMetrics()])
     editingId.value = null
   } catch (error) {
     toast(normalizeError(error) || 'Lưu thất bại', 'warn')
@@ -493,6 +628,3 @@ onMounted(async () => {
 })
 </script>
 
-<style scoped>
-  @import '@/styles/saleCss.css'
-</style>

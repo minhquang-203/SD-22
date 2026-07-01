@@ -21,7 +21,7 @@ const categories = ref([])
 const navLinks = [
   { to: '/', label: 'Trang chủ', exact: true },
   { to: '/san-pham', label: 'Kem chống nắng' },
-  { to: '/san-pham?noiBat=1', label: 'Khuyến mãi' },
+  { to: '/san-pham/khuyen-mai', label: 'Khuyến mãi' },
   { to: '/san-pham', label: 'Thương hiệu', hash: 'brands' },
   { to: '/quiz', label: 'Quiz da' },
   { to: '#', label: 'Blog', disabled: true },
@@ -107,7 +107,7 @@ function isLinkActive(link) {
     return path === '/san-pham' && !q.noiBat && !q.thuongHieu && !q.danhMuc
   }
   if (link.label === 'Khuyến mãi') {
-    return path === '/san-pham' && String(q.noiBat) === '1'
+    return path === '/san-pham/khuyen-mai'
   }
   if (link.label === 'Thương hiệu') {
     if (path === '/') return route.hash === '#sf-brands'

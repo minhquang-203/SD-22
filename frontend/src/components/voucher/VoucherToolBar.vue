@@ -36,6 +36,7 @@ const emit = defineEmits([
       <option value="active">Đang hoạt động</option>
       <option value="upcoming">Sắp diễn ra</option>
       <option value="expired">Đã hết hạn</option>
+      <option value="inactive">Ngừng áp dụng</option>
     </select>
 
     <select

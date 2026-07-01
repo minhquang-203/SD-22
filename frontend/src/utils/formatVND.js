@@ -19,3 +19,10 @@ export function formatPriceRange(giaMin, giaMax) {
   }
   return formatVND(!Number.isNaN(min) ? min : max)
 }
+
+/** Hiển thị phần trăm giảm giá */
+export function formatDiscountPercent(value) {
+  const num = Number(value)
+  if (Number.isNaN(num) || num <= 0) return ''
+  return Number.isInteger(num) ? `-${num}%` : `-${num.toFixed(1)}%`
+}

@@ -13,7 +13,7 @@ import {
   fetchThanhPhanList,
 } from '@/api/storefrontApi'
 import { useCart } from '@/composables/useCart'
-import { formatVND } from '@/utils/formatVND'
+import { formatDiscountPercent, formatVND } from '@/utils/formatVND'
 import { productImageUrl } from '@/utils/productImage'
 
 const route = useRoute()
@@ -40,6 +40,18 @@ const variants = computed(() => product.value?.chiTiets?.filter((v) => v.trangTh
 const selectedVariant = computed(() =>
   variants.value.find((v) => v.id === selectedVariantId.value) || variants.value[0] || null,
 )
+
+const hasVariantSale = computed(() => selectedVariant.value?.giaSauGiam != null)
+
+const variantSaleLabel = computed(() => formatDiscountPercent(selectedVariant.value?.phanTramGiam))
+
+const variantOriginalPrice = computed(() => {
+  const v = selectedVariant.value
+  if (!v) return ''
+  return formatVND(v.giaGoc ?? v.giaBan)
+})
+
+const variantSalePrice = computed(() => formatVND(selectedVariant.value?.giaSauGiam))
 
 const galleryImages = computed(() => {
   const urls = (product.value?.anhs || []).map((a) => a.url).filter(Boolean)
@@ -97,14 +109,17 @@ async function addToCart() {
     return false
   }
   try {
+    const originalPrice = Number(v.giaGoc ?? v.giaBan)
+    const sellingPrice = v.giaSauGiam != null ? Number(v.giaSauGiam) : originalPrice
     await addItem({
       idChiTietSanPham: v.id,
       idSanPham: product.value.id,
       tenSanPham: product.value.ten,
       tenThuongHieu: product.value.tenThuongHieu || '',
       sku: v.sku,
-      giaBan: Number(v.giaBan),
-      giaGoc: product.value.giaGoc ? Number(product.value.giaGoc) : null,
+      giaBan: sellingPrice,
+      giaGoc: v.giaSauGiam != null ? originalPrice : null,
+      phanTramGiam: v.phanTramGiam ?? null,
       soLuongTon: Number(v.soLuongTon) || 0,
       soLuong: quantity.value,
       anhUrl: activeImage.value || product.value.anhChinhUrl,
@@ -222,12 +237,19 @@ onMounted(() => {
           <p v-if="product.tenThuongHieu" class="sf-pdp__brand">{{ product.tenThuongHieu }}</p>
           <h1 class="sf-pdp__title">{{ product.ten }}</h1>
 
-          <div class="sf-pdp__rating" v-if="product.soLuongDanhGia">
+          <div v-if="product.soLuongDanhGia" class="sf-pdp__rating">
             <Icon v-for="i in 5" :key="i" icon="solar:star-bold" :class="{ dim: i > Math.round(avgRating) }" width="16" />
             <span>{{ avgRating.toFixed(1) }} ({{ product.soLuongDanhGia }} đánh giá)</span>
           </div>
 
-          <p class="sf-pdp__price">{{ formatVND(selectedVariant?.giaBan) }}</p>
+          <div v-if="hasVariantSale" class="sf-pdp__price-wrap">
+            <span v-if="variantSaleLabel" class="sf-pdp__sale-badge">{{ variantSaleLabel }}</span>
+            <div class="sf-pdp__prices">
+              <p class="sf-pdp__price sf-pdp__price--sale">{{ variantSalePrice }}</p>
+              <p class="sf-pdp__price sf-pdp__price--original">{{ variantOriginalPrice }}</p>
+            </div>
+          </div>
+          <p v-else class="sf-pdp__price">{{ formatVND(selectedVariant?.giaBan) }}</p>
 
           <div v-if="colors.length" class="sf-pdp__option">
             <span class="sf-pdp__option-label">Màu sắc</span>

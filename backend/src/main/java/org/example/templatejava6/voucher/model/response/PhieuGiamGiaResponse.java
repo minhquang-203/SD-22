@@ -23,6 +23,9 @@ public class PhieuGiamGiaResponse {
     private LocalDateTime ngayBatDau;
     private LocalDateTime ngayKetThuc;
     private Boolean trangThai;
+    private Boolean isActive;
+    private String timeStatus;
+    private String timeStatusLabel;
 
     public PhieuGiamGiaResponse(PhieuGiamGia pgg) {
         this.id = pgg.getId();
@@ -36,5 +39,28 @@ public class PhieuGiamGiaResponse {
         this.ngayBatDau = pgg.getNgayBatDau();
         this.ngayKetThuc = pgg.getNgayKetThuc();
         this.trangThai = pgg.getTrangThai();
+        this.isActive = pgg.getIsActive();
+        resolveTimeStatus(pgg);
+    }
+
+    private void resolveTimeStatus(PhieuGiamGia pgg) {
+        if (!Boolean.TRUE.equals(pgg.getIsActive())) {
+            this.timeStatus = "INACTIVE";
+            this.timeStatusLabel = "Ngừng áp dụng";
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        if (pgg.getNgayBatDau() != null && pgg.getNgayBatDau().isAfter(now)) {
+            this.timeStatus = "UPCOMING";
+            this.timeStatusLabel = "Sắp diễn ra";
+            return;
+        }
+        if (pgg.getNgayKetThuc() != null && pgg.getNgayKetThuc().isBefore(now)) {
+            this.timeStatus = "EXPIRED";
+            this.timeStatusLabel = "Đã hết hạn";
+            return;
+        }
+        this.timeStatus = "ACTIVE";
+        this.timeStatusLabel = "Đang hoạt động";
     }
 }
