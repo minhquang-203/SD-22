@@ -145,6 +145,16 @@ function formatReviewDate(d) {
   return new Date(d).toLocaleDateString('vi-VN')
 }
 
+function maskCustomerName(name) {
+  if (!name) return 'Khách hàng'
+  if (name.startsWith('khachhang_')) return name
+  const n = name.trim()
+  if (n.length <= 1) return n + '***'
+  const first = n.charAt(0)
+  const last = n.charAt(n.length - 1)
+  return `${first}***${last}`
+}
+
 async function loadProduct(id) {
   loading.value = true
   notFound.value = false
@@ -187,8 +197,21 @@ watch(
   },
 )
 
+let intervalId = null;
+
 onMounted(() => {
   loadProduct(route.params.id)
+  intervalId = setInterval(async () => {
+    if (route.params.id) {
+      const res = await fetchProductReviews(route.params.id)
+      reviews.value = res.data || []
+    }
+  }, 10000)
+})
+
+import { onUnmounted } from 'vue'
+onUnmounted(() => {
+  if (intervalId) clearInterval(intervalId)
 })
 </script>
 
@@ -344,12 +367,37 @@ onMounted(() => {
           </div>
           <div v-show="activeTab === 'danhGia'" class="sf-tab-panel">
             <div v-if="reviews.length" class="sf-reviews">
-              <div v-for="rv in reviews" :key="rv.id" class="sf-review-item">
-                <div class="sf-review-stars">
-                  <Icon v-for="i in 5" :key="i" icon="solar:star-bold" :class="{ dim: i > rv.soSao }" width="14" />
+              <div v-for="rv in reviews" :key="rv.id" class="sf-review-card">
+                <div class="sf-review-avatar">
+                  <Icon icon="solar:user-circle-bold" width="36" />
                 </div>
-                <p class="sf-review-text">{{ rv.noiDung }}</p>
-                <span class="sf-review-date">{{ formatReviewDate(rv.ngayTao) }}</span>
+                <div class="sf-review-main">
+                  <div class="sf-review-name">{{ maskCustomerName(rv.tenKhachHang || ('khachhang_' + rv.idKhachHang)) }}</div>
+                  <div class="sf-review-stars">
+                    <Icon v-for="i in 5" :key="i" icon="solar:star-bold" :class="{ dim: i > rv.soSao }" width="14" />
+                  </div>
+                  <div class="sf-review-date-variant">
+                    <span>{{ formatReviewDate(rv.ngayTao) }}</span>
+                    <span v-if="rv.tenPhanLoaiHang" class="divider">|</span>
+                    <span v-if="rv.tenPhanLoaiHang">Phân loại hàng: {{ rv.tenPhanLoaiHang }}</span>
+                  </div>
+                  <p class="sf-review-text">{{ rv.noiDung }}</p>
+                  
+                  <div class="sf-review-media" v-if="rv.hinhAnhVideo">
+                    <img :src="rv.hinhAnhVideo" alt="Hình ảnh đánh giá" onerror="this.style.display='none'" />
+                  </div>
+                  
+                  <div class="sf-shop-reply" v-if="rv.phanHoiCuaShop">
+                    <div class="reply-header">Phản hồi của Người Bán</div>
+                    <div class="reply-content">{{ rv.phanHoiCuaShop }}</div>
+                  </div>
+                  
+                  <div class="sf-review-actions">
+                    <button class="sf-btn-like">
+                      <Icon icon="solar:like-bold" width="16" /> Hữu ích ({{ rv.soLuotThich || 0 }})
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
             <p v-else>Chưa có đánh giá nào.</p>
@@ -370,3 +418,70 @@ onMounted(() => {
     </template>
   </div>
 </template>
+
+<style scoped>
+.sf-pdp { padding-bottom: 60px; }
+.sf-pdp-loading { text-align: center; padding: 100px 20px; color: #64748b; font-size: 1.1rem; }
+.sf-pdp__grid { display: grid; grid-template-columns: 1fr; gap: 32px; padding-top: 32px; padding-bottom: 48px; }
+@media (min-width: 768px) { .sf-pdp__grid { grid-template-columns: 1fr 1fr; gap: 48px; } }
+.sf-pdp__main-img { width: 100%; aspect-ratio: 4/5; background: #f8fafc; border-radius: 8px; overflow: hidden; }
+.sf-pdp__main-img img { width: 100%; height: 100%; object-fit: cover; }
+.sf-pdp__thumbs { display: flex; gap: 12px; margin-top: 16px; overflow-x: auto; padding-bottom: 4px; }
+.sf-pdp__thumb { width: 80px; height: 80px; border-radius: 6px; overflow: hidden; border: 2px solid transparent; cursor: pointer; flex-shrink: 0; }
+.sf-pdp__thumb.active { border-color: #0f172a; }
+.sf-pdp__thumb img { width: 100%; height: 100%; object-fit: cover; }
+.sf-pdp__brand { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 8px; }
+.sf-pdp__title { font-size: 24px; font-weight: 400; color: #0f172a; margin-bottom: 16px; line-height: 1.3; }
+.sf-pdp__rating { display: flex; align-items: center; gap: 4px; color: #eab308; margin-bottom: 24px; font-size: 14px; }
+.sf-pdp__rating span { color: #64748b; margin-left: 8px; }
+.sf-pdp__rating .dim { color: #e2e8f0; }
+.sf-pdp__price { font-size: 28px; font-weight: 500; color: #0f172a; margin-bottom: 32px; }
+.sf-pdp__option { margin-bottom: 24px; }
+.sf-pdp__option-label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 12px; color: #334155; }
+.sf-pdp__chips { display: flex; flex-wrap: wrap; gap: 12px; }
+.sf-chip { padding: 8px 16px; border: 1px solid #cbd5e1; border-radius: 4px; background: white; color: #334155; font-size: 14px; cursor: pointer; transition: all 0.2s; }
+.sf-chip:hover { border-color: #94a3b8; }
+.sf-chip.active { border-color: #0f172a; background: #0f172a; color: white; }
+.sf-pdp__stock { font-size: 14px; color: #059669; margin-bottom: 32px; }
+.sf-pdp__stock.out { color: #ef4444; }
+.sf-pdp__actions { display: flex; flex-direction: column; gap: 16px; }
+.sf-pdp__qty { display: flex; align-items: center; border: 1px solid #cbd5e1; border-radius: 4px; width: max-content; }
+.sf-pdp__qty button { width: 40px; height: 48px; background: transparent; border: none; font-size: 18px; cursor: pointer; }
+.sf-pdp__qty input { width: 50px; height: 48px; border: none; text-align: center; font-size: 16px; }
+.sf-pdp__qty input:focus { outline: none; }
+.sf-pdp__buttons { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 640px) { .sf-pdp__buttons { grid-template-columns: 1fr 1fr; } }
+.sf-pdp__meta { margin-top: 48px; padding-top: 32px; border-top: 1px solid #f1f5f9; }
+.sf-pdp__meta-row { display: grid; grid-template-columns: 140px 1fr; padding: 12px 0; border-bottom: 1px solid #f8fafc; font-size: 14px; }
+.sf-pdp__meta-label { color: #64748b; }
+.sf-pdp__meta-val { color: #0f172a; }
+.sf-tabs-nav { display: flex; gap: 32px; border-bottom: 1px solid #e2e8f0; margin-bottom: 32px; overflow-x: auto; }
+.sf-tabs-nav button { background: transparent; border: none; padding: 16px 0; font-size: 15px; font-weight: 500; color: #64748b; cursor: pointer; position: relative; white-space: nowrap; }
+.sf-tabs-nav button.active { color: #0f172a; }
+.sf-tabs-nav button.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #c9a96e; }
+.sf-tab-panel { font-size: 15px; line-height: 1.6; color: #334155; animation: fadeIn 0.3s ease; }
+.sf-tag-list { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 12px; }
+.sf-tag-list li { background: #f1f5f9; padding: 6px 16px; border-radius: 20px; font-size: 14px; }
+
+/* CUSTOMER REVIEWS STYLING */
+.sf-review-card { display: flex; gap: 16px; padding: 24px 0; border-bottom: 1px solid #f1f5f9; }
+.sf-review-avatar { color: #cbd5e1; }
+.sf-review-main { flex: 1; }
+.sf-review-name { font-weight: 600; font-size: 14px; color: #0f172a; margin-bottom: 4px; }
+.sf-review-stars { color: #eab308; margin-bottom: 8px; }
+.sf-review-stars .dim { color: #e2e8f0; }
+.sf-review-date-variant { font-size: 12px; color: #94a3b8; margin-bottom: 12px; }
+.sf-review-date-variant .divider { margin: 0 8px; }
+.sf-review-text { font-size: 14px; line-height: 1.6; color: #334155; margin-bottom: 16px; }
+.sf-review-media img { width: 120px; height: 120px; object-fit: cover; border-radius: 8px; border: 1px solid #f1f5f9; margin-bottom: 16px; }
+.sf-shop-reply { background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 16px; }
+.sf-shop-reply .reply-header { font-weight: 600; font-size: 13px; color: #475569; margin-bottom: 8px; }
+.sf-shop-reply .reply-content { font-size: 14px; color: #334155; }
+.sf-btn-like { background: transparent; border: none; display: inline-flex; align-items: center; gap: 8px; color: #64748b; font-size: 13px; cursor: pointer; padding: 0; }
+.sf-btn-like:hover { color: #0f172a; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+.sf-section-title { text-align: center; font-size: 28px; font-weight: 400; color: #0f172a; margin-bottom: 48px; }
+.sf-product-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+@media (min-width: 768px) { .sf-product-grid { grid-template-columns: repeat(4, 1fr); gap: 32px; } }
+</style>

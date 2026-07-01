@@ -26,4 +26,9 @@ public class DanhGiaRequest {
     private Byte soSao;
 
     private String noiDung;
+
+    private String hinhAnhVideo;
+
+    private Integer idHoaDonChiTiet;
+    private String imageBase64;
 }

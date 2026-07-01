@@ -13,6 +13,7 @@ public class HoaDonChiTietResponse {
     private Integer id;
     private Integer idHoaDon;
     private Integer idChiTietSanPham;
+    private Integer idSanPham;
     private String sku;
     private String tenSanPham;
     private String bienThe;
@@ -24,6 +25,8 @@ public class HoaDonChiTietResponse {
         this.id = ct.getId();
         this.idHoaDon = ct.getIdHoaDon() != null ? ct.getIdHoaDon().getId() : null;
         this.idChiTietSanPham = ct.getIdChiTietSanPham() != null ? ct.getIdChiTietSanPham().getId() : null;
+        this.idSanPham = ct.getIdChiTietSanPham() != null && ct.getIdChiTietSanPham().getSanPham() != null 
+                ? ct.getIdChiTietSanPham().getSanPham().getId() : null;
         this.sku = ct.getIdChiTietSanPham() != null ? ct.getIdChiTietSanPham().getSku() : null;
         this.tenSanPham = ct.getIdChiTietSanPham() != null
                 && ct.getIdChiTietSanPham().getSanPham() != null
