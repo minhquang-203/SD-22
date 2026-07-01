@@ -9,6 +9,8 @@ import { toast } from '@/composables/useToast'
 import { INFO_PAGES } from '@/constants/storefrontInfo'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import StorefrontLayout from '@/layouts/StorefrontLayout.vue'
+import BlogView from '@/views/BlogView.vue'
+import BlogDetailView from '@/views/BlogDetailView.vue'
 
 const infoRoutes = Object.keys(INFO_PAGES).map((slug) => ({
   path: slug,
@@ -98,6 +100,16 @@ const router = createRouter({
           component: () => import('@/views/storefront/QuizPlaceholder.vue'),
           meta: { title: 'Quiz da — SUNOVA' },
         },
+          {
+    path: '/blog',
+    name: 'blog',
+    component: BlogView,
+  },
+  {
+    path: '/blog/:slug',
+    name: 'blog-detail',
+    component: BlogDetailView,
+  },
       ],
     },
 

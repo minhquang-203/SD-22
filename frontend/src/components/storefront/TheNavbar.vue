@@ -24,7 +24,7 @@ const navLinks = [
   { to: '/san-pham?noiBat=1', label: 'Khuyến mãi' },
   { to: '/san-pham', label: 'Thương hiệu', hash: 'brands' },
   { to: '/quiz', label: 'Quiz da' },
-  { to: '#', label: 'Blog', disabled: true },
+  { to: '/blog', label: 'Blog' },
   { to: '/tra-cuu-don', label: 'Tra cứu đơn' },
 ]
 

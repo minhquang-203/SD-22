@@ -12,11 +12,11 @@ defineProps({
   <div class="space-y-5">
     <PageHeader :title="title" :description="subtitle || 'Trang đang được phát triển.'" />
 
-    <div class="admin-card admin-card--rounded">
+    <!-- <div class="admin-card admin-card--rounded">
       <div class="p-10 text-center">
         <p v-if="icon" class="text-3xl mb-3">{{ icon }}</p>
         <p class="text-[var(--admin-muted)] text-sm">Trang đang được phát triển.</p>
       </div>
-    </div>
+    </div> -->
   </div>
 </template>
