@@ -24,13 +24,8 @@ const navLinks = [
   { to: '/san-pham/khuyen-mai', label: 'Khuyến mãi' },
   { to: '/san-pham', label: 'Thương hiệu', hash: 'brands' },
   { to: '/quiz', label: 'Quiz da' },
-<<<<<<< HEAD
   { to: '/blog', label: 'Blog' },
-  { to: '/tra-cuu-don', label: 'Tra cứu đơn' },
-=======
-  { to: '#', label: 'Blog', disabled: true },
   { to: '/tra-cuu-don', label: 'Tra cứu đơn', requiresAuth: true },
->>>>>>> f95488cec1fc17238371786a11f064eb0a807601
 ]
 
 onMounted(async () => {

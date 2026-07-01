@@ -24,7 +24,7 @@ public class TinNhanChatAi {
     @Column(name = "nguoi_gui", nullable = false)
     private String nguoiGui; // KHACH hoặc AI
 
-    @Column(name = "noi_dung", nullable = false)
+    @Column(name = "noi_dung", nullable = false, columnDefinition = "NVARCHAR(MAX)")
     private String noiDung;
 
     @ManyToOne(fetch = FetchType.LAZY)
