@@ -13,6 +13,7 @@ import org.example.templatejava6.order.entity.HoaDonChiTiet;
 import org.example.templatejava6.order.entity.LichSuDonHang;
 import org.example.templatejava6.order.entity.ThanhToanHoaDon;
 import org.example.templatejava6.order.model.request.GiuDonChoRequest;
+import org.example.templatejava6.order.model.request.PosTinhGiaRequest;
 import org.example.templatejava6.order.model.request.TaoDonTaiQuayRequest;
 import org.example.templatejava6.order.model.response.BanHangHoaDonResponse;
 import org.example.templatejava6.order.model.response.BanHangHoaDonResponse.BanHangChiTietResponse;
@@ -20,15 +21,23 @@ import org.example.templatejava6.order.model.response.BienTheBanResponse;
 import org.example.templatejava6.order.model.response.DonChoDetailResponse;
 import org.example.templatejava6.order.model.response.DonChoListItemResponse;
 import org.example.templatejava6.order.model.response.GiuDonChoResponse;
+import org.example.templatejava6.order.model.response.PosTinhGiaResponse;
+import org.example.templatejava6.order.model.response.PosThanhToanStatusResponse;
 import org.example.templatejava6.order.repository.HoaDonChiTietRepository;
 import org.example.templatejava6.order.repository.HoaDonRepository;
 import org.example.templatejava6.order.repository.LichSuDonHangRepository;
 import org.example.templatejava6.order.repository.NhanVienRepository;
 import org.example.templatejava6.order.repository.PhuongThucThanhToanRepository;
 import org.example.templatejava6.order.repository.ThanhToanHoaDonRepository;
+import org.example.templatejava6.product.entity.AnhSanPham;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
+import org.example.templatejava6.product.repository.AnhSanPhamRepository;
 import org.example.templatejava6.product.repository.ChiTietSanPhamRepository;
 import org.example.templatejava6.product.service.LoHangService;
+import org.example.templatejava6.payment.model.request.TaoThanhToanRequest;
+import org.example.templatejava6.payment.model.response.TaoThanhToanResponse;
+import org.example.templatejava6.payment.service.PaymentService;
+import org.example.templatejava6.payment.vnpay.VnpayGateway;
 import org.example.templatejava6.voucher.model.response.VariantSaleInfo;
 import org.example.templatejava6.voucher.repository.PhieuGiamGiaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,9 +52,14 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -54,9 +68,13 @@ public class BanHangService {
     private static final String LOAI_TAI_QUAY = "TAI_QUAY";
     private static final String TRANG_THAI_THANH_CONG = "THANH_CONG";
     private static final String MA_TIEN_MAT = "TIEN_MAT";
+    private static final String MA_VNPAY = "VNPAY";
+    private static final String TRANG_THAI_CHO_THANH_TOAN = "CHO_THANH_TOAN";
+    private static final String TRANG_THAI_THAT_BAI = "THAT_BAI";
     private static final int SAN_PHAM_PAGE_SIZE = 48;
 
     @Autowired private ChiTietSanPhamRepository chiTietSanPhamRepository;
+    @Autowired private AnhSanPhamRepository anhSanPhamRepository;
     @Autowired private HoaDonRepository hoaDonRepository;
     @Autowired private HoaDonChiTietRepository hoaDonChiTietRepository;
     @Autowired private ThanhToanHoaDonRepository thanhToanHoaDonRepository;
@@ -67,24 +85,65 @@ public class BanHangService {
     @Autowired private NhanVienRepository nhanVienRepository;
     @Autowired private LoHangService loHangService;
     @Autowired private CheckoutPricingService checkoutPricingService;
+    @Autowired private PaymentService paymentService;
+    @Autowired private PosOrderLifecycleService posOrderLifecycleService;
 
     @Transactional(readOnly = true)
     public List<BienTheBanResponse> danhSachSanPhamBan(String keyword, Integer page) {
         String kw = keyword != null ? keyword.trim() : "";
         int pageNo = page != null && page >= 0 ? page : 0;
         Map<Integer, VariantSaleInfo> saleMap = checkoutPricingService.loadActiveSales();
-        return chiTietSanPhamRepository
-                .danhSachBienTheBan(kw, PageRequest.of(pageNo, SAN_PHAM_PAGE_SIZE))
-                .stream()
-                .map(cts -> toBienTheBanResponse(cts, saleMap))
+        List<ChiTietSanPham> variants = chiTietSanPhamRepository
+                .danhSachBienTheBan(kw, PageRequest.of(pageNo, SAN_PHAM_PAGE_SIZE));
+        Map<Integer, String> imageMap = loadMainImageUrls(variants);
+        return variants.stream()
+                .map(cts -> toBienTheBanResponse(cts, saleMap, imageMap))
                 .toList();
     }
 
-    private BienTheBanResponse toBienTheBanResponse(ChiTietSanPham cts, Map<Integer, VariantSaleInfo> saleMap) {
+    private Map<Integer, String> loadMainImageUrls(List<ChiTietSanPham> variants) {
+        Set<Integer> sanPhamIds = variants.stream()
+                .map(cts -> cts.getSanPham() != null ? cts.getSanPham().getId() : null)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (sanPhamIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Integer, List<AnhSanPham>> byProduct = anhSanPhamRepository.findBySanPham_IdIn(sanPhamIds).stream()
+                .collect(Collectors.groupingBy(a -> a.getSanPham().getId()));
+        Map<Integer, String> result = new HashMap<>();
+        for (Map.Entry<Integer, List<AnhSanPham>> entry : byProduct.entrySet()) {
+            entry.getValue().stream()
+                    .sorted(Comparator
+                            .comparing((AnhSanPham a) -> !Boolean.TRUE.equals(a.getLaAnhChinh()))
+                            .thenComparing(a -> a.getThuTu() != null ? a.getThuTu() : 0))
+                    .map(AnhSanPham::getUrl)
+                    .filter(url -> url != null && !url.isBlank())
+                    .findFirst()
+                    .ifPresent(url -> result.put(entry.getKey(), url));
+        }
+        return result;
+    }
+
+    private BienTheBanResponse toBienTheBanResponse(
+            ChiTietSanPham cts,
+            Map<Integer, VariantSaleInfo> saleMap,
+            Map<Integer, String> imageMap) {
         BienTheBanResponse res = new BienTheBanResponse(cts);
         BigDecimal donGia = checkoutPricingService.resolveDonGia(cts, saleMap);
         if (donGia != null) {
             res.setGiaBan(donGia);
+        }
+        VariantSaleInfo sale = saleMap != null ? saleMap.get(cts.getId()) : null;
+        if (sale != null && sale.getGiaSauGiam() != null) {
+            res.setDangGiamGia(true);
+            res.setGiaGoc(sale.getGiaGoc() != null ? sale.getGiaGoc() : cts.getGiaBan());
+            res.setPhanTramGiam(sale.getPhanTramGiam());
+        } else {
+            res.setDangGiamGia(false);
+        }
+        if (cts.getSanPham() != null) {
+            res.setAnhUrl(imageMap.get(cts.getSanPham().getId()));
         }
         LocalDate nearest = loHangService.nearestExpiry(cts.getId());
         res.setHanSuDungGanNhat(nearest);
@@ -97,6 +156,44 @@ public class BanHangService {
     @Transactional(readOnly = true)
     public List<BienTheBanResponse> timSanPhamBan(String keyword) {
         return danhSachSanPhamBan(keyword, 0);
+    }
+
+    @Transactional(readOnly = true)
+    public PosTinhGiaResponse tinhGiaTaiQuay(PosTinhGiaRequest req) {
+        if (req.getItems() == null || req.getItems().isEmpty()) {
+            throw new ApiException("Giỏ hàng trống.", "EMPTY_CART");
+        }
+
+        Map<Integer, Integer> qtyByVariant = mergeItems(req.getItems());
+        Map<Integer, VariantSaleInfo> saleMap = checkoutPricingService.loadActiveSales();
+        List<LineCalc> lines = buildLines(qtyByVariant, false, saleMap);
+        BigDecimal tongTien = sumTongTien(lines);
+
+        BigDecimal tienGiamGia = BigDecimal.ZERO;
+        String maPhieu = null;
+        if (req.getMaPhieuGiamGia() != null && !req.getMaPhieuGiamGia().isBlank()) {
+            final String maPhieuTrimmed = req.getMaPhieuGiamGia().trim();
+            maPhieu = maPhieuTrimmed;
+            PhieuGiamGia phieu = phieuGiamGiaRepository.findByMa(maPhieuTrimmed)
+                    .orElseThrow(() -> new ApiException(
+                            "Mã giảm giá \"" + maPhieuTrimmed + "\" không tồn tại.", "INVALID_VOUCHER"));
+            List<Integer> variantIds = lines.stream()
+                    .map(line -> line.cts.getId())
+                    .toList();
+            tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien, variantIds, saleMap);
+        }
+
+        BigDecimal thanhTien = tongTien.subtract(tienGiamGia);
+        if (thanhTien.compareTo(BigDecimal.ZERO) < 0) {
+            thanhTien = BigDecimal.ZERO;
+        }
+
+        PosTinhGiaResponse res = new PosTinhGiaResponse();
+        res.setTongTien(tongTien);
+        res.setTienGiamGia(tienGiamGia);
+        res.setThanhTien(thanhTien);
+        res.setMaPhieuGiamGia(maPhieu);
+        return res;
     }
 
     @Transactional
@@ -182,7 +279,7 @@ public class BanHangService {
     }
 
     @Transactional
-    public BanHangHoaDonResponse taoDonTaiQuay(TaoDonTaiQuayRequest req) {
+    public BanHangHoaDonResponse taoDonTaiQuay(TaoDonTaiQuayRequest req, String clientIp) {
         if (req.getItems() == null || req.getItems().isEmpty()) {
             throw new ApiException("Giỏ hàng trống. Vui lòng thêm sản phẩm.", "EMPTY_CART");
         }
@@ -218,6 +315,8 @@ public class BanHangService {
             thanhTien = BigDecimal.ZERO;
         }
 
+        boolean isVnpay = MA_VNPAY.equals(pttt.getMa());
+
         BigDecimal soTienKhachDua = null;
         BigDecimal tienThua = null;
         if (MA_TIEN_MAT.equals(pttt.getMa())) {
@@ -250,7 +349,7 @@ public class BanHangService {
         hoaDon.setIdPhuongThucThanhToan(pttt);
         hoaDon.setIdPhieuGiamGia(phieu);
         hoaDon.setLoaiDon(LOAI_TAI_QUAY);
-        hoaDon.setTrangThai(TrangThaiDonHang.HOAN_THANH);
+        hoaDon.setTrangThai(isVnpay ? TrangThaiDonHang.CHO_XAC_NHAN : TrangThaiDonHang.HOAN_THANH);
         hoaDon.setTongTien(tongTien);
         hoaDon.setTienGiamGia(tienGiamGia);
         hoaDon.setPhiVanChuyen(BigDecimal.ZERO);
@@ -285,6 +384,21 @@ public class BanHangService {
                     nhanVien, now);
         }
 
+        if (isVnpay) {
+            if (phieu != null) {
+                phieu.setSoLuong(phieu.getSoLuong() - 1);
+                phieuGiamGiaRepository.save(phieu);
+            }
+            TaoThanhToanRequest paymentRequest = new TaoThanhToanRequest();
+            paymentRequest.setIdHoaDon(hoaDon.getId());
+            TaoThanhToanResponse payment = paymentService.taoThanhToan(VnpayGateway.PROVIDER_CODE, paymentRequest, clientIp);
+            BanHangHoaDonResponse res = BanHangHoaDonResponse.from(hoaDon, null, lineResponses);
+            res.setPaymentUrl(payment.getPaymentUrl());
+            res.setTransactionRef(payment.getTransactionRef());
+            res.setTrangThaiThanhToan(TRANG_THAI_CHO_THANH_TOAN);
+            return res;
+        }
+
         ThanhToanHoaDon tt = new ThanhToanHoaDon();
         tt.setIdHoaDon(hoaDon);
         tt.setIdPhuongThucThanhToan(pttt);
@@ -314,6 +428,43 @@ public class BanHangService {
         }
 
         return BanHangHoaDonResponse.from(hoaDon, tt, lineResponses);
+    }
+
+    @Transactional(readOnly = true)
+    public PosThanhToanStatusResponse kiemTraThanhToanTaiQuay(Integer idHoaDon) {
+        HoaDon hoaDon = hoaDonRepository.findById(idHoaDon)
+                .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn.", "NOT_FOUND"));
+        if (!LOAI_TAI_QUAY.equalsIgnoreCase(hoaDon.getLoaiDon())) {
+            throw new ApiException("Không phải hóa đơn tại quầy.", "INVALID_ORDER_TYPE");
+        }
+
+        ThanhToanHoaDon thanhToan = thanhToanHoaDonRepository.findLatestByHoaDon(hoaDon)
+                .orElseThrow(() -> new ApiException("Không tìm thấy giao dịch thanh toán.", "PAYMENT_NOT_FOUND"));
+        String trangThai = thanhToan.getTrangThai() != null ? thanhToan.getTrangThai() : TRANG_THAI_CHO_THANH_TOAN;
+
+        BanHangHoaDonResponse hoaDonResponse = null;
+        if (TRANG_THAI_THANH_CONG.equals(trangThai)) {
+            List<BanHangChiTietResponse> lines = hoaDonChiTietRepository.findByIdHoaDon(hoaDon).stream()
+                    .map(BanHangChiTietResponse::new)
+                    .toList();
+            hoaDonResponse = BanHangHoaDonResponse.from(hoaDon, thanhToan, lines);
+            hoaDonResponse.setTrangThaiThanhToan(TRANG_THAI_THANH_CONG);
+        }
+
+        return PosThanhToanStatusResponse.of(hoaDon.getId(), hoaDon.getMaHoaDon(), trangThai, hoaDonResponse);
+    }
+
+    @Transactional
+    public void huyThanhToanVnpayTaiQuay(Integer idHoaDon) {
+        HoaDon hoaDon = hoaDonRepository.findById(idHoaDon)
+                .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn.", "NOT_FOUND"));
+        posOrderLifecycleService.huyDonVnpay(hoaDon, "Nhân viên hủy thanh toán QR tại quầy");
+        thanhToanHoaDonRepository.findLatestByHoaDonAndTrangThai(hoaDon, TRANG_THAI_CHO_THANH_TOAN)
+                .ifPresent(thanhToan -> {
+                    thanhToan.setTrangThai(TRANG_THAI_THAT_BAI);
+                    thanhToan.setThoiGian(LocalDateTime.now());
+                    thanhToanHoaDonRepository.save(thanhToan);
+                });
     }
 
     private HoaDon loadDonCho(Integer id) {

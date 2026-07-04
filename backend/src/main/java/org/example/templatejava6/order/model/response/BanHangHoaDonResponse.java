@@ -28,6 +28,9 @@ public class BanHangHoaDonResponse {
     private BigDecimal soTienKhachDua;
     private BigDecimal tienThua;
     private String ghiChu;
+    private String paymentUrl;
+    private String transactionRef;
+    private String trangThaiThanhToan;
     private List<BanHangChiTietResponse> items;
 
     public static BanHangHoaDonResponse from(

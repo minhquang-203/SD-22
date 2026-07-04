@@ -261,6 +261,7 @@ async function handleSubmit(form) {
       showMessage('Cập nhật sản phẩm thành công')
     }
     modalOpen.value = false
+    editingDetail.value = null
     await loadProducts()
   } catch (err) {
     showMessage(String(err), 'error')

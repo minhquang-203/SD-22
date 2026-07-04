@@ -17,6 +17,7 @@ import org.example.templatejava6.product.entity.AnhSanPham;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
 import org.example.templatejava6.product.entity.SanPham;
 import org.example.templatejava6.product.repository.AnhSanPhamRepository;
+import org.example.templatejava6.review.repository.DanhGiaRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,7 @@ public class HoaDonStorefrontService {
     private final KhachHangRepository khachHangRepository;
     private final AnhSanPhamRepository anhSanPhamRepository;
     private final GhnTrackingService ghnTrackingService;
+    private final DanhGiaRepository danhGiaRepository;
 
     public HoaDonStorefrontService(
             HoaDonRepository hoaDonRepository,
@@ -42,13 +44,15 @@ public class HoaDonStorefrontService {
             LichSuDonHangRepository lichSuDonHangRepository,
             KhachHangRepository khachHangRepository,
             AnhSanPhamRepository anhSanPhamRepository,
-            GhnTrackingService ghnTrackingService) {
+            GhnTrackingService ghnTrackingService,
+            DanhGiaRepository danhGiaRepository) {
         this.hoaDonRepository = hoaDonRepository;
         this.hoaDonChiTietRepository = hoaDonChiTietRepository;
         this.lichSuDonHangRepository = lichSuDonHangRepository;
         this.khachHangRepository = khachHangRepository;
         this.anhSanPhamRepository = anhSanPhamRepository;
         this.ghnTrackingService = ghnTrackingService;
+        this.danhGiaRepository = danhGiaRepository;
     }
 
     @Transactional(readOnly = true)
@@ -137,19 +141,33 @@ public class HoaDonStorefrontService {
 
     private StorefrontOrderLineResponse buildLine(HoaDonChiTiet ct) {
         StorefrontOrderLineResponse line = new StorefrontOrderLineResponse();
+        line.setId(ct.getId());
         ChiTietSanPham cts = ct.getIdChiTietSanPham();
         if (cts != null) {
+            line.setIdChiTietSanPham(cts.getId());
             SanPham sp = cts.getSanPham();
             line.setTenSanPham(sp != null ? sp.getTen() : null);
-            line.setBienThe(buildBienThe(cts));
             if (sp != null) {
+                line.setIdSanPham(sp.getId());
                 line.setAnhUrl(resolveAnhUrl(sp.getId()));
             }
+            line.setBienThe(buildBienThe(cts));
         }
         line.setSoLuong(ct.getSoLuong());
         line.setDonGia(ct.getDonGia());
         line.setThanhTien(ct.getThanhTien());
+        applyReviewStatus(line, ct.getId());
         return line;
+    }
+
+    private void applyReviewStatus(StorefrontOrderLineResponse line, Integer idHoaDonChiTiet) {
+        danhGiaRepository.findFirstByHoaDonChiTiet_Id(idHoaDonChiTiet).ifPresentOrElse(dg -> {
+            line.setDaDanhGia(true);
+            line.setTrangThaiDanhGia(dg.getTrangThai());
+        }, () -> {
+            line.setDaDanhGia(false);
+            line.setTrangThaiDanhGia(null);
+        });
     }
 
     private String buildBienThe(ChiTietSanPham cts) {

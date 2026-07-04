@@ -90,10 +90,8 @@ function handleSubmit() {
 </script>
 
 <template>
-  <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div class="absolute inset-0 bg-black/45" @click="emit('close')" />
-
-    <div class="relative w-full max-w-5xl max-h-[92vh] overflow-hidden admin-card flex flex-col">
+  <div v-if="open" class="modal-overlay" @click.self="emit('close')">
+    <div class="modal-panel relative w-full max-w-5xl max-h-[92vh] overflow-hidden admin-card flex flex-col">
       <div class="px-5 py-4 border-b flex items-center justify-between" style="border-color: var(--admin-border)">
         <div>
           <h2 class="text-lg font-semibold">{{ title }}</h2>

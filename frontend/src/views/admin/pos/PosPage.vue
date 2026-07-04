@@ -1,6 +1,7 @@
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
+import { NQrCode } from 'naive-ui'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import {
   getSanPhamBan,
@@ -8,12 +9,17 @@ import {
   timKhachTheoSdt,
   taoKhachNhanh,
   taoDonTaiQuay,
+  tinhGiaTaiQuay,
+  kiemTraThanhToanPos,
+  huyThanhToanPos,
   giuDon,
   dsDonCho,
   layDonCho,
   huyDonCho,
 } from '@/api/banHangApi'
 import { formatCurrency, formatMonthYear } from '@/utils/format'
+import { formatDiscountPercent } from '@/utils/formatVND'
+import { productImageUrl } from '@/utils/productImage'
 import { confirm } from '@/composables/useConfirm'
 import { useAdminAuth } from '@/composables/useAdminAuth'
 
@@ -38,6 +44,8 @@ const quickName = ref('')
 
 const voucherCode = ref('')
 const appliedVoucher = ref('')
+const voucherDiscount = ref(0)
+const voucherLoading = ref(false)
 
 const paymentMethods = ref([])
 const selectedPaymentId = ref(null)
@@ -53,7 +61,17 @@ const showHeldDrawer = ref(false)
 const activeHeldOrderId = ref(null)
 const holding = ref(false)
 
+const showQrModal = ref(false)
+const qrPaymentUrl = ref('')
+const qrOrderId = ref(null)
+const qrOrderCode = ref('')
+const qrAmount = ref(0)
+const qrTransactionRef = ref('')
+const qrStatus = ref('CHO_THANH_TOAN')
+const qrPolling = ref(false)
+
 let searchTimer = null
+let qrPollTimer = null
 
 const heldCount = computed(() =>
   heldOrders.value.filter((o) => o.id !== activeHeldOrderId.value).length,
@@ -69,13 +87,23 @@ const selectedPayment = computed(() =>
 
 const isCash = computed(() => selectedPayment.value?.ma === 'TIEN_MAT')
 
-const isNonCash = computed(() => selectedPayment.value && !isCash.value)
+const isVnpay = computed(() => selectedPayment.value?.ma === 'VNPAY')
+
+const isManualTransfer = computed(() =>
+  selectedPayment.value && !isCash.value && !isVnpay.value,
+)
+
+const isNonCash = computed(() => isManualTransfer.value)
 
 const tongTienHang = computed(() =>
   cart.value.reduce((sum, line) => sum + line.giaBan * line.soLuong, 0),
 )
 
-const thanhTien = computed(() => tongTienHang.value)
+const hasSaleItemsInCart = computed(() =>
+  cart.value.some((line) => line.dangGiamGia),
+)
+
+const thanhTien = computed(() => Math.max(0, tongTienHang.value - voucherDiscount.value))
 
 const tienThua = computed(() => {
   const cash = Number(cashGiven.value) || 0
@@ -99,6 +127,17 @@ const canCheckout = computed(() => {
   return true
 })
 
+const checkoutButtonLabel = computed(() => {
+  if (paying.value) return isVnpay.value ? 'Đang tạo mã QR...' : 'Đang tạo...'
+  return isVnpay.value ? 'Tạo mã QR thanh toán' : 'Tạo hóa đơn'
+})
+
+const qrStatusLabel = computed(() => {
+  if (qrStatus.value === 'THANH_CONG') return 'Đã thanh toán'
+  if (qrStatus.value === 'THAT_BAI') return 'Thanh toán thất bại'
+  return 'Chờ khách quét mã QR'
+})
+
 function notify(text, type = 'success') {
   message.value = text
   messageType.value = type
@@ -116,11 +155,6 @@ function cartKey(id) {
   return id
 }
 
-function productInitial(name) {
-  const t = (name || '?').trim()
-  return t ? t.charAt(0).toUpperCase() : '?'
-}
-
 function isOutOfStock(product) {
   return !product.soLuongTon || product.soLuongTon <= 0
 }
@@ -130,6 +164,14 @@ function posExpiryBadge(product) {
   if (product.soNgayConLai <= 0) return 'expired'
   if (product.soNgayConLai <= 30) return 'warning'
   return null
+}
+
+function isOnSale(product) {
+  return Boolean(product.dangGiamGia)
+}
+
+function saleLabel(product) {
+  return formatDiscountPercent(product.phanTramGiam)
 }
 
 function addToCart(product) {
@@ -146,11 +188,18 @@ function addToCart(product) {
       idChiTietSanPham: product.idChiTietSanPham,
       sku: product.sku,
       tenSanPham: product.tenSanPham,
+      anhUrl: product.anhUrl,
       bienThe: formatVariant(product),
       giaBan: Number(product.giaBan),
+      giaGoc: product.giaGoc != null ? Number(product.giaGoc) : null,
+      phanTramGiam: product.phanTramGiam != null ? Number(product.phanTramGiam) : null,
+      dangGiamGia: Boolean(product.dangGiamGia),
       soLuongTon: product.soLuongTon,
       soLuong: 1,
     })
+  }
+  if (appliedVoucher.value) {
+    void recalculateVoucher()
   }
 }
 
@@ -165,10 +214,20 @@ function changeQty(line, delta) {
     return
   }
   line.soLuong = next
+  if (appliedVoucher.value) {
+    void recalculateVoucher()
+  }
 }
 
 function removeLine(line) {
   cart.value = cart.value.filter((l) => l.idChiTietSanPham !== line.idChiTietSanPham)
+  if (appliedVoucher.value) {
+    if (cart.value.length === 0) {
+      clearVoucher()
+    } else {
+      void recalculateVoucher()
+    }
+  }
 }
 
 async function loadProducts() {
@@ -252,20 +311,73 @@ function clearCash() {
   cashGiven.value = ''
 }
 
+function clearVoucher() {
+  voucherCode.value = ''
+  appliedVoucher.value = ''
+  voucherDiscount.value = 0
+}
+
+async function recalculateVoucher() {
+  if (!appliedVoucher.value || cart.value.length === 0) {
+    voucherDiscount.value = 0
+    return
+  }
+  voucherLoading.value = true
+  try {
+    const res = await tinhGiaTaiQuay({
+      items: cart.value.map((l) => ({
+        idChiTietSanPham: l.idChiTietSanPham,
+        soLuong: l.soLuong,
+      })),
+      maPhieuGiamGia: appliedVoucher.value,
+    })
+    voucherDiscount.value = Number(res.data?.tienGiamGia) || 0
+  } catch (err) {
+    clearVoucher()
+    notify(String(err), 'error')
+  } finally {
+    voucherLoading.value = false
+  }
+}
+
 function applyVoucher() {
   const code = voucherCode.value.trim()
   if (!code) {
-    appliedVoucher.value = ''
+    clearVoucher()
+    return
+  }
+  if (cart.value.length === 0) {
+    notify('Thêm sản phẩm trước khi áp mã giảm giá', 'error')
+    return
+  }
+  if (hasSaleItemsInCart.value) {
+    notify('Không thể áp dụng mã khi đơn có sản phẩm đang giảm giá', 'error')
     return
   }
   confirm({
     title: 'Áp mã giảm giá',
     message: `Áp dụng mã "${code}" cho đơn này?`,
     confirmText: 'Áp mã',
-  }).then((ok) => {
+  }).then(async (ok) => {
     if (!ok) return
-    appliedVoucher.value = code
-    notify(`Mã "${code}" sẽ được áp dụng khi thanh toán`)
+    voucherLoading.value = true
+    try {
+      const res = await tinhGiaTaiQuay({
+        items: cart.value.map((l) => ({
+          idChiTietSanPham: l.idChiTietSanPham,
+          soLuong: l.soLuong,
+        })),
+        maPhieuGiamGia: code,
+      })
+      appliedVoucher.value = code
+      voucherDiscount.value = Number(res.data?.tienGiamGia) || 0
+      notify(`Đã áp mã "${code}" — giảm ${formatCurrency(voucherDiscount.value)}`)
+    } catch (err) {
+      clearVoucher()
+      notify(String(err), 'error')
+    } finally {
+      voucherLoading.value = false
+    }
   })
 }
 
@@ -299,8 +411,7 @@ function formatHeldAgo(dateStr) {
 
 function clearCartOnly() {
   cart.value = []
-  voucherCode.value = ''
-  appliedVoucher.value = ''
+  clearVoucher()
   cashGiven.value = ''
   transferRef.value = ''
 }
@@ -410,9 +521,11 @@ async function cancelHeldOrder(order) {
 async function checkout() {
   if (!canCheckout.value) return
   const ok = await confirm({
-    title: 'Tạo hóa đơn',
-    message: 'Bạn có chắc muốn tạo hóa đơn này?',
-    confirmText: 'Tạo hóa đơn',
+    title: isVnpay.value ? 'Tạo mã QR thanh toán' : 'Tạo hóa đơn',
+    message: isVnpay.value
+      ? 'Tạo hóa đơn và hiển thị mã QR VNPay cho khách thanh toán?'
+      : 'Bạn có chắc muốn tạo hóa đơn này?',
+    confirmText: isVnpay.value ? 'Tạo mã QR' : 'Tạo hóa đơn',
   })
   if (!ok) return
   paying.value = true
@@ -426,11 +539,21 @@ async function checkout() {
       maPhieuGiamGia: appliedVoucher.value || null,
       idPhuongThucThanhToan: selectedPaymentId.value,
       soTienKhachDua: isCash.value ? Number(cashGiven.value) : null,
-      maGiaoDich: isNonCash.value && transferRef.value.trim() ? transferRef.value.trim() : null,
+      maGiaoDich: isManualTransfer.value && transferRef.value.trim() ? transferRef.value.trim() : null,
       ghiChu: ghiChu.value.trim() || null,
       idHoaDonCho: activeHeldOrderId.value ?? null,
     }
     const res = await taoDonTaiQuay(payload)
+    if (res.data?.paymentUrl) {
+      openQrPayment(res.data)
+      activeHeldOrderId.value = null
+      clearCustomer()
+      cart.value = []
+      void loadProducts()
+      await loadHeldOrders()
+      notify('Đã tạo mã QR — chờ khách thanh toán')
+      return
+    }
     receipt.value = res.data
     showReceipt.value = true
     activeHeldOrderId.value = null
@@ -446,13 +569,101 @@ async function checkout() {
   }
 }
 
+function openQrPayment(data) {
+  qrOrderId.value = data.id
+  qrOrderCode.value = data.maHoaDon
+  qrAmount.value = Number(data.thanhTien) || 0
+  qrPaymentUrl.value = data.paymentUrl
+  qrTransactionRef.value = data.transactionRef || ''
+  qrStatus.value = data.trangThaiThanhToan || 'CHO_THANH_TOAN'
+  showQrModal.value = true
+  startQrPolling()
+}
+
+function stopQrPolling() {
+  qrPolling.value = false
+  if (qrPollTimer) {
+    clearInterval(qrPollTimer)
+    qrPollTimer = null
+  }
+}
+
+async function pollQrPaymentStatus() {
+  if (!qrOrderId.value || qrPolling.value) return
+  qrPolling.value = true
+  try {
+    const res = await kiemTraThanhToanPos(qrOrderId.value)
+    const status = res.data?.trangThaiThanhToan
+    if (status) qrStatus.value = status
+    if (status === 'THANH_CONG' && res.data?.hoaDon) {
+      stopQrPolling()
+      showQrModal.value = false
+      receipt.value = res.data.hoaDon
+      showReceipt.value = true
+      notify('Thanh toán QR thành công!')
+    } else if (status === 'THAT_BAI') {
+      stopQrPolling()
+      notify('Thanh toán thất bại hoặc đã hủy', 'error')
+    }
+  } catch (err) {
+    notify(String(err), 'error')
+  } finally {
+    qrPolling.value = false
+  }
+}
+
+function startQrPolling() {
+  stopQrPolling()
+  void pollQrPaymentStatus()
+  qrPollTimer = setInterval(() => {
+    void pollQrPaymentStatus()
+  }, 3000)
+}
+
+async function cancelQrPayment() {
+  const ok = await confirm({
+    title: 'Hủy thanh toán QR',
+    message: 'Hủy giao dịch và hoàn tồn kho cho đơn này?',
+    confirmText: 'Hủy thanh toán',
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    if (qrOrderId.value) {
+      await huyThanhToanPos(qrOrderId.value)
+    }
+    stopQrPolling()
+    showQrModal.value = false
+    qrPaymentUrl.value = ''
+    qrOrderId.value = null
+    void loadProducts()
+    notify('Đã hủy thanh toán QR')
+  } catch (err) {
+    notify(String(err), 'error')
+  }
+}
+
+function closeQrModal() {
+  if (qrStatus.value === 'CHO_THANH_TOAN') {
+    void cancelQrPayment()
+    return
+  }
+  stopQrPolling()
+  showQrModal.value = false
+}
+
 function resetSale() {
   clearTimeout(searchTimer)
+  stopQrPolling()
+  showQrModal.value = false
+  qrPaymentUrl.value = ''
+  qrOrderId.value = null
   cart.value = []
   keyword.value = ''
   clearCustomer()
   voucherCode.value = ''
   appliedVoucher.value = ''
+  voucherDiscount.value = 0
   cashGiven.value = ''
   transferRef.value = ''
   ghiChu.value = ''
@@ -497,6 +708,10 @@ onMounted(async () => {
   await Promise.all([loadMeta(), loadHeldOrders(), loadProducts()])
   await nextTick()
   searchInput.value?.focus()
+})
+
+onBeforeUnmount(() => {
+  stopQrPolling()
 })
 </script>
 
@@ -557,13 +772,27 @@ onMounted(async () => {
             <span v-if="!isOutOfStock(item)" class="pos-product-card__add" aria-hidden="true">
               <Icon icon="mdi:plus" width="18" />
             </span>
+            <span
+              v-if="isOnSale(item) && saleLabel(item) && !isOutOfStock(item)"
+              class="pos-product-card__badge-sale"
+            >
+              {{ saleLabel(item) }}
+            </span>
             <span v-if="isOutOfStock(item)" class="pos-product-card__badge-out">Hết hàng</span>
             <div class="pos-product-card__thumb">
-              {{ productInitial(item.tenSanPham) }}
+              <img
+                :src="productImageUrl(item.anhUrl)"
+                :alt="item.tenSanPham"
+                loading="lazy"
+              />
             </div>
             <p class="pos-product-card__name">{{ item.tenSanPham }}</p>
             <p class="pos-product-card__variant">{{ formatVariant(item) }}</p>
-            <p class="pos-product-card__price">{{ formatCurrency(item.giaBan) }}</p>
+            <div v-if="isOnSale(item)" class="pos-product-card__prices">
+              <p class="pos-product-card__price pos-product-card__price--sale">{{ formatCurrency(item.giaBan) }}</p>
+              <p class="pos-product-card__price pos-product-card__price--original">{{ formatCurrency(item.giaGoc) }}</p>
+            </div>
+            <p v-else class="pos-product-card__price">{{ formatCurrency(item.giaBan) }}</p>
             <p class="pos-product-card__stock">
               {{ isOutOfStock(item) ? 'Hết hàng' : `Còn ${item.soLuongTon}` }}
             </p>
@@ -640,10 +869,25 @@ onMounted(async () => {
         </div>
         <div v-else class="pos-cart-lines">
           <div v-for="line in cart" :key="cartKey(line.idChiTietSanPham)" class="pos-cart-line">
+            <div class="pos-cart-line__thumb">
+              <img
+                :src="productImageUrl(line.anhUrl)"
+                :alt="line.tenSanPham"
+                loading="lazy"
+              />
+            </div>
             <div class="pos-cart-line__info">
               <div class="pos-cart-line__name">{{ line.tenSanPham }}</div>
               <div class="pos-cart-line__variant">{{ line.bienThe }}</div>
-              <div class="pos-cart-line__price">{{ formatCurrency(line.giaBan) }} / sp</div>
+              <div v-if="line.dangGiamGia" class="pos-cart-line__prices">
+                <span class="pos-cart-line__price pos-cart-line__price--sale">
+                  {{ formatCurrency(line.giaBan) }} / sp
+                </span>
+                <span class="pos-cart-line__price pos-cart-line__price--original">
+                  {{ formatCurrency(line.giaGoc) }}
+                </span>
+              </div>
+              <div v-else class="pos-cart-line__price">{{ formatCurrency(line.giaBan) }} / sp</div>
             </div>
             <button
               type="button"
@@ -684,12 +928,21 @@ onMounted(async () => {
               class="admin-input flex-1"
               placeholder="Nhập mã (tùy chọn)"
             />
-            <button type="button" class="admin-btn admin-btn-default" @click="applyVoucher">
-              Áp dụng
+            <button
+              type="button"
+              class="admin-btn admin-btn-default"
+              :disabled="voucherLoading || hasSaleItemsInCart || cart.length === 0"
+              @click="applyVoucher"
+            >
+              {{ voucherLoading ? 'Đang kiểm tra...' : 'Áp dụng' }}
             </button>
           </div>
-          <p v-if="appliedVoucher" class="text-xs text-[var(--admin-muted)] mt-1">
-            Mã đã nhập: <strong>{{ appliedVoucher }}</strong> — giảm tính khi thanh toán
+          <p v-if="hasSaleItemsInCart" class="text-xs text-[var(--coral)] mt-1">
+            Đơn có sản phẩm đang giảm giá nên không thể áp dụng mã voucher.
+          </p>
+          <p v-else-if="appliedVoucher" class="text-xs text-[var(--admin-muted)] mt-1">
+            Mã đã áp dụng: <strong>{{ appliedVoucher }}</strong>
+            — giảm <strong class="text-[var(--sage)]">{{ formatCurrency(voucherDiscount) }}</strong>
           </p>
         </div>
 
@@ -699,9 +952,9 @@ onMounted(async () => {
             <span>Tổng tiền hàng</span>
             <span>{{ formatCurrency(tongTienHang) }}</span>
           </div>
-          <div v-if="appliedVoucher" class="pos-totals__row">
-            <span>Giảm giá</span>
-            <span class="text-[var(--sage)]">Theo mã {{ appliedVoucher }}</span>
+          <div v-if="voucherDiscount > 0" class="pos-totals__row">
+            <span>Giảm giá ({{ appliedVoucher }})</span>
+            <span class="text-[var(--sage)]">−{{ formatCurrency(voucherDiscount) }}</span>
           </div>
           <div class="pos-totals__grand">
             <span class="pos-totals__grand-label">Thành tiền</span>
@@ -752,9 +1005,14 @@ onMounted(async () => {
           </p>
         </div>
 
-        <div v-else-if="isNonCash" class="mb-4">
+        <div v-else-if="isManualTransfer" class="mb-4">
           <label class="soleil-label block mb-2">Mã giao dịch (tùy chọn)</label>
           <input v-model="transferRef" type="text" class="admin-input w-full" placeholder="Mã GD / tham chiếu..." />
+        </div>
+
+        <div v-else-if="isVnpay" class="mb-4 pos-qr-hint">
+          <Icon icon="solar:qr-code-linear" class="text-xl shrink-0" />
+          <p>Khách quét mã QR VNPay trên điện thoại. Hệ thống tự xác nhận khi thanh toán thành công.</p>
         </div>
 
         <div class="pos-checkout-row">
@@ -772,7 +1030,7 @@ onMounted(async () => {
             :disabled="!canCheckout || paying"
             @click="checkout"
           >
-            {{ paying ? 'Đang tạo...' : 'Tạo hóa đơn' }}
+            {{ checkoutButtonLabel }}
           </button>
         </div>
         <p v-if="activeHeldOrderId" class="text-xs text-[var(--admin-muted)] mt-2 text-center">
@@ -887,6 +1145,58 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+    </Teleport>
+
+    <!-- Modal QR thanh toán VNPay -->
+    <Teleport to="body">
+      <div v-if="showQrModal" class="pos-qr-overlay" @click.self="closeQrModal">
+        <div class="pos-qr-modal">
+          <div class="pos-qr-modal__head">
+            <h2 class="pos-qr-modal__title">Thanh toán QR VNPay</h2>
+            <button type="button" class="admin-icon-btn" title="Đóng" @click="closeQrModal">
+              <Icon icon="mdi:close" width="20" />
+            </button>
+          </div>
+
+          <div class="pos-qr-modal__body">
+            <p class="pos-qr-modal__order">{{ qrOrderCode }}</p>
+            <p class="pos-qr-modal__amount">{{ formatCurrency(qrAmount) }}</p>
+            <p class="pos-qr-modal__status" :class="{ 'pos-qr-modal__status--ok': qrStatus === 'THANH_CONG' }">
+              {{ qrStatusLabel }}
+            </p>
+
+            <div v-if="qrPaymentUrl && qrStatus === 'CHO_THANH_TOAN'" class="pos-qr-modal__code">
+              <NQrCode :value="qrPaymentUrl" :size="240" padding="12" />
+            </div>
+
+            <p v-if="qrTransactionRef" class="pos-qr-modal__ref">
+              Mã GD: <strong>{{ qrTransactionRef }}</strong>
+            </p>
+            <p class="pos-qr-modal__hint">
+              Khách mở app ngân hàng / VNPay và quét mã. Màn hình sẽ tự cập nhật khi thanh toán xong.
+            </p>
+          </div>
+
+          <div class="pos-qr-modal__actions">
+            <button
+              v-if="qrStatus === 'CHO_THANH_TOAN'"
+              type="button"
+              class="soleil-btn-outline flex-1"
+              @click="cancelQrPayment"
+            >
+              Hủy thanh toán
+            </button>
+            <button
+              type="button"
+              class="soleil-btn-primary flex-1"
+              :disabled="qrPolling"
+              @click="pollQrPaymentStatus"
+            >
+              {{ qrPolling ? 'Đang kiểm tra...' : 'Kiểm tra lại' }}
+            </button>
+          </div>
+        </div>
+      </div>
     </Teleport>
   </div>
 </template>

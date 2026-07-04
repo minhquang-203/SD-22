@@ -5,6 +5,7 @@ import org.example.templatejava6.product.entity.SanPham;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,4 +19,6 @@ public interface AnhSanPhamRepository extends JpaRepository<AnhSanPham, Integer>
     Optional<AnhSanPham> findFirstBySanPham_IdAndLaAnhChinhTrue(Integer sanPhamId);
 
     Optional<AnhSanPham> findFirstBySanPham_IdOrderByThuTuAsc(Integer sanPhamId);
+
+    List<AnhSanPham> findBySanPham_IdIn(Collection<Integer> sanPhamIds);
 }

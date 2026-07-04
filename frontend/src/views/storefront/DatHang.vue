@@ -108,7 +108,7 @@ const successOrderCode = computed(
 const successAmount = computed(() => orderResult.value?.thanhTien ?? null)
 
 const successStatusLabel = computed(
-  () => orderResult.value?.trangThaiLabel || (paymentCallback.value?.success ? 'Đã thanh toán' : ''),
+  () => orderResult.value?.trangThaiLabel || (paymentCallback.value?.success ? 'Đang chuẩn bị hàng' : ''),
 )
 
 const checkoutPhase = computed(() => {

@@ -53,6 +53,11 @@ const shippingText = computed(() => {
 function toggleOpen() {
   isOpen.value = !isOpen.value
 }
+
+function canReview(line) {
+  const delivered = props.order?.trangThai === 'HOAN_THANH' || props.order?.trangThai === 'GIAO_THANH_CONG'
+  return delivered && !line?.daDanhGia && line?.idSanPham
+}
 </script>
 
 <template>
@@ -131,14 +136,21 @@ function toggleOpen() {
             <p class="sf-order-line__name">{{ line.tenSanPham }}</p>
             <p v-if="line.bienThe" class="sf-order-line__variant">{{ line.bienThe }}</p>
             <p class="sf-order-line__qty">x{{ line.soLuong }} · {{ formatVND(line.donGia) }}</p>
-            
-            <button 
-              v-if="order.trangThai === 'HOAN_THANH' || order.trangThai === 'GIAO_THANH_CONG'" 
-              class="sf-btn-review" 
+
+            <button
+              v-if="canReview(line)"
+              type="button"
+              class="sf-btn-review"
               @click.stop="$emit('review', line)"
             >
               Đánh giá
             </button>
+            <span v-else-if="line.daDanhGia && line.trangThaiDanhGia === 'CHO_DUYET'" class="sf-review-status sf-review-status--pending">
+              Đang chờ duyệt
+            </span>
+            <span v-else-if="line.daDanhGia" class="sf-review-status sf-review-status--done">
+              Đã đánh giá
+            </span>
           </div>
           <strong class="sf-order-line__total">{{ formatVND(line.thanhTien) }}</strong>
         </li>
@@ -190,5 +202,20 @@ function toggleOpen() {
 }
 .sf-btn-review:hover {
   background-color: #d97706;
+}
+
+.sf-review-status {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sf-review-status--pending {
+  color: #d97706;
+}
+
+.sf-review-status--done {
+  color: #16a34a;
 }
 </style>

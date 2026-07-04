@@ -2,8 +2,8 @@
 export function orderStatusLabel(trangThai, fallback = '') {
   const map = {
     CHO_XAC_NHAN: 'Chờ xác nhận',
-    DA_XAC_NHAN: 'Chờ xác nhận',
-    DANG_CHUAN_BI: 'Chờ xác nhận',
+    DA_XAC_NHAN: 'Đã xác nhận',
+    DANG_CHUAN_BI: 'Đang chuẩn bị hàng',
     DANG_GIAO: 'Đang giao',
     HOAN_THANH: 'Đã giao',
     DA_HUY: 'Đã hủy',
@@ -15,7 +15,7 @@ export function orderStatusClass(trangThai) {
   const map = {
     CHO_XAC_NHAN: 'sf-order-badge--wait',
     DA_XAC_NHAN: 'sf-order-badge--wait',
-    DANG_CHUAN_BI: 'sf-order-badge--wait',
+    DANG_CHUAN_BI: 'sf-order-badge--ship',
     DANG_GIAO: 'sf-order-badge--ship',
     HOAN_THANH: 'sf-order-badge--done',
     DA_HUY: 'sf-order-badge--cancel',

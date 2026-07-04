@@ -8,11 +8,14 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface DanhGiaRepository extends JpaRepository<DanhGia, Integer> {
 
     List<DanhGia> findBySanPhamAndTrangThai(SanPham sanPham, String trangThai);
+
+    Optional<DanhGia> findFirstByHoaDonChiTiet_Id(Integer idHoaDonChiTiet);
 
     List<DanhGia> findByTrangThai(String trangThai);
 

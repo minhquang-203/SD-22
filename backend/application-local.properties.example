@@ -1,4 +1,4 @@
-# Sao chép thành application-local.properties và điền Gmail App Password (16 ký tự).
+# Sao chép thành src/main/resources/application-local.properties (hoặc backend/application-local.properties)
 # KHÔNG commit file application-local.properties lên git.
 
 MAIL_USERNAME=your-email@gmail.com
@@ -6,3 +6,24 @@ MAIL_PASSWORD=your-16-char-app-password
 
 spring.mail.username=${MAIL_USERNAME}
 spring.mail.password=${MAIL_PASSWORD}
+
+# ---------------------------------------------------------------------------
+# VNPay — test QR trên điện thoại (bắt buộc URL public cho callback)
+# ---------------------------------------------------------------------------
+# 1. Chạy backend local port 8080
+# 2. Mở tunnel (chọn 1):
+#      ngrok http 8080
+#      cloudflared tunnel --url http://localhost:8080
+# 3. Lấy URL https dạng https://xxxx.ngrok-free.app hoặc https://xxxx.trycloudflare.com
+# 4. Điền vào dòng dưới (thay YOUR_PUBLIC_HOST), restart backend
+# 5. Tạo LẠI mã QR trên POS (URL cũ vẫn nhúng localhost)
+#
+# Ví dụ:
+# payment.vnpay.return-url=https://abc123.ngrok-free.app/api/payments/vnpay/callback
+# payment.vnpay.frontend-return-url=https://abc123.ngrok-free.app/dat-hang
+#
+# Hoặc set biến môi trường trước khi chạy backend:
+#   set VNPAY_RETURN_URL=https://abc123.ngrok-free.app/api/payments/vnpay/callback
+
+payment.vnpay.return-url=https://YOUR_PUBLIC_HOST/api/payments/vnpay/callback
+payment.vnpay.frontend-return-url=https://YOUR_PUBLIC_HOST/dat-hang

@@ -159,10 +159,17 @@ public class SanPhamService {
         validateMaSanPham(request.getMaSanPham(), id);
         validateChiTiets(request.getChiTiets(), id);
 
+        Boolean trangThai = sp.getTrangThai();
+        Boolean noiBat = sp.getNoiBat();
+        LocalDateTime ngayTao = sp.getNgayTao();
+
         MapperUtil.mapToExisting(request, sp);
         sp.setThuongHieu(categoryService.getThuongHieuOrThrow(request.getIdThuongHieu()));
         sp.setDanhMuc(categoryService.getDanhMucOrThrow(request.getIdDanhMuc()));
         sp.setDangSanPham(categoryService.getDangSanPhamOrThrow(request.getIdDangSanPham()));
+        sp.setTrangThai(trangThai);
+        sp.setNoiBat(request.getNoiBat() != null ? request.getNoiBat() : (noiBat != null ? noiBat : false));
+        sp.setNgayTao(ngayTao);
         sp.setId(id);
         sanPhamRepository.save(sp);
 

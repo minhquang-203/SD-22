@@ -1442,6 +1442,12 @@
   border-bottom: 1px solid var(--sf-sand);
 }
 
+.sf-review-stars {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
 .sf-review-stars .dim {
   opacity: 0.25;
 }
@@ -3345,6 +3351,12 @@
 .sf-order-msg--err {
   border-color: rgba(163, 59, 28, 0.35);
   color: var(--sf-espresso);
+}
+
+.sf-order-msg--ok {
+  border-color: rgba(22, 163, 74, 0.35);
+  color: #166534;
+  background: #f0fdf4;
 }
 
 .sf-order-card {

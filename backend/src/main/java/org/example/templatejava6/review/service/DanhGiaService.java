@@ -43,6 +43,11 @@ public class DanhGiaService {
 
     @Transactional
     public void add(DanhGiaRequest request, MultipartFile file) {
+        if (request.getIdHoaDonChiTiet() != null
+                && danhGiaRepository.findFirstByHoaDonChiTiet_Id(request.getIdHoaDonChiTiet()).isPresent()) {
+            throw new ApiException("Bạn đã đánh giá sản phẩm này trong đơn hàng", "VALIDATION_ERROR");
+        }
+
         DanhGia dg = new DanhGia();
         dg.setIdKhachHang(request.getIdKhachHang());
         dg.setSoSao(request.getSoSao());

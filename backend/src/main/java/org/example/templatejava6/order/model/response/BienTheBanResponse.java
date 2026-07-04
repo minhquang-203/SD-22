@@ -17,9 +17,13 @@ public class BienTheBanResponse {
     private BigDecimal dungTichMl;
     private String tenMauSac;
     private BigDecimal giaBan;
+    private BigDecimal giaGoc;
+    private BigDecimal phanTramGiam;
+    private Boolean dangGiamGia;
     private Integer soLuongTon;
     private LocalDate hanSuDungGanNhat;
     private Integer soNgayConLai;
+    private String anhUrl;
 
     public BienTheBanResponse(ChiTietSanPham cts) {
         this.idChiTietSanPham = cts.getId();

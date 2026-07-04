@@ -18,6 +18,15 @@ export const taoKhachNhanh = (payload) =>
 export const taoDonTaiQuay = (payload) =>
   request.post('/ban-hang/tai-quay', payload)
 
+export const tinhGiaTaiQuay = (payload) =>
+  request.post('/ban-hang/tinh-gia', payload)
+
+export const kiemTraThanhToanPos = (idHoaDon) =>
+  request.get(`/ban-hang/tai-quay/${idHoaDon}/thanh-toan`)
+
+export const huyThanhToanPos = (idHoaDon) =>
+  request.post(`/ban-hang/tai-quay/${idHoaDon}/huy-thanh-toan`)
+
 export const giuDon = (payload) => request.post('/ban-hang/cho', payload)
 
 export const dsDonCho = () => request.get('/ban-hang/cho')

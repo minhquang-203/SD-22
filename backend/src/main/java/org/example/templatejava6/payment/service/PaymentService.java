@@ -12,6 +12,7 @@ import org.example.templatejava6.order.repository.PhuongThucThanhToanRepository;
 import org.example.templatejava6.order.repository.ThanhToanHoaDonRepository;
 import org.example.templatejava6.order.service.GhnOrderCreationService;
 import org.example.templatejava6.order.service.OnlineOrderLifecycleService;
+import org.example.templatejava6.order.service.PosOrderLifecycleService;
 import org.example.templatejava6.payment.gateway.PaymentCallbackResult;
 import org.example.templatejava6.payment.gateway.PaymentCreateCommand;
 import org.example.templatejava6.payment.gateway.PaymentCreateResult;
@@ -37,6 +38,7 @@ public class PaymentService {
     private static final String TRANG_THAI_THANH_CONG = "THANH_CONG";
     private static final String TRANG_THAI_THAT_BAI = "THAT_BAI";
     private static final String LOAI_DON_ONLINE = "ONLINE";
+    private static final String LOAI_TAI_QUAY = "TAI_QUAY";
     private static final DateTimeFormatter TRANSACTION_TIME = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     private final PaymentGatewayRegistry gatewayRegistry;
@@ -45,6 +47,7 @@ public class PaymentService {
     private final PhuongThucThanhToanRepository phuongThucThanhToanRepository;
     private final LichSuDonHangRepository lichSuDonHangRepository;
     private final OnlineOrderLifecycleService onlineOrderLifecycleService;
+    private final PosOrderLifecycleService posOrderLifecycleService;
     private final GhnOrderCreationService ghnOrderCreationService;
 
     public PaymentService(
@@ -54,6 +57,7 @@ public class PaymentService {
             PhuongThucThanhToanRepository phuongThucThanhToanRepository,
             LichSuDonHangRepository lichSuDonHangRepository,
             OnlineOrderLifecycleService onlineOrderLifecycleService,
+            PosOrderLifecycleService posOrderLifecycleService,
             GhnOrderCreationService ghnOrderCreationService) {
         this.gatewayRegistry = gatewayRegistry;
         this.hoaDonRepository = hoaDonRepository;
@@ -61,6 +65,7 @@ public class PaymentService {
         this.phuongThucThanhToanRepository = phuongThucThanhToanRepository;
         this.lichSuDonHangRepository = lichSuDonHangRepository;
         this.onlineOrderLifecycleService = onlineOrderLifecycleService;
+        this.posOrderLifecycleService = posOrderLifecycleService;
         this.ghnOrderCreationService = ghnOrderCreationService;
     }
 
@@ -145,21 +150,31 @@ public class PaymentService {
             thanhToan.setThoiGian(LocalDateTime.now());
             thanhToanHoaDonRepository.save(thanhToan);
 
-            if (hoaDon.getTrangThai() == TrangThaiDonHang.CHO_XAC_NHAN) {
-                hoaDon.setTrangThai(TrangThaiDonHang.DA_XAC_NHAN);
+            if (LOAI_TAI_QUAY.equalsIgnoreCase(hoaDon.getLoaiDon())) {
+                posOrderLifecycleService.hoanThanhDonVnpay(hoaDon);
+            } else if (hoaDon.getTrangThai() == TrangThaiDonHang.CHO_XAC_NHAN) {
+                hoaDon.setTrangThai(TrangThaiDonHang.DANG_CHUAN_BI);
                 hoaDonRepository.save(hoaDon);
+                ghiNhatKy(hoaDon, "DANG_CHUAN_BI",
+                        "Thanh toán online thành công, chuyển sang chuẩn bị hàng.");
             }
             ghiNhatKy(hoaDon, "THANH_TOAN",
                     "Thanh toán " + provider + " thành công"
                             + formatProviderTransaction(callback.getProviderTransactionNo()));
-            ghnOrderCreationService.taoVanDonNeuCan(hoaDon);
+            if (LOAI_DON_ONLINE.equalsIgnoreCase(hoaDon.getLoaiDon())) {
+                ghnOrderCreationService.taoVanDonNeuCan(hoaDon);
+            }
             return buildCallbackResponse(callback, provider, hoaDon, true, callback.getMessage());
         }
 
         thanhToan.setTrangThai(TRANG_THAI_THAT_BAI);
         thanhToan.setThoiGian(LocalDateTime.now());
         thanhToanHoaDonRepository.save(thanhToan);
-        onlineOrderLifecycleService.huyDonOnline(hoaDon, "Thanh toán " + provider + " thất bại, hủy đơn và hoàn tồn.");
+        if (LOAI_TAI_QUAY.equalsIgnoreCase(hoaDon.getLoaiDon())) {
+            posOrderLifecycleService.huyDonVnpay(hoaDon, "Thanh toán " + provider + " thất bại, hủy đơn và hoàn tồn.");
+        } else {
+            onlineOrderLifecycleService.huyDonOnline(hoaDon, "Thanh toán " + provider + " thất bại, hủy đơn và hoàn tồn.");
+        }
         ghiNhatKy(hoaDon, "THANH_TOAN_THAT_BAI",
                 "Thanh toán " + provider + " thất bại. Mã phản hồi: " + callback.getResponseCode());
         return buildCallbackResponse(callback, provider, hoaDon, false, callback.getMessage());
@@ -172,8 +187,10 @@ public class PaymentService {
         if (hoaDon.getTrangThai() == null || hoaDon.getTrangThai().laTrangThaiKetThuc()) {
             throw new ApiException("Hóa đơn không thể thanh toán ở trạng thái hiện tại.", "INVALID_ORDER_STATUS");
         }
-        if (hoaDon.getLoaiDon() != null && !LOAI_DON_ONLINE.equalsIgnoreCase(hoaDon.getLoaiDon())) {
-            throw new ApiException("Chỉ hỗ trợ thanh toán online cho hóa đơn ONLINE.", "INVALID_ORDER_TYPE");
+        if (hoaDon.getLoaiDon() != null
+                && !LOAI_DON_ONLINE.equalsIgnoreCase(hoaDon.getLoaiDon())
+                && !LOAI_TAI_QUAY.equalsIgnoreCase(hoaDon.getLoaiDon())) {
+            throw new ApiException("Chỉ hỗ trợ thanh toán VNPAY cho hóa đơn ONLINE hoặc TAI_QUAY.", "INVALID_ORDER_TYPE");
         }
         thanhToanHoaDonRepository.findLatestByHoaDonAndTrangThai(hoaDon, TRANG_THAI_THANH_CONG)
                 .ifPresent(thanhToan -> {
