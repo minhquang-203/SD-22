@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer; // Thêm import này
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -32,6 +33,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                // 1. KÍCH HOẠT CORS ĐỂ KẾT NỐI VỚI VUE
+                .cors(Customizer.withDefaults())
+
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
@@ -42,6 +46,10 @@ public class SecurityConfig {
                     .requestMatchers("/api/auth/khach/**").permitAll()
                     .requestMatchers("/api/khach/quiz/**").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/auth/nhan-vien/dang-nhap").permitAll()
+
+                    // 2. MỞ CỬA TỰ DO CHO API THỜI TIẾT VÀ CẤU HÌNH UV
+                    .requestMatchers("/api/v1/weather/**", "/api/v1/admin/config/uv").permitAll()
+
                     .requestMatchers(HttpMethod.GET,
                             "/api/san-pham/**",
                             "/api/danh-muc/**",
