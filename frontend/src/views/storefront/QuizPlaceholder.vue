@@ -102,6 +102,7 @@
                   :class="{ 'sg-answer-card--selected': isSelected(answer) }"
                   @click="selectAnswer(answer)"
                 >
+                  <Icon v-if="answer.icon" :icon="answer.icon" class="sg-answer-card__icon" />
                   <h3 class="sg-answer-card__label">{{ answer.label }}</h3>
                 </div>
               </div>
@@ -214,6 +215,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter, onBeforeRouteLeave } from 'vue-router';
+import { Icon } from '@iconify/vue';
 
 // CHUẨN KIẾN TRÚC GỌI API (Đã thay đổi theo hướng dẫn đồ án)
 
@@ -857,5 +859,18 @@ const retakeQuiz = () => {
   .sg-progress__sun { font-size: 28px; top: -12px; right: -14px; }
   .sg-result__title { font-size: 22px; }
   .sg-result__skin-name { font-size: 24px; }
+}
+
+.sg-answer-card__icon {
+  font-size: 38px;
+  margin-bottom: 12px;
+  color: var(--sq-gold);
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  transition: all 0.3s;
+}
+.sg-answer-card--selected .sg-answer-card__icon {
+  color: var(--sq-cream);
 }
 </style>
