@@ -3,7 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import OrderCard from '@/components/storefront/OrderCard.vue'
 import ProductReviewModal from '@/components/storefront/ProductReviewModal.vue'
-import { fetchChiTietDonCuaToi, fetchDonCuaToi } from '@/api/donHangApi'
+import { confirm } from '@/composables/useConfirm'
+import { fetchChiTietDonCuaToi, fetchDonCuaToi, huyDonCuaToi } from '@/api/donHangApi'
 
 const search = ref('')
 const currentFilter = ref('all')
@@ -13,13 +14,16 @@ const error = ref('')
 const showReviewModal = ref(false)
 const reviewLine = ref(null)
 const reviewNotice = ref('')
+const cancelLoadingId = ref(null)
+const cancelNotice = ref('')
+const cancelError = ref('')
 
 const filters = [
   { value: 'all', label: 'Tất cả' },
   { value: 'shipping', label: 'Đang giao' },
   { value: 'processing', label: 'Đang xử lý' },
   { value: 'delivered', label: 'Đã giao' },
-  { value: 'cancelled', label: 'Đã hủy' },
+  { value: 'cancelled', label: 'Đã hủy / Trả hàng' },
 ]
 
 onMounted(loadOrders)
@@ -65,6 +69,7 @@ function statusGroup(status) {
     DANG_CHUAN_BI: 'processing',
     DANG_GIAO: 'shipping',
     HOAN_THANH: 'delivered',
+    TRA_HANG: 'cancelled',
     DA_HUY: 'cancelled',
   }
   return map[status] || 'processing'
@@ -89,6 +94,35 @@ function onReviewSubmitted({ lineId }) {
       line.trangThaiDanhGia = 'CHO_DUYET'
       break
     }
+  }
+}
+
+async function handleCancelOrder(order) {
+  if (!order?.id || cancelLoadingId.value) return
+
+  const ok = await confirm({
+    title: 'Hủy đơn hàng',
+    message: `Bạn có chắc muốn hủy đơn ${order.maHoaDon}? Hành động này không thể hoàn tác.`,
+    confirmText: 'Hủy đơn',
+    danger: true,
+  })
+  if (!ok) return
+
+  cancelLoadingId.value = order.id
+  cancelError.value = ''
+  cancelNotice.value = ''
+  try {
+    const res = await huyDonCuaToi(order.id)
+    const updated = res.data || order
+    const idx = orders.value.findIndex((item) => item.id === order.id)
+    if (idx >= 0) {
+      orders.value[idx] = updated
+    }
+    cancelNotice.value = `Đã hủy đơn ${order.maHoaDon}.`
+  } catch (err) {
+    cancelError.value = typeof err === 'string' ? err : 'Không hủy được đơn hàng. Vui lòng thử lại.'
+  } finally {
+    cancelLoadingId.value = null
   }
 }
 </script>
@@ -128,7 +162,9 @@ function onReviewSubmitted({ lineId }) {
         </div>
 
         <p v-if="error" class="sf-order-msg sf-order-msg--err">{{ error }}</p>
+        <p v-if="cancelError" class="sf-order-msg sf-order-msg--err">{{ cancelError }}</p>
         <p v-if="reviewNotice" class="sf-order-msg sf-order-msg--ok">{{ reviewNotice }}</p>
+        <p v-if="cancelNotice" class="sf-order-msg sf-order-msg--ok">{{ cancelNotice }}</p>
 
         <div v-if="loading" class="sf-order-skeleton" />
 
@@ -138,7 +174,9 @@ function onReviewSubmitted({ lineId }) {
             :key="order.id"
             :order="order"
             :default-open="idx === 0"
+            :cancel-loading="cancelLoadingId === order.id"
             @review="openReview"
+            @cancel-order="handleCancelOrder"
           />
         </div>
 

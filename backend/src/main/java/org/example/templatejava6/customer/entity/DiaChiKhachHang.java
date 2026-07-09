@@ -54,6 +54,16 @@ public class DiaChiKhachHang {
     @Column(name = "dia_chi_chi_tiet", length = 255)
     private String diaChiChiTiet;
 
+    @Column(name = "province_id")
+    private Integer provinceId;
+
+    @Column(name = "district_id")
+    private Integer districtId;
+
+    @Size(max = 20)
+    @Column(name = "ward_code", length = 20)
+    private String wardCode;
+
     @Column(name = "mac_dinh")
     private Boolean macDinh;
 }

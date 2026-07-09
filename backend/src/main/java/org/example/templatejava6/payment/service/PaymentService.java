@@ -10,7 +10,6 @@ import org.example.templatejava6.order.repository.HoaDonRepository;
 import org.example.templatejava6.order.repository.LichSuDonHangRepository;
 import org.example.templatejava6.order.repository.PhuongThucThanhToanRepository;
 import org.example.templatejava6.order.repository.ThanhToanHoaDonRepository;
-import org.example.templatejava6.order.service.GhnOrderCreationService;
 import org.example.templatejava6.order.service.OnlineOrderLifecycleService;
 import org.example.templatejava6.order.service.PosOrderLifecycleService;
 import org.example.templatejava6.payment.gateway.PaymentCallbackResult;
@@ -48,7 +47,6 @@ public class PaymentService {
     private final LichSuDonHangRepository lichSuDonHangRepository;
     private final OnlineOrderLifecycleService onlineOrderLifecycleService;
     private final PosOrderLifecycleService posOrderLifecycleService;
-    private final GhnOrderCreationService ghnOrderCreationService;
 
     public PaymentService(
             PaymentGatewayRegistry gatewayRegistry,
@@ -57,8 +55,7 @@ public class PaymentService {
             PhuongThucThanhToanRepository phuongThucThanhToanRepository,
             LichSuDonHangRepository lichSuDonHangRepository,
             OnlineOrderLifecycleService onlineOrderLifecycleService,
-            PosOrderLifecycleService posOrderLifecycleService,
-            GhnOrderCreationService ghnOrderCreationService) {
+            PosOrderLifecycleService posOrderLifecycleService) {
         this.gatewayRegistry = gatewayRegistry;
         this.hoaDonRepository = hoaDonRepository;
         this.thanhToanHoaDonRepository = thanhToanHoaDonRepository;
@@ -66,7 +63,6 @@ public class PaymentService {
         this.lichSuDonHangRepository = lichSuDonHangRepository;
         this.onlineOrderLifecycleService = onlineOrderLifecycleService;
         this.posOrderLifecycleService = posOrderLifecycleService;
-        this.ghnOrderCreationService = ghnOrderCreationService;
     }
 
     @Transactional
@@ -152,18 +148,10 @@ public class PaymentService {
 
             if (LOAI_TAI_QUAY.equalsIgnoreCase(hoaDon.getLoaiDon())) {
                 posOrderLifecycleService.hoanThanhDonVnpay(hoaDon);
-            } else if (hoaDon.getTrangThai() == TrangThaiDonHang.CHO_XAC_NHAN) {
-                hoaDon.setTrangThai(TrangThaiDonHang.DANG_CHUAN_BI);
-                hoaDonRepository.save(hoaDon);
-                ghiNhatKy(hoaDon, "DANG_CHUAN_BI",
-                        "Thanh toán online thành công, chuyển sang chuẩn bị hàng.");
             }
             ghiNhatKy(hoaDon, "THANH_TOAN",
                     "Thanh toán " + provider + " thành công"
                             + formatProviderTransaction(callback.getProviderTransactionNo()));
-            if (LOAI_DON_ONLINE.equalsIgnoreCase(hoaDon.getLoaiDon())) {
-                ghnOrderCreationService.taoVanDonNeuCan(hoaDon);
-            }
             return buildCallbackResponse(callback, provider, hoaDon, true, callback.getMessage());
         }
 

@@ -57,7 +57,7 @@ public class KhachHangService {
         KhachHang kh = khachHangRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Không tìm thấy khách hàng", "NOT_FOUND"));
         KhachHangDetailResponse response = new KhachHangDetailResponse(kh);
-        response.setDiaChis(diaChiKhachHangRepository.findByKhachHang(kh).stream()
+        response.setDiaChis(diaChiKhachHangRepository.findByKhachHangOrderByMacDinhDescIdDesc(kh).stream()
                 .map(DiaChiResponse::new)
                 .toList());
         return response;

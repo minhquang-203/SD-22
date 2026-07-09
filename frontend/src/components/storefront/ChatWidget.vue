@@ -156,7 +156,7 @@ const viewProduct = (productId) => {
   position: fixed;
   bottom: 30px;
   right: 30px;
-  z-index: 9999;
+  z-index: 4000;
   font-family: 'Inter', sans-serif;
 }
 

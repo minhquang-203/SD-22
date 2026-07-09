@@ -2,13 +2,17 @@ package org.example.templatejava6.order.controller;
 
 import jakarta.validation.Valid;
 import org.example.templatejava6.order.model.request.HoaDonChuyenTrangThaiRequest;
+import org.example.templatejava6.order.model.request.HoaDonGhnWebhookRequest;
 import org.example.templatejava6.order.model.request.HoaDonRequest;
+import org.example.templatejava6.order.model.request.HoaDonTuChoiRequest;
+import org.example.templatejava6.order.model.response.GhnTrangThaiOptionResponse;
 import org.example.templatejava6.order.model.response.HoaDonDetailResponse;
 import org.example.templatejava6.order.model.response.HoaDonResponse;
 import org.example.templatejava6.order.model.response.StorefrontOrderDetailResponse;
 import org.example.templatejava6.order.model.response.StorefrontOrderSummaryResponse;
 import org.example.templatejava6.order.service.GhnOrderCreationService;
 import org.example.templatejava6.order.service.GhnOrderSyncService;
+import org.example.templatejava6.order.service.GhnTrackingService;
 import org.example.templatejava6.order.service.HoaDonService;
 import org.example.templatejava6.order.service.HoaDonStorefrontService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,6 +55,15 @@ public class HoaDonController {
     @GetMapping("/cua-toi/{id}")
     public StorefrontOrderDetailResponse chiTietCuaToi(@PathVariable Integer id) {
         return hoaDonStorefrontService.chiTietCuaToi(id);
+    }
+
+    @PostMapping("/cua-toi/{id}/huy")
+    public StorefrontOrderDetailResponse huyDonCuaToi(
+            @PathVariable Integer id,
+            @RequestBody(required = false) HoaDonTuChoiRequest request) {
+        return hoaDonStorefrontService.huyDonCuaToi(
+                id,
+                request != null ? request.getGhiChu() : null);
     }
 
     @GetMapping
@@ -105,10 +118,38 @@ public class HoaDonController {
                 request.getIdNhanVien()
         );
     }
+
+    @PostMapping("/{id}/tu-choi")
+    public void tuChoiDon(
+            @PathVariable Integer id,
+            @RequestBody(required = false) HoaDonTuChoiRequest request
+    ) {
+        hoaDonService.tuChoiDon(
+                id,
+                request != null ? request.getGhiChu() : null,
+                request != null ? request.getIdNhanVien() : null
+        );
+    }
     
     @PostMapping("/{id}/dong-bo-ghn")
     public GhnOrderSyncService.KetQuaDongBo dongBoGhn(@PathVariable Integer id) {
         return ghnOrderSyncService.dongBoTheoId(id);
+    }
+
+    @GetMapping("/ghn-trang-thai")
+    public List<GhnTrangThaiOptionResponse> ghnTrangThai() {
+        return GhnTrackingService.allStatusOptions();
+    }
+
+    @PostMapping("/{id}/gia-lap-webhook-ghn")
+    public GhnOrderSyncService.KetQuaDongBo giaLapWebhookGhn(
+            @PathVariable Integer id,
+            @Valid @RequestBody HoaDonGhnWebhookRequest request
+    ) {
+        return ghnOrderSyncService.giaLapWebhookTheoId(
+                id,
+                request.getStatus(),
+                request.getGhiChu());
     }
 
     @PostMapping("/{id}/tao-van-don-ghn")

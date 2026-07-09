@@ -37,6 +37,7 @@ public class HoaDonStorefrontService {
     private final AnhSanPhamRepository anhSanPhamRepository;
     private final GhnTrackingService ghnTrackingService;
     private final DanhGiaRepository danhGiaRepository;
+    private final OnlineOrderLifecycleService onlineOrderLifecycleService;
 
     public HoaDonStorefrontService(
             HoaDonRepository hoaDonRepository,
@@ -45,7 +46,8 @@ public class HoaDonStorefrontService {
             KhachHangRepository khachHangRepository,
             AnhSanPhamRepository anhSanPhamRepository,
             GhnTrackingService ghnTrackingService,
-            DanhGiaRepository danhGiaRepository) {
+            DanhGiaRepository danhGiaRepository,
+            OnlineOrderLifecycleService onlineOrderLifecycleService) {
         this.hoaDonRepository = hoaDonRepository;
         this.hoaDonChiTietRepository = hoaDonChiTietRepository;
         this.lichSuDonHangRepository = lichSuDonHangRepository;
@@ -53,6 +55,7 @@ public class HoaDonStorefrontService {
         this.anhSanPhamRepository = anhSanPhamRepository;
         this.ghnTrackingService = ghnTrackingService;
         this.danhGiaRepository = danhGiaRepository;
+        this.onlineOrderLifecycleService = onlineOrderLifecycleService;
     }
 
     @Transactional(readOnly = true)
@@ -82,6 +85,18 @@ public class HoaDonStorefrontService {
         HoaDon hd = hoaDonRepository.findByIdAndIdKhachHang_Id(id, kh.getId())
                 .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng", "NOT_FOUND"));
         return buildDetail(hd);
+    }
+
+    @Transactional
+    public StorefrontOrderDetailResponse huyDonCuaToi(Integer id, String ghiChu) {
+        KhachHang kh = getKhachDangNhap();
+        HoaDon hd = hoaDonRepository.findByIdAndIdKhachHang_Id(id, kh.getId())
+                .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng", "NOT_FOUND"));
+        onlineOrderLifecycleService.huyDonOnline(
+                hd,
+                ghiChu != null && !ghiChu.isBlank() ? ghiChu : "Khách hàng hủy đơn online");
+        HoaDon updated = hoaDonRepository.findById(id).orElse(hd);
+        return buildDetail(updated);
     }
 
     private StorefrontOrderSummaryResponse buildSummary(HoaDon hd) {
@@ -255,9 +270,12 @@ public class HoaDonStorefrontService {
             return "—";
         }
         return switch (trangThai) {
-            case CHO_XAC_NHAN, DA_XAC_NHAN, DANG_CHUAN_BI -> "Chờ xác nhận";
+            case CHO_XAC_NHAN -> "Chờ xác nhận";
+            case DA_XAC_NHAN -> "Đã xác nhận";
+            case DANG_CHUAN_BI -> "Đang chuẩn bị hàng";
             case DANG_GIAO -> "Đang giao";
             case HOAN_THANH -> "Đã giao";
+            case TRA_HANG -> "Trả hàng";
             case DA_HUY -> "Đã hủy";
             default -> trangThai.getLabel();
         };

@@ -3,7 +3,9 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
-import { getHoaDonDetail, getLichSu, taoVanDonGhn, dongBoGhn } from '@/api/hoaDonApi'
+import { getHoaDonDetail, getLichSu, taoVanDonGhn, dongBoGhn, giaLapWebhookGhn, capNhatTrangThai, tuChoiDon } from '@/api/hoaDonApi'
+import { confirm } from '@/composables/useConfirm'
+import { GHN_STATUS_OPTIONS } from '@/constants/ghnStatuses'
 import { formatCurrency } from '@/utils/format'
 
 const route = useRoute()
@@ -18,7 +20,17 @@ const ghnLoading = ref(false)
 const ghnMessage = ref('')
 const ghnMessageType = ref('success')
 
-const TRANG_THAI_KET_THUC = new Set(['HOAN_THANH', 'DA_HUY'])
+const actionLoading = ref(false)
+const actionMessage = ref('')
+const actionMessageType = ref('success')
+
+const webhookLoading = ref(false)
+const webhookMessage = ref('')
+const webhookMessageType = ref('success')
+const selectedGhnStatus = ref(GHN_STATUS_OPTIONS[0]?.value || '')
+const webhookGhiChu = ref('')
+
+const TRANG_THAI_KET_THUC = new Set(['HOAN_THANH', 'TRA_HANG', 'DA_HUY'])
 
 const coTheTaoVanDon = computed(
   () =>
@@ -27,10 +39,195 @@ const coTheTaoVanDon = computed(
     !TRANG_THAI_KET_THUC.has(detail.value.trangThai),
 )
 
+const coTheXacNhanDon = computed(() => detail.value?.trangThai === 'CHO_XAC_NHAN')
+
+const coTheTuChoiDon = computed(() => detail.value?.trangThai === 'CHO_XAC_NHAN')
+
+const coTheHuyDonDaXacNhan = computed(
+  () =>
+    detail.value?.loaiDon === 'ONLINE' &&
+    (detail.value?.trangThai === 'DA_XAC_NHAN' || detail.value?.trangThai === 'DANG_CHUAN_BI'),
+)
+
+const coTheXuLyDon = computed(
+  () => coTheXacNhanDon.value || coTheTuChoiDon.value || coTheHuyDonDaXacNhan.value,
+)
+
+const coTheGiaLapWebhook = computed(
+  () =>
+    detail.value &&
+    detail.value.maVanDonGhn &&
+    !TRANG_THAI_KET_THUC.has(detail.value.trangThai),
+)
+
+const canCapNhatWebhook = computed(
+  () => Boolean(selectedGhnStatus.value) && coTheGiaLapWebhook.value,
+)
+
 function notifyGhn(text, type = 'success') {
   ghnMessage.value = text
   ghnMessageType.value = type
   setTimeout(() => { ghnMessage.value = '' }, 5000)
+}
+
+function notifyAction(text, type = 'success') {
+  actionMessage.value = text
+  actionMessageType.value = type
+  setTimeout(() => { actionMessage.value = '' }, 5000)
+}
+
+function notifyWebhook(text, type = 'success') {
+  webhookMessage.value = text
+  webhookMessageType.value = type
+  setTimeout(() => { webhookMessage.value = '' }, 5000)
+}
+
+function resetWebhookSelection() {
+  selectedGhnStatus.value = GHN_STATUS_OPTIONS[0]?.value || ''
+  webhookGhiChu.value = ''
+}
+
+function ghnStatusLabel(status) {
+  return GHN_STATUS_OPTIONS.find((opt) => opt.value === status)?.label || status
+}
+
+async function handleXacNhanDon() {
+  if (!orderId.value || !coTheXacNhanDon.value || actionLoading.value) return
+
+  const ok = await confirm({
+    title: 'Xác nhận đơn hàng',
+    message: `Xác nhận đơn ${detail.value.maHoaDon}? Hệ thống sẽ thử tạo vận đơn GHN.`,
+    confirmText: 'Xác nhận',
+  })
+  if (!ok) return
+
+  actionLoading.value = true
+  try {
+    await capNhatTrangThai(orderId.value, {
+      trangThai: 'DA_XAC_NHAN',
+      ghiChu: 'Admin xác nhận đơn hàng',
+    })
+    notifyAction('Đã xác nhận đơn hàng', 'success')
+    await loadDetail()
+    const ghnOk = await tryTaoVanDonSauXacNhan()
+    await loadDetail()
+    if (!ghnOk && !detail.value?.maVanDonGhn) {
+      notifyAction('Đơn đã xác nhận nhưng chưa tạo được vận đơn GHN. Xem thông báo bên phần GHN.', 'error')
+    }
+  } catch (err) {
+    notifyAction(typeof err === 'string' ? err : 'Không xác nhận được đơn hàng', 'error')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function handleTuChoiDon() {
+  if (!orderId.value || !coTheTuChoiDon.value || actionLoading.value) return
+
+  const ok = await confirm({
+    title: 'Từ chối đơn hàng',
+    message: `Từ chối đơn ${detail.value.maHoaDon}? Hàng sẽ được hoàn về kho.`,
+    confirmText: 'Từ chối',
+    danger: true,
+  })
+  if (!ok) return
+
+  actionLoading.value = true
+  try {
+    await tuChoiDon(orderId.value, { ghiChu: 'Admin từ chối đơn hàng' })
+    notifyAction('Đã từ chối đơn hàng', 'success')
+    await loadDetail()
+  } catch (err) {
+    notifyAction(typeof err === 'string' ? err : 'Không từ chối được đơn hàng', 'error')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function handleHuyDonDaXacNhan() {
+  if (!orderId.value || !coTheHuyDonDaXacNhan.value || actionLoading.value) return
+
+  const ok = await confirm({
+    title: 'Hủy đơn hàng',
+    message: `Hủy đơn ${detail.value.maHoaDon}? Hàng sẽ được hoàn về kho.`,
+    confirmText: 'Hủy đơn',
+    danger: true,
+  })
+  if (!ok) return
+
+  actionLoading.value = true
+  try {
+    await tuChoiDon(orderId.value, { ghiChu: 'Admin hủy đơn hàng' })
+    notifyAction('Đã hủy đơn hàng', 'success')
+    await loadDetail()
+  } catch (err) {
+    notifyAction(typeof err === 'string' ? err : 'Không hủy được đơn hàng', 'error')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function tryTaoVanDonSauXacNhan() {
+  if (!coTheTaoVanDon.value) {
+    if (detail.value?.maVanDonGhn) {
+      notifyGhn(`Đã tạo vận đơn GHN: ${detail.value.maVanDonGhn}`, 'success')
+    }
+    return false
+  }
+  ghnLoading.value = true
+  try {
+    const res = await taoVanDonGhn(orderId.value)
+    const payload = res.data
+    if (payload?.thanhCong) {
+      notifyGhn(payload.thongDiep || `Đã tạo vận đơn GHN: ${payload.maVanDon}`, 'success')
+      await loadDetail()
+      return true
+    }
+    notifyGhn(
+      payload?.thongDiep || 'Không tạo được vận đơn GHN. Vui lòng thử lại bằng nút bên dưới.',
+      'error',
+    )
+    return false
+  } catch (err) {
+    notifyGhn(
+      typeof err === 'string' ? err : 'Không tạo được vận đơn GHN. Vui lòng thử lại bằng nút bên dưới.',
+      'error',
+    )
+    return false
+  } finally {
+    ghnLoading.value = false
+  }
+}
+
+async function handleCapNhatWebhook() {
+  if (!orderId.value || !canCapNhatWebhook.value) return
+
+  const status = selectedGhnStatus.value
+  const ghiChu = webhookGhiChu.value.trim() || undefined
+  const statusLabelText = ghnStatusLabel(status)
+
+  webhookLoading.value = true
+  try {
+    const res = await giaLapWebhookGhn(orderId.value, { status, ghiChu })
+    const payload = res.data
+    if (payload?.daCapNhat) {
+      notifyWebhook(
+        payload.thongDiep ||
+          `Đã cập nhật đơn theo webhook GHN "${statusLabelText}"`,
+        'success',
+      )
+    } else {
+      notifyWebhook(
+        payload?.thongDiep || `Webhook GHN "${statusLabelText}" không đổi trạng thái đơn.`,
+        'error',
+      )
+    }
+    await loadDetail()
+  } catch (err) {
+    notifyWebhook(typeof err === 'string' ? err : 'Không gửi được webhook GHN giả lập', 'error')
+  } finally {
+    webhookLoading.value = false
+  }
 }
 
 async function handleTaoVanDon() {
@@ -38,8 +235,13 @@ async function handleTaoVanDon() {
   ghnLoading.value = true
   try {
     const res = await taoVanDonGhn(orderId.value)
-    notifyGhn(res.data?.thongDiep || 'Đã tạo vận đơn GHN', res.data?.thanhCong ? 'success' : 'error')
-    await loadDetail()
+    const payload = res.data
+    if (payload?.thanhCong) {
+      notifyGhn(payload.thongDiep || `Đã tạo vận đơn GHN: ${payload.maVanDon}`, 'success')
+      await loadDetail()
+    } else {
+      notifyGhn(payload?.thongDiep || 'Không tạo được vận đơn GHN', 'error')
+    }
   } catch (err) {
     notifyGhn(typeof err === 'string' ? err : 'Không tạo được vận đơn GHN', 'error')
   } finally {
@@ -74,6 +276,7 @@ function statusLabel(trangThai) {
     DANG_CHUAN_BI: 'Đang chuẩn bị',
     DANG_GIAO: 'Đang giao',
     HOAN_THANH: 'Hoàn thành',
+    TRA_HANG: 'Trả hàng',
     DA_HUY: 'Đã hủy',
   }
   return map[trangThai] || trangThai || '—'
@@ -81,6 +284,7 @@ function statusLabel(trangThai) {
 
 function statusTone(trangThai) {
   if (trangThai === 'HOAN_THANH') return 'success'
+  if (trangThai === 'TRA_HANG') return 'warning'
   if (trangThai === 'DANG_GIAO') return 'info'
   if (trangThai === 'DA_HUY') return 'danger'
   if (trangThai === 'CHO' || trangThai === 'CHO_XAC_NHAN') return 'warning'
@@ -113,6 +317,7 @@ function actionIcon(ma) {
     DA_XAC_NHAN: 'mdi:check',
     DANG_CHUAN_BI: 'mdi:package-variant',
     DANG_GIAO: 'mdi:truck-delivery-outline',
+    TRA_HANG: 'mdi:package-variant-closed-remove',
     DA_HUY: 'mdi:close-circle-outline',
     CHO: 'mdi:pause-circle-outline',
   }
@@ -141,6 +346,7 @@ async function loadDetail() {
     ])
     detail.value = detailRes.data
     lichSu.value = lsRes.data || []
+    resetWebhookSelection()
   } catch (err) {
     error.value = String(err)
   } finally {
@@ -158,7 +364,9 @@ function goBack() {
 
 watch(() => route.params.id, () => loadDetail())
 
-onMounted(() => loadDetail())
+onMounted(() => {
+  loadDetail()
+})
 </script>
 
 <template>
@@ -234,6 +442,137 @@ onMounted(() => loadDetail())
         </div>
         </section>
 
+        <section v-if="coTheXuLyDon" class="soleil-card hoa-don-actions no-print">
+          <div class="hoa-don-actions__head">
+            <h2 class="hoa-don-section-title" style="margin: 0">
+              <Icon icon="mdi:clipboard-check-outline" width="18" class="hoa-don-actions__title-icon" />
+              Xử lý đơn hàng
+            </h2>
+          </div>
+
+          <p class="hoa-don-actions__hint">
+            <template v-if="coTheXacNhanDon">
+              Đơn đang chờ xác nhận. Xác nhận để chuyển sang <strong>Đã xác nhận</strong> và tự thử tạo vận đơn GHN.
+            </template>
+            <template v-else-if="coTheHuyDonDaXacNhan">
+              Đơn online chưa chuyển sang đang giao — có thể hủy và hoàn hàng về kho.
+            </template>
+          </p>
+
+          <div class="hoa-don-actions__buttons">
+            <button
+              v-if="coTheXacNhanDon"
+              type="button"
+              class="soleil-btn-primary"
+              :disabled="actionLoading || ghnLoading"
+              @click="handleXacNhanDon"
+            >
+              <Icon icon="mdi:check-circle-outline" />
+              {{ actionLoading ? 'Đang xử lý...' : 'Xác nhận đơn hàng' }}
+            </button>
+
+            <button
+              v-if="coTheTuChoiDon"
+              type="button"
+              class="soleil-btn-outline hoa-don-actions__danger"
+              :disabled="actionLoading"
+              @click="handleTuChoiDon"
+            >
+              <Icon icon="mdi:close-circle-outline" />
+              {{ actionLoading ? 'Đang xử lý...' : 'Từ chối đơn' }}
+            </button>
+
+            <button
+              v-if="coTheHuyDonDaXacNhan"
+              type="button"
+              class="soleil-btn-outline hoa-don-actions__danger"
+              :disabled="actionLoading"
+              @click="handleHuyDonDaXacNhan"
+            >
+              <Icon icon="mdi:cancel" />
+              {{ actionLoading ? 'Đang xử lý...' : 'Hủy đơn' }}
+            </button>
+          </div>
+
+          <div
+            v-if="actionMessage"
+            class="admin-alert rounded-lg px-4 py-2 mt-3 text-sm"
+            :class="actionMessageType === 'error' ? 'admin-alert-error' : 'admin-alert-success'"
+          >
+            {{ actionMessage }}
+          </div>
+        </section>
+
+        <section v-if="coTheGiaLapWebhook" class="soleil-card hoa-don-webhook no-print">
+          <div class="hoa-don-webhook__head">
+            <h2 class="hoa-don-section-title" style="margin: 0">
+              <Icon icon="mdi:webhook" width="18" class="hoa-don-webhook__title-icon" />
+              Giả lập webhook cập nhật trạng thái
+            </h2>
+          </div>
+
+          <p class="hoa-don-webhook__hint">
+            Mô phỏng webhook GHN gửi về hệ thống: chọn <strong>trạng thái vận đơn GHN</strong>,
+            hệ thống sẽ ánh xạ sang trạng thái đơn nội bộ (giống webhook thật).
+            Chỉ dùng khi đơn đã có mã vận đơn GHN.
+          </p>
+
+          <div class="hoa-don-webhook__form">
+            <div class="hoa-don-webhook__field">
+              <span class="hoa-don-webhook__label">Trạng thái đơn hiện tại</span>
+              <div class="hoa-don-webhook__select hoa-don-webhook__current" aria-readonly="true">
+                {{ statusLabel(detail.trangThai) }}
+              </div>
+            </div>
+
+            <div class="hoa-don-webhook__field">
+              <label class="hoa-don-webhook__label" for="webhook-ghn-status">Trạng thái GHN (webhook)</label>
+              <select
+                id="webhook-ghn-status"
+                v-model="selectedGhnStatus"
+                class="hoa-don-webhook__select"
+              >
+                <option
+                  v-for="opt in GHN_STATUS_OPTIONS"
+                  :key="opt.value"
+                  :value="opt.value"
+                >
+                  {{ opt.label }} ({{ opt.value }})
+                </option>
+              </select>
+            </div>
+
+            <div class="hoa-don-webhook__field hoa-don-webhook__field--wide">
+              <label class="hoa-don-webhook__label" for="webhook-ghi-chu">Ghi chú (tuỳ chọn)</label>
+              <input
+                id="webhook-ghi-chu"
+                v-model="webhookGhiChu"
+                type="text"
+                class="hoa-don-webhook__input"
+                placeholder="Ví dụ: Webhook test từ GHN"
+              />
+            </div>
+
+            <button
+              type="button"
+              class="soleil-btn-primary hoa-don-webhook__submit"
+              :disabled="!canCapNhatWebhook || webhookLoading"
+              @click="handleCapNhatWebhook"
+            >
+              <Icon icon="icon-park-outline:refresh" />
+              {{ webhookLoading ? 'Đang gửi webhook...' : 'Gửi webhook GHN giả lập' }}
+            </button>
+          </div>
+
+          <div
+            v-if="webhookMessage"
+            class="admin-alert rounded-lg px-4 py-2 mt-3 text-sm"
+            :class="webhookMessageType === 'error' ? 'admin-alert-error' : 'admin-alert-success'"
+          >
+            {{ webhookMessage }}
+          </div>
+        </section>
+
         <section class="soleil-card hoa-don-ghn no-print">
           <div class="hoa-don-ghn__head">
             <h2 class="hoa-don-section-title" style="margin: 0">
@@ -277,7 +616,7 @@ onMounted(() => loadDetail())
           </p>
           <p v-else class="hoa-don-ghn__hint">
             <template v-if="coTheTaoVanDon">
-              Đơn chưa có vận đơn GHN. Bấm "Tạo vận đơn GHN" để gửi sang GHN và lấy mã vận đơn.
+              Đơn chưa có vận đơn GHN. Bấm "Tạo vận đơn GHN" để thử lại (ví dụ khi tạo tự động lúc xác nhận thất bại).
             </template>
             <template v-else>
               Đơn ở trạng thái này không thể tạo vận đơn GHN.
@@ -481,6 +820,98 @@ onMounted(() => loadDetail())
   font-size: 1.75rem;
   font-weight: 600;
   color: var(--bronze, #a67c3d);
+}
+
+.hoa-don-actions {
+  margin-top: 1.5rem;
+}
+.hoa-don-actions__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.hoa-don-actions__title-icon {
+  vertical-align: -3px;
+  margin-right: 0.35rem;
+}
+.hoa-don-actions__hint {
+  margin-top: 0.85rem;
+  font-size: 0.85rem;
+  color: var(--admin-muted);
+}
+.hoa-don-actions__buttons {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.hoa-don-actions__danger {
+  border-color: rgba(180, 72, 72, 0.35);
+  color: #a83a3a;
+}
+.hoa-don-actions__danger:hover {
+  background: rgba(180, 72, 72, 0.06);
+}
+
+.hoa-don-webhook {
+  margin-top: 1.5rem;
+}
+.hoa-don-webhook__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.hoa-don-webhook__title-icon {
+  vertical-align: -3px;
+  margin-right: 0.35rem;
+}
+.hoa-don-webhook__hint {
+  margin-top: 0.85rem;
+  font-size: 0.85rem;
+  color: var(--admin-muted);
+}
+.hoa-don-webhook__form {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 1rem;
+  align-items: end;
+}
+.hoa-don-webhook__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.hoa-don-webhook__field--wide {
+  grid-column: 1 / -1;
+}
+.hoa-don-webhook__label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--admin-muted);
+}
+.hoa-don-webhook__select,
+.hoa-don-webhook__input {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--admin-border, rgba(30, 21, 16, 0.12));
+  border-radius: 0.5rem;
+  background: #fff;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.hoa-don-webhook__current {
+  background: var(--cream, #faf6f0);
+  cursor: default;
+  user-select: none;
+}
+.hoa-don-webhook__submit {
+  justify-self: start;
 }
 
 .hoa-don-ghn {

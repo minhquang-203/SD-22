@@ -10,6 +10,7 @@ public enum TrangThaiDonHang {
     DANG_CHUAN_BI(2, "Đang chuẩn bị hàng"),
     DANG_GIAO(3, "Đang giao"),
     HOAN_THANH(4, "HOAN_THANH"),
+    TRA_HANG(5, "Trả hàng"),
     DA_HUY(-1, "Đã hủy");
 
     private final int thuTu;
@@ -21,7 +22,7 @@ public enum TrangThaiDonHang {
     }
 
     public boolean laTrangThaiKetThuc() {
-        return this == HOAN_THANH || this == DA_HUY;
+        return this == HOAN_THANH || this == TRA_HANG || this == DA_HUY;
     }
 
     public boolean coTheChuyenSang(TrangThaiDonHang trangThaiMoi) {
@@ -35,5 +36,10 @@ public enum TrangThaiDonHang {
             return true;
         }
         return trangThaiMoi.thuTu > this.thuTu;
+    }
+
+    /** Don online co the huy khi chua chuyen sang dang giao (DVVC chua lay hang). */
+    public boolean coTheHuyTruocKhiGiao() {
+        return this == CHO_XAC_NHAN || this == DA_XAC_NHAN || this == DANG_CHUAN_BI;
     }
 }

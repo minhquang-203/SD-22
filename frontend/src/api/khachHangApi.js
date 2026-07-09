@@ -13,6 +13,18 @@ export function doiMatKhauToi(payload) {
   return request.put('/khach-hang/toi/doi-mat-khau', payload)
 }
 
+export function fetchDiaChiToi() {
+  return request.get('/khach-hang/toi/dia-chi')
+}
+
+export function createDiaChiToi(payload) {
+  return request.post('/khach-hang/toi/dia-chi', payload)
+}
+
+export function updateDiaChiToi(id, payload) {
+  return request.put(`/khach-hang/toi/dia-chi/${id}`, payload)
+}
+
 // —— Admin: quản lý khách hàng ——
 export function getCustomers() {
   return request.get('/khach-hang')

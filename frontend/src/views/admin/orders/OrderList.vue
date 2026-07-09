@@ -5,6 +5,7 @@ import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import { getAllHoaDon } from '@/api/hoaDonApi'
 import { formatCurrency } from '@/utils/format'
+import { orderStatusLabel } from '@/utils/orderStatus'
 
 const router = useRouter()
 const loading = ref(false)
@@ -21,6 +22,16 @@ const dateTo = ref('')
 const page = ref(1)
 const pageSize = ref(12)
 
+const TAB_ALL = 'ALL'
+const TAB_PENDING = 'CHO_XAC_NHAN'
+
+const tabs = [
+  { value: TAB_ALL, label: 'Tất cả' },
+  { value: TAB_PENDING, label: 'Chờ xác nhận' },
+]
+
+const currentTab = ref(TAB_PENDING)
+
 const LOAI_OPTIONS = [
   { value: '', label: 'Tất cả loại' },
   { value: 'TAI_QUAY', label: 'Tại quầy' },
@@ -29,14 +40,15 @@ const LOAI_OPTIONS = [
 
 const TRANG_THAI_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
-  { value: 'HOAN_THANH', label: 'Hoàn thành' },
-  { value: 'DANG_XU_LY', label: 'Đang xử lý' },
+  { value: 'CHO_XAC_NHAN', label: 'Chờ xác nhận' },
+  { value: 'DA_XAC_NHAN', label: 'Đã xác nhận' },
+  { value: 'DANG_CHUAN_BI', label: 'Đang chuẩn bị' },
   { value: 'DANG_GIAO', label: 'Đang giao' },
+  { value: 'HOAN_THANH', label: 'Hoàn thành' },
+  { value: 'TRA_HANG', label: 'Trả hàng' },
   { value: 'DA_HUY', label: 'Đã hủy' },
-  { value: 'CHO', label: 'Chờ' },
+  { value: 'CHO', label: 'Chờ tại quầy' },
 ]
-
-const DANG_XU_LY_SET = new Set(['CHO_XAC_NHAN', 'DA_XAC_NHAN', 'DANG_CHUAN_BI'])
 
 function notify(text, type = 'success') {
   message.value = text
@@ -45,16 +57,9 @@ function notify(text, type = 'success') {
 }
 
 function statusLabel(trangThai) {
-  const map = {
-    CHO: 'Chờ tại quầy',
-    CHO_XAC_NHAN: 'Chờ xác nhận',
-    DA_XAC_NHAN: 'Đã xác nhận',
-    DANG_CHUAN_BI: 'Đang chuẩn bị',
-    DANG_GIAO: 'Đang giao',
-    HOAN_THANH: 'Hoàn thành',
-    DA_HUY: 'Đã hủy',
-  }
-  return map[trangThai] || trangThai || '—'
+  if (trangThai === 'CHO') return 'Chờ tại quầy'
+  if (trangThai === 'HOAN_THANH') return 'Hoàn thành'
+  return orderStatusLabel(trangThai)
 }
 
 function statusTone(trangThai) {
@@ -96,17 +101,50 @@ function matchesDate(ngayTao) {
   return true
 }
 
-function matchesTrangThai(trangThai) {
-  if (!filterTrangThai.value) return true
-  if (filterTrangThai.value === 'DANG_XU_LY') {
-    return DANG_XU_LY_SET.has(trangThai)
+function matchesTab(trangThai) {
+  if (currentTab.value === TAB_PENDING) {
+    return trangThai === 'CHO_XAC_NHAN'
   }
+  return true
+}
+
+function matchesTrangThai(trangThai) {
+  if (currentTab.value === TAB_PENDING) return true
+  if (!filterTrangThai.value) return true
   return trangThai === filterTrangThai.value
 }
+
+const tabCounts = computed(() => ({
+  [TAB_ALL]: allOrders.value.length,
+  [TAB_PENDING]: allOrders.value.filter((o) => o.trangThai === 'CHO_XAC_NHAN').length,
+}))
+
+const pageTitle = computed(() =>
+  currentTab.value === TAB_PENDING ? 'Đơn hàng chờ xác nhận' : 'Hóa đơn',
+)
+
+const listLabel = computed(() =>
+  currentTab.value === TAB_PENDING ? 'đơn chờ xác nhận' : 'hóa đơn',
+)
+
+const pageDescription = computed(() =>
+  `SUNOVA — ${filteredOrders.value.length} ${listLabel.value}`,
+)
+
+const tableTitle = computed(() =>
+  currentTab.value === TAB_PENDING ? 'Đơn chờ xác nhận' : 'Danh sách hóa đơn',
+)
+
+const emptyMessage = computed(() =>
+  currentTab.value === TAB_PENDING
+    ? 'Không có đơn hàng chờ xác nhận'
+    : 'Không có hóa đơn phù hợp',
+)
 
 const filteredOrders = computed(() => {
   const kw = keyword.value.trim().toLowerCase()
   return allOrders.value.filter((o) => {
+    if (!matchesTab(o.trangThai)) return false
     if (filterLoaiDon.value && o.loaiDon !== filterLoaiDon.value) return false
     if (!matchesTrangThai(o.trangThai)) return false
     if (!matchesDate(o.ngayTao)) return false
@@ -154,7 +192,14 @@ function customerDisplay(row) {
   return row.tenKhachHang || 'Khách lẻ'
 }
 
-watch([keyword, filterLoaiDon, filterTrangThai, dateFrom, dateTo], () => {
+function switchTab(tab) {
+  currentTab.value = tab
+  if (tab === TAB_PENDING) {
+    filterTrangThai.value = ''
+  }
+}
+
+watch([keyword, filterLoaiDon, filterTrangThai, dateFrom, dateTo, currentTab], () => {
   page.value = 1
 })
 
@@ -170,9 +215,23 @@ onMounted(() => loadOrders())
 <template>
   <div class="space-y-6 order-list-page">
     <PageHeader
-      title="Hóa đơn"
-      :description="`SUNOVA — ${filteredOrders.length} hóa đơn`"
+      :title="pageTitle"
+      :description="pageDescription"
     />
+
+    <div class="order-tabs">
+      <button
+        v-for="tab in tabs"
+        :key="tab.value"
+        type="button"
+        class="order-tab-btn"
+        :class="{ active: currentTab === tab.value }"
+        @click="switchTab(tab.value)"
+      >
+        {{ tab.label }}
+        <span class="order-tab-count">{{ tabCounts[tab.value] ?? 0 }}</span>
+      </button>
+    </div>
 
     <div
       v-if="message"
@@ -203,7 +262,7 @@ onMounted(() => loadOrders())
           </option>
         </select>
       </div>
-      <div class="soleil-toolbar__field">
+      <div v-if="currentTab === TAB_ALL" class="soleil-toolbar__field">
         <label class="soleil-toolbar__label">Trạng thái</label>
         <select v-model="filterTrangThai" class="soleil-toolbar__select">
           <option v-for="opt in TRANG_THAI_OPTIONS" :key="opt.value" :value="opt.value">
@@ -227,7 +286,7 @@ onMounted(() => loadOrders())
 
     <div class="soleil-table-card">
       <div class="soleil-table-card__head">
-        <span class="soleil-label" style="margin: 0">Danh sách hóa đơn</span>
+        <span class="soleil-label" style="margin: 0">{{ tableTitle }}</span>
         <span class="text-xs text-[rgba(30,21,16,0.45)]">Trang {{ page }} / {{ totalPages }}</span>
       </div>
 
@@ -253,7 +312,7 @@ onMounted(() => loadOrders())
             </tr>
             <tr v-else-if="pagedOrders.length === 0">
               <td colspan="8" class="text-center py-10 text-[var(--admin-muted)]">
-                Không có hóa đơn phù hợp
+                {{ emptyMessage }}
               </td>
             </tr>
             <tr v-for="item in pagedOrders" :key="item.id">
@@ -299,7 +358,7 @@ onMounted(() => loadOrders())
 
       <div class="soleil-pagination">
         <span class="soleil-pagination__info">
-          Hiển thị {{ pagedOrders.length }} / {{ filteredOrders.length }} hóa đơn
+          Hiển thị {{ pagedOrders.length }} / {{ filteredOrders.length }} {{ listLabel }}
         </span>
         <div class="soleil-pagination__btns">
           <button type="button" class="soleil-page-btn" :disabled="page <= 1" @click="page--">
@@ -320,6 +379,59 @@ onMounted(() => loadOrders())
 </template>
 
 <style scoped>
+.order-tabs {
+  display: flex;
+  gap: 2px;
+  width: fit-content;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(30, 21, 16, 0.05);
+}
+
+.order-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.9rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(30, 21, 16, 0.55);
+  font-size: 0.8125rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.order-tab-btn:hover:not(.active) {
+  color: rgba(30, 21, 16, 0.75);
+}
+
+.order-tab-btn.active {
+  background: #fff;
+  color: var(--bronze, #a67c3d);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(30, 21, 16, 0.08);
+}
+
+.order-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: rgba(30, 21, 16, 0.08);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.order-tab-btn.active .order-tab-count {
+  background: rgba(196, 149, 84, 0.18);
+  color: var(--bronze, #a67c3d);
+}
+
 .order-badge {
   display: inline-block;
   padding: 0.2rem 0.55rem;

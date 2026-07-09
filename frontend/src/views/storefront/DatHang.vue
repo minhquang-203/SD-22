@@ -3,14 +3,16 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { createOnlineCheckout } from '@/api/onlineCheckout'
-import { fetchKhachToi } from '@/api/khachHangApi'
+import { fetchDiaChiToi, fetchKhachToi } from '@/api/khachHangApi'
 import { calcShippingFee, fetchDistricts, fetchProvinces, fetchWards } from '@/api/shipping'
 import { useAuth } from '@/composables/useAuth'
 import { useCart, variantLabel } from '@/composables/useCart'
 import { toast } from '@/composables/useToast'
 import { formatVND } from '@/utils/formatVND'
+import { orderStatusLabel } from '@/utils/orderStatus'
 import { getPhoneValidationError, normalizePhoneDigits } from '@/utils/phone'
 import { productImageUrl } from '@/utils/productImage'
+import CheckoutRecipientModal from '@/components/storefront/CheckoutRecipientModal.vue'
 import CheckoutVoucherModal from '@/components/storefront/CheckoutVoucherModal.vue'
 
 const SHIPPING_FEE = 30000
@@ -19,7 +21,7 @@ const FREE_SHIPPING_FROM = 500000
 const route = useRoute()
 const router = useRouter()
 
-const { id: idKhachHang } = useAuth()
+const { id: idKhachHang, isLoggedIn } = useAuth()
 const {
   loading: cartLoading,
   selectedItems,
@@ -30,11 +32,17 @@ const {
 } = useCart()
 
 const profileLoading = ref(false)
+const addressesLoading = ref(false)
 const submitting = ref(false)
 const selectedPayment = ref('COD')
-const addressMode = ref('account')
 const orderResult = ref(null)
 const paymentCallback = ref(null)
+
+const savedAddresses = ref([])
+const selectedAddressId = ref(null)
+const showRecipientModal = ref(false)
+const recipientModalMode = ref('pick')
+const editingAddress = ref(null)
 
 const form = reactive({
   hoTen: '',
@@ -67,7 +75,7 @@ const paymentMethods = [
     code: 'COD',
     name: 'Thanh toán khi nhận',
     icon: 'solar:wallet-money-linear',
-    description: 'Thanh toán tiền mặt khi nhận hàng. Đơn sẽ được ghi nhận ngay.',
+    description: 'Thanh toán tiền mặt khi nhận hàng. Đơn chờ shop xác nhận trước khi giao.',
   },
   {
     code: 'VNPAY',
@@ -107,9 +115,33 @@ const successOrderCode = computed(
 
 const successAmount = computed(() => orderResult.value?.thanhTien ?? null)
 
-const successStatusLabel = computed(
-  () => orderResult.value?.trangThaiLabel || (paymentCallback.value?.success ? 'Đang chuẩn bị hàng' : ''),
-)
+const successStatusLabel = computed(() => {
+  if (orderResult.value?.trangThai) {
+    return orderStatusLabel(orderResult.value.trangThai)
+  }
+  if (paymentCallback.value?.success) {
+    return orderStatusLabel('CHO_XAC_NHAN')
+  }
+  return ''
+})
+
+const hasSelectedRecipient = computed(() => {
+  if (!isLoggedIn.value) return true
+  return Boolean(
+    form.hoTen.trim() &&
+      form.soDienThoai.trim() &&
+      form.districtId &&
+      form.wardCode &&
+      buildAddress(),
+  )
+})
+
+const selectedRecipientSummary = computed(() => {
+  if (!form.hoTen.trim()) return ''
+  return `${form.hoTen.trim()} · ${form.soDienThoai.trim()}`
+})
+
+const selectedAddressLine = computed(() => buildAddress())
 
 const checkoutPhase = computed(() => {
   if (showSuccess.value || showFailure.value) return 'complete'
@@ -128,26 +160,112 @@ function buildAddress() {
     .join(', ')
 }
 
-function resetRecipient() {
-  addressMode.value = 'new'
-  form.hoTen = ''
-  form.soDienThoai = ''
-  form.email = ''
+async function applySavedAddress(address) {
+  if (!address) return
+  selectedAddressId.value = address.id ?? null
+  form.hoTen = address.hoTenNguoiNhan || ''
+  form.soDienThoai = address.soDienThoai || ''
+  form.provinceId = address.provinceId ?? null
+  form.districtId = address.districtId ?? null
+  form.wardCode = address.wardCode || ''
+  form.tinhThanh = address.tinhThanh || ''
+  form.quanHuyen = address.quanHuyen || ''
+  form.phuongXa = address.phuongXa || ''
+  form.diaChiCuThe = address.diaChiChiTiet || ''
   fieldErrors.soDienThoai = ''
+
+  if (form.provinceId) {
+    addressLoading.districts = true
+    try {
+      const res = await fetchDistricts(form.provinceId)
+      districts.value = res.data || []
+    } catch {
+      districts.value = []
+    } finally {
+      addressLoading.districts = false
+    }
+  }
+
+  if (form.districtId) {
+    addressLoading.wards = true
+    try {
+      const res = await fetchWards(form.districtId)
+      wards.value = res.data || []
+    } catch {
+      wards.value = []
+    } finally {
+      addressLoading.wards = false
+    }
+  }
+
+  await recalcShippingFee()
 }
 
-function useAccountRecipient() {
-  addressMode.value = 'account'
-  void loadProfile()
+async function loadSavedAddresses(autoSelect = true) {
+  if (!isLoggedIn.value) return
+  addressesLoading.value = true
+  try {
+    const res = await fetchDiaChiToi()
+    savedAddresses.value = res.data || []
+    if (!autoSelect) return
+
+    const selected = savedAddresses.value.find((item) => item.id === selectedAddressId.value)
+      || savedAddresses.value.find((item) => item.macDinh)
+      || savedAddresses.value[0]
+
+    if (selected) {
+      if (!selected.districtId || !selected.wardCode) {
+        selectedAddressId.value = selected.id ?? null
+        openRecipientModal('form', selected)
+        return
+      }
+      await applySavedAddress(selected)
+      return
+    }
+
+    selectedAddressId.value = null
+    if (showCheckoutForm.value) {
+      openRecipientModal('form')
+    }
+  } catch (error) {
+    toast(typeof error === 'string' ? error : 'Không tải được địa chỉ đã lưu')
+  } finally {
+    addressesLoading.value = false
+  }
+}
+
+function openRecipientModal(mode = 'pick', address = null) {
+  recipientModalMode.value = mode
+  editingAddress.value = address
+  showRecipientModal.value = true
+}
+
+function onRecipientSelected(address) {
+  void applySavedAddress(address)
+}
+
+async function onRecipientSaved(address) {
+  try {
+    const res = await fetchDiaChiToi()
+    savedAddresses.value = res.data || []
+  } catch {
+    // Giữ danh sách hiện tại nếu tải lại thất bại.
+  }
+  await applySavedAddress(address)
 }
 
 async function loadProfile() {
+  if (!isLoggedIn.value) return
   profileLoading.value = true
   try {
     const res = await fetchKhachToi()
-    form.hoTen = res.data?.hoTen || ''
     form.email = res.data?.email || ''
-    form.soDienThoai = res.data?.soDienThoai || ''
+    if (!form.hoTen.trim()) {
+      form.hoTen = res.data?.hoTen || ''
+    }
+    if (!form.soDienThoai.trim()) {
+      form.soDienThoai = res.data?.soDienThoai || ''
+    }
   } catch (error) {
     toast(typeof error === 'string' ? error : 'Không tải được thông tin tài khoản')
   } finally {
@@ -252,6 +370,9 @@ function validatePhoneField() {
 
 function validateCheckout() {
   if (!hasSelectedCartItems.value) return 'Vui lòng chọn sản phẩm trong giỏ hàng để đặt hàng'
+  if (isLoggedIn.value && !hasSelectedRecipient.value) {
+    return 'Vui lòng chọn hoặc thêm địa chỉ người nhận'
+  }
   if (!form.hoTen.trim()) return 'Vui lòng nhập họ tên người nhận'
   const phoneError = getPhoneValidationError(form.soDienThoai)
   if (phoneError) {
@@ -357,8 +478,12 @@ onMounted(() => {
       toast(typeof error === 'string' ? error : 'Không tải được giỏ hàng')
     })
   }
-  void loadProfile()
-  void loadProvinces()
+  if (isLoggedIn.value) {
+    void loadProfile()
+    void loadSavedAddresses()
+  } else {
+    void loadProvinces()
+  }
 })
 </script>
 
@@ -470,128 +595,160 @@ onMounted(() => {
               Thông tin người nhận
             </h2>
 
-            <div class="sf-checkout-tabs">
-              <button
-                type="button"
-                class="sf-checkout-tab"
-                :class="{ active: addressMode === 'account' }"
-                :disabled="profileLoading"
-                @click="useAccountRecipient"
+            <template v-if="isLoggedIn">
+              <div v-if="addressesLoading" class="sf-checkout-recipient-loading">
+                <Icon icon="svg-spinners:ring-resize" width="22" />
+                <span>Đang tải địa chỉ...</span>
+              </div>
+
+              <div
+                v-else-if="hasSelectedRecipient"
+                class="sf-checkout-recipient-summary"
+                role="button"
+                tabindex="0"
+                @click="openRecipientModal('pick')"
+                @keydown.enter.prevent="openRecipientModal('pick')"
+                @keydown.space.prevent="openRecipientModal('pick')"
               >
-                Thông tin tài khoản
-              </button>
-              <button
-                type="button"
-                class="sf-checkout-tab"
-                :class="{ active: addressMode === 'new' }"
-                @click="resetRecipient"
-              >
-                + Người nhận mới
-              </button>
-            </div>
+                <div class="sf-checkout-recipient-summary__main">
+                  <strong>{{ selectedRecipientSummary }}</strong>
+                  <p>{{ selectedAddressLine }}</p>
+                </div>
+                <span class="sf-checkout-recipient-summary__action">
+                  Thay đổi
+                  <Icon icon="solar:alt-arrow-right-linear" width="16" />
+                </span>
+              </div>
 
-            <div class="sf-checkout-form-row">
-              <div class="sf-checkout-field">
-                <label for="checkout-name">Họ và tên</label>
-                <input id="checkout-name" v-model="form.hoTen" type="text" autocomplete="name" />
+              <div v-else class="sf-checkout-recipient-empty">
+                <Icon icon="solar:map-point-linear" width="28" />
+                <p>Chưa có địa chỉ người nhận. Vui lòng thêm để tiếp tục đặt hàng.</p>
+                <button type="button" class="sf-checkout-recipient-empty__btn" @click="openRecipientModal('form')">
+                  Thêm địa chỉ người nhận
+                </button>
               </div>
-              <div class="sf-checkout-field">
-                <label for="checkout-phone">Số điện thoại</label>
-                <input
-                  id="checkout-phone"
-                  :value="form.soDienThoai"
-                  type="tel"
-                  autocomplete="tel"
-                  inputmode="numeric"
-                  maxlength="10"
-                  pattern="0[35789][0-9]{8}"
-                  placeholder="0xxxxxxxxx"
-                  :class="{ 'is-invalid': fieldErrors.soDienThoai }"
-                  @input="onPhoneInput"
-                  @blur="validatePhoneField"
-                />
-                <span v-if="fieldErrors.soDienThoai" class="sf-field-error">{{ fieldErrors.soDienThoai }}</span>
-              </div>
-            </div>
 
-            <div class="sf-checkout-field">
-              <label for="checkout-email">Email</label>
-              <input id="checkout-email" v-model="form.email" type="email" autocomplete="email" />
-            </div>
+              <div class="sf-checkout-field sf-checkout-field--last">
+                <label for="checkout-note">Ghi chú</label>
+                <textarea
+                  id="checkout-note"
+                  v-model="form.ghiChu"
+                  placeholder="Giao giờ hành chính, gọi trước khi giao..."
+                ></textarea>
+              </div>
+            </template>
 
-            <div class="sf-checkout-form-row">
-              <div class="sf-checkout-field">
-                <label for="checkout-city">Tỉnh / Thành phố</label>
-                <select
-                  id="checkout-city"
-                  v-model="form.provinceId"
-                  :disabled="addressLoading.provinces"
-                  @change="onProvinceChange"
-                >
-                  <option :value="null">
-                    {{ addressLoading.provinces ? 'Đang tải...' : 'Chọn tỉnh / thành phố' }}
-                  </option>
-                  <option v-for="p in provinces" :key="p.provinceId" :value="p.provinceId">
-                    {{ p.provinceName }}
-                  </option>
-                </select>
+            <template v-else>
+              <div class="sf-checkout-form-row">
+                <div class="sf-checkout-field">
+                  <label for="checkout-name">Họ và tên</label>
+                  <input id="checkout-name" v-model="form.hoTen" type="text" autocomplete="name" />
+                </div>
+                <div class="sf-checkout-field">
+                  <label for="checkout-phone">Số điện thoại</label>
+                  <input
+                    id="checkout-phone"
+                    :value="form.soDienThoai"
+                    type="tel"
+                    autocomplete="tel"
+                    inputmode="numeric"
+                    maxlength="10"
+                    pattern="0[35789][0-9]{8}"
+                    placeholder="0xxxxxxxxx"
+                    :class="{ 'is-invalid': fieldErrors.soDienThoai }"
+                    @input="onPhoneInput"
+                    @blur="validatePhoneField"
+                  />
+                  <span v-if="fieldErrors.soDienThoai" class="sf-field-error">{{ fieldErrors.soDienThoai }}</span>
+                </div>
               </div>
-              <div class="sf-checkout-field">
-                <label for="checkout-district">Quận / Huyện</label>
-                <select
-                  id="checkout-district"
-                  v-model="form.districtId"
-                  :disabled="!form.provinceId || addressLoading.districts"
-                  @change="onDistrictChange"
-                >
-                  <option :value="null">
-                    {{ addressLoading.districts ? 'Đang tải...' : 'Chọn quận / huyện' }}
-                  </option>
-                  <option v-for="d in districts" :key="d.districtId" :value="d.districtId">
-                    {{ d.districtName }}
-                  </option>
-                </select>
-              </div>
-            </div>
 
-            <div class="sf-checkout-form-row">
               <div class="sf-checkout-field">
-                <label for="checkout-ward">Phường / Xã</label>
-                <select
-                  id="checkout-ward"
-                  v-model="form.wardCode"
-                  :disabled="!form.districtId || addressLoading.wards"
-                  @change="onWardChange"
-                >
-                  <option value="">
-                    {{ addressLoading.wards ? 'Đang tải...' : 'Chọn phường / xã' }}
-                  </option>
-                  <option v-for="w in wards" :key="w.wardCode" :value="w.wardCode">
-                    {{ w.wardName }}
-                  </option>
-                </select>
+                <label for="checkout-email">Email</label>
+                <input id="checkout-email" v-model="form.email" type="email" autocomplete="email" />
               </div>
-              <div class="sf-checkout-field">
-                <label for="checkout-address">Địa chỉ cụ thể</label>
-                <input id="checkout-address" v-model="form.diaChiCuThe" type="text" autocomplete="street-address" placeholder="Số nhà, tên đường..." />
-              </div>
-            </div>
 
-            <div class="sf-checkout-field sf-checkout-field--last">
-              <label for="checkout-note">Ghi chú</label>
-              <textarea
-                id="checkout-note"
-                v-model="form.ghiChu"
-                placeholder="Giao giờ hành chính, gọi trước khi giao..."
-              ></textarea>
-            </div>
+              <div class="sf-checkout-form-row">
+                <div class="sf-checkout-field">
+                  <label for="checkout-city">Tỉnh / Thành phố</label>
+                  <select
+                    id="checkout-city"
+                    v-model="form.provinceId"
+                    :disabled="addressLoading.provinces"
+                    @change="onProvinceChange"
+                  >
+                    <option :value="null">
+                      {{ addressLoading.provinces ? 'Đang tải...' : 'Chọn tỉnh / thành phố' }}
+                    </option>
+                    <option v-for="p in provinces" :key="p.provinceId" :value="p.provinceId">
+                      {{ p.provinceName }}
+                    </option>
+                  </select>
+                </div>
+                <div class="sf-checkout-field">
+                  <label for="checkout-district">Quận / Huyện</label>
+                  <select
+                    id="checkout-district"
+                    v-model="form.districtId"
+                    :disabled="!form.provinceId || addressLoading.districts"
+                    @change="onDistrictChange"
+                  >
+                    <option :value="null">
+                      {{ addressLoading.districts ? 'Đang tải...' : 'Chọn quận / huyện' }}
+                    </option>
+                    <option v-for="d in districts" :key="d.districtId" :value="d.districtId">
+                      {{ d.districtName }}
+                    </option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="sf-checkout-form-row">
+                <div class="sf-checkout-field">
+                  <label for="checkout-ward">Phường / Xã</label>
+                  <select
+                    id="checkout-ward"
+                    v-model="form.wardCode"
+                    :disabled="!form.districtId || addressLoading.wards"
+                    @change="onWardChange"
+                  >
+                    <option value="">
+                      {{ addressLoading.wards ? 'Đang tải...' : 'Chọn phường / xã' }}
+                    </option>
+                    <option v-for="w in wards" :key="w.wardCode" :value="w.wardCode">
+                      {{ w.wardName }}
+                    </option>
+                  </select>
+                </div>
+                <div class="sf-checkout-field">
+                  <label for="checkout-address">Địa chỉ cụ thể</label>
+                  <input id="checkout-address" v-model="form.diaChiCuThe" type="text" autocomplete="street-address" placeholder="Số nhà, tên đường..." />
+                </div>
+              </div>
+
+              <div class="sf-checkout-field sf-checkout-field--last">
+                <label for="checkout-note-guest">Ghi chú</label>
+                <textarea
+                  id="checkout-note-guest"
+                  v-model="form.ghiChu"
+                  placeholder="Giao giờ hành chính, gọi trước khi giao..."
+                ></textarea>
+              </div>
+            </template>
           </section>
 
+          <CheckoutRecipientModal
+            v-if="isLoggedIn"
+            v-model:visible="showRecipientModal"
+            :mode="recipientModalMode"
+            :selected-id="selectedAddressId"
+            :editing-address="editingAddress"
+            :default-contact="{ hoTen: form.hoTen, soDienThoai: form.soDienThoai }"
+            @select="onRecipientSelected"
+            @saved="onRecipientSaved"
+          />
+
           <section class="sf-checkout-card">
-            <h2 class="sf-checkout-card__title">
-              <span><Icon icon="solar:ticket-sale-linear" width="18" /></span>
-              Mã giảm giá
-            </h2>
             <div
               role="button"
               tabindex="0"
@@ -605,7 +762,7 @@ onMounted(() => {
                 class="sf-checkout-voucher__value"
                 :class="{ 'sf-checkout-voucher__value--empty': !form.maPhieuGiamGia }"
               >
-                {{ form.maPhieuGiamGia || 'Chọn hoặc tìm mã voucher' }}
+                {{ form.maPhieuGiamGia || 'Chọn phiếu giảm giá của bạn' }}
               </span>
               <button
                 v-if="form.maPhieuGiamGia"

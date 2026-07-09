@@ -4,7 +4,8 @@ import { RouterLink } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import OrderCard from '@/components/storefront/OrderCard.vue'
 import ProductReviewModal from '@/components/storefront/ProductReviewModal.vue'
-import { fetchChiTietDonCuaToi, fetchDonCuaToi } from '@/api/donHangApi'
+import { confirm } from '@/composables/useConfirm'
+import { fetchChiTietDonCuaToi, fetchDonCuaToi, huyDonCuaToi } from '@/api/donHangApi'
 import { formatVND } from '@/utils/formatVND'
 import { formatOrderDate, orderStatusClass, orderStatusLabel } from '@/utils/orderStatus'
 
@@ -17,6 +18,9 @@ const error = ref('')
 const showReviewModal = ref(false)
 const reviewLine = ref(null)
 const reviewNotice = ref('')
+const cancelLoading = ref(false)
+const cancelNotice = ref('')
+const cancelError = ref('')
 
 onMounted(loadList)
 
@@ -71,6 +75,39 @@ function onReviewSubmitted({ lineId }) {
     line.trangThaiDanhGia = 'CHO_DUYET'
   }
 }
+
+async function handleCancelOrder(order) {
+  if (!order?.id || cancelLoading.value) return
+
+  const ok = await confirm({
+    title: 'Hủy đơn hàng',
+    message: `Bạn có chắc muốn hủy đơn ${order.maHoaDon}? Hành động này không thể hoàn tác.`,
+    confirmText: 'Hủy đơn',
+    danger: true,
+  })
+  if (!ok) return
+
+  cancelLoading.value = true
+  cancelError.value = ''
+  cancelNotice.value = ''
+  try {
+    const res = await huyDonCuaToi(order.id)
+    detail.value = res.data || order
+    const idx = orders.value.findIndex((item) => item.id === order.id)
+    if (idx >= 0) {
+      orders.value[idx] = {
+        ...orders.value[idx],
+        trangThai: detail.value.trangThai,
+        trangThaiLabel: detail.value.trangThaiLabel,
+      }
+    }
+    cancelNotice.value = `Đã hủy đơn ${order.maHoaDon}.`
+  } catch (err) {
+    cancelError.value = typeof err === 'string' ? err : 'Không hủy được đơn hàng. Vui lòng thử lại.'
+  } finally {
+    cancelLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -86,7 +123,9 @@ function onReviewSubmitted({ lineId }) {
       <p class="sf-order-page__desc">Lịch sử mua hàng khi bạn đăng nhập tài khoản SUNOVA.</p>
 
       <p v-if="error" class="sf-order-msg sf-order-msg--err">{{ error }}</p>
+      <p v-if="cancelError" class="sf-order-msg sf-order-msg--err">{{ cancelError }}</p>
       <p v-if="reviewNotice" class="sf-order-msg sf-order-msg--ok">{{ reviewNotice }}</p>
+      <p v-if="cancelNotice" class="sf-order-msg sf-order-msg--ok">{{ cancelNotice }}</p>
 
       <div v-if="loading" class="sf-order-skeleton" />
 
@@ -116,7 +155,7 @@ function onReviewSubmitted({ lineId }) {
               class="sf-order-badge"
               :class="orderStatusClass(item.trangThai)"
             >
-              {{ item.trangThaiLabel || orderStatusLabel(item.trangThai) }}
+              {{ orderStatusLabel(item.trangThai) }}
             </span>
             <strong class="sf-order-list__price">{{ formatVND(item.thanhTien) }}</strong>
           </button>
@@ -124,7 +163,13 @@ function onReviewSubmitted({ lineId }) {
 
         <div v-if="selectedId" class="sf-order-detail-panel">
           <div v-if="detailLoading" class="sf-order-skeleton sf-order-skeleton--short" />
-          <OrderCard v-else-if="detail" :order="detail" @review="openReview" />
+          <OrderCard
+            v-else-if="detail"
+            :order="detail"
+            :cancel-loading="cancelLoading"
+            @review="openReview"
+            @cancel-order="handleCancelOrder"
+          />
         </div>
       </div>
     </div>

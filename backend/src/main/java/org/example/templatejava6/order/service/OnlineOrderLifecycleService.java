@@ -60,8 +60,10 @@ public class OnlineOrderLifecycleService {
         if (hoaDon.getTrangThai() == null || hoaDon.getTrangThai().laTrangThaiKetThuc()) {
             return false;
         }
-        if (daThanhToanThanhCong(hoaDon) && hoaDon.getTrangThai() != TrangThaiDonHang.CHO_XAC_NHAN) {
-            throw new ApiException("Đơn hàng đã thanh toán và đang xử lý, không thể tự hủy.", "ORDER_CANNOT_CANCEL");
+        if (!hoaDon.getTrangThai().coTheHuyTruocKhiGiao()) {
+            throw new ApiException(
+                    "Đơn hàng đã chuyển sang đang giao hoặc không thể hủy.",
+                    "ORDER_CANNOT_CANCEL");
         }
 
         hoanTonKho(hoaDon);

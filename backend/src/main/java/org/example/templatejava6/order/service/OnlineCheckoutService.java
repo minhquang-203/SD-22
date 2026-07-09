@@ -66,7 +66,6 @@ public class OnlineCheckoutService {
     private final LoHangService loHangService;
     private final PaymentService paymentService;
     private final OnlineOrderLifecycleService onlineOrderLifecycleService;
-    private final GhnOrderCreationService ghnOrderCreationService;
     private final CheckoutPricingService checkoutPricingService;
 
     public OnlineCheckoutService(
@@ -82,7 +81,6 @@ public class OnlineCheckoutService {
             LoHangService loHangService,
             PaymentService paymentService,
             OnlineOrderLifecycleService onlineOrderLifecycleService,
-            GhnOrderCreationService ghnOrderCreationService,
             CheckoutPricingService checkoutPricingService) {
         this.gioHangRepository = gioHangRepository;
         this.chiTietGioHangRepository = chiTietGioHangRepository;
@@ -96,7 +94,6 @@ public class OnlineCheckoutService {
         this.loHangService = loHangService;
         this.paymentService = paymentService;
         this.onlineOrderLifecycleService = onlineOrderLifecycleService;
-        this.ghnOrderCreationService = ghnOrderCreationService;
         this.checkoutPricingService = checkoutPricingService;
     }
 
@@ -138,7 +135,7 @@ public class OnlineCheckoutService {
         hoaDon.setIdPhuongThucThanhToan(phuongThuc);
         hoaDon.setIdPhieuGiamGia(phieu);
         hoaDon.setLoaiDon(LOAI_DON_ONLINE);
-        hoaDon.setTrangThai(MA_COD.equals(maPhuongThuc) ? TrangThaiDonHang.DA_XAC_NHAN : TrangThaiDonHang.CHO_XAC_NHAN);
+        hoaDon.setTrangThai(TrangThaiDonHang.CHO_XAC_NHAN);
         hoaDon.setDiaChiGiao(request.getDiaChiGiao().trim());
         hoaDon.setTenNguoiNhan(coGiaTri(request.getTenNguoiNhan()) ? request.getTenNguoiNhan().trim() : khachHang.getHoTen());
         hoaDon.setSdtNguoiNhan(coGiaTri(request.getSdtNguoiNhan()) ? request.getSdtNguoiNhan().trim() : khachHang.getSoDienThoai());
@@ -174,8 +171,7 @@ public class OnlineCheckoutService {
         TaoThanhToanResponse payment = null;
         if (MA_COD.equals(maPhuongThuc)) {
             taoThanhToanCod(hoaDon, phuongThuc, now);
-            ghiNhatKy(hoaDon, "DA_XAC_NHAN", "Đơn COD đã được ghi nhận, chờ giao hàng");
-            ghnOrderCreationService.taoVanDonNeuCan(hoaDon);
+            ghiNhatKy(hoaDon, "CHO_XAC_NHAN", "Đơn COD chờ nhân viên xác nhận");
         } else {
             TaoThanhToanRequest paymentRequest = new TaoThanhToanRequest();
             paymentRequest.setIdHoaDon(hoaDon.getId());

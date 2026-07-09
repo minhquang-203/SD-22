@@ -2,31 +2,37 @@
 import { computed, ref } from 'vue'
 import { formatVND } from '@/utils/formatVND'
 import { productImageUrl } from '@/utils/productImage'
-import { formatOrderDate, orderStatusClass, orderStatusLabel } from '@/utils/orderStatus'
+import { formatOrderDate, orderStatusClass, orderStatusLabel, coTheHuyDon } from '@/utils/orderStatus'
 
 const props = defineProps({
   order: { type: Object, required: true },
   defaultOpen: { type: Boolean, default: true },
+  cancelLoading: { type: Boolean, default: false },
 })
+
+const emit = defineEmits(['review', 'cancelOrder'])
 
 const isOpen = ref(props.defaultOpen)
 
-const steps = ['Đặt hàng', 'Xác nhận', 'Vận chuyển', 'Đã nhận']
+const steps = ['Đặt hàng', 'Chờ Xác nhận','Đã xác nhận', 'Vận chuyển', 'Đã nhận']
 
 const timelineSteps = computed(() => {
   const status = props.order?.trangThai
   const map = {
-    CHO_XAC_NHAN: ['active', '', '', ''],
-    DA_XAC_NHAN: ['done', 'active', '', ''],
-    DANG_CHUAN_BI: ['done', 'active', '', ''],
-    DANG_GIAO: ['done', 'done', 'active', ''],
-    HOAN_THANH: ['done', 'done', 'done', 'done'],
-    DA_HUY: ['done', '', '', ''],
+    CHO_XAC_NHAN: ['done', 'active', '', '', ''],
+    DA_XAC_NHAN: ['done', 'done', 'active', '', ''],
+    DANG_CHUAN_BI: ['done', 'done', 'done', 'active', ''],
+    DANG_GIAO: ['done', 'done', 'done', 'active', ''],
+    HOAN_THANH: ['done', 'done', 'done', 'done', 'done'],
+    TRA_HANG: ['done', 'done', 'done', '', ''],
+    DA_HUY: ['done', '', '', '', ''],
   }
-  return map[status] || ['active', '', '', '']
+  return map[status] || ['done', 'active', '', '', '']
 })
 
 const isCancelled = computed(() => props.order?.trangThai === 'DA_HUY')
+
+const canCancel = computed(() => coTheHuyDon(props.order?.trangThai))
 
 const productPreview = computed(() => {
   const lines = props.order?.chiTiets || []
@@ -71,7 +77,7 @@ function canReview(line) {
             :class="orderStatusClass(order.trangThai)"
           >
             <span class="sf-order-badge__dot"></span>
-            {{ order.trangThaiLabel || orderStatusLabel(order.trangThai) }}
+            {{ orderStatusLabel(order.trangThai) }}
           </span>
         </div>
         <div class="sf-order-card__preview">
@@ -183,6 +189,20 @@ function canReview(line) {
         {{ order.capNhatGanNhatLabel || order.capNhatGanNhatTrangThai }}
         · {{ formatOrderDate(order.capNhatGanNhatLuc) }}
       </p>
+
+      <div v-if="canCancel" class="sf-order-card__actions">
+        <button
+          type="button"
+          class="sf-btn-cancel-order"
+          :disabled="cancelLoading"
+          @click.stop="emit('cancelOrder', order)"
+        >
+          {{ cancelLoading ? 'Đang hủy...' : 'Hủy đơn hàng' }}
+        </button>
+        <p class="sf-order-card__cancel-hint">
+          Có thể hủy khi đơn chưa chuyển sang trạng thái đang giao.
+        </p>
+      </div>
     </div>
   </article>
 </template>
@@ -217,5 +237,39 @@ function canReview(line) {
 
 .sf-review-status--done {
   color: #16a34a;
+}
+
+.sf-order-card__actions {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed rgba(30, 21, 16, 0.12);
+}
+
+.sf-btn-cancel-order {
+  padding: 8px 16px;
+  border: 1px solid rgba(180, 72, 72, 0.35);
+  background: rgba(180, 72, 72, 0.08);
+  color: #a83a3a;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.sf-btn-cancel-order:hover:not(:disabled) {
+  background: rgba(180, 72, 72, 0.14);
+  border-color: rgba(180, 72, 72, 0.5);
+}
+
+.sf-btn-cancel-order:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sf-order-card__cancel-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: rgba(30, 21, 16, 0.55);
 }
 </style>

@@ -1,6 +1,7 @@
 package org.example.templatejava6.order.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import org.example.templatejava6.order.model.response.GhnTrangThaiOptionResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
@@ -12,6 +13,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -20,6 +22,31 @@ public class GhnTrackingService {
 
     private static final String GHN_ORDER_DETAIL_URL =
             "https://dev-online-gateway.ghn.vn/shiip/public-api/v2/shipping-order/detail";
+
+    private static final List<String> ALL_STATUSES = List.of(
+            "ready_to_pick",
+            "picking",
+            "cancel",
+            "money_collect_picking",
+            "picked",
+            "storing",
+            "transporting",
+            "sorting",
+            "delivering",
+            "money_collect_delivering",
+            "delivered",
+            "delivery_fail",
+            "waiting_to_return",
+            "return",
+            "return_transporting",
+            "return_sorting",
+            "returning",
+            "return_fail",
+            "returned",
+            "exception",
+            "damage",
+            "lost"
+    );
 
     private final RestTemplate restTemplate;
     private final String token;
@@ -36,6 +63,8 @@ public class GhnTrackingService {
         if (isBlank(token) || isBlank(orderCode)) {
             return Optional.empty();
         }
+
+        String code = orderCode.trim();
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -56,7 +85,7 @@ public class GhnTrackingService {
             return Optional.of(new TrackingInfo(
                     textOrDefault(data, "order_code", orderCode.trim()),
                     status,
-                    statusLabel(status),
+                    labelOf(status),
                     firstNonBlank(text(data, "leadtime"), text(data, "leadtime_order"))
             ));
         } catch (RestClientException ignored) {
@@ -82,7 +111,13 @@ public class GhnTrackingService {
         return value == null || value.isBlank();
     }
 
-    private static String statusLabel(String status) {
+    public static List<GhnTrangThaiOptionResponse> allStatusOptions() {
+        return ALL_STATUSES.stream()
+                .map(status -> new GhnTrangThaiOptionResponse(status, labelOf(status)))
+                .toList();
+    }
+
+    public static String labelOf(String status) {
         if (status == null) {
             return null;
         }

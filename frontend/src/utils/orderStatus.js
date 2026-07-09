@@ -1,4 +1,10 @@
 /** Nhãn trạng thái đơn — storefront */
+export const TRANG_THAI_CHUA_GIAO = new Set(['CHO_XAC_NHAN', 'DA_XAC_NHAN', 'DANG_CHUAN_BI'])
+
+export function coTheHuyDon(trangThai) {
+  return TRANG_THAI_CHUA_GIAO.has(trangThai)
+}
+
 export function orderStatusLabel(trangThai, fallback = '') {
   const map = {
     CHO_XAC_NHAN: 'Chờ xác nhận',
@@ -6,6 +12,7 @@ export function orderStatusLabel(trangThai, fallback = '') {
     DANG_CHUAN_BI: 'Đang chuẩn bị hàng',
     DANG_GIAO: 'Đang giao',
     HOAN_THANH: 'Đã giao',
+    TRA_HANG: 'Trả hàng',
     DA_HUY: 'Đã hủy',
   }
   return map[trangThai] || fallback || trangThai || '—'
@@ -18,6 +25,7 @@ export function orderStatusClass(trangThai) {
     DANG_CHUAN_BI: 'sf-order-badge--ship',
     DANG_GIAO: 'sf-order-badge--ship',
     HOAN_THANH: 'sf-order-badge--done',
+    TRA_HANG: 'sf-order-badge--cancel',
     DA_HUY: 'sf-order-badge--cancel',
   }
   return map[trangThai] || 'sf-order-badge--wait'

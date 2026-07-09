@@ -85,6 +85,10 @@ public class HoaDonService {
 
     @Autowired private GhnOrderCreationService ghnOrderCreationService;
 
+    @Autowired private OnlineOrderLifecycleService onlineOrderLifecycleService;
+
+    @Autowired private PosOrderLifecycleService posOrderLifecycleService;
+
 
 
     @Transactional(readOnly = true)
@@ -246,6 +250,52 @@ public class HoaDonService {
                 || trangThai == TrangThaiDonHang.DANG_CHUAN_BI
 
                 || trangThai == TrangThaiDonHang.DANG_GIAO;
+
+    }
+
+
+
+    @Transactional
+
+    public void tuChoiDon(Integer id, String ghiChu, Integer idNhanVien) {
+
+        HoaDon hd = getHoaDonOrThrow(id);
+
+        String note = ghiChu != null && !ghiChu.isBlank() ? ghiChu : "Admin từ chối đơn hàng";
+
+        if ("ONLINE".equalsIgnoreCase(hd.getLoaiDon())) {
+
+            if (!hd.getTrangThai().coTheHuyTruocKhiGiao()) {
+
+                throw new ApiException(
+
+                        "Chỉ hủy được đơn online chưa chuyển sang đang giao.",
+
+                        "VALIDATION_ERROR");
+
+            }
+
+            onlineOrderLifecycleService.huyDonOnline(hd, note);
+
+            return;
+
+        }
+
+        if (hd.getTrangThai() != TrangThaiDonHang.CHO_XAC_NHAN) {
+
+            throw new ApiException("Chỉ từ chối được đơn đang chờ xác nhận.", "VALIDATION_ERROR");
+
+        }
+
+        if ("TAI_QUAY".equalsIgnoreCase(hd.getLoaiDon())) {
+
+            posOrderLifecycleService.huyDonVnpay(hd, note);
+
+            return;
+
+        }
+
+        chuyenTrangThai(id, TrangThaiDonHang.DA_HUY, note, idNhanVien);
 
     }
 

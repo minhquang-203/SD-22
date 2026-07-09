@@ -10,5 +10,7 @@ import java.util.List;
 @Repository
 public interface DiaChiKhachHangRepository extends JpaRepository<DiaChiKhachHang, Integer> {
 
-    List<DiaChiKhachHang> findByKhachHang(KhachHang khachHang);
+    List<DiaChiKhachHang> findByKhachHangOrderByMacDinhDescIdDesc(KhachHang khachHang);
+
+    java.util.Optional<DiaChiKhachHang> findByIdAndKhachHang(Integer id, KhachHang khachHang);
 }
