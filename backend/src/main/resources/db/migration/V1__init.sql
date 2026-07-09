@@ -260,7 +260,7 @@ CREATE TABLE dap_an_quiz (
     noi_dung   NVARCHAR(255) NOT NULL,
     id_loai_da INT NOT NULL,
     diem       INT DEFAULT 1,
-    icon       NVARCHAR(20) NULL,
+    icon       NVARCHAR(100) NULL,
     CONSTRAINT fk_da_ch FOREIGN KEY (id_cau_hoi) REFERENCES cau_hoi_quiz(id),
     CONSTRAINT fk_da_ld FOREIGN KEY (id_loai_da) REFERENCES loai_da(id)
 );
