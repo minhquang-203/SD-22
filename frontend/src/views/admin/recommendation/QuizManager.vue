@@ -27,6 +27,7 @@
             <div class="answers-edit-list">
               <p class="label-sm">Các đáp án:</p>
               <div v-for="(ans, aIndex) in currentQuestion.answers" :key="aIndex" class="inline-answer-row">
+                <input type="text" v-model="ans.icon" placeholder="Tên Icon (VD: lucide:sun)" class="flex-1 text-sm font-mono" title="Tên Icon từ thư viện Lucide hoặc Phosphor">
                 <input type="text" v-model="ans.label" placeholder="Nội dung đáp án" class="flex-2">
                 <input type="number" v-model="ans.scoreValue" placeholder="Điểm" class="flex-1 text-center">
                 <select v-model="ans.tagId" class="flex-1">
@@ -56,6 +57,7 @@
               <p class="q-title-display">{{ q.title }}</p>
               <div class="ans-badges-preview">
                 <span v-for="(ans, aIndex) in q.answers" :key="aIndex" class="preview-badge">
+                  <span v-if="ans.icon" class="text-xs mr-1 opacity-70">[{{ ans.icon }}]</span>
                   {{ ans.label }} ({{ ans.scoreValue }}đ)
                 </span>
               </div>
@@ -73,6 +75,7 @@
           </div>
           <div class="answers-edit-list">
             <div v-for="(ans, aIndex) in currentQuestion.answers" :key="aIndex" class="inline-answer-row">
+              <input type="text" v-model="ans.icon" placeholder="Tên Icon (VD: lucide:sun)" class="flex-1 text-sm font-mono">
               <input type="text" v-model="ans.label" placeholder="Nội dung đáp án" class="flex-2">
               <input type="number" v-model="ans.scoreValue" placeholder="Điểm" class="flex-1 text-center">
               <select v-model="ans.tagId" class="flex-1">
@@ -168,8 +171,8 @@ const addNewInline = () => {
     id: null,
     title: '',
     answers: [
-      { label: '', tagId: '', scoreValue: 10 },
-      { label: '', tagId: '', scoreValue: 10 }
+      { label: '', icon: '', tagId: '', scoreValue: 10 },
+      { label: '', icon: '', tagId: '', scoreValue: 10 }
     ]
   };
 };
@@ -179,7 +182,7 @@ const cancelEdit = () => {
   currentQuestion.value = null;
 };
 
-const addAnswer = () => { currentQuestion.value.answers.push({ label: '', tagId: '', scoreValue: 10 }); };
+const addAnswer = () => { currentQuestion.value.answers.push({ label: '', icon: '', tagId: '', scoreValue: 10 }); };
 const removeAnswer = (index) => { currentQuestion.value.answers.splice(index, 1); };
 
 const saveQuestion = async () => {
