@@ -8,7 +8,6 @@ const props = defineProps({
   visible: { type: Boolean, default: false },
   selectedCode: { type: String, default: '' },
   subtotal: { type: Number, default: 0 },
-  hasSaleItems: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:visible', 'select'])
@@ -50,15 +49,11 @@ function formatExpiry(value) {
 }
 
 function isEligible(voucher) {
-  if (props.hasSaleItems) return false
   const min = Number(voucher.giaTriDonToiThieu) || 0
   return props.subtotal >= min
 }
 
 function eligibilityMessage(voucher) {
-  if (props.hasSaleItems) {
-    return 'Không áp dụng khi có sản phẩm đang giảm giá'
-  }
   const min = Number(voucher.giaTriDonToiThieu) || 0
   if (props.subtotal < min) {
     return `Đơn tối thiểu ${formatVND(min)}`
@@ -158,11 +153,6 @@ onUnmounted(() => {
             placeholder="Tìm theo mã hoặc tên chương trình..."
             autocomplete="off"
           />
-        </div>
-
-        <div v-if="hasSaleItems" class="sf-voucher-modal__alert">
-          <Icon icon="solar:info-circle-linear" width="18" />
-          <p>Đơn có sản phẩm đang trong đợt giảm giá nên không thể dùng mã voucher.</p>
         </div>
 
         <div class="sf-voucher-modal__body">

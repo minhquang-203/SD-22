@@ -4,13 +4,15 @@ import jakarta.validation.Valid;
 import org.example.templatejava6.order.model.request.TaoYeuCauTraHangRequest;
 import org.example.templatejava6.order.model.response.YeuCauTraHangResponse;
 import org.example.templatejava6.order.service.ReturnRequestService;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -25,12 +27,13 @@ public class TraHangKhachController {
         this.returnRequestService = returnRequestService;
     }
 
-    @PostMapping("/orders/{idHoaDon}/tra-hang")
+    @PostMapping(value = "/orders/{idHoaDon}/tra-hang", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public YeuCauTraHangResponse taoYeuCau(
             @PathVariable Integer idHoaDon,
             @RequestParam Integer idKhachHang,
-            @Valid @RequestBody TaoYeuCauTraHangRequest request) {
-        return returnRequestService.taoYeuCau(idKhachHang, idHoaDon, request);
+            @Valid @RequestPart("data") TaoYeuCauTraHangRequest request,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files) {
+        return returnRequestService.taoYeuCau(idKhachHang, idHoaDon, request, files);
     }
 
     @GetMapping("/tra-hang")

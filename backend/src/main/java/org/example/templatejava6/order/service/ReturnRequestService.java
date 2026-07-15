@@ -5,15 +5,18 @@ import org.example.templatejava6.common.enums.LoaiHoanTien;
 import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.example.templatejava6.common.enums.TrangThaiTraHang;
 import org.example.templatejava6.common.exception.ApiException;
+import org.example.templatejava6.common.service.ProductFileStorageService;
 import org.example.templatejava6.notification.enums.LoaiThongBao;
 import org.example.templatejava6.notification.service.OrderMailService;
 import org.example.templatejava6.notification.service.ThongBaoService;
+import org.example.templatejava6.order.entity.AnhYeuCauTraHang;
 import org.example.templatejava6.order.entity.HoaDon;
 import org.example.templatejava6.order.entity.HoaDonChiTiet;
 import org.example.templatejava6.order.entity.LichSuDonHang;
 import org.example.templatejava6.order.entity.YeuCauTraHang;
 import org.example.templatejava6.order.model.request.TaoYeuCauTraHangRequest;
 import org.example.templatejava6.order.model.response.YeuCauTraHangResponse;
+import org.example.templatejava6.order.repository.AnhYeuCauTraHangRepository;
 import org.example.templatejava6.order.repository.HoaDonChiTietRepository;
 import org.example.templatejava6.order.repository.HoaDonRepository;
 import org.example.templatejava6.order.repository.LichSuDonHangRepository;
@@ -27,6 +30,7 @@ import org.example.templatejava6.shipping.model.response.CreateShippingOrderResp
 import org.example.templatejava6.shipping.service.ShippingService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -44,8 +48,10 @@ public class ReturnRequestService {
 
     private static final String LOAI_DON_ONLINE = "ONLINE";
     private static final String MA_VNPAY = "VNPAY";
+    private static final int MIN_RETURN_IMAGES = 2;
 
     private final YeuCauTraHangRepository yeuCauTraHangRepository;
+    private final AnhYeuCauTraHangRepository anhYeuCauTraHangRepository;
     private final HoaDonRepository hoaDonRepository;
     private final HoaDonChiTietRepository hoaDonChiTietRepository;
     private final LichSuDonHangRepository lichSuDonHangRepository;
@@ -55,8 +61,10 @@ public class ReturnRequestService {
     private final RefundService refundService;
     private final ThongBaoService thongBaoService;
     private final OrderMailService orderMailService;
+    private final ProductFileStorageService productFileStorageService;
 
     public ReturnRequestService(YeuCauTraHangRepository yeuCauTraHangRepository,
+                                AnhYeuCauTraHangRepository anhYeuCauTraHangRepository,
                                 HoaDonRepository hoaDonRepository,
                                 HoaDonChiTietRepository hoaDonChiTietRepository,
                                 LichSuDonHangRepository lichSuDonHangRepository,
@@ -65,8 +73,10 @@ public class ReturnRequestService {
                                 ShippingService shippingService,
                                 RefundService refundService,
                                 ThongBaoService thongBaoService,
-                                OrderMailService orderMailService) {
+                                OrderMailService orderMailService,
+                                ProductFileStorageService productFileStorageService) {
         this.yeuCauTraHangRepository = yeuCauTraHangRepository;
+        this.anhYeuCauTraHangRepository = anhYeuCauTraHangRepository;
         this.hoaDonRepository = hoaDonRepository;
         this.hoaDonChiTietRepository = hoaDonChiTietRepository;
         this.lichSuDonHangRepository = lichSuDonHangRepository;
@@ -76,11 +86,14 @@ public class ReturnRequestService {
         this.refundService = refundService;
         this.thongBaoService = thongBaoService;
         this.orderMailService = orderMailService;
+        this.productFileStorageService = productFileStorageService;
     }
 
     /** Khach hang gui yeu cau tra hang cho mot don da nhan (HOAN_THANH). */
     @Transactional
-    public YeuCauTraHangResponse taoYeuCau(Integer idKhachHang, Integer idHoaDon, TaoYeuCauTraHangRequest request) {
+    public YeuCauTraHangResponse taoYeuCau(Integer idKhachHang, Integer idHoaDon,
+                                           TaoYeuCauTraHangRequest request,
+                                           List<MultipartFile> files) {
         HoaDon hoaDon = loadOwnedOnlineOrder(idKhachHang, idHoaDon);
         if (hoaDon.getTrangThai() != TrangThaiDonHang.HOAN_THANH) {
             throw new ApiException(
@@ -96,6 +109,13 @@ public class ReturnRequestService {
             throw new ApiException(
                     "Vui lòng cung cấp thông tin tài khoản ngân hàng để nhận tiền hoàn.",
                     "BANK_INFO_REQUIRED");
+        }
+
+        List<MultipartFile> validFiles = filterValidFiles(files);
+        if (validFiles.size() < MIN_RETURN_IMAGES) {
+            throw new ApiException(
+                    "Vui lòng tải lên tối thiểu " + MIN_RETURN_IMAGES + " hình ảnh sản phẩm.",
+                    "RETURN_IMAGES_REQUIRED");
         }
 
         YeuCauTraHang yc = new YeuCauTraHang();
@@ -116,6 +136,8 @@ public class ReturnRequestService {
         yc.setNgayCapNhat(LocalDateTime.now());
         YeuCauTraHang saved = yeuCauTraHangRepository.save(yc);
 
+        List<String> anhUrls = luuAnhTraHang(saved, validFiles);
+
         ghiNhatKy(hoaDon, "YEU_CAU_TRA_HANG", "Khách gửi yêu cầu trả hàng: "
                 + (request.getLyDo() != null ? request.getLyDo() : ""));
         thongBaoService.taoThongBao(
@@ -125,14 +147,14 @@ public class ReturnRequestService {
                 "/admin/tra-hang",
                 saved.getId(),
                 hoaDon.getMaHoaDon());
-        return new YeuCauTraHangResponse(saved);
+        return new YeuCauTraHangResponse(saved, anhUrls);
     }
 
     @Transactional(readOnly = true)
     public List<YeuCauTraHangResponse> danhSachCuaToi(Integer idKhachHang) {
         return yeuCauTraHangRepository
                 .findByIdHoaDon_IdKhachHang_IdOrderByNgayTaoDesc(idKhachHang)
-                .stream().map(YeuCauTraHangResponse::new).toList();
+                .stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
@@ -140,7 +162,7 @@ public class ReturnRequestService {
         List<YeuCauTraHang> list = trangThai != null
                 ? yeuCauTraHangRepository.findByTrangThaiOrderByNgayTaoDesc(trangThai)
                 : yeuCauTraHangRepository.findAllByOrderByNgayTaoDesc();
-        return list.stream().map(YeuCauTraHangResponse::new).toList();
+        return list.stream().map(this::toResponse).toList();
     }
 
     /**
@@ -172,14 +194,14 @@ public class ReturnRequestService {
                     null, null, null,
                     idNhanVien);
             orderMailService.guiYeuCauTraHangDuocDuyet(hoaDon);
-            return new YeuCauTraHangResponse(saved);
+            return toResponse(saved);
         }
 
         yc.setTrangThai(TrangThaiTraHang.DA_DUYET);
         YeuCauTraHang saved = yeuCauTraHangRepository.save(yc);
         ghiNhatKy(hoaDon, "TRA_HANG_DA_DUYET", "Duyệt yêu cầu trả hàng");
         orderMailService.guiYeuCauTraHangDuocDuyet(hoaDon);
-        return new YeuCauTraHangResponse(saved);
+        return toResponse(saved);
     }
 
     /** Admin tu choi yeu cau tra hang. */
@@ -197,7 +219,7 @@ public class ReturnRequestService {
         ghiNhatKy(yc.getIdHoaDon(), "TRA_HANG_TU_CHOI",
                 "Từ chối yêu cầu trả hàng" + (lyDo != null && !lyDo.isBlank() ? ": " + lyDo : ""));
         orderMailService.guiYeuCauTraHangBiTuChoi(yc.getIdHoaDon(), lyDo);
-        return new YeuCauTraHangResponse(saved);
+        return toResponse(saved);
     }
 
     /** Khach tao van don GHN hoan tra hang ve shop (sau khi da duoc duyet). */
@@ -233,7 +255,7 @@ public class ReturnRequestService {
         yc.setNgayCapNhat(LocalDateTime.now());
         YeuCauTraHang saved = yeuCauTraHangRepository.save(yc);
         ghiNhatKy(hoaDon, "TRA_HANG_DANG_HOAN", "Đã tạo vận đơn hoàn trả GHN: " + response.getOrderCode());
-        return new YeuCauTraHangResponse(saved);
+        return toResponse(saved);
     }
 
     /** Admin xac nhan da nhan lai hang: don chuyen TRA_HANG, hoan ton kho va tao yeu cau hoan tien. */
@@ -271,7 +293,44 @@ public class ReturnRequestService {
                     hoaDon, LoaiHoanTien.TRA_HANG, hoaDon.getThanhTien(), saved,
                     yc.getTenNganHang(), yc.getSoTaiKhoan(), yc.getChuTaiKhoan());
         }
-        return new YeuCauTraHangResponse(saved);
+        return toResponse(saved);
+    }
+
+    private YeuCauTraHangResponse toResponse(YeuCauTraHang yc) {
+        List<String> anhUrls = anhYeuCauTraHangRepository
+                .findByIdYeuCauTraHang_IdOrderByIdAsc(yc.getId())
+                .stream()
+                .map(AnhYeuCauTraHang::getDuongDan)
+                .toList();
+        return new YeuCauTraHangResponse(yc, anhUrls);
+    }
+
+    private List<MultipartFile> filterValidFiles(List<MultipartFile> files) {
+        if (files == null || files.isEmpty()) {
+            return List.of();
+        }
+        List<MultipartFile> valid = new ArrayList<>();
+        for (MultipartFile file : files) {
+            if (file != null && !file.isEmpty()) {
+                valid.add(file);
+            }
+        }
+        return valid;
+    }
+
+    private List<String> luuAnhTraHang(YeuCauTraHang yeuCau, List<MultipartFile> files) {
+        List<String> urls = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now();
+        for (MultipartFile file : files) {
+            String path = productFileStorageService.store(file);
+            AnhYeuCauTraHang anh = new AnhYeuCauTraHang();
+            anh.setIdYeuCauTraHang(yeuCau);
+            anh.setDuongDan(path);
+            anh.setNgayTao(now);
+            anhYeuCauTraHangRepository.save(anh);
+            urls.add(path);
+        }
+        return urls;
     }
 
     private boolean laVnpay(HoaDon hoaDon) {

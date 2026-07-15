@@ -16,10 +16,12 @@ import org.example.templatejava6.order.entity.LichSuDonHang;
 import org.example.templatejava6.order.entity.ThanhToanHoaDon;
 import org.example.templatejava6.order.model.request.HuyDonOnlineRequest;
 import org.example.templatejava6.order.model.request.OnlineCheckoutRequest;
+import org.example.templatejava6.order.model.request.OnlineTinhGiaRequest;
 import org.example.templatejava6.order.model.response.HoaDonChiTietResponse;
 import org.example.templatejava6.order.model.response.HoaDonDetailResponse;
 import org.example.templatejava6.order.model.response.HoaDonResponse;
 import org.example.templatejava6.order.model.response.OnlineCheckoutResponse;
+import org.example.templatejava6.order.model.response.OnlineTinhGiaResponse;
 import org.example.templatejava6.order.repository.HoaDonChiTietRepository;
 import org.example.templatejava6.order.repository.HoaDonRepository;
 import org.example.templatejava6.order.repository.LichSuDonHangRepository;
@@ -126,10 +128,7 @@ public class OnlineCheckoutService {
         PhieuGiamGia phieu = resolvePhieu(request.getMaPhieuGiamGia());
         BigDecimal tienGiamGia = BigDecimal.ZERO;
         if (phieu != null) {
-            List<Integer> variantIds = lines.stream()
-                    .map(line -> line.chiTietSanPham().getId())
-                    .toList();
-            tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien, variantIds, saleMap);
+            tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien);
         }
         BigDecimal phiVanChuyen = request.getPhiVanChuyen() != null ? request.getPhiVanChuyen() : BigDecimal.ZERO;
         BigDecimal thanhTien = tongTien.subtract(tienGiamGia).add(phiVanChuyen);
@@ -190,6 +189,40 @@ public class OnlineCheckoutService {
             payment = paymentService.taoThanhToan(MA_VNPAY, paymentRequest, clientIp);
         }
         return OnlineCheckoutResponse.from(hoaDon, payment);
+    }
+
+    @Transactional(readOnly = true)
+    public OnlineTinhGiaResponse tinhGia(OnlineTinhGiaRequest request) {
+        KhachHang khachHang = khachHangRepository.findById(request.getIdKhachHang())
+                .orElseThrow(() -> new ApiException("Khách hàng không tồn tại.", "NOT_FOUND"));
+        GioHang gioHang = gioHangRepository.findFirstByKhachHang_IdOrderByIdAsc(khachHang.getId())
+                .orElseThrow(() -> new ApiException("Khách hàng chưa có giỏ hàng.", "EMPTY_CART"));
+        List<ChiTietGioHang> selectedItems = resolveSelectedCartItems(gioHang, request.getIdsChiTietGioHang());
+        Map<Integer, VariantSaleInfo> saleMap = checkoutPricingService.loadActiveSales();
+        List<LineCalc> lines = buildLines(selectedItems, saleMap);
+        BigDecimal tongTien = sumTongTien(lines);
+
+        PhieuGiamGia phieu = resolvePhieu(request.getMaPhieuGiamGia());
+        BigDecimal tienGiamGia = BigDecimal.ZERO;
+        String maPhieu = null;
+        if (phieu != null) {
+            tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien);
+            maPhieu = phieu.getMa();
+        }
+
+        BigDecimal phiVanChuyen = request.getPhiVanChuyen() != null ? request.getPhiVanChuyen() : BigDecimal.ZERO;
+        BigDecimal thanhTien = tongTien.subtract(tienGiamGia).add(phiVanChuyen);
+        if (thanhTien.compareTo(BigDecimal.ZERO) < 0) {
+            thanhTien = BigDecimal.ZERO;
+        }
+
+        OnlineTinhGiaResponse res = new OnlineTinhGiaResponse();
+        res.setTongTien(tongTien);
+        res.setTienGiamGia(tienGiamGia);
+        res.setPhiVanChuyen(phiVanChuyen);
+        res.setThanhTien(thanhTien);
+        res.setMaPhieuGiamGia(maPhieu);
+        return res;
     }
 
     @Transactional(readOnly = true)

@@ -28,6 +28,7 @@ public class StorefrontOrderDetailResponse {
     private String tenNguoiNhan;
     private String sdtNguoiNhan;
     private String diaChiGiao;
+    private String maPhuongThucThanhToan;
     private List<StorefrontOrderLineResponse> chiTiets;
     private String capNhatGanNhatTrangThai;
     private String capNhatGanNhatLabel;

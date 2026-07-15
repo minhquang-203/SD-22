@@ -1,8 +1,17 @@
 import request from './request'
 
-/** Khách: tạo yêu cầu trả hàng */
-export function taoYeuCauTraHang(idHoaDon, idKhachHang, payload) {
-  return request.post(`/online/orders/${idHoaDon}/tra-hang`, payload, {
+/** Khách: tạo yêu cầu trả hàng (multipart: data JSON + files ảnh) */
+export function taoYeuCauTraHang(idHoaDon, idKhachHang, payload, files = []) {
+  const formData = new FormData()
+  formData.append(
+    'data',
+    new Blob([JSON.stringify(payload)], { type: 'application/json' }),
+    'data.json',
+  )
+  ;(files || []).forEach((file) => {
+    if (file) formData.append('files', file)
+  })
+  return request.post(`/online/orders/${idHoaDon}/tra-hang`, formData, {
     params: { idKhachHang },
   })
 }

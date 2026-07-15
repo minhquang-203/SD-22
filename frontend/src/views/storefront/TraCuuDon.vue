@@ -3,7 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import OrderCard from '@/components/storefront/OrderCard.vue'
 import ProductReviewModal from '@/components/storefront/ProductReviewModal.vue'
-import ReturnRequestModal from '@/components/storefront/ReturnRequestModal.vue'
+import ReturnRequestCodModal from '@/components/storefront/ReturnRequestCodModal.vue'
+import ReturnRequestWalletModal from '@/components/storefront/ReturnRequestWalletModal.vue'
 import { confirm } from '@/composables/useConfirm'
 import { getCustomerId } from '@/composables/useAuth'
 import { toast } from '@/composables/useToast'
@@ -274,7 +275,15 @@ async function handleCancelOrder(order) {
       @submitted="onReviewSubmitted"
     />
 
-    <ReturnRequestModal
+    <ReturnRequestCodModal
+      v-if="returnOrder && String(returnOrder.maPhuongThucThanhToan || '').toUpperCase() === 'COD'"
+      :visible="showReturnModal"
+      :order="returnOrder"
+      @close="closeReturn"
+      @submitted="onReturnSubmitted"
+    />
+    <ReturnRequestWalletModal
+      v-else-if="returnOrder"
       :visible="showReturnModal"
       :order="returnOrder"
       @close="closeReturn"

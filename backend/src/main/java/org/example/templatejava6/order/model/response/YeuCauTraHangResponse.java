@@ -5,6 +5,8 @@ import lombok.Setter;
 import org.example.templatejava6.order.entity.YeuCauTraHang;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -27,6 +29,7 @@ public class YeuCauTraHangResponse {
     private String chuTaiKhoan;
     private String ghiChuAdmin;
     private String phuongThucThanhToan;
+    private List<String> anhUrls = new ArrayList<>();
     private LocalDateTime ngayTao;
     private LocalDateTime ngayCapNhat;
 
@@ -58,5 +61,10 @@ public class YeuCauTraHangResponse {
         this.ghiChuAdmin = yc.getGhiChuAdmin();
         this.ngayTao = yc.getNgayTao();
         this.ngayCapNhat = yc.getNgayCapNhat();
+    }
+
+    public YeuCauTraHangResponse(YeuCauTraHang yc, List<String> anhUrls) {
+        this(yc);
+        this.anhUrls = anhUrls != null ? new ArrayList<>(anhUrls) : new ArrayList<>();
     }
 }

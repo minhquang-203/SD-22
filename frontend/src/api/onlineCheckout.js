@@ -4,6 +4,10 @@ export function createOnlineCheckout(payload) {
   return request.post('/online/checkout', payload)
 }
 
+export function tinhGiaOnline(payload) {
+  return request.post('/online/tinh-gia', payload)
+}
+
 export function fetchOnlineOrders(idKhachHang) {
   return request.get('/online/orders', { params: { idKhachHang } })
 }

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
@@ -13,6 +13,7 @@ import {
 } from '@/api/traHangApi'
 import { useAdminBadges } from '@/composables/useAdminBadges'
 import { traHangStatusLabel, traHangStatusTone } from '@/utils/returnStatus'
+import { productImageUrl } from '@/utils/productImage'
 
 const router = useRouter()
 const { nhanVienId } = useAdminAuth()
@@ -42,6 +43,30 @@ const showRejectModal = ref(false)
 const rejectTarget = ref(null)
 const rejectNote = ref('')
 const expandedId = ref(null)
+const previewImageUrl = ref('')
+
+function openImagePreview(url) {
+  previewImageUrl.value = productImageUrl(url)
+}
+
+function closeImagePreview() {
+  previewImageUrl.value = ''
+}
+
+function onPreviewKeydown(e) {
+  if (e.key === 'Escape' && previewImageUrl.value) {
+    closeImagePreview()
+  }
+}
+
+watch(previewImageUrl, (url) => {
+  document.body.style.overflow = url ? 'hidden' : ''
+})
+
+onUnmounted(() => {
+  document.body.style.overflow = ''
+  window.removeEventListener('keydown', onPreviewKeydown)
+})
 
 function notify(text, type = 'success') {
   message.value = text
@@ -198,7 +223,10 @@ watch(filteredItems, () => {
   if (page.value > totalPages.value) page.value = totalPages.value
 })
 
-onMounted(loadList)
+onMounted(() => {
+  window.addEventListener('keydown', onPreviewKeydown)
+  loadList()
+})
 </script>
 
 <template>
@@ -343,11 +371,30 @@ onMounted(loadList)
                   <div class="detail-grid">
                     <div><strong>Mô tả:</strong> {{ item.moTa || '—' }}</div>
                     <div><strong>Địa chỉ trả:</strong> {{ item.diaChiTra || '—' }}</div>
+                    <div><strong>Phương thức TT:</strong> {{ item.phuongThucThanhToan || '—' }}</div>
                     <div><strong>Ngân hàng:</strong> {{ item.tenNganHang || '—' }}</div>
                     <div><strong>STK:</strong> {{ item.soTaiKhoan || '—' }}</div>
                     <div><strong>Chủ TK:</strong> {{ item.chuTaiKhoan || '—' }}</div>
                     <div><strong>Ghi chú admin:</strong> {{ item.ghiChuAdmin || '—' }}</div>
                     <div><strong>Cập nhật:</strong> {{ formatDateTime(item.ngayCapNhat) }}</div>
+                  </div>
+                  <div v-if="item.anhUrls?.length" class="return-images">
+                    <strong class="return-images__label">Ảnh đính kèm:</strong>
+                    <div class="return-images__grid">
+                      <button
+                        v-for="(url, idx) in item.anhUrls"
+                        :key="`${item.id}-${idx}`"
+                        type="button"
+                        class="return-images__item"
+                        title="Xem ảnh"
+                        @click="openImagePreview(url)"
+                      >
+                        <img :src="productImageUrl(url)" :alt="`Ảnh trả hàng ${idx + 1}`" />
+                      </button>
+                    </div>
+                  </div>
+                  <div v-else class="return-images return-images--empty">
+                    <strong>Ảnh đính kèm:</strong> —
                   </div>
                 </td>
               </tr>
@@ -391,6 +438,32 @@ onMounted(loadList)
         </div>
       </div>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="previewImageUrl"
+        class="return-lightbox"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Xem ảnh trả hàng"
+        @click.self="closeImagePreview"
+      >
+        <button
+          type="button"
+          class="return-lightbox__close"
+          aria-label="Đóng"
+          @click="closeImagePreview"
+        >
+          <Icon icon="mdi:close" width="24" />
+        </button>
+        <img
+          :src="previewImageUrl"
+          alt="Ảnh trả hàng"
+          class="return-lightbox__img"
+          @click.stop
+        />
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -491,6 +564,82 @@ onMounted(loadList)
   gap: 8px 16px;
   font-size: 13px;
   color: rgba(30, 21, 16, 0.8);
+}
+.return-images {
+  margin-top: 12px;
+}
+.return-images--empty {
+  font-size: 13px;
+  color: rgba(30, 21, 16, 0.8);
+}
+.return-images__label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.return-images__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.return-images__item {
+  display: block;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(30, 21, 16, 0.12);
+  background: #fff;
+  cursor: pointer;
+}
+.return-images__item:hover {
+  border-color: var(--bronze, #a67c3d);
+  box-shadow: 0 0 0 2px rgba(166, 124, 61, 0.2);
+}
+.return-images__item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.return-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 6000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px 24px;
+  background: rgba(15, 23, 42, 0.82);
+}
+.return-lightbox__close {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 6001;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  background: #fff;
+  color: #0f172a;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+.return-lightbox__close:hover {
+  background: #f1f5f9;
+}
+.return-lightbox__img {
+  max-width: min(960px, 100%);
+  max-height: calc(100vh - 80px);
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  background: #fff;
 }
 .modal-overlay {
   position: fixed;

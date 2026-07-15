@@ -178,10 +178,7 @@ public class BanHangService {
             PhieuGiamGia phieu = phieuGiamGiaRepository.findByMa(maPhieuTrimmed)
                     .orElseThrow(() -> new ApiException(
                             "Mã giảm giá \"" + maPhieuTrimmed + "\" không tồn tại.", "INVALID_VOUCHER"));
-            List<Integer> variantIds = lines.stream()
-                    .map(line -> line.cts.getId())
-                    .toList();
-            tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien, variantIds, saleMap);
+            tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien);
         }
 
         BigDecimal thanhTien = tongTien.subtract(tienGiamGia);
@@ -310,10 +307,7 @@ public class BanHangService {
             phieu = phieuGiamGiaRepository.findByMa(req.getMaPhieuGiamGia().trim())
                     .orElseThrow(() -> new ApiException(
                             "Mã giảm giá \"" + req.getMaPhieuGiamGia() + "\" không tồn tại.", "INVALID_VOUCHER"));
-            List<Integer> variantIds = lines.stream()
-                    .map(line -> line.cts.getId())
-                    .toList();
-            tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien, variantIds, saleMap);
+            tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien);
         }
 
         BigDecimal thanhTien = tongTien.subtract(tienGiamGia);

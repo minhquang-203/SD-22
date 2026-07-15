@@ -99,10 +99,6 @@ const tongTienHang = computed(() =>
   cart.value.reduce((sum, line) => sum + line.giaBan * line.soLuong, 0),
 )
 
-const hasSaleItemsInCart = computed(() =>
-  cart.value.some((line) => line.dangGiamGia),
-)
-
 const thanhTien = computed(() => Math.max(0, tongTienHang.value - voucherDiscount.value))
 
 const tienThua = computed(() => {
@@ -349,10 +345,6 @@ function applyVoucher() {
   }
   if (cart.value.length === 0) {
     notify('Thêm sản phẩm trước khi áp mã giảm giá', 'error')
-    return
-  }
-  if (hasSaleItemsInCart.value) {
-    notify('Không thể áp dụng mã khi đơn có sản phẩm đang giảm giá', 'error')
     return
   }
   confirm({
@@ -932,16 +924,13 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="admin-btn admin-btn-default"
-              :disabled="voucherLoading || hasSaleItemsInCart || cart.length === 0"
+              :disabled="voucherLoading || cart.length === 0"
               @click="applyVoucher"
             >
               {{ voucherLoading ? 'Đang kiểm tra...' : 'Áp dụng' }}
             </button>
           </div>
-          <p v-if="hasSaleItemsInCart" class="text-xs text-[var(--coral)] mt-1">
-            Đơn có sản phẩm đang giảm giá nên không thể áp dụng mã voucher.
-          </p>
-          <p v-else-if="appliedVoucher" class="text-xs text-[var(--admin-muted)] mt-1">
+          <p v-if="appliedVoucher" class="text-xs text-[var(--admin-muted)] mt-1">
             Mã đã áp dụng: <strong>{{ appliedVoucher }}</strong>
             — giảm <strong class="text-[var(--sage)]">{{ formatCurrency(voucherDiscount) }}</strong>
           </p>

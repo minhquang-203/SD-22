@@ -136,6 +136,9 @@ public class HoaDonStorefrontService {
         r.setTenNguoiNhan(resolveTenNguoiNhan(hd));
         r.setSdtNguoiNhan(resolveSdtNguoiNhan(hd));
         r.setDiaChiGiao(hd.getDiaChiGiao());
+        if (hd.getIdPhuongThucThanhToan() != null) {
+            r.setMaPhuongThucThanhToan(hd.getIdPhuongThucThanhToan().getMa());
+        }
         r.setChiTiets(hoaDonChiTietRepository.findByIdHoaDon(hd).stream()
                 .map(this::buildLine)
                 .toList());

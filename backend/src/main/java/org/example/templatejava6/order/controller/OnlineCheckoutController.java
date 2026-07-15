@@ -5,9 +5,11 @@ import jakarta.validation.Valid;
 import org.example.templatejava6.common.util.PaginationUtil;
 import org.example.templatejava6.order.model.request.HuyDonOnlineRequest;
 import org.example.templatejava6.order.model.request.OnlineCheckoutRequest;
+import org.example.templatejava6.order.model.request.OnlineTinhGiaRequest;
 import org.example.templatejava6.order.model.response.HoaDonDetailResponse;
 import org.example.templatejava6.order.model.response.HoaDonResponse;
 import org.example.templatejava6.order.model.response.OnlineCheckoutResponse;
+import org.example.templatejava6.order.model.response.OnlineTinhGiaResponse;
 import org.example.templatejava6.order.service.OnlineCheckoutService;
 import org.example.templatejava6.voucher.model.response.PhieuGiamGiaResponse;
 import org.example.templatejava6.voucher.service.PhieuGiamGiaService;
@@ -46,6 +48,11 @@ public class OnlineCheckoutController {
             @RequestParam(defaultValue = "20") int size) {
         Pageable pageable = PaginationUtil.create(page, size);
         return ResponseEntity.ok(phieuGiamGiaService.listAvailableForCustomer(keyword, pageable));
+    }
+
+    @PostMapping("/tinh-gia")
+    public OnlineTinhGiaResponse tinhGia(@Valid @RequestBody OnlineTinhGiaRequest request) {
+        return onlineCheckoutService.tinhGia(request);
     }
 
     @PostMapping("/checkout")
