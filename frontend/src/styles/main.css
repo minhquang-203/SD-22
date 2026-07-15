@@ -709,6 +709,34 @@ h2,
   transition: color 0.28s ease !important;
 }
 
+.admin-menu-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.admin-menu-label__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-menu-badge {
+  flex-shrink: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  letter-spacing: 0;
+}
+
 /* Tắt ::before Naive — tránh chớp khi chuyển selected giữa 2 mục con */
 .admin-sidebar-naive__menu .n-menu-item-content::before {
   display: none !important;

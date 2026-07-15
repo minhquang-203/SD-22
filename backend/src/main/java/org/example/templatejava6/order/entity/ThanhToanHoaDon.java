@@ -46,6 +46,16 @@ public class ThanhToanHoaDon {
     @Column(name = "ma_giao_dich", length = 100)
     private String maGiaoDich;
 
+    /** Ma giao dich cua nha cung cap (vd: vnp_TransactionNo) — can de goi API refund. */
+    @Size(max = 100)
+    @Column(name = "provider_transaction_no", length = 100)
+    private String providerTransactionNo;
+
+    /** Ngay thanh toan goc tu nha cung cap (vd: vnp_PayDate yyyyMMddHHmmss). */
+    @Size(max = 20)
+    @Column(name = "provider_pay_date", length = 20)
+    private String providerPayDate;
+
     @Size(max = 15)
     @ColumnDefault("'THANH_CONG'")
     @Column(name = "trang_thai", length = 15)

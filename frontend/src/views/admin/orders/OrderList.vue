@@ -4,10 +4,12 @@ import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import { getAllHoaDon } from '@/api/hoaDonApi'
+import { useAdminBadges } from '@/composables/useAdminBadges'
 import { formatCurrency } from '@/utils/format'
 import { orderStatusLabel } from '@/utils/orderStatus'
 
 const router = useRouter()
+const { refreshBadges } = useAdminBadges()
 const loading = ref(false)
 const message = ref('')
 const messageType = ref('success')
@@ -177,6 +179,7 @@ async function loadOrders() {
     const res = await getAllHoaDon()
     allOrders.value = res.data || []
     page.value = 1
+    await refreshBadges()
   } catch (err) {
     notify(String(err), 'error')
   } finally {

@@ -14,6 +14,8 @@ public class PaymentCallbackResult {
     private boolean successful;
     private String transactionRef;
     private String providerTransactionNo;
+    /** Ngay thanh toan goc (vd: vnp_PayDate yyyyMMddHHmmss) — can de goi API refund. */
+    private String providerPayDate;
     private String responseCode;
     private String message;
     private BigDecimal amount;

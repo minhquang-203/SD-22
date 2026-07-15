@@ -12,6 +12,9 @@ import org.example.templatejava6.order.repository.PhuongThucThanhToanRepository;
 import org.example.templatejava6.order.repository.ThanhToanHoaDonRepository;
 import org.example.templatejava6.order.service.OnlineOrderLifecycleService;
 import org.example.templatejava6.order.service.PosOrderLifecycleService;
+import org.example.templatejava6.notification.enums.LoaiThongBao;
+import org.example.templatejava6.notification.service.OrderMailService;
+import org.example.templatejava6.notification.service.ThongBaoService;
 import org.example.templatejava6.payment.gateway.PaymentCallbackResult;
 import org.example.templatejava6.payment.gateway.PaymentCreateCommand;
 import org.example.templatejava6.payment.gateway.PaymentCreateResult;
@@ -47,6 +50,8 @@ public class PaymentService {
     private final LichSuDonHangRepository lichSuDonHangRepository;
     private final OnlineOrderLifecycleService onlineOrderLifecycleService;
     private final PosOrderLifecycleService posOrderLifecycleService;
+    private final ThongBaoService thongBaoService;
+    private final OrderMailService orderMailService;
 
     public PaymentService(
             PaymentGatewayRegistry gatewayRegistry,
@@ -55,7 +60,9 @@ public class PaymentService {
             PhuongThucThanhToanRepository phuongThucThanhToanRepository,
             LichSuDonHangRepository lichSuDonHangRepository,
             OnlineOrderLifecycleService onlineOrderLifecycleService,
-            PosOrderLifecycleService posOrderLifecycleService) {
+            PosOrderLifecycleService posOrderLifecycleService,
+            ThongBaoService thongBaoService,
+            OrderMailService orderMailService) {
         this.gatewayRegistry = gatewayRegistry;
         this.hoaDonRepository = hoaDonRepository;
         this.thanhToanHoaDonRepository = thanhToanHoaDonRepository;
@@ -63,6 +70,8 @@ public class PaymentService {
         this.lichSuDonHangRepository = lichSuDonHangRepository;
         this.onlineOrderLifecycleService = onlineOrderLifecycleService;
         this.posOrderLifecycleService = posOrderLifecycleService;
+        this.thongBaoService = thongBaoService;
+        this.orderMailService = orderMailService;
     }
 
     @Transactional
@@ -143,6 +152,8 @@ public class PaymentService {
                 return buildCallbackResponse(callback, provider, hoaDon, false, "Đơn hàng đã hết hạn hoặc đã hủy.");
             }
             thanhToan.setTrangThai(TRANG_THAI_THANH_CONG);
+            thanhToan.setProviderTransactionNo(callback.getProviderTransactionNo());
+            thanhToan.setProviderPayDate(callback.getProviderPayDate());
             thanhToan.setThoiGian(LocalDateTime.now());
             thanhToanHoaDonRepository.save(thanhToan);
 
@@ -152,6 +163,11 @@ public class PaymentService {
             ghiNhatKy(hoaDon, "THANH_TOAN",
                     "Thanh toán " + provider + " thành công"
                             + formatProviderTransaction(callback.getProviderTransactionNo()));
+            // Đơn online thanh toán online thành công -> báo admin + gửi hóa đơn điện tử cho khách
+            if (LOAI_DON_ONLINE.equalsIgnoreCase(hoaDon.getLoaiDon())) {
+                thongBaoDonMoi(hoaDon);
+                orderMailService.guiHoaDonDatHangThanhCong(hoaDon);
+            }
             return buildCallbackResponse(callback, provider, hoaDon, true, callback.getMessage());
         }
 
@@ -224,6 +240,20 @@ public class PaymentService {
 
     private String normalizeProvider(String providerCode) {
         return providerCode == null ? "" : providerCode.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private void thongBaoDonMoi(HoaDon hoaDon) {
+        String tenKhach = hoaDon.getIdKhachHang() != null && hoaDon.getIdKhachHang().getHoTen() != null
+                ? hoaDon.getIdKhachHang().getHoTen()
+                : "Khách hàng";
+        String noiDung = tenKhach + " vừa thanh toán online thành công cho đơn " + hoaDon.getMaHoaDon() + ".";
+        thongBaoService.taoThongBao(
+                LoaiThongBao.DON_HANG_MOI,
+                "Đơn hàng online mới",
+                noiDung,
+                "/admin/hoa-don/chi-tiet/" + hoaDon.getId(),
+                hoaDon.getId(),
+                hoaDon.getMaHoaDon());
     }
 
     private void ghiNhatKy(HoaDon hoaDon, String trangThai, String ghiChu) {

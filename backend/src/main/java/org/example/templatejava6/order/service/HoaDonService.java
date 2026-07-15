@@ -83,6 +83,8 @@ public class HoaDonService {
 
     @Autowired private ThanhToanHoaDonRepository thanhToanHoaDonRepository;
 
+    @Autowired private HoanTienRepository hoanTienRepository;
+
     @Autowired private GhnOrderCreationService ghnOrderCreationService;
 
     @Autowired private OnlineOrderLifecycleService onlineOrderLifecycleService;
@@ -424,6 +426,17 @@ public class HoaDonService {
             response.setTienThua(tt.getTienThua());
             response.setMaGiaoDich(tt.getMaGiaoDich());
         });
+
+        List<HoanTien> hoanTiens = hoanTienRepository.findByIdHoaDonOrderByNgayTaoDesc(hd);
+        if (!hoanTiens.isEmpty()) {
+            HoanTien ht = hoanTiens.get(0);
+            if (ht.getTrangThai() != null) {
+                response.setTrangThaiHoanTien(ht.getTrangThai().name());
+                response.setTrangThaiHoanTienLabel(ht.getTrangThai().getLabel());
+            }
+            response.setMaGiaoDichHoan(ht.getMaGiaoDichHoan());
+            response.setSoTienHoan(ht.getSoTien());
+        }
 
         return response;
 

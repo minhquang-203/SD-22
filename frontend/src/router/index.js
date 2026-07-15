@@ -178,6 +178,18 @@ const router = createRouter({
           meta: { title: 'Chi tiết hóa đơn', breadcrumb: 'Quản lý hóa đơn / Chi tiết' },
         },
         {
+          path: 'tra-hang',
+          name: 'AdminTraHang',
+          component: () => import('@/views/admin/returns/ReturnList.vue'),
+          meta: { title: 'Trả hàng', breadcrumb: 'Quản lý hóa đơn / Trả hàng' },
+        },
+        {
+          path: 'hoan-tien',
+          name: 'AdminHoanTien',
+          component: () => import('@/views/admin/refunds/RefundList.vue'),
+          meta: { title: 'Hoàn tiền', breadcrumb: 'Quản lý hóa đơn / Hoàn tiền' },
+        },
+        {
           path: 'products',
           name: 'AdminProducts',
           component: () => import('@/views/product/ProductList.vue'),

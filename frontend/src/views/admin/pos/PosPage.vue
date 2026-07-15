@@ -253,7 +253,8 @@ function onSearchEnter() {
 async function loadMeta() {
   try {
     const ptRes = await getPhuongThuc()
-    paymentMethods.value = ptRes.data || []
+    // POS tại quầy: chỉ TIEN_MAT / VNPAY — COD (thanh toán khi nhận) chỉ dùng online
+    paymentMethods.value = (ptRes.data || []).filter((p) => p.ma !== 'COD')
     const cash = paymentMethods.value.find((p) => p.ma === 'TIEN_MAT')
     if (cash) selectedPaymentId.value = cash.id
   } catch (err) {

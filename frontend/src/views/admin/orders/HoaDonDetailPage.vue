@@ -690,6 +690,20 @@ onMounted(() => {
               Mã giao dịch: <span class="soleil-sp-code">{{ detail.maGiaoDich }}</span>
             </p>
           </div>
+
+          <div v-if="detail.trangThaiHoanTien" class="hoa-don-pay-block">
+            <p class="text-sm font-medium mb-1">Hoàn tiền</p>
+            <p class="text-sm">
+              Trạng thái:
+              <strong>{{ detail.trangThaiHoanTienLabel || detail.trangThaiHoanTien }}</strong>
+              <template v-if="detail.soTienHoan != null">
+                · Số tiền: <strong>{{ formatCurrency(detail.soTienHoan) }}</strong>
+              </template>
+            </p>
+            <p v-if="detail.maGiaoDichHoan" class="text-sm mt-1">
+              Mã GD hoàn: <span class="soleil-sp-code">{{ detail.maGiaoDichHoan }}</span>
+            </p>
+          </div>
         </section>
 
         <aside class="soleil-card hoa-don-timeline no-print">

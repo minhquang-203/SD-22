@@ -4,15 +4,20 @@ import org.example.templatejava6.common.entity.KhachHang;
 import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.customer.repository.KhachHangRepository;
+import org.example.templatejava6.common.enums.TrangThaiTraHang;
 import org.example.templatejava6.order.entity.HoaDon;
 import org.example.templatejava6.order.entity.HoaDonChiTiet;
+import org.example.templatejava6.order.entity.HoanTien;
 import org.example.templatejava6.order.entity.LichSuDonHang;
+import org.example.templatejava6.order.entity.YeuCauTraHang;
 import org.example.templatejava6.order.model.response.StorefrontOrderDetailResponse;
 import org.example.templatejava6.order.model.response.StorefrontOrderLineResponse;
 import org.example.templatejava6.order.model.response.StorefrontOrderSummaryResponse;
 import org.example.templatejava6.order.repository.HoaDonChiTietRepository;
 import org.example.templatejava6.order.repository.HoaDonRepository;
+import org.example.templatejava6.order.repository.HoanTienRepository;
 import org.example.templatejava6.order.repository.LichSuDonHangRepository;
+import org.example.templatejava6.order.repository.YeuCauTraHangRepository;
 import org.example.templatejava6.product.entity.AnhSanPham;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
 import org.example.templatejava6.product.entity.SanPham;
@@ -38,6 +43,8 @@ public class HoaDonStorefrontService {
     private final GhnTrackingService ghnTrackingService;
     private final DanhGiaRepository danhGiaRepository;
     private final OnlineOrderLifecycleService onlineOrderLifecycleService;
+    private final YeuCauTraHangRepository yeuCauTraHangRepository;
+    private final HoanTienRepository hoanTienRepository;
 
     public HoaDonStorefrontService(
             HoaDonRepository hoaDonRepository,
@@ -47,7 +54,9 @@ public class HoaDonStorefrontService {
             AnhSanPhamRepository anhSanPhamRepository,
             GhnTrackingService ghnTrackingService,
             DanhGiaRepository danhGiaRepository,
-            OnlineOrderLifecycleService onlineOrderLifecycleService) {
+            OnlineOrderLifecycleService onlineOrderLifecycleService,
+            YeuCauTraHangRepository yeuCauTraHangRepository,
+            HoanTienRepository hoanTienRepository) {
         this.hoaDonRepository = hoaDonRepository;
         this.hoaDonChiTietRepository = hoaDonChiTietRepository;
         this.lichSuDonHangRepository = lichSuDonHangRepository;
@@ -56,6 +65,8 @@ public class HoaDonStorefrontService {
         this.ghnTrackingService = ghnTrackingService;
         this.danhGiaRepository = danhGiaRepository;
         this.onlineOrderLifecycleService = onlineOrderLifecycleService;
+        this.yeuCauTraHangRepository = yeuCauTraHangRepository;
+        this.hoanTienRepository = hoanTienRepository;
     }
 
     @Transactional(readOnly = true)
@@ -137,7 +148,34 @@ public class HoaDonStorefrontService {
             r.setCapNhatGanNhatLabel(resolveLichSuLabel(latest.getTrangThai()));
             r.setCapNhatGanNhatLuc(latest.getThoiGian());
         }
+        applyTraHangVaHoanTien(r, hd);
         return r;
+    }
+
+    private void applyTraHangVaHoanTien(StorefrontOrderDetailResponse r, HoaDon hd) {
+        List<YeuCauTraHang> yeuCaus = yeuCauTraHangRepository.findByIdHoaDonOrderByNgayTaoDesc(hd);
+        YeuCauTraHang moiNhat = yeuCaus.isEmpty() ? null : yeuCaus.get(0);
+        boolean coYeuCauDangXuLy = yeuCaus.stream()
+                .anyMatch(yc -> yc.getTrangThai() != TrangThaiTraHang.TU_CHOI);
+        r.setCoTheYeuCauTraHang(hd.getTrangThai() == TrangThaiDonHang.HOAN_THANH && !coYeuCauDangXuLy);
+        if (moiNhat != null) {
+            r.setIdYeuCauTraHang(moiNhat.getId());
+            if (moiNhat.getTrangThai() != null) {
+                r.setTrangThaiTraHang(moiNhat.getTrangThai().name());
+                r.setTrangThaiTraHangLabel(moiNhat.getTrangThai().getLabel());
+            }
+            r.setMaVanDonTra(moiNhat.getMaVanDonTra());
+        }
+
+        List<HoanTien> hoanTiens = hoanTienRepository.findByIdHoaDonOrderByNgayTaoDesc(hd);
+        if (!hoanTiens.isEmpty()) {
+            HoanTien htMoiNhat = hoanTiens.get(0);
+            if (htMoiNhat.getTrangThai() != null) {
+                r.setTrangThaiHoanTien(htMoiNhat.getTrangThai().name());
+                r.setTrangThaiHoanTienLabel(htMoiNhat.getTrangThai().getLabel());
+            }
+            r.setMaGiaoDichHoan(htMoiNhat.getMaGiaoDichHoan());
+        }
     }
 
     private void applyGhnTracking(StorefrontOrderDetailResponse r, HoaDon hd) {
