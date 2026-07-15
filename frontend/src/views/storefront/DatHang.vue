@@ -16,7 +16,6 @@ import CheckoutRecipientModal from '@/components/storefront/CheckoutRecipientMod
 import CheckoutVoucherModal from '@/components/storefront/CheckoutVoucherModal.vue'
 
 const SHIPPING_FEE = 30000
-const FREE_SHIPPING_FROM = 500000
 
 const route = useRoute()
 const router = useRouter()
@@ -29,6 +28,7 @@ const {
   selectedSubtotal,
   selectedSavings,
   refreshCart,
+  syncAfterCheckout,
 } = useCart()
 
 const profileLoading = ref(false)
@@ -86,12 +86,10 @@ const paymentMethods = [
 ]
 
 const shippingFee = computed(() => {
-  if (selectedSubtotal.value >= FREE_SHIPPING_FROM) return 0
   if (ghnFee.value != null) return ghnFee.value
   return SHIPPING_FEE
 })
 const estimatedTotal = computed(() => selectedSubtotal.value + shippingFee.value)
-const isFreeShipping = computed(() => selectedSubtotal.value >= FREE_SHIPPING_FROM)
 const hasSelectedCartItems = computed(() => selectedItems.value.length > 0)
 const hasSaleItemsInCart = computed(() => selectedSavings.value > 0)
 
@@ -418,7 +416,7 @@ function parsePaymentCallback() {
   router.replace({ path: route.path })
 
   if (paymentCallback.value.success) {
-    void refreshCart().catch(() => {})
+    void syncAfterCheckout().catch(() => {})
     toast('Thanh toán thành công')
   } else {
     toast(paymentCallback.value.message || 'Thanh toán thất bại')
@@ -440,9 +438,11 @@ async function submitCheckout() {
     if (form.email.trim()) noteParts.push(`Email: ${form.email.trim()}`)
     if (form.ghiChu.trim()) noteParts.push(form.ghiChu.trim())
 
+    const purchasedIds = selectedItems.value.map((line) => line.idChiTietGioHang)
+
     const res = await createOnlineCheckout({
       idKhachHang: Number(idKhachHang.value),
-      idsChiTietGioHang: selectedItems.value.map((line) => line.idChiTietGioHang),
+      idsChiTietGioHang: purchasedIds,
       maPhuongThucThanhToan: selectedPayment.value,
       maPhieuGiamGia: form.maPhieuGiamGia.trim() || null,
       diaChiGiao,
@@ -455,7 +455,7 @@ async function submitCheckout() {
     })
 
     orderResult.value = res.data
-    await refreshCart()
+    await syncAfterCheckout(purchasedIds)
 
     if (res.data?.paymentUrl) {
       toast('Tạo đơn thành công. Đang chuyển sang VNPay...')
@@ -853,10 +853,7 @@ onMounted(() => {
             <strong v-if="feeLoading">Đang tính...</strong>
             <strong v-else>{{ shippingFee ? formatVND(shippingFee) : 'Miễn phí' }}</strong>
           </div>
-          <p v-if="isFreeShipping" class="sf-checkout-hint">
-            Đơn từ {{ formatVND(FREE_SHIPPING_FROM) }} được miễn phí vận chuyển.
-          </p>
-          <p v-else-if="feeNotice" class="sf-checkout-hint">{{ feeNotice }}</p>
+          <p v-if="feeNotice" class="sf-checkout-hint">{{ feeNotice }}</p>
           <div v-if="form.maPhieuGiamGia" class="sf-checkout-summary__row">
             <span>Mã giảm giá</span>
             <strong>{{ form.maPhieuGiamGia }}</strong>

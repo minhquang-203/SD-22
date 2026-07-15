@@ -19,6 +19,10 @@ public class HoaDonDetailResponse extends HoaDonResponse {
     private BigDecimal soTienKhachDua;
     private BigDecimal tienThua;
     private String maGiaoDich;
+    private String trangThaiHoanTien;
+    private String trangThaiHoanTienLabel;
+    private String maGiaoDichHoan;
+    private BigDecimal soTienHoan;
     private List<HoaDonChiTietResponse> chiTiets;
 
     public HoaDonDetailResponse(HoaDon hd) {

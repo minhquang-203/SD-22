@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NMenu } from 'naive-ui'
 import {
@@ -9,6 +9,7 @@ import {
 } from '@/constants/adminMenu'
 import { buildAdminMenuOptions } from '@/utils/adminMenuOptions'
 import { useAdminAuth } from '@/composables/useAdminAuth'
+import { useAdminBadges } from '@/composables/useAdminBadges'
 import AppLogo from '@/components/common/AppLogo.vue'
 
 const props = defineProps({
@@ -18,6 +19,7 @@ const props = defineProps({
 const route = useRoute()
 const router = useRouter()
 const { vaiTro } = useAdminAuth()
+const { startPolling, stopPolling, refreshBadges } = useAdminBadges()
 
 const menuOptions = computed(() => {
   const filtered = filterMenuByRole(ADMIN_MENU, vaiTro.value)
@@ -48,6 +50,23 @@ watch(
   },
   { immediate: true },
 )
+
+watch(
+  () => route.path,
+  (path, prev) => {
+    if (path?.startsWith('/admin') && path !== prev) {
+      refreshBadges()
+    }
+  },
+)
+
+onMounted(() => {
+  startPolling()
+})
+
+onBeforeUnmount(() => {
+  stopPolling()
+})
 </script>
 
 <template>

@@ -25,6 +25,9 @@ import org.example.templatejava6.order.repository.HoaDonRepository;
 import org.example.templatejava6.order.repository.LichSuDonHangRepository;
 import org.example.templatejava6.order.repository.PhuongThucThanhToanRepository;
 import org.example.templatejava6.order.repository.ThanhToanHoaDonRepository;
+import org.example.templatejava6.notification.enums.LoaiThongBao;
+import org.example.templatejava6.notification.service.OrderMailService;
+import org.example.templatejava6.notification.service.ThongBaoService;
 import org.example.templatejava6.payment.model.request.TaoThanhToanRequest;
 import org.example.templatejava6.payment.model.response.TaoThanhToanResponse;
 import org.example.templatejava6.payment.service.PaymentService;
@@ -67,6 +70,8 @@ public class OnlineCheckoutService {
     private final PaymentService paymentService;
     private final OnlineOrderLifecycleService onlineOrderLifecycleService;
     private final CheckoutPricingService checkoutPricingService;
+    private final ThongBaoService thongBaoService;
+    private final OrderMailService orderMailService;
 
     public OnlineCheckoutService(
             GioHangRepository gioHangRepository,
@@ -81,7 +86,9 @@ public class OnlineCheckoutService {
             LoHangService loHangService,
             PaymentService paymentService,
             OnlineOrderLifecycleService onlineOrderLifecycleService,
-            CheckoutPricingService checkoutPricingService) {
+            CheckoutPricingService checkoutPricingService,
+            ThongBaoService thongBaoService,
+            OrderMailService orderMailService) {
         this.gioHangRepository = gioHangRepository;
         this.chiTietGioHangRepository = chiTietGioHangRepository;
         this.khachHangRepository = khachHangRepository;
@@ -95,6 +102,8 @@ public class OnlineCheckoutService {
         this.paymentService = paymentService;
         this.onlineOrderLifecycleService = onlineOrderLifecycleService;
         this.checkoutPricingService = checkoutPricingService;
+        this.thongBaoService = thongBaoService;
+        this.orderMailService = orderMailService;
     }
 
     @Transactional
@@ -172,6 +181,9 @@ public class OnlineCheckoutService {
         if (MA_COD.equals(maPhuongThuc)) {
             taoThanhToanCod(hoaDon, phuongThuc, now);
             ghiNhatKy(hoaDon, "CHO_XAC_NHAN", "Đơn COD chờ nhân viên xác nhận");
+            // COD: đơn đã đặt thành công ngay -> báo admin + gửi hóa đơn điện tử cho khách
+            thongBaoDonMoi(hoaDon);
+            orderMailService.guiHoaDonDatHangThanhCong(hoaDon);
         } else {
             TaoThanhToanRequest paymentRequest = new TaoThanhToanRequest();
             paymentRequest.setIdHoaDon(hoaDon.getId());
@@ -354,6 +366,27 @@ public class OnlineCheckoutService {
 
     private boolean coGiaTri(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private void thongBaoDonMoi(HoaDon hoaDon) {
+        String tenKhach = hoaDon.getIdKhachHang() != null && hoaDon.getIdKhachHang().getHoTen() != null
+                ? hoaDon.getIdKhachHang().getHoTen()
+                : "Khách hàng";
+        String noiDung = tenKhach + " vừa đặt đơn " + hoaDon.getMaHoaDon()
+                + " trị giá " + dinhDangTien(hoaDon.getThanhTien()) + ".";
+        thongBaoService.taoThongBao(
+                LoaiThongBao.DON_HANG_MOI,
+                "Đơn hàng online mới",
+                noiDung,
+                "/admin/hoa-don/chi-tiet/" + hoaDon.getId(),
+                hoaDon.getId(),
+                hoaDon.getMaHoaDon());
+    }
+
+    private String dinhDangTien(BigDecimal value) {
+        BigDecimal v = value != null ? value : BigDecimal.ZERO;
+        return String.format(Locale.US, "%,d", v.setScale(0, java.math.RoundingMode.HALF_UP).longValue())
+                .replace(',', '.') + "\u20ab";
     }
 
     private void ghiNhatKy(HoaDon hoaDon, String trangThai, String ghiChu) {

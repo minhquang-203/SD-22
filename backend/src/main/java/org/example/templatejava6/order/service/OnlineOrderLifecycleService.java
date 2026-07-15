@@ -1,6 +1,7 @@
 package org.example.templatejava6.order.service;
 
 import org.example.templatejava6.common.entity.PhieuGiamGia;
+import org.example.templatejava6.common.enums.LoaiHoanTien;
 import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.order.entity.HoaDon;
@@ -29,6 +30,7 @@ public class OnlineOrderLifecycleService {
     private final LichSuDonHangRepository lichSuDonHangRepository;
     private final PhieuGiamGiaRepository phieuGiamGiaRepository;
     private final LoHangService loHangService;
+    private final RefundService refundService;
 
     public OnlineOrderLifecycleService(
             HoaDonRepository hoaDonRepository,
@@ -36,13 +38,15 @@ public class OnlineOrderLifecycleService {
             ThanhToanHoaDonRepository thanhToanHoaDonRepository,
             LichSuDonHangRepository lichSuDonHangRepository,
             PhieuGiamGiaRepository phieuGiamGiaRepository,
-            LoHangService loHangService) {
+            LoHangService loHangService,
+            RefundService refundService) {
         this.hoaDonRepository = hoaDonRepository;
         this.hoaDonChiTietRepository = hoaDonChiTietRepository;
         this.thanhToanHoaDonRepository = thanhToanHoaDonRepository;
         this.lichSuDonHangRepository = lichSuDonHangRepository;
         this.phieuGiamGiaRepository = phieuGiamGiaRepository;
         this.loHangService = loHangService;
+        this.refundService = refundService;
     }
 
     @Transactional
@@ -66,11 +70,18 @@ public class OnlineOrderLifecycleService {
                     "ORDER_CANNOT_CANCEL");
         }
 
+        boolean daThanhToan = daThanhToanThanhCong(hoaDon);
         hoanTonKho(hoaDon);
         hoanLuotVoucher(hoaDon);
         hoaDon.setTrangThai(TrangThaiDonHang.DA_HUY);
         hoaDonRepository.save(hoaDon);
         ghiNhatKy(hoaDon, "DA_HUY", ghiChu != null && !ghiChu.isBlank() ? ghiChu : "Hủy đơn online");
+
+        // Don da thanh toan (VNPAY) ma huy truoc khi giao -> tao yeu cau hoan tien cho admin xu ly.
+        if (daThanhToan) {
+            refundService.taoHoanTienChoXuLy(
+                    hoaDon, LoaiHoanTien.HUY_DON, hoaDon.getThanhTien(), null, null, null, null);
+        }
         return true;
     }
 

@@ -33,6 +33,15 @@ public class GhnProperties {
     /** Phuong/xa cua kho gui hang. */
     private String fromWardCode;
 
+    /** Ten nguoi nhan tai shop (dung cho van don hoan tra hang ve shop). */
+    private String shopName = "SUNOVA Shop";
+
+    /** So dien thoai shop (van don hoan tra). */
+    private String shopPhone;
+
+    /** Dia chi shop (van don hoan tra). */
+    private String shopAddress;
+
     /** Khoi luong mac dinh moi don (gram). */
     private Integer defaultWeight = 500;
 

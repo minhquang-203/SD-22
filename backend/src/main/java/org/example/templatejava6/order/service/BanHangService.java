@@ -69,6 +69,7 @@ public class BanHangService {
     private static final String TRANG_THAI_THANH_CONG = "THANH_CONG";
     private static final String MA_TIEN_MAT = "TIEN_MAT";
     private static final String MA_VNPAY = "VNPAY";
+    private static final String MA_COD = "COD";
     private static final String TRANG_THAI_CHO_THANH_TOAN = "CHO_THANH_TOAN";
     private static final String TRANG_THAI_THAT_BAI = "THAT_BAI";
     private static final int SAN_PHAM_PAGE_SIZE = 48;
@@ -291,6 +292,11 @@ public class BanHangService {
                 .orElseThrow(() -> new ApiException("Phương thức thanh toán không hợp lệ.", "INVALID_PAYMENT"));
         if (!Boolean.TRUE.equals(pttt.getTrangThai())) {
             throw new ApiException("Phương thức thanh toán không còn hoạt động.", "INACTIVE_PAYMENT");
+        }
+        if (MA_COD.equalsIgnoreCase(pttt.getMa())) {
+            throw new ApiException(
+                    "Thanh toán khi nhận hàng không áp dụng cho bán tại quầy.",
+                    "UNSUPPORTED_PAYMENT_METHOD");
         }
 
         Map<Integer, Integer> qtyByVariant = mergeItems(req.getItems());

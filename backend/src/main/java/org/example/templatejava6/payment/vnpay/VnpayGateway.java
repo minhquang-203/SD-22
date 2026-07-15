@@ -89,6 +89,7 @@ public class VnpayGateway implements PaymentGateway {
                 .successful(validSignature && SUCCESS_RESPONSE_CODE.equals(responseCode))
                 .transactionRef(params.get("vnp_TxnRef"))
                 .providerTransactionNo(params.get("vnp_TransactionNo"))
+                .providerPayDate(params.get("vnp_PayDate"))
                 .responseCode(responseCode)
                 .message(toMessage(responseCode, validSignature))
                 .amount(fromVnpayAmount(params.get("vnp_Amount")))

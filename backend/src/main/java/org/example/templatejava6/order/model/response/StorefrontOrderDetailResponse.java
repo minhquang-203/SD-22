@@ -32,4 +32,13 @@ public class StorefrontOrderDetailResponse {
     private String capNhatGanNhatTrangThai;
     private String capNhatGanNhatLabel;
     private LocalDateTime capNhatGanNhatLuc;
+
+    private Boolean coTheYeuCauTraHang;
+    private Integer idYeuCauTraHang;
+    private String trangThaiTraHang;
+    private String trangThaiTraHangLabel;
+    private String maVanDonTra;
+    private String trangThaiHoanTien;
+    private String trangThaiHoanTienLabel;
+    private String maGiaoDichHoan;
 }

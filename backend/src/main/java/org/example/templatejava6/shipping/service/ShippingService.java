@@ -5,6 +5,7 @@ import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.shipping.client.GhnClient;
 import org.example.templatejava6.shipping.config.GhnProperties;
 import org.example.templatejava6.shipping.model.request.CreateShippingOrderRequest;
+import org.example.templatejava6.shipping.model.request.ReturnShippingOrderRequest;
 import org.example.templatejava6.shipping.model.request.ShippingFeeRequest;
 import org.example.templatejava6.shipping.model.response.CreateShippingOrderResponse;
 import org.example.templatejava6.shipping.model.response.GhnDistrictResponse;
@@ -157,19 +158,23 @@ public class ShippingService {
      * Uu tien service_type_id da cau hinh, neu khong co thi lay goi dau tien.
      */
     private Integer resolveServiceId(Integer toDistrictId) {
+        return resolveServiceId(properties.getFromDistrictId(), toDistrictId);
+    }
+
+    private Integer resolveServiceId(Integer fromDistrictId, Integer toDistrictId) {
         Integer shopId = parseShopId();
         if (shopId == null) {
             return null;
         }
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("shop_id", shopId);
-        body.put("from_district", properties.getFromDistrictId());
+        body.put("from_district", fromDistrictId);
         body.put("to_district", toDistrictId);
         try {
             JsonNode response = ghnClient.post("/v2/shipping-order/available-services", body);
             JsonNode data = response != null ? response.path("data") : null;
             if (data == null || !data.isArray() || data.isEmpty()) {
-                log.warn("GHN available-services rỗng cho tuyến {} -> {}", properties.getFromDistrictId(), toDistrictId);
+                log.warn("GHN available-services rỗng cho tuyến {} -> {}", fromDistrictId, toDistrictId);
                 return null;
             }
             Integer preferredType = properties.getServiceTypeId();
@@ -189,7 +194,7 @@ public class ShippingService {
             return firstServiceId;
         } catch (RestClientException ex) {
             log.warn("GHN available-services thất bại cho tuyến {} -> {}: {}",
-                    properties.getFromDistrictId(), toDistrictId, ghnError(ex));
+                    fromDistrictId, toDistrictId, ghnError(ex));
             return null;
         }
     }
@@ -281,6 +286,96 @@ public class ShippingService {
                     request.getToDistrictId(), serviceId, chiTiet);
             throw new ApiException("Không tạo được vận đơn GHN. Lỗi GHN: " + chiTiet, "GHN_ERROR");
         }
+    }
+
+    /**
+     * Tao van don hoan tra hang: nguoi gui la khach hang (from_*), nguoi nhan la shop
+     * (lay tu cau hinh ghn.shop-* va ghn.from-*). Shop chiu phi (payment_type_id = 1).
+     */
+    public CreateShippingOrderResponse createReturnOrder(ReturnShippingOrderRequest request) {
+        if (!properties.isFeeConfigured()) {
+            throw new ApiException("Chưa cấu hình ShopId / kho gửi của GHN.", "GHN_NOT_CONFIGURED");
+        }
+        if (request.getFromDistrictId() == null
+                || request.getFromWardCode() == null || request.getFromWardCode().isBlank()) {
+            throw new ApiException(
+                    "Thiếu quận/huyện hoặc phường/xã của địa chỉ lấy hàng trả.", "GHN_MISSING_ADDRESS");
+        }
+
+        Integer serviceId = resolveServiceId(request.getFromDistrictId(), properties.getFromDistrictId());
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("payment_type_id", 1); // shop tra phi hoan tra
+        body.put("required_note", "CHOXEMHANGKHONGTHU");
+        // Nguoi gui = khach hang
+        body.put("from_name", request.getFromName());
+        body.put("from_phone", request.getFromPhone());
+        body.put("from_address", request.getFromAddress());
+        body.put("from_ward_code", request.getFromWardCode());
+        body.put("from_district_id", request.getFromDistrictId());
+        // Nguoi nhan = shop
+        body.put("to_name", orElse(properties.getShopName(), "SUNOVA Shop"));
+        body.put("to_phone", orElse(properties.getShopPhone(), "0900000000"));
+        body.put("to_address", orElse(properties.getShopAddress(), "Kho SUNOVA"));
+        body.put("to_ward_code", properties.getFromWardCode());
+        body.put("to_district_id", properties.getFromDistrictId());
+        if (serviceId != null) {
+            body.put("service_id", serviceId);
+        } else {
+            body.put("service_type_id", properties.getServiceTypeId());
+        }
+        body.put("weight", request.getWeight() != null ? request.getWeight() : properties.getDefaultWeight());
+        body.put("length", properties.getDefaultLength());
+        body.put("width", properties.getDefaultWidth());
+        body.put("height", properties.getDefaultHeight());
+        if (request.getInsuranceValue() != null && request.getInsuranceValue() > 0) {
+            body.put("insurance_value", request.getInsuranceValue());
+        }
+        body.put("items", buildReturnItems(request));
+
+        try {
+            JsonNode response = ghnClient.postWithShop("/v2/shipping-order/create", body);
+            JsonNode data = response != null ? response.path("data") : null;
+            if (data == null || data.isMissingNode() || !data.hasNonNull("order_code")) {
+                String chiTiet = ghnMessage(response);
+                log.warn("GHN không trả về mã vận đơn hoàn trả (from_district={}): {}",
+                        request.getFromDistrictId(), chiTiet);
+                throw new ApiException("GHN không trả về mã vận đơn hoàn trả. Phản hồi GHN: " + chiTiet, "GHN_ERROR");
+            }
+            return new CreateShippingOrderResponse(
+                    data.path("order_code").asText(),
+                    data.hasNonNull("total_fee") ? data.path("total_fee").asLong() : null,
+                    text(data, "expected_delivery_time"));
+        } catch (RestClientException ex) {
+            String chiTiet = ghnError(ex);
+            log.warn("GHN tạo vận đơn hoàn trả thất bại (from_district={}): {}",
+                    request.getFromDistrictId(), chiTiet);
+            throw new ApiException("Không tạo được vận đơn hoàn trả GHN. Lỗi GHN: " + chiTiet, "GHN_ERROR");
+        }
+    }
+
+    private List<Map<String, Object>> buildReturnItems(ReturnShippingOrderRequest request) {
+        List<Map<String, Object>> items = new ArrayList<>();
+        if (request.getItems() != null && !request.getItems().isEmpty()) {
+            for (CreateShippingOrderRequest.Item item : request.getItems()) {
+                Map<String, Object> map = new LinkedHashMap<>();
+                map.put("name", item.getName() != null ? item.getName() : "Sản phẩm");
+                map.put("quantity", item.getQuantity() != null && item.getQuantity() > 0 ? item.getQuantity() : 1);
+                map.put("weight", item.getWeight() != null ? item.getWeight() : properties.getDefaultWeight());
+                items.add(map);
+            }
+            return items;
+        }
+        Map<String, Object> single = new LinkedHashMap<>();
+        single.put("name", "Hàng hoàn trả");
+        single.put("quantity", 1);
+        single.put("weight", request.getWeight() != null ? request.getWeight() : properties.getDefaultWeight());
+        items.add(single);
+        return items;
+    }
+
+    private static String orElse(String value, String fallback) {
+        return value != null && !value.isBlank() ? value : fallback;
     }
 
     private List<Map<String, Object>> buildItems(CreateShippingOrderRequest request) {
