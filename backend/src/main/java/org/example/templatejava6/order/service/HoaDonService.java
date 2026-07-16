@@ -35,6 +35,10 @@ import org.example.templatejava6.product.entity.ChiTietSanPham;
 
 import org.example.templatejava6.product.repository.ChiTietSanPhamRepository;
 
+import org.example.templatejava6.product.service.LoHangService;
+
+import org.example.templatejava6.realtime.service.OrderRealtimeService;
+
 import org.springframework.beans.factory.annotation.Autowired;
 
 import org.springframework.data.domain.Page;
@@ -91,13 +95,18 @@ public class HoaDonService {
 
     @Autowired private PosOrderLifecycleService posOrderLifecycleService;
 
+    @Autowired private OrderRealtimeService orderRealtimeService;
+
+    @Autowired private LoHangService loHangService;
+
 
 
     @Transactional(readOnly = true)
 
     public List<HoaDonResponse> getAll() {
 
-        return hoaDonRepository.findAllByOrderByNgayTaoDesc().stream().map(HoaDonResponse::new).toList();
+        return hoaDonRepository.findVisibleForAdminOrderByNgayTaoDesc()
+                .stream().map(HoaDonResponse::new).toList();
 
     }
 
@@ -109,7 +118,8 @@ public class HoaDonService {
 
         Pageable pageable = PageRequest.of(pageNo, pageSize);
 
-        return hoaDonRepository.findAllByOrderByNgayTaoDesc(pageable).map(HoaDonResponse::new);
+        return hoaDonRepository.findVisibleForAdminOrderByNgayTaoDesc(pageable)
+                .map(HoaDonResponse::new);
 
     }
 
@@ -119,7 +129,7 @@ public class HoaDonService {
 
     public List<HoaDonResponse> timKiem(String keyword) {
 
-        return hoaDonRepository.findByMaHoaDonContainingIgnoreCase(keyword)
+        return hoaDonRepository.findVisibleForAdminByMaHoaDonContaining(keyword)
 
                 .stream().map(HoaDonResponse::new).toList();
 
@@ -223,9 +233,43 @@ public class HoaDonService {
 
             throw new ApiException(
 
-                    "Không thể chuyển từ '" + trangThaiCu.getLabel() + "' sang '" + trangThaiMoi.getLabel() + "'",
+                    "Không thể chuyển từ '" + trangThaiCu.getLabel() + "' sang '" + trangThaiMoi.getLabel() + "'", 
 
                     "VALIDATION_ERROR");
+
+        }
+
+        validateVnpayDaThanhToanNeuCan(hd, trangThaiMoi);
+
+
+
+        // Hủy đơn: ưu tiên lifecycle (hoàn tồn + voucher/refund), tránh mất tồn kho.
+
+        if (trangThaiMoi == TrangThaiDonHang.DA_HUY) {
+
+            String note = ghiChu != null && !ghiChu.isBlank() ? ghiChu : "Hủy đơn hàng";
+
+            if ("ONLINE".equalsIgnoreCase(hd.getLoaiDon()) && trangThaiCu.coTheHuyTruocKhiGiao()) {
+
+                onlineOrderLifecycleService.huyDonOnline(hd, note);
+
+                return;
+
+            }
+
+            if ("TAI_QUAY".equalsIgnoreCase(hd.getLoaiDon()) && trangThaiCu == TrangThaiDonHang.CHO_XAC_NHAN) {
+
+                posOrderLifecycleService.huyDonVnpay(hd, note);
+
+                return;
+
+            }
+
+            if (canHoanTonKhiHuy(trangThaiCu, hd.getLoaiDon())) {
+
+                hoanTonTheoHoaDon(hd);
+
+            }
 
         }
 
@@ -240,6 +284,40 @@ public class HoaDonService {
         if (canTaoVanDonGhn(trangThaiMoi)) {
 
             ghnOrderCreationService.taoVanDonNeuCan(hd);
+
+        }
+
+        orderRealtimeService.publishStatusChanged(hd, trangThaiCu);
+
+    }
+
+    /** Đơn đã trừ tồn lúc tạo/giữ thì khi hủy phải hoàn lại. */
+
+    private boolean canHoanTonKhiHuy(TrangThaiDonHang trangThaiCu, String loaiDon) {
+
+        if (trangThaiCu == TrangThaiDonHang.CHO && "TAI_QUAY".equalsIgnoreCase(loaiDon)) {
+
+            return true;
+
+        }
+
+        // Online / tại quầy đã checkout: tồn đã trừ từ lúc tạo đơn.
+
+        return trangThaiCu == TrangThaiDonHang.CHO_XAC_NHAN
+
+                || trangThaiCu == TrangThaiDonHang.DA_XAC_NHAN
+
+                || trangThaiCu == TrangThaiDonHang.DANG_CHUAN_BI
+
+                || trangThaiCu == TrangThaiDonHang.DANG_GIAO;
+
+    }
+
+    private void hoanTonTheoHoaDon(HoaDon hoaDon) {
+
+        for (HoaDonChiTiet chiTiet : hoaDonChiTietRepository.findByIdHoaDon(hoaDon)) {
+
+            loHangService.hoanTonTheoChiTiet(chiTiet);
 
         }
 
@@ -315,9 +393,43 @@ public class HoaDonService {
 
     public HoaDon getHoaDonOrThrow(Integer id) {
 
-        return hoaDonRepository.findById(id)
+        HoaDon hd = hoaDonRepository.findById(id)
 
                 .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn", "NOT_FOUND"));
+
+        if (onlineOrderLifecycleService.laVnpayChuaThanhToan(hd)) {
+
+            throw new ApiException("Không tìm thấy hóa đơn", "NOT_FOUND");
+
+        }
+
+        return hd;
+
+    }
+
+    private void validateVnpayDaThanhToanNeuCan(HoaDon hd, TrangThaiDonHang trangThaiMoi) {
+
+        if (trangThaiMoi == TrangThaiDonHang.DA_HUY) {
+
+            return;
+
+        }
+
+        PhuongThucThanhToan phuongThuc = hd.getIdPhuongThucThanhToan();
+
+        if (phuongThuc == null || phuongThuc.getMa() == null
+
+                || !"VNPAY".equalsIgnoreCase(phuongThuc.getMa())) {
+
+            return;
+
+        }
+
+        if (!onlineOrderLifecycleService.daThanhToanThanhCong(hd)) {
+
+            throw new ApiException("Đơn VNPAY chưa thanh toán thành công.", "PAYMENT_REQUIRED");
+
+        }
 
     }
 

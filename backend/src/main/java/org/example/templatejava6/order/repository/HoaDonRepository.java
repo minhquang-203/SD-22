@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
@@ -26,6 +27,50 @@ public interface HoaDonRepository extends JpaRepository<HoaDon, Integer> {
 
     List<HoaDon> findAllByOrderByNgayTaoDesc();
 
+    /**
+     * Admin: ẩn đơn VNPAY chưa có ThanhToanHoaDon = THANH_CONG.
+     * COD vẫn hiện dù payment còn CHO_THANH_TOAN.
+     */
+    @Query("""
+            SELECT h FROM HoaDon h
+            WHERE NOT (
+                UPPER(h.idPhuongThucThanhToan.ma) = 'VNPAY'
+                AND NOT EXISTS (
+                    SELECT 1 FROM ThanhToanHoaDon t
+                    WHERE t.idHoaDon = h AND t.trangThai = 'THANH_CONG'
+                )
+            )
+            ORDER BY h.ngayTao DESC
+            """)
+    List<HoaDon> findVisibleForAdminOrderByNgayTaoDesc();
+
+    @Query("""
+            SELECT h FROM HoaDon h
+            WHERE NOT (
+                UPPER(h.idPhuongThucThanhToan.ma) = 'VNPAY'
+                AND NOT EXISTS (
+                    SELECT 1 FROM ThanhToanHoaDon t
+                    WHERE t.idHoaDon = h AND t.trangThai = 'THANH_CONG'
+                )
+            )
+            ORDER BY h.ngayTao DESC
+            """)
+    Page<HoaDon> findVisibleForAdminOrderByNgayTaoDesc(Pageable pageable);
+
+    @Query("""
+            SELECT h FROM HoaDon h
+            WHERE LOWER(h.maHoaDon) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              AND NOT (
+                UPPER(h.idPhuongThucThanhToan.ma) = 'VNPAY'
+                AND NOT EXISTS (
+                    SELECT 1 FROM ThanhToanHoaDon t
+                    WHERE t.idHoaDon = h AND t.trangThai = 'THANH_CONG'
+                )
+              )
+            ORDER BY h.ngayTao DESC
+            """)
+    List<HoaDon> findVisibleForAdminByMaHoaDonContaining(@Param("keyword") String keyword);
+
     List<HoaDon> findByTrangThaiAndLoaiDonOrderByNgayTaoDesc(TrangThaiDonHang trangThai, String loaiDon);
 
     Optional<HoaDon> findByIdAndTrangThaiAndLoaiDon(Integer id, TrangThaiDonHang trangThai, String loaiDon);
@@ -38,8 +83,6 @@ public interface HoaDonRepository extends JpaRepository<HoaDon, Integer> {
 
     Optional<HoaDon> findByIdAndIdKhachHang_IdAndLoaiDon(Integer id, Integer idKhachHang, String loaiDon);
 
-    Optional<HoaDon> findByMaHoaDonIgnoreCase(String maHoaDon);
-
     List<HoaDon> findByMaVanDonGhnNotNullAndTrangThaiNotIn(java.util.Collection<TrangThaiDonHang> trangThaiKetThuc);
 
     @Query("""
@@ -47,7 +90,11 @@ public interface HoaDonRepository extends JpaRepository<HoaDon, Integer> {
             WHERE h.loaiDon = 'ONLINE'
               AND h.trangThai = org.example.templatejava6.common.enums.TrangThaiDonHang.CHO_XAC_NHAN
               AND h.ngayTao <= :cutoff
-              AND h.idPhuongThucThanhToan.ma = 'VNPAY'
+              AND UPPER(h.idPhuongThucThanhToan.ma) = 'VNPAY'
+              AND NOT EXISTS (
+                  SELECT 1 FROM ThanhToanHoaDon t
+                  WHERE t.idHoaDon = h AND t.trangThai = 'THANH_CONG'
+              )
             ORDER BY h.ngayTao ASC
             """)
     List<HoaDon> findExpiredUnpaidVnpayOrders(LocalDateTime cutoff);

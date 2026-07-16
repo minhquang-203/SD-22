@@ -5,8 +5,11 @@ import org.example.templatejava6.notification.enums.LoaiThongBao;
 import org.example.templatejava6.notification.model.response.ThongBaoResponse;
 import org.example.templatejava6.notification.model.response.ThongBaoTongQuanResponse;
 import org.example.templatejava6.notification.repository.ThongBaoRepository;
+import org.example.templatejava6.realtime.event.AdminNotificationAppEvent;
+import org.example.templatejava6.realtime.model.AdminNotificationEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -22,9 +25,12 @@ public class ThongBaoService {
     private static final int MAX_HIEN_THI = 30;
 
     private final ThongBaoRepository thongBaoRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public ThongBaoService(ThongBaoRepository thongBaoRepository) {
+    public ThongBaoService(ThongBaoRepository thongBaoRepository,
+                           ApplicationEventPublisher eventPublisher) {
         this.thongBaoRepository = thongBaoRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     /** Tạo thông báo cho admin. Chạy giao dịch riêng + nuốt lỗi để không ảnh hưởng luồng nghiệp vụ chính. */
@@ -42,7 +48,19 @@ public class ThongBaoService {
             tb.setIdKhachHang(null); // thông báo cho admin/hệ thống
             tb.setDaDoc(false);
             tb.setThoiGian(LocalDateTime.now());
-            thongBaoRepository.save(tb);
+            ThongBao saved = thongBaoRepository.save(tb);
+            eventPublisher.publishEvent(new AdminNotificationAppEvent(
+                    this,
+                    AdminNotificationEvent.builder()
+                            .type(AdminNotificationEvent.TYPE_NOTIFICATION)
+                            .id(saved.getId())
+                            .loai(loai != null ? loai.name() : null)
+                            .tieuDe(tieuDe)
+                            .noiDung(noiDung)
+                            .link(link)
+                            .idThamChieu(idThamChieu)
+                            .maThamChieu(maThamChieu)
+                            .build()));
         } catch (Exception ex) {
             log.error("Không tạo được thông báo admin: {}", ex.getMessage(), ex);
         }

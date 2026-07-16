@@ -404,14 +404,17 @@ async function previewVoucherPricing(code = form.maPhieuGiamGia) {
   voucherPricingLoading.value = true
   try {
     const res = await tinhGiaOnline({
-      idKhachHang: idKhachHang.value,
       idsChiTietGioHang: selectedItems.value.map((line) => line.idChiTietGioHang),
       maPhieuGiamGia: normalized,
-      phiVanChuyen: shippingFee.value,
+      toDistrictId: form.districtId || undefined,
+      toWardCode: form.wardCode || undefined,
     })
     voucherDiscount.value = Number(res.data?.tienGiamGia) || 0
     if (res.data?.maPhieuGiamGia) {
       form.maPhieuGiamGia = res.data.maPhieuGiamGia
+    }
+    if (typeof res.data?.phiVanChuyen === 'number') {
+      ghnFee.value = res.data.phiVanChuyen
     }
   } catch (error) {
     form.maPhieuGiamGia = ''
@@ -437,7 +440,7 @@ function clearVoucher() {
 }
 
 watch(
-  [selectedSubtotal, shippingFee],
+  [selectedSubtotal, () => form.districtId, () => form.wardCode],
   () => {
     if (form.maPhieuGiamGia) {
       void previewVoucherPricing()
@@ -488,12 +491,10 @@ async function submitCheckout() {
     const purchasedIds = selectedItems.value.map((line) => line.idChiTietGioHang)
 
     const res = await createOnlineCheckout({
-      idKhachHang: Number(idKhachHang.value),
       idsChiTietGioHang: purchasedIds,
       maPhuongThucThanhToan: selectedPayment.value,
       maPhieuGiamGia: form.maPhieuGiamGia.trim() || null,
       diaChiGiao,
-      phiVanChuyen: shippingFee.value,
       ghiChu: compactText(noteParts.join(' | ')),
       tenNguoiNhan: form.hoTen.trim(),
       sdtNguoiNhan: form.soDienThoai.trim(),

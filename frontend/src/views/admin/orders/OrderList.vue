@@ -1,10 +1,11 @@
 ﻿<script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import { getAllHoaDon } from '@/api/hoaDonApi'
 import { useAdminBadges } from '@/composables/useAdminBadges'
+import { subscribeAdminOrders } from '@/composables/useRealtime'
 import { formatCurrency } from '@/utils/format'
 import { orderStatusLabel } from '@/utils/orderStatus'
 
@@ -13,6 +14,8 @@ const { refreshBadges } = useAdminBadges()
 const loading = ref(false)
 const message = ref('')
 const messageType = ref('success')
+
+let unsubscribeOrders = null
 
 const allOrders = ref([])
 const keyword = ref('')
@@ -76,6 +79,23 @@ function loaiDonLabel(loai) {
   if (loai === 'TAI_QUAY') return 'Tại quầy'
   if (loai === 'ONLINE') return 'Online'
   return loai || '—'
+}
+
+function onOrderRealtime(event) {
+  if (!event?.idHoaDon) return
+  const idx = allOrders.value.findIndex((o) => Number(o.id) === Number(event.idHoaDon))
+  if (idx >= 0) {
+    allOrders.value[idx] = {
+      ...allOrders.value[idx],
+      trangThai: event.trangThai ?? allOrders.value[idx].trangThai,
+    }
+  } else if (event.type === 'ORDER_CREATED') {
+    loadOrders({ silent: true })
+  }
+}
+
+function onOrderRealtimeWindow(e) {
+  onOrderRealtime(e?.detail)
 }
 
 function loaiDonTone(loai) {
@@ -173,17 +193,17 @@ const pagedOrders = computed(() => {
   return filteredOrders.value.slice(start, start + pageSize.value)
 })
 
-async function loadOrders() {
-  loading.value = true
+async function loadOrders({ silent = false } = {}) {
+  if (!silent) loading.value = true
   try {
     const res = await getAllHoaDon()
     allOrders.value = res.data || []
-    page.value = 1
+    if (!silent) page.value = 1
     await refreshBadges()
   } catch (err) {
-    notify(String(err), 'error')
+    if (!silent) notify(String(err), 'error')
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
 }
 
@@ -212,7 +232,17 @@ watch(filteredOrders, () => {
   }
 })
 
-onMounted(() => loadOrders())
+onMounted(() => {
+  loadOrders()
+  unsubscribeOrders = subscribeAdminOrders(onOrderRealtime)
+  window.addEventListener('sunova-admin-order-realtime', onOrderRealtimeWindow)
+})
+
+onUnmounted(() => {
+  unsubscribeOrders?.()
+  unsubscribeOrders = null
+  window.removeEventListener('sunova-admin-order-realtime', onOrderRealtimeWindow)
+})
 </script>
 
 <template>

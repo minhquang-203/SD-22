@@ -70,18 +70,6 @@ public class HoaDonStorefrontService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<StorefrontOrderDetailResponse> traCuu(String ma, String sdt) {
-        String maNorm = normalizeMa(ma);
-        String sdtNorm = normalizePhone(sdt);
-        if (maNorm.isBlank() || sdtNorm.isBlank()) {
-            return Optional.empty();
-        }
-        return hoaDonRepository.findByMaHoaDonIgnoreCase(maNorm)
-                .filter(hd -> phoneMatches(hd, sdtNorm))
-                .map(this::buildDetail);
-    }
-
-    @Transactional(readOnly = true)
     public List<StorefrontOrderSummaryResponse> donCuaToi() {
         KhachHang kh = getKhachDangNhap();
         return hoaDonRepository.findByIdKhachHang_IdOrderByNgayTaoDesc(kh.getId())
@@ -251,17 +239,6 @@ public class HoaDonStorefrontService {
         return anh.map(AnhSanPham::getUrl).orElse(null);
     }
 
-    private boolean phoneMatches(HoaDon hd, String sdtNorm) {
-        String sdtNhan = normalizePhone(hd.getSdtNguoiNhan());
-        if (!sdtNhan.isBlank() && sdtNhan.equals(sdtNorm)) {
-            return true;
-        }
-        if (hd.getIdKhachHang() != null) {
-            return normalizePhone(hd.getIdKhachHang().getSoDienThoai()).equals(sdtNorm);
-        }
-        return false;
-    }
-
     private String resolveTenNguoiNhan(HoaDon hd) {
         if (hd.getTenNguoiNhan() != null && !hd.getTenNguoiNhan().isBlank()) {
             return hd.getTenNguoiNhan();
@@ -293,13 +270,6 @@ public class HoaDonStorefrontService {
 
     static String normalizeMa(String ma) {
         return ma == null ? "" : ma.trim();
-    }
-
-    static String normalizePhone(String sdt) {
-        if (sdt == null) {
-            return "";
-        }
-        return sdt.replaceAll("[\\s\\-.]", "");
     }
 
     static BigDecimal defaultZero(BigDecimal value) {

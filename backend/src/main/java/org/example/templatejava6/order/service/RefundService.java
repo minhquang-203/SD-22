@@ -24,6 +24,7 @@ import org.example.templatejava6.payment.gateway.RefundCommand;
 import org.example.templatejava6.payment.gateway.RefundGateway;
 import org.example.templatejava6.payment.gateway.RefundGatewayRegistry;
 import org.example.templatejava6.payment.gateway.RefundResult;
+import org.example.templatejava6.realtime.service.OrderRealtimeService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,6 +56,7 @@ public class RefundService {
     private final RefundGatewayRegistry refundGatewayRegistry;
     private final ThongBaoService thongBaoService;
     private final OrderMailService orderMailService;
+    private final OrderRealtimeService orderRealtimeService;
 
     public RefundService(HoanTienRepository hoanTienRepository,
                          HoaDonRepository hoaDonRepository,
@@ -63,7 +65,8 @@ public class RefundService {
                          NhanVienRepository nhanVienRepository,
                          RefundGatewayRegistry refundGatewayRegistry,
                          ThongBaoService thongBaoService,
-                         OrderMailService orderMailService) {
+                         OrderMailService orderMailService,
+                         OrderRealtimeService orderRealtimeService) {
         this.hoanTienRepository = hoanTienRepository;
         this.hoaDonRepository = hoaDonRepository;
         this.thanhToanHoaDonRepository = thanhToanHoaDonRepository;
@@ -72,6 +75,7 @@ public class RefundService {
         this.refundGatewayRegistry = refundGatewayRegistry;
         this.thongBaoService = thongBaoService;
         this.orderMailService = orderMailService;
+        this.orderRealtimeService = orderRealtimeService;
     }
 
     /** Tao mot ban ghi hoan tien CHO_XU_LY cho admin xu ly. Bao admin qua chuong thong bao. */
@@ -216,9 +220,11 @@ public class RefundService {
             return;
         }
         if (hoaDon.getTrangThai() != TrangThaiDonHang.TRA_HANG) {
+            TrangThaiDonHang trangThaiCu = hoaDon.getTrangThai();
             hoaDon.setTrangThai(TrangThaiDonHang.TRA_HANG);
             hoaDonRepository.save(hoaDon);
             ghiNhatKy(hoaDon, "TRA_HANG", "Đơn chuyển sang trả hàng sau khi hoàn tiền thành công");
+            orderRealtimeService.publishStatusChanged(hoaDon, trangThaiCu);
         }
     }
 

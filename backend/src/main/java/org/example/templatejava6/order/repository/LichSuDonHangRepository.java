@@ -12,4 +12,6 @@ public interface LichSuDonHangRepository extends JpaRepository<LichSuDonHang, In
     List<LichSuDonHang> findAllByOrderByThoiGianDesc();
 
     List<LichSuDonHang> findByIdHoaDon_IdOrderByThoiGianDesc(Integer idHoaDon);
+
+    void deleteByIdHoaDon_Id(Integer idHoaDon);
 }

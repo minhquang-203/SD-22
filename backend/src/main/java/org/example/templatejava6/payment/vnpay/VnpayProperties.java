@@ -15,6 +15,11 @@ public class VnpayProperties {
     private String hashSecret;
     private String payUrl;
     private String returnUrl;
+    /**
+     * URL IPN (server-to-server). Không gửi trong payment URL — khai báo trên cổng merchant sandbox/production.
+     * Phải là HTTPS public; localhost VNPay không gọi được.
+     */
+    private String ipnUrl;
     private String frontendReturnUrl;
     /** Endpoint merchant API (refund / query). */
     private String merchantApiUrl = "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction";

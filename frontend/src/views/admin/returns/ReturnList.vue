@@ -148,7 +148,7 @@ async function handleDuyet(item) {
   const ok = await confirm({
     title: 'Duyệt yêu cầu trả hàng',
     message: isVnpay
-      ? `Duyệt đơn ${item.maHoaDon}? Hệ thống sẽ hoàn tiền VNPAY tự động và chuyển đơn sang Trả hàng.`
+      ? `Duyệt đơn ${item.maHoaDon}? Hệ thống sẽ hoàn tiền VNPAY tự động. Tồn kho được hoàn sau khi xác nhận đã nhận hàng trả.`
       : `Duyệt yêu cầu trả hàng cho đơn ${item.maHoaDon}?`,
     confirmText: 'Duyệt',
   })

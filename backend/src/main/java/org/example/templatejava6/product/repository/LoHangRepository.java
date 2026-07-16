@@ -1,12 +1,15 @@
 package org.example.templatejava6.product.repository;
 
+import jakarta.persistence.LockModeType;
 import org.example.templatejava6.product.entity.LoHang;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface LoHangRepository extends JpaRepository<LoHang, Integer> {
@@ -18,6 +21,8 @@ public interface LoHangRepository extends JpaRepository<LoHang, Integer> {
             """)
     List<LoHang> findByChiTietSanPham_IdOrderByNgayNhapDescHanSuDungAsc(@Param("idCts") Integer idChiTietSanPham);
 
+    /** SELECT FOR UPDATE — serialize FEFO deduct cho cùng SKU. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT l FROM LoHang l
             WHERE l.chiTietSanPham.id = :idCts
@@ -27,7 +32,20 @@ public interface LoHangRepository extends JpaRepository<LoHang, Integer> {
             """)
     List<LoHang> findAvailableForFefo(@Param("idCts") Integer idChiTietSanPham);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT l FROM LoHang l WHERE l.id = :id")
+    Optional<LoHang> findByIdForUpdate(@Param("id") Integer id);
+
     List<LoHang> findByChiTietSanPham_IdAndTrangThaiTrueOrderByIdDesc(Integer idChiTietSanPham);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT l FROM LoHang l
+            WHERE l.chiTietSanPham.id = :idCts
+              AND l.trangThai = true
+            ORDER BY CASE WHEN l.hanSuDung IS NULL THEN 1 ELSE 0 END, l.hanSuDung ASC, l.id ASC
+            """)
+    List<LoHang> findActiveForRestock(@Param("idCts") Integer idChiTietSanPham);
 
     @Query("""
             SELECT COALESCE(SUM(l.soLuongCon), 0) FROM LoHang l

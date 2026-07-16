@@ -11,6 +11,16 @@ public final class SecurityUtils {
 
     /** ID nhân viên từ JWT subject (đăng nhập admin/POS). */
     public static Integer currentNhanVienId() {
+        return currentUserId();
+    }
+
+    /** ID khách hàng từ JWT subject (đăng nhập storefront). */
+    public static Integer currentKhachHangId() {
+        return currentUserId();
+    }
+
+    /** ID người dùng đang đăng nhập (JWT subject = id tài khoản). */
+    public static Integer currentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
             throw new ApiException("Phiên đăng nhập không hợp lệ", "UNAUTHORIZED");

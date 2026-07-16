@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import OrderCard from '@/components/storefront/OrderCard.vue'
 import ProductReviewModal from '@/components/storefront/ProductReviewModal.vue'
@@ -8,6 +8,7 @@ import ReturnRequestWalletModal from '@/components/storefront/ReturnRequestWalle
 import { confirm } from '@/composables/useConfirm'
 import { getCustomerId } from '@/composables/useAuth'
 import { toast } from '@/composables/useToast'
+import { subscribeCustomerOrders } from '@/composables/useRealtime'
 import { fetchChiTietDonCuaToi, fetchDonCuaToi, huyDonCuaToi } from '@/api/donHangApi'
 import { taoVanDonTra } from '@/api/traHangApi'
 
@@ -28,6 +29,8 @@ const returnOrder = ref(null)
 const returnActionLoadingId = ref(null)
 const returnNotice = ref('')
 
+let unsubscribeRealtime = null
+
 const filters = [
   { value: 'all', label: 'Tất cả' },
   { value: 'shipping', label: 'Đang giao' },
@@ -36,7 +39,18 @@ const filters = [
   { value: 'cancelled', label: 'Đã hủy / Trả hàng' },
 ]
 
-onMounted(loadOrders)
+onMounted(() => {
+  loadOrders()
+  unsubscribeRealtime = subscribeCustomerOrders(async (event) => {
+    if (!event?.idHoaDon) return
+    await applyRealtimeOrder(event)
+  })
+})
+
+onUnmounted(() => {
+  unsubscribeRealtime?.()
+  unsubscribeRealtime = null
+})
 
 const filteredOrders = computed(() => {
   const q = search.value.trim().toLowerCase()
@@ -69,6 +83,45 @@ async function loadDetailOrSummary(summary) {
     return res.data || summary
   } catch {
     return { ...summary, chiTiets: [] }
+  }
+}
+
+async function applyRealtimeOrder(event) {
+  const orderId = Number(event.idHoaDon)
+  const idx = orders.value.findIndex((item) => Number(item.id) === orderId)
+
+  try {
+    const res = await fetchChiTietDonCuaToi(orderId)
+    if (res.data) {
+      if (idx >= 0) {
+        orders.value[idx] = res.data
+      } else if (event.type === 'ORDER_CREATED') {
+        orders.value = [res.data, ...orders.value]
+      }
+    } else if (idx >= 0 && event.trangThai) {
+      orders.value[idx] = {
+        ...orders.value[idx],
+        trangThai: event.trangThai,
+        trangThaiLabel: event.trangThaiLabel || orders.value[idx].trangThaiLabel,
+      }
+    }
+  } catch {
+    if (idx >= 0 && event.trangThai) {
+      orders.value[idx] = {
+        ...orders.value[idx],
+        trangThai: event.trangThai,
+        trangThaiLabel: event.trangThaiLabel || orders.value[idx].trangThaiLabel,
+      }
+    }
+  }
+
+  if (event.type === 'ORDER_STATUS_CHANGED') {
+    toast(
+      event.message || `Đơn ${event.maHoaDon || ''} đã cập nhật: ${event.trangThaiLabel || event.trangThai || ''}`,
+      'info',
+    )
+  } else if (event.type === 'ORDER_CREATED') {
+    toast(event.message || `Đơn mới: ${event.maHoaDon || ''}`, 'info')
   }
 }
 

@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import OrderCard from '@/components/storefront/OrderCard.vue'
@@ -9,6 +9,7 @@ import ReturnRequestWalletModal from '@/components/storefront/ReturnRequestWalle
 import { confirm } from '@/composables/useConfirm'
 import { getCustomerId } from '@/composables/useAuth'
 import { toast } from '@/composables/useToast'
+import { subscribeCustomerOrders } from '@/composables/useRealtime'
 import { fetchChiTietDonCuaToi, fetchDonCuaToi, huyDonCuaToi } from '@/api/donHangApi'
 import { taoVanDonTra } from '@/api/traHangApi'
 import { formatVND } from '@/utils/formatVND'
@@ -31,7 +32,39 @@ const returnOrder = ref(null)
 const returnActionLoading = ref(false)
 const returnNotice = ref('')
 
-onMounted(loadList)
+let unsubscribeRealtime = null
+
+onMounted(() => {
+  loadList()
+  unsubscribeRealtime = subscribeCustomerOrders(async (event) => {
+    if (!event?.idHoaDon) return
+    const orderId = Number(event.idHoaDon)
+    const idx = orders.value.findIndex((item) => Number(item.id) === orderId)
+    if (idx >= 0) {
+      orders.value[idx] = {
+        ...orders.value[idx],
+        trangThai: event.trangThai ?? orders.value[idx].trangThai,
+        trangThaiLabel: event.trangThaiLabel ?? orders.value[idx].trangThaiLabel,
+      }
+    } else if (event.type === 'ORDER_CREATED') {
+      await loadList()
+    }
+    if (Number(selectedId.value) === orderId) {
+      await reloadDetail(orderId)
+    }
+    if (event.type === 'ORDER_STATUS_CHANGED') {
+      toast(
+        event.message || `Đơn ${event.maHoaDon || ''} đã cập nhật trạng thái`,
+        'info',
+      )
+    }
+  })
+})
+
+onUnmounted(() => {
+  unsubscribeRealtime?.()
+  unsubscribeRealtime = null
+})
 
 async function loadList() {
   loading.value = true

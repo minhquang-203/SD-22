@@ -202,7 +202,8 @@ public class BanHangService {
 
         Map<Integer, Integer> qtyByVariant = mergeItems(req.getItems());
         Map<Integer, VariantSaleInfo> saleMap = checkoutPricingService.loadActiveSales();
-        List<LineCalc> lines = buildLines(qtyByVariant, false, saleMap);
+        // Giữ đơn phải kiểm tra và trừ tồn theo lô (FEFO), giống checkout.
+        List<LineCalc> lines = buildLines(qtyByVariant, true, saleMap);
         BigDecimal tongTien = sumTongTien(lines);
 
         KhachHang khachHang = resolveKhachHang(req.getIdKhachHang());
@@ -272,6 +273,7 @@ public class BanHangService {
     @Transactional
     public void huyDonCho(Integer id) {
         HoaDon hd = loadDonCho(id);
+        hoanTonTheoHoaDon(hd);
         hoaDonChiTietRepository.deleteByIdHoaDon(hd);
         hoaDonRepository.delete(hd);
     }
@@ -337,6 +339,8 @@ public class BanHangService {
         HoaDon hoaDon;
         if (req.getIdHoaDonCho() != null) {
             hoaDon = loadDonCho(req.getIdHoaDonCho());
+            // Đơn chờ đã trừ tồn khi giữ — hoàn lại trước khi trừ theo dòng mới (tránh trừ 2 lần).
+            hoanTonTheoHoaDon(hoaDon);
             hoaDonChiTietRepository.deleteByIdHoaDon(hoaDon);
         } else {
             hoaDon = new HoaDon();
@@ -370,7 +374,7 @@ public class BanHangService {
             hdct.setThanhTien(line.thanhTien);
             hdct = hoaDonChiTietRepository.save(hdct);
 
-            loHangService.truTonTheoFefo(line.cts.getId(), line.soLuong);
+            loHangService.truTonVaGhiNhan(hdct, line.soLuong);
 
             lineResponses.add(new BanHangChiTietResponse(hdct));
             ghiNhatKy(hoaDon, "THEM_HANG",
@@ -540,11 +544,13 @@ public class BanHangService {
             hdct.setThanhTien(line.thanhTien);
             hoaDonChiTietRepository.save(hdct);
 
-            // Cập nhật lại số lượng tồn kho sau khi bán
-            if (line.cts.getSoLuongTon() != null) {
-                line.cts.setSoLuongTon(line.cts.getSoLuongTon() - line.soLuong);
-                chiTietSanPhamRepository.save(line.cts);
-            }
+            loHangService.truTonVaGhiNhan(hdct, line.soLuong);
+        }
+    }
+
+    private void hoanTonTheoHoaDon(HoaDon hoaDon) {
+        for (HoaDonChiTiet chiTiet : hoaDonChiTietRepository.findByIdHoaDon(hoaDon)) {
+            loHangService.hoanTonTheoChiTiet(chiTiet);
         }
     }
 

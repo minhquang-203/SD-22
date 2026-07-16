@@ -25,6 +25,12 @@ export default defineConfig({
         secure: false,
         timeout: 60000,
       },
+      '/ws': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+      },
       '/uploads': {
         target: 'http://localhost:8080',
         changeOrigin: true,
@@ -32,5 +38,8 @@ export default defineConfig({
         timeout: 60000,
       },
     },
+  },
+  define: {
+    global: 'globalThis',
   },
 })

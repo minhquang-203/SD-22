@@ -9,6 +9,7 @@ import org.example.templatejava6.common.entity.PhieuGiamGia;
 import org.example.templatejava6.common.entity.PhuongThucThanhToan;
 import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.example.templatejava6.common.exception.ApiException;
+import org.example.templatejava6.common.security.SecurityUtils;
 import org.example.templatejava6.customer.repository.KhachHangRepository;
 import org.example.templatejava6.order.entity.HoaDon;
 import org.example.templatejava6.order.entity.HoaDonChiTiet;
@@ -35,12 +36,17 @@ import org.example.templatejava6.payment.model.response.TaoThanhToanResponse;
 import org.example.templatejava6.payment.service.PaymentService;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
 import org.example.templatejava6.product.service.LoHangService;
+import org.example.templatejava6.realtime.service.OrderRealtimeService;
+import org.example.templatejava6.shipping.model.request.ShippingFeeRequest;
+import org.example.templatejava6.shipping.model.response.ShippingFeeResponse;
+import org.example.templatejava6.shipping.service.ShippingService;
 import org.example.templatejava6.voucher.model.response.VariantSaleInfo;
 import org.example.templatejava6.voucher.repository.PhieuGiamGiaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
@@ -74,6 +80,8 @@ public class OnlineCheckoutService {
     private final CheckoutPricingService checkoutPricingService;
     private final ThongBaoService thongBaoService;
     private final OrderMailService orderMailService;
+    private final OrderRealtimeService orderRealtimeService;
+    private final ShippingService shippingService;
 
     public OnlineCheckoutService(
             GioHangRepository gioHangRepository,
@@ -90,7 +98,9 @@ public class OnlineCheckoutService {
             OnlineOrderLifecycleService onlineOrderLifecycleService,
             CheckoutPricingService checkoutPricingService,
             ThongBaoService thongBaoService,
-            OrderMailService orderMailService) {
+            OrderMailService orderMailService,
+            OrderRealtimeService orderRealtimeService,
+            ShippingService shippingService) {
         this.gioHangRepository = gioHangRepository;
         this.chiTietGioHangRepository = chiTietGioHangRepository;
         this.khachHangRepository = khachHangRepository;
@@ -106,12 +116,13 @@ public class OnlineCheckoutService {
         this.checkoutPricingService = checkoutPricingService;
         this.thongBaoService = thongBaoService;
         this.orderMailService = orderMailService;
+        this.orderRealtimeService = orderRealtimeService;
+        this.shippingService = shippingService;
     }
 
     @Transactional
     public OnlineCheckoutResponse checkout(OnlineCheckoutRequest request, String clientIp) {
-        KhachHang khachHang = khachHangRepository.findById(request.getIdKhachHang())
-                .orElseThrow(() -> new ApiException("Khách hàng không tồn tại.", "NOT_FOUND"));
+        KhachHang khachHang = getKhachDangNhap();
         String maPhuongThuc = normalize(request.getMaPhuongThucThanhToan());
         if (!MA_COD.equals(maPhuongThuc) && !MA_VNPAY.equals(maPhuongThuc)) {
             throw new ApiException("Chỉ hỗ trợ COD hoặc VNPAY cho bán hàng online.", "UNSUPPORTED_PAYMENT_METHOD");
@@ -130,7 +141,8 @@ public class OnlineCheckoutService {
         if (phieu != null) {
             tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien);
         }
-        BigDecimal phiVanChuyen = request.getPhiVanChuyen() != null ? request.getPhiVanChuyen() : BigDecimal.ZERO;
+        BigDecimal phiVanChuyen = resolvePhiVanChuyen(
+                request.getToDistrictId(), request.getToWardCode(), tongTien);
         BigDecimal thanhTien = tongTien.subtract(tienGiamGia).add(phiVanChuyen);
         if (thanhTien.compareTo(BigDecimal.ZERO) < 0) {
             thanhTien = BigDecimal.ZERO;
@@ -165,7 +177,7 @@ public class OnlineCheckoutService {
             chiTiet.setDonGia(line.donGia());
             chiTiet.setThanhTien(line.thanhTien());
             hoaDonChiTietRepository.save(chiTiet);
-            loHangService.truTonTheoFefo(line.chiTietSanPham().getId(), line.soLuong());
+            loHangService.truTonVaGhiNhan(chiTiet, line.soLuong());
         }
 
         if (phieu != null) {
@@ -183,6 +195,7 @@ public class OnlineCheckoutService {
             // COD: đơn đã đặt thành công ngay -> báo admin + gửi hóa đơn điện tử cho khách
             thongBaoDonMoi(hoaDon);
             orderMailService.guiHoaDonDatHangThanhCong(hoaDon);
+            orderRealtimeService.publishCreated(hoaDon);
         } else {
             TaoThanhToanRequest paymentRequest = new TaoThanhToanRequest();
             paymentRequest.setIdHoaDon(hoaDon.getId());
@@ -193,8 +206,7 @@ public class OnlineCheckoutService {
 
     @Transactional(readOnly = true)
     public OnlineTinhGiaResponse tinhGia(OnlineTinhGiaRequest request) {
-        KhachHang khachHang = khachHangRepository.findById(request.getIdKhachHang())
-                .orElseThrow(() -> new ApiException("Khách hàng không tồn tại.", "NOT_FOUND"));
+        KhachHang khachHang = getKhachDangNhap();
         GioHang gioHang = gioHangRepository.findFirstByKhachHang_IdOrderByIdAsc(khachHang.getId())
                 .orElseThrow(() -> new ApiException("Khách hàng chưa có giỏ hàng.", "EMPTY_CART"));
         List<ChiTietGioHang> selectedItems = resolveSelectedCartItems(gioHang, request.getIdsChiTietGioHang());
@@ -210,7 +222,8 @@ public class OnlineCheckoutService {
             maPhieu = phieu.getMa();
         }
 
-        BigDecimal phiVanChuyen = request.getPhiVanChuyen() != null ? request.getPhiVanChuyen() : BigDecimal.ZERO;
+        BigDecimal phiVanChuyen = resolvePhiVanChuyen(
+                request.getToDistrictId(), request.getToWardCode(), tongTien);
         BigDecimal thanhTien = tongTien.subtract(tienGiamGia).add(phiVanChuyen);
         if (thanhTien.compareTo(BigDecimal.ZERO) < 0) {
             thanhTien = BigDecimal.ZERO;
@@ -226,25 +239,25 @@ public class OnlineCheckoutService {
     }
 
     @Transactional(readOnly = true)
-    public List<HoaDonResponse> danhSachDonHang(Integer idKhachHang) {
-        validateKhachHang(idKhachHang);
-        return hoaDonRepository.findByIdKhachHang_IdAndLoaiDonOrderByNgayTaoDesc(idKhachHang, LOAI_DON_ONLINE)
+    public List<HoaDonResponse> danhSachDonHang() {
+        KhachHang khachHang = getKhachDangNhap();
+        return hoaDonRepository.findByIdKhachHang_IdAndLoaiDonOrderByNgayTaoDesc(khachHang.getId(), LOAI_DON_ONLINE)
                 .stream()
                 .map(HoaDonResponse::new)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public HoaDonDetailResponse chiTietDonHang(Integer idKhachHang, Integer idHoaDon) {
-        validateKhachHang(idKhachHang);
-        HoaDon hoaDon = loadOwnedOnlineOrder(idKhachHang, idHoaDon);
+    public HoaDonDetailResponse chiTietDonHang(Integer idHoaDon) {
+        KhachHang khachHang = getKhachDangNhap();
+        HoaDon hoaDon = loadOwnedOnlineOrder(khachHang.getId(), idHoaDon);
         return buildDetailResponse(hoaDon);
     }
 
     @Transactional
-    public HoaDonDetailResponse huyDonHang(Integer idKhachHang, Integer idHoaDon, HuyDonOnlineRequest request) {
-        validateKhachHang(idKhachHang);
-        HoaDon hoaDon = loadOwnedOnlineOrder(idKhachHang, idHoaDon);
+    public HoaDonDetailResponse huyDonHang(Integer idHoaDon, HuyDonOnlineRequest request) {
+        KhachHang khachHang = getKhachDangNhap();
+        HoaDon hoaDon = loadOwnedOnlineOrder(khachHang.getId(), idHoaDon);
         String ghiChu = request != null ? request.getGhiChu() : null;
         onlineOrderLifecycleService.huyDonOnline(hoaDon,
                 ghiChu != null && !ghiChu.isBlank() ? ghiChu : "Khách hàng hủy đơn online");
@@ -375,10 +388,25 @@ public class OnlineCheckoutService {
         return response;
     }
 
-    private void validateKhachHang(Integer idKhachHang) {
-        if (idKhachHang == null || !khachHangRepository.existsById(idKhachHang)) {
-            throw new ApiException("Khách hàng không tồn tại.", "NOT_FOUND");
+    private KhachHang getKhachDangNhap() {
+        Integer id = SecurityUtils.currentKhachHangId();
+        return khachHangRepository.findById(id)
+                .orElseThrow(() -> new ApiException("Không tìm thấy tài khoản khách hàng.", "NOT_FOUND"));
+    }
+
+    /**
+     * Tính phí vận chuyển phía server qua GHN. Không tin phí từ client.
+     * Khi thiếu địa chỉ GHN, ShippingService trả phí fallback theo cấu hình.
+     */
+    private BigDecimal resolvePhiVanChuyen(Integer toDistrictId, String toWardCode, BigDecimal tongTienHang) {
+        ShippingFeeRequest feeRequest = new ShippingFeeRequest();
+        feeRequest.setToDistrictId(toDistrictId);
+        feeRequest.setToWardCode(coGiaTri(toWardCode) ? toWardCode.trim() : null);
+        if (tongTienHang != null && tongTienHang.compareTo(BigDecimal.ZERO) > 0) {
+            feeRequest.setInsuranceValue(tongTienHang.setScale(0, RoundingMode.HALF_UP).longValue());
         }
+        ShippingFeeResponse fee = shippingService.calcFee(feeRequest);
+        return BigDecimal.valueOf(fee.getTotal());
     }
 
     private String sinhMaHoaDon(LocalDateTime now) {

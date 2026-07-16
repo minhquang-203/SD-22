@@ -4,10 +4,15 @@ import { docTatCaThongBao, docThongBao, getThongBao } from '@/api/thongBaoApi'
 import { fetchTraHangList } from '@/api/traHangApi'
 import { fetchHoanTienList } from '@/api/hoanTienApi'
 import { useAdminAuth } from '@/composables/useAdminAuth'
+import { toast } from '@/composables/useToast'
+import {
+  subscribeAdminNotifications,
+  subscribeAdminOrders,
+} from '@/composables/useRealtime'
 
 const MAX_PENDING_ORDERS = 10
 const MAX_PENDING_RETURNS = 10
-const POLL_MS = 30000
+const POLL_MS = 60000
 
 /** Các loại đã hiển thị ở mục riêng trong modal chuông — không đưa vào "Khác" */
 const EXCLUDED_FROM_OTHER = new Set(['DON_HANG_MOI', 'YEU_CAU_TRA_HANG'])
@@ -47,6 +52,9 @@ const badgeVersion = computed(
 
 let pollTimer = null
 let subscriberCount = 0
+let unsubOrders = null
+let unsubNotifications = null
+let lastToastAt = 0
 
 function sortByNewest(list) {
   return [...list].sort((a, b) => {
@@ -128,19 +136,55 @@ async function refreshBadges() {
   ])
 }
 
+function maybeToast(message) {
+  const now = Date.now()
+  if (now - lastToastAt < 1500) return
+  lastToastAt = now
+  toast(message, 'info')
+}
+
+function bindRealtime() {
+  if (unsubOrders || unsubNotifications) return
+  unsubOrders = subscribeAdminOrders((event) => {
+    refreshBadges()
+    if (event?.type === 'ORDER_CREATED') {
+      maybeToast(event.message || `Đơn mới: ${event.maHoaDon || ''}`)
+    }
+    window.dispatchEvent(new CustomEvent('sunova-admin-order-realtime', { detail: event }))
+  })
+  unsubNotifications = subscribeAdminNotifications((event) => {
+    refreshBadges()
+    if (event?.tieuDe) {
+      maybeToast(event.tieuDe)
+    }
+  })
+}
+
+function unbindRealtime() {
+  unsubOrders?.()
+  unsubNotifications?.()
+  unsubOrders = null
+  unsubNotifications = null
+}
+
 function startPolling() {
   subscriberCount += 1
   if (subscriberCount === 1) {
     refreshBadges()
+    bindRealtime()
+    // fallback nhẹ khi WS tạm mất kết nối
     pollTimer = setInterval(() => refreshBadges(), POLL_MS)
   }
 }
 
 function stopPolling() {
   subscriberCount = Math.max(0, subscriberCount - 1)
-  if (subscriberCount === 0 && pollTimer) {
-    clearInterval(pollTimer)
-    pollTimer = null
+  if (subscriberCount === 0) {
+    if (pollTimer) {
+      clearInterval(pollTimer)
+      pollTimer = null
+    }
+    unbindRealtime()
   }
 }
 

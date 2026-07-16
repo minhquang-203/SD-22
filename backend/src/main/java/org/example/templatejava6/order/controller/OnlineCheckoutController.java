@@ -63,23 +63,20 @@ public class OnlineCheckoutController {
     }
 
     @GetMapping("/orders")
-    public List<HoaDonResponse> danhSachDonHang(@RequestParam Integer idKhachHang) {
-        return onlineCheckoutService.danhSachDonHang(idKhachHang);
+    public List<HoaDonResponse> danhSachDonHang() {
+        return onlineCheckoutService.danhSachDonHang();
     }
 
     @GetMapping("/orders/{idHoaDon}")
-    public HoaDonDetailResponse chiTietDonHang(
-            @PathVariable Integer idHoaDon,
-            @RequestParam Integer idKhachHang) {
-        return onlineCheckoutService.chiTietDonHang(idKhachHang, idHoaDon);
+    public HoaDonDetailResponse chiTietDonHang(@PathVariable Integer idHoaDon) {
+        return onlineCheckoutService.chiTietDonHang(idHoaDon);
     }
 
     @PatchMapping("/orders/{idHoaDon}/cancel")
     public HoaDonDetailResponse huyDonHang(
             @PathVariable Integer idHoaDon,
-            @RequestParam Integer idKhachHang,
             @RequestBody(required = false) HuyDonOnlineRequest request) {
-        return onlineCheckoutService.huyDonHang(idKhachHang, idHoaDon, request);
+        return onlineCheckoutService.huyDonHang(idHoaDon, request);
     }
 
     private String getClientIp(HttpServletRequest request) {

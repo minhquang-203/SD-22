@@ -24,6 +24,7 @@ import org.example.templatejava6.order.repository.NhanVienRepository;
 import org.example.templatejava6.order.repository.YeuCauTraHangRepository;
 import org.example.templatejava6.product.entity.SanPham;
 import org.example.templatejava6.product.service.LoHangService;
+import org.example.templatejava6.realtime.service.OrderRealtimeService;
 import org.example.templatejava6.shipping.model.request.CreateShippingOrderRequest;
 import org.example.templatejava6.shipping.model.request.ReturnShippingOrderRequest;
 import org.example.templatejava6.shipping.model.response.CreateShippingOrderResponse;
@@ -39,9 +40,9 @@ import java.util.List;
 /**
  * Quan ly luong tra hang sau khi khach da nhan hang:
  * - Chuyen khoan: khach gui yeu cau -> admin duyet -> khach tao van don hoan
- *   -> admin xac nhan nhan hang -> TRA_HANG + yeu cau hoan tien thu cong.
- * - VNPAY: khach gui yeu cau -> admin duyet -> hoan kho + goi refund API ngay
- *   -> hoa don TRA_HANG, hoan tien DA_HOAN (co ma giao dich refund).
+ *   -> admin xac nhan nhan hang -> TRA_HANG + hoan ton + yeu cau hoan tien thu cong.
+ * - VNPAY: khach gui yeu cau -> admin duyet -> hoan tien API ngay (DA_DUYET)
+ *   -> khach tao van don / admin xac nhan nhan hang -> hoan ton + HOAN_TAT.
  */
 @Service
 public class ReturnRequestService {
@@ -62,6 +63,7 @@ public class ReturnRequestService {
     private final ThongBaoService thongBaoService;
     private final OrderMailService orderMailService;
     private final ProductFileStorageService productFileStorageService;
+    private final OrderRealtimeService orderRealtimeService;
 
     public ReturnRequestService(YeuCauTraHangRepository yeuCauTraHangRepository,
                                 AnhYeuCauTraHangRepository anhYeuCauTraHangRepository,
@@ -74,7 +76,8 @@ public class ReturnRequestService {
                                 RefundService refundService,
                                 ThongBaoService thongBaoService,
                                 OrderMailService orderMailService,
-                                ProductFileStorageService productFileStorageService) {
+                                ProductFileStorageService productFileStorageService,
+                                OrderRealtimeService orderRealtimeService) {
         this.yeuCauTraHangRepository = yeuCauTraHangRepository;
         this.anhYeuCauTraHangRepository = anhYeuCauTraHangRepository;
         this.hoaDonRepository = hoaDonRepository;
@@ -87,6 +90,7 @@ public class ReturnRequestService {
         this.thongBaoService = thongBaoService;
         this.orderMailService = orderMailService;
         this.productFileStorageService = productFileStorageService;
+        this.orderRealtimeService = orderRealtimeService;
     }
 
     /** Khach hang gui yeu cau tra hang cho mot don da nhan (HOAN_THANH). */
@@ -167,8 +171,8 @@ public class ReturnRequestService {
 
     /**
      * Admin duyet yeu cau tra hang.
-     * - VNPAY: hoan kho, goi refund API ngay → hoa don TRA_HANG, hoan tien DA_HOAN + ma GD.
-     * - Khac (chuyen khoan): chi danh dau DA_DUYET, cho khach giao hang ve roi moi hoan tien.
+     * - VNPAY: goi refund API ngay, giu DA_DUYET de cho hang ve roi moi hoan ton.
+     * - Khac (chuyen khoan): chi danh dau DA_DUYET, cho khach giao hang ve roi moi hoan ton/tien.
      */
     @Transactional
     public YeuCauTraHangResponse duyet(Integer id, Integer idNhanVien, String ghiChu) {
@@ -182,10 +186,10 @@ public class ReturnRequestService {
         yc.setNgayCapNhat(LocalDateTime.now());
 
         if (laVnpay(hoaDon)) {
-            hoanTonKho(hoaDon);
-            yc.setTrangThai(TrangThaiTraHang.HOAN_TAT);
+            // Hoàn tiền ngay; tồn kho chỉ hoàn khi đã nhận lại hàng (xacNhanNhanHang).
+            yc.setTrangThai(TrangThaiTraHang.DA_DUYET);
             YeuCauTraHang saved = yeuCauTraHangRepository.save(yc);
-            ghiNhatKy(hoaDon, "TRA_HANG_DA_DUYET", "Duyệt trả hàng VNPAY — hoàn kho và hoàn tiền tự động");
+            ghiNhatKy(hoaDon, "TRA_HANG_DA_DUYET", "Duyệt trả hàng VNPAY — hoàn tiền tự động, chờ nhận hàng để hoàn kho");
             refundService.taoVaHoanTuDong(
                     hoaDon,
                     LoaiHoanTien.TRA_HANG,
@@ -258,7 +262,7 @@ public class ReturnRequestService {
         return toResponse(saved);
     }
 
-    /** Admin xac nhan da nhan lai hang: don chuyen TRA_HANG, hoan ton kho va tao yeu cau hoan tien. */
+    /** Admin xac nhan da nhan lai hang: hoan ton kho, don TRA_HANG, tao yeu cau hoan tien neu chua. */
     @Transactional
     public YeuCauTraHangResponse xacNhanNhanHang(Integer id, Integer idNhanVien) {
         YeuCauTraHang yc = load(id);
@@ -268,10 +272,12 @@ public class ReturnRequestService {
                     "Yêu cầu trả hàng không ở trạng thái có thể xác nhận nhận hàng.", "INVALID_RETURN_STATUS");
         }
         HoaDon hoaDon = yc.getIdHoaDon();
+        TrangThaiDonHang trangThaiCu = hoaDon.getTrangThai();
 
         hoanTonKho(hoaDon);
         hoaDon.setTrangThai(TrangThaiDonHang.TRA_HANG);
         hoaDonRepository.save(hoaDon);
+        orderRealtimeService.publishStatusChanged(hoaDon, trangThaiCu);
 
         yc.setTrangThai(TrangThaiTraHang.HOAN_TAT);
         yc.setIdNhanVienDuyet(resolveNhanVien(idNhanVien));
@@ -279,16 +285,8 @@ public class ReturnRequestService {
         YeuCauTraHang saved = yeuCauTraHangRepository.save(yc);
 
         ghiNhatKy(hoaDon, "TRA_HANG", "Đã nhận lại hàng trả, hoàn tồn kho");
-        if (laVnpay(hoaDon)) {
-            // Luong cu: da duyet truoc do → xac nhan nhan hang thi goi refund VNPAY ngay.
-            refundService.taoVaHoanTuDong(
-                    hoaDon,
-                    LoaiHoanTien.TRA_HANG,
-                    refundService.resolveSoTienHoan(hoaDon),
-                    saved,
-                    null, null, null,
-                    idNhanVien);
-        } else {
+        if (!laVnpay(hoaDon)) {
+            // VNPAY đã hoàn tiền lúc duyệt; chuyển khoản tạo yêu cầu hoàn sau khi nhận hàng.
             refundService.taoHoanTienChoXuLy(
                     hoaDon, LoaiHoanTien.TRA_HANG, hoaDon.getThanhTien(), saved,
                     yc.getTenNganHang(), yc.getSoTaiKhoan(), yc.getChuTaiKhoan());
@@ -341,9 +339,7 @@ public class ReturnRequestService {
 
     private void hoanTonKho(HoaDon hoaDon) {
         for (HoaDonChiTiet chiTiet : hoaDonChiTietRepository.findByIdHoaDon(hoaDon)) {
-            if (chiTiet.getIdChiTietSanPham() != null) {
-                loHangService.hoanTon(chiTiet.getIdChiTietSanPham().getId(), chiTiet.getSoLuong());
-            }
+            loHangService.hoanTonTheoChiTiet(chiTiet);
         }
     }
 

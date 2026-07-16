@@ -83,10 +83,14 @@ public class VnpayGateway implements PaymentGateway {
         String actualHash = params.get("vnp_SecureHash");
         boolean validSignature = actualHash != null && expectedHash.equalsIgnoreCase(actualHash);
         String responseCode = params.get("vnp_ResponseCode");
+        String transactionStatus = params.get("vnp_TransactionStatus");
+        // Return URL đôi khi không gửi TransactionStatus; IPN thì nên có và phải = 00.
+        boolean statusOk = transactionStatus == null || transactionStatus.isBlank()
+                || SUCCESS_RESPONSE_CODE.equals(transactionStatus);
 
         return PaymentCallbackResult.builder()
                 .validSignature(validSignature)
-                .successful(validSignature && SUCCESS_RESPONSE_CODE.equals(responseCode))
+                .successful(validSignature && SUCCESS_RESPONSE_CODE.equals(responseCode) && statusOk)
                 .transactionRef(params.get("vnp_TxnRef"))
                 .providerTransactionNo(params.get("vnp_TransactionNo"))
                 .providerPayDate(params.get("vnp_PayDate"))
