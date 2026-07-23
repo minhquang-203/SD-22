@@ -132,6 +132,13 @@ public class OnlineCheckoutService {
         GioHang gioHang = gioHangRepository.findFirstByKhachHang_IdOrderByIdAsc(khachHang.getId())
                 .orElseThrow(() -> new ApiException("Khách hàng chưa có giỏ hàng.", "EMPTY_CART"));
         List<ChiTietGioHang> selectedItems = resolveSelectedCartItems(gioHang, request.getIdsChiTietGioHang());
+
+        boolean isVnpay = MA_VNPAY.equals(maPhuongThuc);
+        if (isVnpay) {
+            // Hủy đơn VNPAY chưa trả trước đó (trước khi tạo đơn mới) để tránh giữ tồn chồng chéo.
+            huyDonVnpayChuaThanhToanCuaKhach(khachHang.getId());
+        }
+
         Map<Integer, VariantSaleInfo> saleMap = checkoutPricingService.loadActiveSales();
         List<LineCalc> lines = buildLines(selectedItems, saleMap);
         BigDecimal tongTien = sumTongTien(lines);
@@ -184,7 +191,11 @@ public class OnlineCheckoutService {
             phieu.setSoLuong(phieu.getSoLuong() - 1);
             phieuGiamGiaRepository.save(phieu);
         }
-        chiTietGioHangRepository.deleteAll(selectedItems);
+
+        // COD: trừ giỏ ngay. VNPAY: giữ giỏ nguyên đến khi thanh toán thành công.
+        if (!isVnpay) {
+            chiTietGioHangRepository.deleteAll(selectedItems);
+        }
         ghiNhatKy(hoaDon, "TAO_DON", "Khách hàng tạo đơn online từ " + selectedItems.size() + " sản phẩm đã chọn");
         ghiNhatKy(hoaDon, "TRU_TON", "Đã giữ hàng cho đơn online");
 
@@ -243,6 +254,8 @@ public class OnlineCheckoutService {
         KhachHang khachHang = getKhachDangNhap();
         return hoaDonRepository.findByIdKhachHang_IdAndLoaiDonOrderByNgayTaoDesc(khachHang.getId(), LOAI_DON_ONLINE)
                 .stream()
+                // VNPAY chưa thanh toán: coi như chưa đặt — không hiện ở danh sách khách.
+                .filter(hd -> !onlineOrderLifecycleService.laVnpayChuaThanhToan(hd))
                 .map(HoaDonResponse::new)
                 .toList();
     }
@@ -251,6 +264,9 @@ public class OnlineCheckoutService {
     public HoaDonDetailResponse chiTietDonHang(Integer idHoaDon) {
         KhachHang khachHang = getKhachDangNhap();
         HoaDon hoaDon = loadOwnedOnlineOrder(khachHang.getId(), idHoaDon);
+        if (onlineOrderLifecycleService.laVnpayChuaThanhToan(hoaDon)) {
+            throw new ApiException("Không tìm thấy đơn hàng online.", "NOT_FOUND");
+        }
         return buildDetailResponse(hoaDon);
     }
 
@@ -427,6 +443,16 @@ public class OnlineCheckoutService {
 
     private boolean coGiaTri(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private void huyDonVnpayChuaThanhToanCuaKhach(Integer idKhachHang) {
+        List<HoaDon> donCu = hoaDonRepository
+                .findByIdKhachHang_IdAndLoaiDonOrderByNgayTaoDesc(idKhachHang, LOAI_DON_ONLINE);
+        for (HoaDon cu : donCu) {
+            if (onlineOrderLifecycleService.laVnpayChuaThanhToan(cu)) {
+                onlineOrderLifecycleService.xoaDonChuaThanhToan(cu);
+            }
+        }
     }
 
     private void thongBaoDonMoi(HoaDon hoaDon) {

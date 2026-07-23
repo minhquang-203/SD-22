@@ -51,7 +51,7 @@ public class GhnTrackingService {
     private final RestTemplate restTemplate;
     private final String token;
 
-    public GhnTrackingService(RestTemplateBuilder builder, @Value("${token:}") String token) {
+    public GhnTrackingService(RestTemplateBuilder builder, @Value("${ghn.token:}") String token) {
         this.restTemplate = builder
                 .connectTimeout(Duration.ofSeconds(3))
                 .readTimeout(Duration.ofSeconds(5))
