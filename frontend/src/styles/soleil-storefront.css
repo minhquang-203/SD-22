@@ -2873,9 +2873,222 @@
   padding: 2rem 0;
 }
 
+.sf-account-address-list {
+  margin-top: 1.5rem;
+}
+
+.sf-account-address-list__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.sf-account-address-list__head h3 {
+  margin: 0;
+  font-family: var(--sf-font-display);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.sf-account-address-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: none;
+  background: none;
+  color: var(--sf-gold-dark);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sf-account-address-add:hover {
+  color: var(--sf-espresso);
+}
+
+.sf-account-address-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sf-account-address-card {
+  border: 1px solid var(--sf-hairline);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.sf-account-address-card__main {
+  display: block;
+  width: 100%;
+  border: none;
+  background: none;
+  text-align: left;
+  padding: 1rem 1.1rem 0.75rem;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.sf-account-address-card__main.selected {
+  background: color-mix(in srgb, var(--sf-cream) 70%, #fff);
+}
+
+.sf-account-address-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.sf-account-address-card__name {
+  font-weight: 600;
+  color: var(--sf-charcoal);
+}
+
+.sf-account-address-card__phone {
+  font-size: 0.88rem;
+  color: var(--sf-mid);
+  margin-top: 0.15rem;
+}
+
+.sf-account-address-card__badge {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--sf-gold-dark);
+  background: color-mix(in srgb, var(--sf-gold) 18%, #fff);
+  border: 1px solid color-mix(in srgb, var(--sf-gold) 35%, #fff);
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+}
+
+.sf-account-address-card__line {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--sf-mid);
+  line-height: 1.5;
+}
+
+.sf-account-address-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0 1.1rem 1rem;
+}
+
+.sf-account-address-card__btn {
+  border: 1px solid var(--sf-hairline);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--sf-mid);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+}
+
+.sf-account-address-card__btn:hover:not(:disabled) {
+  border-color: var(--sf-gold);
+  color: var(--sf-charcoal);
+}
+
+.sf-account-address-card__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Reuse checkout recipient summary look on account page */
+.sf-account-main .sf-checkout-recipient-loading,
+.sf-account-main .sf-checkout-recipient-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  text-align: center;
+  color: var(--sf-light-mid);
+  padding: 1.25rem 0.5rem 1.5rem;
+}
+
+.sf-account-main .sf-checkout-recipient-empty p {
+  margin: 0;
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+.sf-account-main .sf-checkout-recipient-empty__btn {
+  margin-top: 0.35rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--sf-gold-dark);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  padding: 0.65rem 1.1rem;
+  cursor: pointer;
+}
+
+.sf-account-main .sf-checkout-recipient-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  margin-bottom: 0.25rem;
+  border: 1px solid var(--sf-sand);
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sf-account-main .sf-checkout-recipient-summary:hover {
+  border-color: var(--sf-gold);
+  box-shadow: 0 2px 10px rgba(26, 24, 20, 0.05);
+}
+
+.sf-account-main .sf-checkout-recipient-summary__main strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--sf-charcoal);
+}
+
+.sf-account-main .sf-checkout-recipient-summary__main p {
+  margin: 0;
+  color: var(--sf-mid);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.sf-account-main .sf-checkout-recipient-summary__action {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--sf-gold-dark);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 @media (max-width: 768px) {
   .sf-account-layout {
     grid-template-columns: 1fr;
+  }
+
+  .sf-account-address-list__head {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 

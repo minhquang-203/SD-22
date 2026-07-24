@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import org.example.templatejava6.payment.model.request.TaoThanhToanRequest;
 import org.example.templatejava6.payment.model.response.KetQuaThanhToanResponse;
 import org.example.templatejava6.payment.model.response.TaoThanhToanResponse;
+import org.example.templatejava6.payment.model.response.VnpayIpnResponse;
 import org.example.templatejava6.payment.service.PaymentService;
 import org.example.templatejava6.payment.vnpay.VnpayGateway;
 import org.example.templatejava6.payment.vnpay.VnpayProperties;
@@ -45,6 +46,15 @@ public class PaymentController {
     public RedirectView vnpayCallback(@RequestParam Map<String, String> params) {
         KetQuaThanhToanResponse result = paymentService.xuLyCallback(VnpayGateway.PROVIDER_CODE, params);
         return new RedirectView(buildFrontendRedirectUrl(result));
+    }
+
+    /**
+     * IPN VNPay (GET, server-to-server). Phải khai báo URL này trên cổng merchant sandbox/production.
+     * Không dùng để redirect trình duyệt — luôn trả JSON RspCode/Message.
+     */
+    @GetMapping("/vnpay/ipn")
+    public VnpayIpnResponse vnpayIpn(@RequestParam Map<String, String> params) {
+        return paymentService.xuLyIpn(params);
     }
 
     private String getClientIp(HttpServletRequest request) {

@@ -1,12 +1,19 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import OrderCard from '@/components/storefront/OrderCard.vue'
 import ProductReviewModal from '@/components/storefront/ProductReviewModal.vue'
+import ReturnRequestCodModal from '@/components/storefront/ReturnRequestCodModal.vue'
+import ReturnRequestWalletModal from '@/components/storefront/ReturnRequestWalletModal.vue'
 import { confirm } from '@/composables/useConfirm'
+import { getCustomerId } from '@/composables/useAuth'
+import { toast } from '@/composables/useToast'
+import { subscribeCustomerOrders } from '@/composables/useRealtime'
 import { fetchChiTietDonCuaToi, fetchDonCuaToi, huyDonCuaToi } from '@/api/donHangApi'
+import { taoVanDonTra } from '@/api/traHangApi'
 
-const search = ref('')
+const route = useRoute()
+const search = ref(typeof route.query.ma === 'string' ? route.query.ma : '')
 const currentFilter = ref('all')
 const loading = ref(true)
 const orders = ref([])
@@ -17,6 +24,12 @@ const reviewNotice = ref('')
 const cancelLoadingId = ref(null)
 const cancelNotice = ref('')
 const cancelError = ref('')
+const showReturnModal = ref(false)
+const returnOrder = ref(null)
+const returnActionLoadingId = ref(null)
+const returnNotice = ref('')
+
+let unsubscribeRealtime = null
 
 const filters = [
   { value: 'all', label: 'Tất cả' },
@@ -26,7 +39,18 @@ const filters = [
   { value: 'cancelled', label: 'Đã hủy / Trả hàng' },
 ]
 
-onMounted(loadOrders)
+onMounted(() => {
+  loadOrders()
+  unsubscribeRealtime = subscribeCustomerOrders(async (event) => {
+    if (!event?.idHoaDon) return
+    await applyRealtimeOrder(event)
+  })
+})
+
+onUnmounted(() => {
+  unsubscribeRealtime?.()
+  unsubscribeRealtime = null
+})
 
 const filteredOrders = computed(() => {
   const q = search.value.trim().toLowerCase()
@@ -62,6 +86,45 @@ async function loadDetailOrSummary(summary) {
   }
 }
 
+async function applyRealtimeOrder(event) {
+  const orderId = Number(event.idHoaDon)
+  const idx = orders.value.findIndex((item) => Number(item.id) === orderId)
+
+  try {
+    const res = await fetchChiTietDonCuaToi(orderId)
+    if (res.data) {
+      if (idx >= 0) {
+        orders.value[idx] = res.data
+      } else if (event.type === 'ORDER_CREATED') {
+        orders.value = [res.data, ...orders.value]
+      }
+    } else if (idx >= 0 && event.trangThai) {
+      orders.value[idx] = {
+        ...orders.value[idx],
+        trangThai: event.trangThai,
+        trangThaiLabel: event.trangThaiLabel || orders.value[idx].trangThaiLabel,
+      }
+    }
+  } catch {
+    if (idx >= 0 && event.trangThai) {
+      orders.value[idx] = {
+        ...orders.value[idx],
+        trangThai: event.trangThai,
+        trangThaiLabel: event.trangThaiLabel || orders.value[idx].trangThaiLabel,
+      }
+    }
+  }
+
+  if (event.type === 'ORDER_STATUS_CHANGED') {
+    toast(
+      event.message || `Đơn ${event.maHoaDon || ''} đã cập nhật: ${event.trangThaiLabel || event.trangThai || ''}`,
+      'info',
+    )
+  } else if (event.type === 'ORDER_CREATED') {
+    toast(event.message || `Đơn mới: ${event.maHoaDon || ''}`, 'info')
+  }
+}
+
 function statusGroup(status) {
   const map = {
     CHO_XAC_NHAN: 'processing',
@@ -94,6 +157,73 @@ function onReviewSubmitted({ lineId }) {
       line.trangThaiDanhGia = 'CHO_DUYET'
       break
     }
+  }
+}
+
+function openReturn(order) {
+  returnOrder.value = order
+  showReturnModal.value = true
+}
+
+function closeReturn() {
+  showReturnModal.value = false
+  returnOrder.value = null
+}
+
+async function onReturnSubmitted(result) {
+  returnNotice.value = 'Đã gửi yêu cầu trả hàng. Cửa hàng sẽ sớm phản hồi.'
+  const orderId = returnOrder.value?.id || result?.idHoaDon
+  if (!orderId) return
+  try {
+    const res = await fetchChiTietDonCuaToi(orderId)
+    const idx = orders.value.findIndex((item) => item.id === orderId)
+    if (idx >= 0 && res.data) {
+      orders.value[idx] = res.data
+    }
+  } catch {
+    // giữ nguyên
+  }
+}
+
+async function handleCreateReturnLabel(order) {
+  if (!order?.idYeuCauTraHang || returnActionLoadingId.value) return
+
+  const idKhachHang = getCustomerId()
+  if (!idKhachHang) {
+    toast('Vui lòng đăng nhập để tạo vận đơn hoàn hàng.', 'warn')
+    return
+  }
+
+  const ok = await confirm({
+    title: 'Tạo vận đơn hoàn hàng',
+    message: `Tạo vận đơn GHN để gửi hàng hoàn cho đơn ${order.maHoaDon}?`,
+    confirmText: 'Tạo vận đơn',
+  })
+  if (!ok) return
+
+  returnActionLoadingId.value = order.id
+  try {
+    const res = await taoVanDonTra(order.idYeuCauTraHang, idKhachHang)
+    const updated = res.data
+    const idx = orders.value.findIndex((item) => item.id === order.id)
+    if (idx >= 0 && updated) {
+      orders.value[idx] = {
+        ...orders.value[idx],
+        trangThaiTraHang: updated.trangThai,
+        trangThaiTraHangLabel: updated.trangThaiLabel,
+        maVanDonTra: updated.maVanDonTra,
+        idYeuCauTraHang: updated.id,
+        coTheYeuCauTraHang: false,
+      }
+    }
+    returnNotice.value = updated?.maVanDonTra
+      ? `Đã tạo vận đơn hoàn: ${updated.maVanDonTra}`
+      : 'Đã tạo vận đơn hoàn hàng.'
+    toast(returnNotice.value, 'info')
+  } catch (err) {
+    toast(typeof err === 'string' ? err : 'Không tạo được vận đơn hoàn hàng.', 'warn')
+  } finally {
+    returnActionLoadingId.value = null
   }
 }
 
@@ -137,7 +267,6 @@ async function handleCancelOrder(order) {
       </nav>
 
       <section class="sf-order-content">
-      
         <div class="sf-order-filter-bar">
           <label class="sf-order-filter-search">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -165,6 +294,7 @@ async function handleCancelOrder(order) {
         <p v-if="cancelError" class="sf-order-msg sf-order-msg--err">{{ cancelError }}</p>
         <p v-if="reviewNotice" class="sf-order-msg sf-order-msg--ok">{{ reviewNotice }}</p>
         <p v-if="cancelNotice" class="sf-order-msg sf-order-msg--ok">{{ cancelNotice }}</p>
+        <p v-if="returnNotice" class="sf-order-msg sf-order-msg--ok">{{ returnNotice }}</p>
 
         <div v-if="loading" class="sf-order-skeleton" />
 
@@ -175,8 +305,11 @@ async function handleCancelOrder(order) {
             :order="order"
             :default-open="idx === 0"
             :cancel-loading="cancelLoadingId === order.id"
+            :return-action-loading="returnActionLoadingId === order.id"
             @review="openReview"
             @cancel-order="handleCancelOrder"
+            @request-return="openReturn"
+            @create-return-label="handleCreateReturnLabel"
           />
         </div>
 
@@ -193,6 +326,21 @@ async function handleCancelOrder(order) {
       :line="reviewLine"
       @close="closeReview"
       @submitted="onReviewSubmitted"
+    />
+
+    <ReturnRequestCodModal
+      v-if="returnOrder && String(returnOrder.maPhuongThucThanhToan || '').toUpperCase() === 'COD'"
+      :visible="showReturnModal"
+      :order="returnOrder"
+      @close="closeReturn"
+      @submitted="onReturnSubmitted"
+    />
+    <ReturnRequestWalletModal
+      v-else-if="returnOrder"
+      :visible="showReturnModal"
+      :order="returnOrder"
+      @close="closeReturn"
+      @submitted="onReturnSubmitted"
     />
   </div>
 </template>

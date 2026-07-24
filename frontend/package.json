@@ -10,12 +10,14 @@
   },
   "dependencies": {
     "@iconify/vue": "^5.0.1",
+    "@stomp/stompjs": "^7.3.0",
     "@tailwindcss/vite": "^4.3.0",
     "apexcharts": "^5.15.2",
     "axios": "^1.18.1",
     "bootstrap": "^5.3.8",
     "icons": "^1.0.0",
     "naive-ui": "^2.44.1",
+    "sockjs-client": "^1.6.1",
     "tailwindcss": "^4.3.0",
     "vue": "^3.5.32",
     "vue-router": "^5.1.0",
@@ -23,6 +25,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/sockjs-client": "^1.5.4",
     "@vitejs/plugin-vue": "^6.0.6",
     "vite": "^8.0.8",
     "vite-plugin-vue-devtools": "^8.1.1"

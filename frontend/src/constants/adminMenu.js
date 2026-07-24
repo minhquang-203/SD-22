@@ -102,6 +102,20 @@ const HOA_DON_MENU = {
       path: "/admin/hoa-don/chi-tiet",
       roles: ALL_STAFF_ROLES,
     },
+    {
+      key: "tra-hang",
+      label: "Trả hàng",
+      icon: "icon-park-outline:return",
+      path: "/admin/tra-hang",
+      roles: ALL_STAFF_ROLES,
+    },
+    {
+      key: "hoan-tien",
+      label: "Hoàn tiền",
+      icon: "icon-park-outline:wallet",
+      path: "/admin/hoan-tien",
+      roles: ALL_STAFF_ROLES,
+    },
   ],
 };
 

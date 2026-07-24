@@ -3,9 +3,13 @@ package org.example.templatejava6.order.service;
 import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.order.entity.HoaDon;
+import org.example.templatejava6.order.entity.HoaDonChiTiet;
 import org.example.templatejava6.order.entity.LichSuDonHang;
+import org.example.templatejava6.order.repository.HoaDonChiTietRepository;
 import org.example.templatejava6.order.repository.HoaDonRepository;
 import org.example.templatejava6.order.repository.LichSuDonHangRepository;
+import org.example.templatejava6.product.service.LoHangService;
+import org.example.templatejava6.realtime.service.OrderRealtimeService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -26,15 +30,24 @@ public class GhnOrderSyncService {
     private static final Logger log = LoggerFactory.getLogger(GhnOrderSyncService.class);
 
     private final HoaDonRepository hoaDonRepository;
+    private final HoaDonChiTietRepository hoaDonChiTietRepository;
     private final LichSuDonHangRepository lichSuDonHangRepository;
     private final GhnTrackingService ghnTrackingService;
+    private final LoHangService loHangService;
+    private final OrderRealtimeService orderRealtimeService;
 
     public GhnOrderSyncService(HoaDonRepository hoaDonRepository,
+                               HoaDonChiTietRepository hoaDonChiTietRepository,
                                LichSuDonHangRepository lichSuDonHangRepository,
-                               GhnTrackingService ghnTrackingService) {
+                               GhnTrackingService ghnTrackingService,
+                               LoHangService loHangService,
+                               OrderRealtimeService orderRealtimeService) {
         this.hoaDonRepository = hoaDonRepository;
+        this.hoaDonChiTietRepository = hoaDonChiTietRepository;
         this.lichSuDonHangRepository = lichSuDonHangRepository;
         this.ghnTrackingService = ghnTrackingService;
+        this.loHangService = loHangService;
+        this.orderRealtimeService = orderRealtimeService;
     }
 
     /**
@@ -121,13 +134,29 @@ public class GhnOrderSyncService {
                     "Khong can chuyen (" + moTa + ").");
         }
 
+        // Hủy / hàng hoàn về kho: hoàn tồn đã trừ lúc tạo đơn.
+        if (trangThaiMoi == TrangThaiDonHang.DA_HUY || trangThaiMoi == TrangThaiDonHang.TRA_HANG) {
+            hoanTonTheoHoaDon(hoaDon);
+        }
+
         hoaDon.setTrangThai(trangThaiMoi);
         hoaDonRepository.save(hoaDon);
         ghiLichSu(hoaDon, trangThaiMoi, ghiChu != null ? ghiChu : moTa);
+        // Load id khách trước khi publish (tránh thiếu topic khách)
+        if (hoaDon.getIdKhachHang() != null) {
+            hoaDon.getIdKhachHang().getId();
+        }
+        orderRealtimeService.publishStatusChanged(hoaDon, trangThaiHienTai);
 
         log.info("Cap nhat tu GHN: don {} {} -> {} (GHN status={})",
                 hoaDon.getMaHoaDon(), trangThaiHienTai, trangThaiMoi, status);
         return KetQuaDongBo.daCapNhat(hoaDon.getId(), trangThaiHienTai, trangThaiMoi, moTa);
+    }
+
+    private void hoanTonTheoHoaDon(HoaDon hoaDon) {
+        for (HoaDonChiTiet chiTiet : hoaDonChiTietRepository.findByIdHoaDon(hoaDon)) {
+            loHangService.hoanTonTheoChiTiet(chiTiet);
+        }
     }
 
     private void ghiLichSu(HoaDon hoaDon, TrangThaiDonHang trangThai, String ghiChu) {
@@ -167,6 +196,7 @@ public class GhnOrderSyncService {
     /**
      * Anh xa trang thai van don GHN sang trang thai don hang noi bo.
      * Tra ve {@code null} voi cac trang thai can xu ly thu cong (giao that bai, su co...).
+     * Chi map {@code returned} → TRA_HANG (hang da ve kho) de tranh hoan ton qua som.
      */
     static TrangThaiDonHang anhXa(String ghnStatus) {
         if (ghnStatus == null) {
@@ -179,9 +209,7 @@ public class GhnOrderSyncService {
                     -> TrangThaiDonHang.DANG_GIAO;
             case "delivered" -> TrangThaiDonHang.HOAN_THANH;
             case "cancel" -> TrangThaiDonHang.DA_HUY;
-            case "waiting_to_return", "return", "return_transporting", "return_sorting",
-                 "returning", "return_fail", "returned"
-                    -> TrangThaiDonHang.TRA_HANG;
+            case "returned" -> TrangThaiDonHang.TRA_HANG;
             default -> null;
         };
     }

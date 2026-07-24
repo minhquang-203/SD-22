@@ -16,7 +16,6 @@ import org.example.templatejava6.order.service.GhnTrackingService;
 import org.example.templatejava6.order.service.HoaDonService;
 import org.example.templatejava6.order.service.HoaDonStorefrontService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -36,16 +35,6 @@ public class HoaDonController {
 
     @Autowired
     private GhnOrderCreationService ghnOrderCreationService;
-
-    @GetMapping("/tra-cuu")
-    public ResponseEntity<StorefrontOrderDetailResponse> traCuu(
-            @RequestParam("ma") String ma,
-            @RequestParam("sdt") String sdt
-    ) {
-        return hoaDonStorefrontService.traCuu(ma, sdt)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-    }
 
     @GetMapping("/cua-toi")
     public List<StorefrontOrderSummaryResponse> donCuaToi() {

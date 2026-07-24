@@ -4,15 +4,20 @@ import org.example.templatejava6.common.entity.KhachHang;
 import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.customer.repository.KhachHangRepository;
+import org.example.templatejava6.common.enums.TrangThaiTraHang;
 import org.example.templatejava6.order.entity.HoaDon;
 import org.example.templatejava6.order.entity.HoaDonChiTiet;
+import org.example.templatejava6.order.entity.HoanTien;
 import org.example.templatejava6.order.entity.LichSuDonHang;
+import org.example.templatejava6.order.entity.YeuCauTraHang;
 import org.example.templatejava6.order.model.response.StorefrontOrderDetailResponse;
 import org.example.templatejava6.order.model.response.StorefrontOrderLineResponse;
 import org.example.templatejava6.order.model.response.StorefrontOrderSummaryResponse;
 import org.example.templatejava6.order.repository.HoaDonChiTietRepository;
 import org.example.templatejava6.order.repository.HoaDonRepository;
+import org.example.templatejava6.order.repository.HoanTienRepository;
 import org.example.templatejava6.order.repository.LichSuDonHangRepository;
+import org.example.templatejava6.order.repository.YeuCauTraHangRepository;
 import org.example.templatejava6.product.entity.AnhSanPham;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
 import org.example.templatejava6.product.entity.SanPham;
@@ -38,6 +43,8 @@ public class HoaDonStorefrontService {
     private final GhnTrackingService ghnTrackingService;
     private final DanhGiaRepository danhGiaRepository;
     private final OnlineOrderLifecycleService onlineOrderLifecycleService;
+    private final YeuCauTraHangRepository yeuCauTraHangRepository;
+    private final HoanTienRepository hoanTienRepository;
 
     public HoaDonStorefrontService(
             HoaDonRepository hoaDonRepository,
@@ -47,7 +54,9 @@ public class HoaDonStorefrontService {
             AnhSanPhamRepository anhSanPhamRepository,
             GhnTrackingService ghnTrackingService,
             DanhGiaRepository danhGiaRepository,
-            OnlineOrderLifecycleService onlineOrderLifecycleService) {
+            OnlineOrderLifecycleService onlineOrderLifecycleService,
+            YeuCauTraHangRepository yeuCauTraHangRepository,
+            HoanTienRepository hoanTienRepository) {
         this.hoaDonRepository = hoaDonRepository;
         this.hoaDonChiTietRepository = hoaDonChiTietRepository;
         this.lichSuDonHangRepository = lichSuDonHangRepository;
@@ -56,18 +65,8 @@ public class HoaDonStorefrontService {
         this.ghnTrackingService = ghnTrackingService;
         this.danhGiaRepository = danhGiaRepository;
         this.onlineOrderLifecycleService = onlineOrderLifecycleService;
-    }
-
-    @Transactional(readOnly = true)
-    public Optional<StorefrontOrderDetailResponse> traCuu(String ma, String sdt) {
-        String maNorm = normalizeMa(ma);
-        String sdtNorm = normalizePhone(sdt);
-        if (maNorm.isBlank() || sdtNorm.isBlank()) {
-            return Optional.empty();
-        }
-        return hoaDonRepository.findByMaHoaDonIgnoreCase(maNorm)
-                .filter(hd -> phoneMatches(hd, sdtNorm))
-                .map(this::buildDetail);
+        this.yeuCauTraHangRepository = yeuCauTraHangRepository;
+        this.hoanTienRepository = hoanTienRepository;
     }
 
     @Transactional(readOnly = true)
@@ -75,6 +74,8 @@ public class HoaDonStorefrontService {
         KhachHang kh = getKhachDangNhap();
         return hoaDonRepository.findByIdKhachHang_IdOrderByNgayTaoDesc(kh.getId())
                 .stream()
+                // VNPAY chưa thanh toán: coi như chưa đặt — không hiện ở tra cứu / đơn hàng.
+                .filter(hd -> !onlineOrderLifecycleService.laVnpayChuaThanhToan(hd))
                 .map(this::buildSummary)
                 .toList();
     }
@@ -84,6 +85,9 @@ public class HoaDonStorefrontService {
         KhachHang kh = getKhachDangNhap();
         HoaDon hd = hoaDonRepository.findByIdAndIdKhachHang_Id(id, kh.getId())
                 .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng", "NOT_FOUND"));
+        if (onlineOrderLifecycleService.laVnpayChuaThanhToan(hd)) {
+            throw new ApiException("Không tìm thấy đơn hàng", "NOT_FOUND");
+        }
         return buildDetail(hd);
     }
 
@@ -125,6 +129,9 @@ public class HoaDonStorefrontService {
         r.setTenNguoiNhan(resolveTenNguoiNhan(hd));
         r.setSdtNguoiNhan(resolveSdtNguoiNhan(hd));
         r.setDiaChiGiao(hd.getDiaChiGiao());
+        if (hd.getIdPhuongThucThanhToan() != null) {
+            r.setMaPhuongThucThanhToan(hd.getIdPhuongThucThanhToan().getMa());
+        }
         r.setChiTiets(hoaDonChiTietRepository.findByIdHoaDon(hd).stream()
                 .map(this::buildLine)
                 .toList());
@@ -137,7 +144,34 @@ public class HoaDonStorefrontService {
             r.setCapNhatGanNhatLabel(resolveLichSuLabel(latest.getTrangThai()));
             r.setCapNhatGanNhatLuc(latest.getThoiGian());
         }
+        applyTraHangVaHoanTien(r, hd);
         return r;
+    }
+
+    private void applyTraHangVaHoanTien(StorefrontOrderDetailResponse r, HoaDon hd) {
+        List<YeuCauTraHang> yeuCaus = yeuCauTraHangRepository.findByIdHoaDonOrderByNgayTaoDesc(hd);
+        YeuCauTraHang moiNhat = yeuCaus.isEmpty() ? null : yeuCaus.get(0);
+        boolean coYeuCauDangXuLy = yeuCaus.stream()
+                .anyMatch(yc -> yc.getTrangThai() != TrangThaiTraHang.TU_CHOI);
+        r.setCoTheYeuCauTraHang(hd.getTrangThai() == TrangThaiDonHang.HOAN_THANH && !coYeuCauDangXuLy);
+        if (moiNhat != null) {
+            r.setIdYeuCauTraHang(moiNhat.getId());
+            if (moiNhat.getTrangThai() != null) {
+                r.setTrangThaiTraHang(moiNhat.getTrangThai().name());
+                r.setTrangThaiTraHangLabel(moiNhat.getTrangThai().getLabel());
+            }
+            r.setMaVanDonTra(moiNhat.getMaVanDonTra());
+        }
+
+        List<HoanTien> hoanTiens = hoanTienRepository.findByIdHoaDonOrderByNgayTaoDesc(hd);
+        if (!hoanTiens.isEmpty()) {
+            HoanTien htMoiNhat = hoanTiens.get(0);
+            if (htMoiNhat.getTrangThai() != null) {
+                r.setTrangThaiHoanTien(htMoiNhat.getTrangThai().name());
+                r.setTrangThaiHoanTienLabel(htMoiNhat.getTrangThai().getLabel());
+            }
+            r.setMaGiaoDichHoan(htMoiNhat.getMaGiaoDichHoan());
+        }
     }
 
     private void applyGhnTracking(StorefrontOrderDetailResponse r, HoaDon hd) {
@@ -210,17 +244,6 @@ public class HoaDonStorefrontService {
         return anh.map(AnhSanPham::getUrl).orElse(null);
     }
 
-    private boolean phoneMatches(HoaDon hd, String sdtNorm) {
-        String sdtNhan = normalizePhone(hd.getSdtNguoiNhan());
-        if (!sdtNhan.isBlank() && sdtNhan.equals(sdtNorm)) {
-            return true;
-        }
-        if (hd.getIdKhachHang() != null) {
-            return normalizePhone(hd.getIdKhachHang().getSoDienThoai()).equals(sdtNorm);
-        }
-        return false;
-    }
-
     private String resolveTenNguoiNhan(HoaDon hd) {
         if (hd.getTenNguoiNhan() != null && !hd.getTenNguoiNhan().isBlank()) {
             return hd.getTenNguoiNhan();
@@ -252,13 +275,6 @@ public class HoaDonStorefrontService {
 
     static String normalizeMa(String ma) {
         return ma == null ? "" : ma.trim();
-    }
-
-    static String normalizePhone(String sdt) {
-        if (sdt == null) {
-            return "";
-        }
-        return sdt.replaceAll("[\\s\\-.]", "");
     }
 
     static BigDecimal defaultZero(BigDecimal value) {

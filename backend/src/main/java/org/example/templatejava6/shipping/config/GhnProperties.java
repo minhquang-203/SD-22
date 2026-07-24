@@ -6,8 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 /**
- * Cau hinh tich hop Giao Hang Nhanh (GHN). Cac gia tri duoc nap tu application.properties
- * voi tien to "ghn.".
+ * Cau hinh tich hop Giao Hang Nhanh (GHN). Nap tu env / .env (prefix ghn.*).
  */
 @Getter
 @Setter
@@ -32,6 +31,15 @@ public class GhnProperties {
 
     /** Phuong/xa cua kho gui hang. */
     private String fromWardCode;
+
+    /** Ten nguoi nhan tai shop (dung cho van don hoan tra hang ve shop). */
+    private String shopName = "SUNOVA Shop";
+
+    /** So dien thoai shop (van don hoan tra). */
+    private String shopPhone;
+
+    /** Dia chi shop (van don hoan tra). */
+    private String shopAddress;
 
     /** Khoi luong mac dinh moi don (gram). */
     private Integer defaultWeight = 500;

@@ -1,12 +1,14 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import { getHoaDonDetail, getLichSu, taoVanDonGhn, dongBoGhn, giaLapWebhookGhn, capNhatTrangThai, tuChoiDon } from '@/api/hoaDonApi'
 import { confirm } from '@/composables/useConfirm'
+import { subscribeAdminOrders } from '@/composables/useRealtime'
 import { GHN_STATUS_OPTIONS } from '@/constants/ghnStatuses'
 import { formatCurrency } from '@/utils/format'
+import { toast } from '@/composables/useToast'
 
 const route = useRoute()
 const router = useRouter()
@@ -364,8 +366,38 @@ function goBack() {
 
 watch(() => route.params.id, () => loadDetail())
 
+let unsubscribeOrders = null
+
+function onOrderRealtime(event) {
+  const currentId = Number(route.params.id)
+  const eventId = Number(event?.idHoaDon)
+  if (!eventId || eventId !== currentId) return
+  loadDetail()
+  // Tránh toast trùng khi chính tab này vừa bấm webhook / đổi trạng thái
+  if (
+    event.type === 'ORDER_STATUS_CHANGED' &&
+    !webhookLoading.value &&
+    !actionLoading.value &&
+    !ghnLoading.value
+  ) {
+    toast(event.message || 'Trạng thái đơn đã cập nhật', 'info')
+  }
+}
+
+function onOrderRealtimeWindow(e) {
+  onOrderRealtime(e?.detail)
+}
+
 onMounted(() => {
   loadDetail()
+  unsubscribeOrders = subscribeAdminOrders(onOrderRealtime)
+  window.addEventListener('sunova-admin-order-realtime', onOrderRealtimeWindow)
+})
+
+onUnmounted(() => {
+  unsubscribeOrders?.()
+  unsubscribeOrders = null
+  window.removeEventListener('sunova-admin-order-realtime', onOrderRealtimeWindow)
 })
 </script>
 
@@ -688,6 +720,20 @@ onMounted(() => {
             </p>
             <p v-if="detail.maGiaoDich" class="text-sm mt-1">
               Mã giao dịch: <span class="soleil-sp-code">{{ detail.maGiaoDich }}</span>
+            </p>
+          </div>
+
+          <div v-if="detail.trangThaiHoanTien" class="hoa-don-pay-block">
+            <p class="text-sm font-medium mb-1">Hoàn tiền</p>
+            <p class="text-sm">
+              Trạng thái:
+              <strong>{{ detail.trangThaiHoanTienLabel || detail.trangThaiHoanTien }}</strong>
+              <template v-if="detail.soTienHoan != null">
+                · Số tiền: <strong>{{ formatCurrency(detail.soTienHoan) }}</strong>
+              </template>
+            </p>
+            <p v-if="detail.maGiaoDichHoan" class="text-sm mt-1">
+              Mã GD hoàn: <span class="soleil-sp-code">{{ detail.maGiaoDichHoan }}</span>
             </p>
           </div>
         </section>

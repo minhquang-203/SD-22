@@ -17,6 +17,8 @@ public interface ThanhToanHoaDonRepository extends JpaRepository<ThanhToanHoaDon
 
     Optional<ThanhToanHoaDon> findByMaGiaoDich(String maGiaoDich);
 
+    void deleteByIdHoaDon(HoaDon hoaDon);
+
     default Optional<ThanhToanHoaDon> findLatestByHoaDon(HoaDon hoaDon) {
         List<ThanhToanHoaDon> list = findByIdHoaDonOrderByThoiGianDesc(hoaDon);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));

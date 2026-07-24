@@ -4,12 +4,20 @@ export function createOnlineCheckout(payload) {
   return request.post('/online/checkout', payload)
 }
 
-export function fetchOnlineOrders(idKhachHang) {
-  return request.get('/online/orders', { params: { idKhachHang } })
+export function tinhGiaOnline(payload) {
+  return request.post('/online/tinh-gia', payload)
 }
 
-export function fetchOnlineOrderDetail(idKhachHang, idHoaDon) {
-  return request.get(`/online/orders/${idHoaDon}`, { params: { idKhachHang } })
+export function fetchOnlineOrders() {
+  return request.get('/online/orders')
+}
+
+export function fetchOnlineOrderDetail(idHoaDon) {
+  return request.get(`/online/orders/${idHoaDon}`)
+}
+
+export function cancelOnlineOrder(idHoaDon, payload = {}) {
+  return request.patch(`/online/orders/${idHoaDon}/cancel`, payload)
 }
 
 export function fetchCheckoutVouchers(keyword = '', page = 1, size = 20) {

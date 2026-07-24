@@ -1,8 +1,8 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
-import { createOnlineCheckout } from '@/api/onlineCheckout'
+import { createOnlineCheckout, tinhGiaOnline } from '@/api/onlineCheckout'
 import { fetchDiaChiToi, fetchKhachToi } from '@/api/khachHangApi'
 import { calcShippingFee, fetchDistricts, fetchProvinces, fetchWards } from '@/api/shipping'
 import { useAuth } from '@/composables/useAuth'
@@ -16,7 +16,6 @@ import CheckoutRecipientModal from '@/components/storefront/CheckoutRecipientMod
 import CheckoutVoucherModal from '@/components/storefront/CheckoutVoucherModal.vue'
 
 const SHIPPING_FEE = 30000
-const FREE_SHIPPING_FROM = 500000
 
 const route = useRoute()
 const router = useRouter()
@@ -29,6 +28,7 @@ const {
   selectedSubtotal,
   selectedSavings,
   refreshCart,
+  syncAfterCheckout,
 } = useCart()
 
 const profileLoading = ref(false)
@@ -69,6 +69,8 @@ const feeLoading = ref(false)
 const feeNotice = ref('')
 const fieldErrors = reactive({ soDienThoai: '' })
 const showVoucherModal = ref(false)
+const voucherDiscount = ref(0)
+const voucherPricingLoading = ref(false)
 
 const paymentMethods = [
   {
@@ -81,19 +83,18 @@ const paymentMethods = [
     code: 'VNPAY',
     name: 'VNPay',
     icon: 'solar:card-transfer-linear',
-    description: 'Bạn sẽ được chuyển đến cổng VNPay sau khi tạo đơn.',
+    description: 'Chuyển đến VNPay để thanh toán. Đơn chỉ được tạo khi thanh toán thành công.',
   },
 ]
 
 const shippingFee = computed(() => {
-  if (selectedSubtotal.value >= FREE_SHIPPING_FROM) return 0
   if (ghnFee.value != null) return ghnFee.value
   return SHIPPING_FEE
 })
-const estimatedTotal = computed(() => selectedSubtotal.value + shippingFee.value)
-const isFreeShipping = computed(() => selectedSubtotal.value >= FREE_SHIPPING_FROM)
+const estimatedTotal = computed(() =>
+  Math.max(0, selectedSubtotal.value - voucherDiscount.value + shippingFee.value),
+)
 const hasSelectedCartItems = computed(() => selectedItems.value.length > 0)
-const hasSaleItemsInCart = computed(() => selectedSavings.value > 0)
 
 const showCheckoutForm = computed(
   () => !showSuccess.value && !showFailure.value,
@@ -394,13 +395,60 @@ function openVoucherModal() {
   showVoucherModal.value = true
 }
 
-function onVoucherSelected(code) {
+async function previewVoucherPricing(code = form.maPhieuGiamGia) {
+  const normalized = (code || '').trim()
+  if (!normalized || !idKhachHang.value || selectedItems.value.length === 0) {
+    voucherDiscount.value = 0
+    return
+  }
+  voucherPricingLoading.value = true
+  try {
+    const res = await tinhGiaOnline({
+      idsChiTietGioHang: selectedItems.value.map((line) => line.idChiTietGioHang),
+      maPhieuGiamGia: normalized,
+      toDistrictId: form.districtId || undefined,
+      toWardCode: form.wardCode || undefined,
+    })
+    voucherDiscount.value = Number(res.data?.tienGiamGia) || 0
+    if (res.data?.maPhieuGiamGia) {
+      form.maPhieuGiamGia = res.data.maPhieuGiamGia
+    }
+    if (typeof res.data?.phiVanChuyen === 'number') {
+      ghnFee.value = res.data.phiVanChuyen
+    }
+  } catch (error) {
+    form.maPhieuGiamGia = ''
+    voucherDiscount.value = 0
+    toast(typeof error === 'string' ? error : 'Không áp dụng được mã giảm giá')
+  } finally {
+    voucherPricingLoading.value = false
+  }
+}
+
+async function onVoucherSelected(code) {
   form.maPhieuGiamGia = code || ''
+  if (!form.maPhieuGiamGia) {
+    voucherDiscount.value = 0
+    return
+  }
+  await previewVoucherPricing(form.maPhieuGiamGia)
 }
 
 function clearVoucher() {
   form.maPhieuGiamGia = ''
+  voucherDiscount.value = 0
 }
+
+watch(
+  [selectedSubtotal, () => form.districtId, () => form.wardCode],
+  () => {
+    if (form.maPhieuGiamGia) {
+      void previewVoucherPricing()
+    } else {
+      voucherDiscount.value = 0
+    }
+  },
+)
 
 function parsePaymentCallback() {
   const { success, orderCode, orderId, message, provider, transactionRef } = route.query
@@ -418,9 +466,11 @@ function parsePaymentCallback() {
   router.replace({ path: route.path })
 
   if (paymentCallback.value.success) {
-    void refreshCart().catch(() => {})
+    void syncAfterCheckout().catch(() => {})
     toast('Thanh toán thành công')
   } else {
+    // Thanh toán hủy/thất bại: đơn đã xóa phía server, giỏ vẫn nguyên — sync lại UI.
+    void refreshCart({ force: true }).catch(() => {})
     toast(paymentCallback.value.message || 'Thanh toán thất bại')
   }
 }
@@ -440,13 +490,13 @@ async function submitCheckout() {
     if (form.email.trim()) noteParts.push(`Email: ${form.email.trim()}`)
     if (form.ghiChu.trim()) noteParts.push(form.ghiChu.trim())
 
+    const purchasedIds = selectedItems.value.map((line) => line.idChiTietGioHang)
+
     const res = await createOnlineCheckout({
-      idKhachHang: Number(idKhachHang.value),
-      idsChiTietGioHang: selectedItems.value.map((line) => line.idChiTietGioHang),
+      idsChiTietGioHang: purchasedIds,
       maPhuongThucThanhToan: selectedPayment.value,
       maPhieuGiamGia: form.maPhieuGiamGia.trim() || null,
       diaChiGiao,
-      phiVanChuyen: shippingFee.value,
       ghiChu: compactText(noteParts.join(' | ')),
       tenNguoiNhan: form.hoTen.trim(),
       sdtNguoiNhan: form.soDienThoai.trim(),
@@ -455,14 +505,15 @@ async function submitCheckout() {
     })
 
     orderResult.value = res.data
-    await refreshCart()
 
     if (res.data?.paymentUrl) {
-      toast('Tạo đơn thành công. Đang chuyển sang VNPay...')
+      // Giữ giỏ nguyên đến khi VNPay thành công (callback).
+      toast('Đang chuyển sang cổng thanh toán VNPay...')
       window.location.assign(res.data.paymentUrl)
       return
     }
 
+    await syncAfterCheckout(purchasedIds)
     toast('Đặt hàng thành công')
   } catch (error) {
     toast(typeof error === 'string' ? error : 'Không thể đặt hàng, vui lòng thử lại')
@@ -775,17 +826,15 @@ onMounted(() => {
               </button>
               <Icon icon="solar:alt-arrow-right-linear" width="16" class="sf-checkout-voucher__arrow" />
             </div>
-            <p v-if="hasSaleItemsInCart" class="sf-checkout-hint sf-checkout-hint--warn">
-              Đơn có sản phẩm đang giảm giá nên không thể áp dụng mã voucher.
+            <p class="sf-checkout-hint">
+              Chọn voucher theo giá trị đơn hàng. Thành tiền sẽ cập nhật ngay khi áp mã.
             </p>
-            <p v-else class="sf-checkout-hint">Chọn voucher từ danh sách hoặc tìm theo mã. Mã sẽ được kiểm tra khi đặt hàng.</p>
           </section>
 
           <CheckoutVoucherModal
             v-model:visible="showVoucherModal"
             :selected-code="form.maPhieuGiamGia"
             :subtotal="selectedSubtotal"
-            :has-sale-items="hasSaleItemsInCart"
             @select="onVoucherSelected"
           />
 
@@ -853,13 +902,11 @@ onMounted(() => {
             <strong v-if="feeLoading">Đang tính...</strong>
             <strong v-else>{{ shippingFee ? formatVND(shippingFee) : 'Miễn phí' }}</strong>
           </div>
-          <p v-if="isFreeShipping" class="sf-checkout-hint">
-            Đơn từ {{ formatVND(FREE_SHIPPING_FROM) }} được miễn phí vận chuyển.
-          </p>
-          <p v-else-if="feeNotice" class="sf-checkout-hint">{{ feeNotice }}</p>
-          <div v-if="form.maPhieuGiamGia" class="sf-checkout-summary__row">
-            <span>Mã giảm giá</span>
-            <strong>{{ form.maPhieuGiamGia }}</strong>
+          <p v-if="feeNotice" class="sf-checkout-hint">{{ feeNotice }}</p>
+          <div v-if="form.maPhieuGiamGia" class="sf-checkout-summary__row sf-checkout-summary__row--save">
+            <span>Giảm giá ({{ form.maPhieuGiamGia }})</span>
+            <strong v-if="voucherPricingLoading">Đang tính...</strong>
+            <strong v-else>-{{ formatVND(voucherDiscount) }}</strong>
           </div>
 
           <hr />

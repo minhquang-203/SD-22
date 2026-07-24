@@ -15,6 +15,7 @@ const items = ref([])
 const loading = ref(false)
 let currentLoadPromise = null
 let loadedCustomerId = null
+let loadSeq = 0
 
 function normalizeLocalLine(line) {
   return {
@@ -119,24 +120,32 @@ function customerIdOrNull() {
   return Number(getCustomerId()) || null
 }
 
-async function refreshCart() {
+async function refreshCart(options = {}) {
+  const force = options === true || Boolean(options?.force)
   const idKhachHang = customerIdOrNull()
   if (!idKhachHang) {
     loadedCustomerId = null
     loadLocal()
     return null
   }
-  if (currentLoadPromise && loadedCustomerId === idKhachHang) return currentLoadPromise
+  if (!force && currentLoadPromise && loadedCustomerId === idKhachHang) {
+    return currentLoadPromise
+  }
 
+  const seq = ++loadSeq
   loading.value = true
   currentLoadPromise = fetchGioHang(idKhachHang)
     .then((res) => {
+      // Bỏ qua response cũ nếu đã có refresh mới hơn (tránh ghi đè sau checkout)
+      if (seq !== loadSeq) return items.value
       applyCartResponse(res.data)
       return res.data
     })
     .finally(() => {
-      loading.value = false
-      currentLoadPromise = null
+      if (seq === loadSeq) {
+        loading.value = false
+        currentLoadPromise = null
+      }
     })
   return currentLoadPromise
 }
@@ -345,6 +354,18 @@ export function useCart() {
     return res.data
   }
 
+  /** Xóa ngay SP đã mua khỏi badge, rồi sync lại từ server. */
+  async function syncAfterCheckout(idsChiTietGioHang = []) {
+    const idSet = new Set(
+      (idsChiTietGioHang || []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0),
+    )
+    if (idSet.size) {
+      items.value = items.value.filter((line) => !idSet.has(Number(line.idChiTietGioHang)))
+      if (!customerIdOrNull()) saveLocal()
+    }
+    return refreshCart({ force: true })
+  }
+
   return {
     items,
     loading,
@@ -365,6 +386,7 @@ export function useCart() {
     setQty,
     clearCart,
     refreshCart,
+    syncAfterCheckout,
     syncCartAfterLogin,
   }
 }

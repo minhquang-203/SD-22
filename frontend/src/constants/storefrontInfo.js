@@ -120,7 +120,6 @@ export const INFO_PAGES = {
         items: [
           'Được cung cấp đầy đủ thông tin sản phẩm, hóa đơn và chứng từ khi yêu cầu.',
           'Đổi trả trong 7 ngày theo chính sách đổi trả & hoàn tiền.',
-          'Freeship đơn từ 500.000đ tại khu vực áp dụng.',
         ],
       },
     ],
@@ -212,9 +211,8 @@ export const INFO_PAGES = {
       {
         type: 'list',
         items: [
-          'Freeship cho đơn hàng từ 500.000đ (áp dụng theo khu vực).',
           'Thời gian giao hàng dự kiến: 2–5 ngày làm việc (nội thành thường 1–3 ngày).',
-          'Phí vận chuyển đơn dưới ngưỡng freeship được tính theo trọng lượng và địa chỉ nhận, hiển thị trước khi đặt hàng.',
+          'Phí vận chuyển được tính theo trọng lượng và địa chỉ nhận, hiển thị trước khi đặt hàng.',
         ],
       },
     ],

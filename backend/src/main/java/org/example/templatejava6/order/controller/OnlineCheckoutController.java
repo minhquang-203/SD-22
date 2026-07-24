@@ -5,9 +5,11 @@ import jakarta.validation.Valid;
 import org.example.templatejava6.common.util.PaginationUtil;
 import org.example.templatejava6.order.model.request.HuyDonOnlineRequest;
 import org.example.templatejava6.order.model.request.OnlineCheckoutRequest;
+import org.example.templatejava6.order.model.request.OnlineTinhGiaRequest;
 import org.example.templatejava6.order.model.response.HoaDonDetailResponse;
 import org.example.templatejava6.order.model.response.HoaDonResponse;
 import org.example.templatejava6.order.model.response.OnlineCheckoutResponse;
+import org.example.templatejava6.order.model.response.OnlineTinhGiaResponse;
 import org.example.templatejava6.order.service.OnlineCheckoutService;
 import org.example.templatejava6.voucher.model.response.PhieuGiamGiaResponse;
 import org.example.templatejava6.voucher.service.PhieuGiamGiaService;
@@ -48,6 +50,11 @@ public class OnlineCheckoutController {
         return ResponseEntity.ok(phieuGiamGiaService.listAvailableForCustomer(keyword, pageable));
     }
 
+    @PostMapping("/tinh-gia")
+    public OnlineTinhGiaResponse tinhGia(@Valid @RequestBody OnlineTinhGiaRequest request) {
+        return onlineCheckoutService.tinhGia(request);
+    }
+
     @PostMapping("/checkout")
     public OnlineCheckoutResponse checkout(
             @Valid @RequestBody OnlineCheckoutRequest request,
@@ -56,23 +63,20 @@ public class OnlineCheckoutController {
     }
 
     @GetMapping("/orders")
-    public List<HoaDonResponse> danhSachDonHang(@RequestParam Integer idKhachHang) {
-        return onlineCheckoutService.danhSachDonHang(idKhachHang);
+    public List<HoaDonResponse> danhSachDonHang() {
+        return onlineCheckoutService.danhSachDonHang();
     }
 
     @GetMapping("/orders/{idHoaDon}")
-    public HoaDonDetailResponse chiTietDonHang(
-            @PathVariable Integer idHoaDon,
-            @RequestParam Integer idKhachHang) {
-        return onlineCheckoutService.chiTietDonHang(idKhachHang, idHoaDon);
+    public HoaDonDetailResponse chiTietDonHang(@PathVariable Integer idHoaDon) {
+        return onlineCheckoutService.chiTietDonHang(idHoaDon);
     }
 
     @PatchMapping("/orders/{idHoaDon}/cancel")
     public HoaDonDetailResponse huyDonHang(
             @PathVariable Integer idHoaDon,
-            @RequestParam Integer idKhachHang,
             @RequestBody(required = false) HuyDonOnlineRequest request) {
-        return onlineCheckoutService.huyDonHang(idKhachHang, idHoaDon, request);
+        return onlineCheckoutService.huyDonHang(idHoaDon, request);
     }
 
     private String getClientIp(HttpServletRequest request) {

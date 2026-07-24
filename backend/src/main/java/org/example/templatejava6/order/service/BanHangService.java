@@ -69,6 +69,7 @@ public class BanHangService {
     private static final String TRANG_THAI_THANH_CONG = "THANH_CONG";
     private static final String MA_TIEN_MAT = "TIEN_MAT";
     private static final String MA_VNPAY = "VNPAY";
+    private static final String MA_COD = "COD";
     private static final String TRANG_THAI_CHO_THANH_TOAN = "CHO_THANH_TOAN";
     private static final String TRANG_THAI_THAT_BAI = "THAT_BAI";
     private static final int SAN_PHAM_PAGE_SIZE = 48;
@@ -177,10 +178,7 @@ public class BanHangService {
             PhieuGiamGia phieu = phieuGiamGiaRepository.findByMa(maPhieuTrimmed)
                     .orElseThrow(() -> new ApiException(
                             "Mã giảm giá \"" + maPhieuTrimmed + "\" không tồn tại.", "INVALID_VOUCHER"));
-            List<Integer> variantIds = lines.stream()
-                    .map(line -> line.cts.getId())
-                    .toList();
-            tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien, variantIds, saleMap);
+            tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien);
         }
 
         BigDecimal thanhTien = tongTien.subtract(tienGiamGia);
@@ -204,7 +202,8 @@ public class BanHangService {
 
         Map<Integer, Integer> qtyByVariant = mergeItems(req.getItems());
         Map<Integer, VariantSaleInfo> saleMap = checkoutPricingService.loadActiveSales();
-        List<LineCalc> lines = buildLines(qtyByVariant, false, saleMap);
+        // Giữ đơn phải kiểm tra và trừ tồn theo lô (FEFO), giống checkout.
+        List<LineCalc> lines = buildLines(qtyByVariant, true, saleMap);
         BigDecimal tongTien = sumTongTien(lines);
 
         KhachHang khachHang = resolveKhachHang(req.getIdKhachHang());
@@ -274,6 +273,7 @@ public class BanHangService {
     @Transactional
     public void huyDonCho(Integer id) {
         HoaDon hd = loadDonCho(id);
+        hoanTonTheoHoaDon(hd);
         hoaDonChiTietRepository.deleteByIdHoaDon(hd);
         hoaDonRepository.delete(hd);
     }
@@ -292,6 +292,11 @@ public class BanHangService {
         if (!Boolean.TRUE.equals(pttt.getTrangThai())) {
             throw new ApiException("Phương thức thanh toán không còn hoạt động.", "INACTIVE_PAYMENT");
         }
+        if (MA_COD.equalsIgnoreCase(pttt.getMa())) {
+            throw new ApiException(
+                    "Thanh toán khi nhận hàng không áp dụng cho bán tại quầy.",
+                    "UNSUPPORTED_PAYMENT_METHOD");
+        }
 
         Map<Integer, Integer> qtyByVariant = mergeItems(req.getItems());
         Map<Integer, VariantSaleInfo> saleMap = checkoutPricingService.loadActiveSales();
@@ -304,10 +309,7 @@ public class BanHangService {
             phieu = phieuGiamGiaRepository.findByMa(req.getMaPhieuGiamGia().trim())
                     .orElseThrow(() -> new ApiException(
                             "Mã giảm giá \"" + req.getMaPhieuGiamGia() + "\" không tồn tại.", "INVALID_VOUCHER"));
-            List<Integer> variantIds = lines.stream()
-                    .map(line -> line.cts.getId())
-                    .toList();
-            tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien, variantIds, saleMap);
+            tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien);
         }
 
         BigDecimal thanhTien = tongTien.subtract(tienGiamGia);
@@ -337,6 +339,8 @@ public class BanHangService {
         HoaDon hoaDon;
         if (req.getIdHoaDonCho() != null) {
             hoaDon = loadDonCho(req.getIdHoaDonCho());
+            // Đơn chờ đã trừ tồn khi giữ — hoàn lại trước khi trừ theo dòng mới (tránh trừ 2 lần).
+            hoanTonTheoHoaDon(hoaDon);
             hoaDonChiTietRepository.deleteByIdHoaDon(hoaDon);
         } else {
             hoaDon = new HoaDon();
@@ -370,7 +374,7 @@ public class BanHangService {
             hdct.setThanhTien(line.thanhTien);
             hdct = hoaDonChiTietRepository.save(hdct);
 
-            loHangService.truTonTheoFefo(line.cts.getId(), line.soLuong);
+            loHangService.truTonVaGhiNhan(hdct, line.soLuong);
 
             lineResponses.add(new BanHangChiTietResponse(hdct));
             ghiNhatKy(hoaDon, "THEM_HANG",
@@ -540,11 +544,13 @@ public class BanHangService {
             hdct.setThanhTien(line.thanhTien);
             hoaDonChiTietRepository.save(hdct);
 
-            // Cập nhật lại số lượng tồn kho sau khi bán
-            if (line.cts.getSoLuongTon() != null) {
-                line.cts.setSoLuongTon(line.cts.getSoLuongTon() - line.soLuong);
-                chiTietSanPhamRepository.save(line.cts);
-            }
+            loHangService.truTonVaGhiNhan(hdct, line.soLuong);
+        }
+    }
+
+    private void hoanTonTheoHoaDon(HoaDon hoaDon) {
+        for (HoaDonChiTiet chiTiet : hoaDonChiTietRepository.findByIdHoaDon(hoaDon)) {
+            loHangService.hoanTonTheoChiTiet(chiTiet);
         }
     }
 

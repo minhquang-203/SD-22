@@ -1,6 +1,11 @@
 package org.example.templatejava6.order.service;
 
+import org.example.templatejava6.cart.entity.GioHang;
+import org.example.templatejava6.cart.repository.ChiTietGioHangRepository;
+import org.example.templatejava6.cart.repository.GioHangRepository;
+import org.example.templatejava6.common.entity.KhachHang;
 import org.example.templatejava6.common.entity.PhieuGiamGia;
+import org.example.templatejava6.common.enums.LoaiHoanTien;
 import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.order.entity.HoaDon;
@@ -10,17 +15,18 @@ import org.example.templatejava6.order.repository.HoaDonChiTietRepository;
 import org.example.templatejava6.order.repository.HoaDonRepository;
 import org.example.templatejava6.order.repository.LichSuDonHangRepository;
 import org.example.templatejava6.order.repository.ThanhToanHoaDonRepository;
+import org.example.templatejava6.product.entity.ChiTietSanPham;
 import org.example.templatejava6.product.service.LoHangService;
+import org.example.templatejava6.realtime.service.OrderRealtimeService;
 import org.example.templatejava6.voucher.repository.PhieuGiamGiaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 
 @Service
 public class OnlineOrderLifecycleService {
 
     private static final String LOAI_DON_ONLINE = "ONLINE";
+    private static final String MA_VNPAY = "VNPAY";
     private static final String TRANG_THAI_THANH_CONG = "THANH_CONG";
 
     private final HoaDonRepository hoaDonRepository;
@@ -28,7 +34,11 @@ public class OnlineOrderLifecycleService {
     private final ThanhToanHoaDonRepository thanhToanHoaDonRepository;
     private final LichSuDonHangRepository lichSuDonHangRepository;
     private final PhieuGiamGiaRepository phieuGiamGiaRepository;
+    private final GioHangRepository gioHangRepository;
+    private final ChiTietGioHangRepository chiTietGioHangRepository;
     private final LoHangService loHangService;
+    private final RefundService refundService;
+    private final OrderRealtimeService orderRealtimeService;
 
     public OnlineOrderLifecycleService(
             HoaDonRepository hoaDonRepository,
@@ -36,13 +46,21 @@ public class OnlineOrderLifecycleService {
             ThanhToanHoaDonRepository thanhToanHoaDonRepository,
             LichSuDonHangRepository lichSuDonHangRepository,
             PhieuGiamGiaRepository phieuGiamGiaRepository,
-            LoHangService loHangService) {
+            GioHangRepository gioHangRepository,
+            ChiTietGioHangRepository chiTietGioHangRepository,
+            LoHangService loHangService,
+            RefundService refundService,
+            OrderRealtimeService orderRealtimeService) {
         this.hoaDonRepository = hoaDonRepository;
         this.hoaDonChiTietRepository = hoaDonChiTietRepository;
         this.thanhToanHoaDonRepository = thanhToanHoaDonRepository;
         this.lichSuDonHangRepository = lichSuDonHangRepository;
         this.phieuGiamGiaRepository = phieuGiamGiaRepository;
+        this.gioHangRepository = gioHangRepository;
+        this.chiTietGioHangRepository = chiTietGioHangRepository;
         this.loHangService = loHangService;
+        this.refundService = refundService;
+        this.orderRealtimeService = orderRealtimeService;
     }
 
     @Transactional
@@ -66,12 +84,102 @@ public class OnlineOrderLifecycleService {
                     "ORDER_CANNOT_CANCEL");
         }
 
+        boolean daThanhToan = daThanhToanThanhCong(hoaDon);
+        // VNPAY chưa trả: xóa hẳn, không để DA_HUY ảo; hoàn tồn/voucher (giỏ vẫn nguyên).
+        if (!daThanhToan && laVnpay(hoaDon)) {
+            xoaDonChuaThanhToan(hoaDon);
+            return true;
+        }
+
+        TrangThaiDonHang trangThaiCu = hoaDon.getTrangThai();
         hoanTonKho(hoaDon);
         hoanLuotVoucher(hoaDon);
         hoaDon.setTrangThai(TrangThaiDonHang.DA_HUY);
         hoaDonRepository.save(hoaDon);
         ghiNhatKy(hoaDon, "DA_HUY", ghiChu != null && !ghiChu.isBlank() ? ghiChu : "Hủy đơn online");
+        orderRealtimeService.publishStatusChanged(hoaDon, trangThaiCu);
+
+        if (daThanhToan) {
+            refundService.taoHoanTienChoXuLy(
+                    hoaDon, LoaiHoanTien.HUY_DON, hoaDon.getThanhTien(), null, null, null, null);
+        }
         return true;
+    }
+
+    /**
+     * Xóa đơn VNPAY quá hạn theo id — load lại trong transaction để tránh LazyInitializationException
+     * khi scheduler/query trả entity detached.
+     */
+    @Transactional
+    public void xoaDonChuaThanhToanNeuCan(Integer idHoaDon) {
+        HoaDon hoaDon = hoaDonRepository.findById(idHoaDon).orElse(null);
+        if (hoaDon == null) {
+            return;
+        }
+        if (daThanhToanThanhCong(hoaDon)) {
+            return;
+        }
+        xoaDonChuaThanhToan(hoaDon);
+    }
+
+    /**
+     * Xóa hẳn đơn online VNPAY chưa thanh toán (hủy/thất bại/quá hạn).
+     * Hoàn tồn và voucher. Không đụng giỏ hàng — giỏ chỉ bị trừ khi thanh toán thành công.
+     * Caller phải gọi trong transaction với entity còn gắn session (hoặc dùng {@link #xoaDonChuaThanhToanNeuCan}).
+     */
+    @Transactional
+    public void xoaDonChuaThanhToan(HoaDon hoaDon) {
+        if (!LOAI_DON_ONLINE.equalsIgnoreCase(hoaDon.getLoaiDon())) {
+            throw new ApiException("Chỉ hỗ trợ xóa đơn online chưa thanh toán.", "INVALID_ORDER_TYPE");
+        }
+        if (daThanhToanThanhCong(hoaDon)) {
+            throw new ApiException("Đơn đã thanh toán, không thể xóa.", "ORDER_ALREADY_PAID");
+        }
+        if (!laVnpay(hoaDon)) {
+            throw new ApiException("Chỉ xóa được đơn VNPAY chưa thanh toán.", "INVALID_PAYMENT_METHOD");
+        }
+
+        hoanTonKho(hoaDon);
+        hoanLuotVoucher(hoaDon);
+
+        thanhToanHoaDonRepository.deleteByIdHoaDon(hoaDon);
+        lichSuDonHangRepository.deleteByIdHoaDon_Id(hoaDon.getId());
+        hoaDonChiTietRepository.deleteByIdHoaDon(hoaDon);
+        hoaDonRepository.delete(hoaDon);
+    }
+
+    /**
+     * Trừ số lượng trong giỏ tương ứng dòng hóa đơn — gọi khi VNPAY thanh toán thành công.
+     */
+    @Transactional
+    public void truGioHangTheoDon(HoaDon hoaDon) {
+        KhachHang khachHang = hoaDon.getIdKhachHang();
+        if (khachHang == null) {
+            return;
+        }
+        GioHang gioHang = gioHangRepository.findFirstByKhachHang_IdOrderByIdAsc(khachHang.getId())
+                .orElse(null);
+        if (gioHang == null) {
+            return;
+        }
+
+        for (HoaDonChiTiet chiTiet : hoaDonChiTietRepository.findByIdHoaDon(hoaDon)) {
+            ChiTietSanPham chiTietSanPham = chiTiet.getIdChiTietSanPham();
+            if (chiTietSanPham == null || chiTiet.getSoLuong() == null || chiTiet.getSoLuong() <= 0) {
+                continue;
+            }
+            chiTietGioHangRepository
+                    .findByGioHang_IdAndChiTietSanPham_Id(gioHang.getId(), chiTietSanPham.getId())
+                    .ifPresent(existing -> {
+                        int remaining = existing.getSoLuong() - chiTiet.getSoLuong();
+                        if (remaining <= 0) {
+                            chiTietGioHangRepository.delete(existing);
+                        } else {
+                            existing.setSoLuong(remaining);
+                            chiTietGioHangRepository.save(existing);
+                        }
+                    });
+        }
     }
 
     @Transactional(readOnly = true)
@@ -81,9 +189,20 @@ public class OnlineOrderLifecycleService {
                 .isPresent();
     }
 
+    @Transactional(readOnly = true)
+    public boolean laVnpayChuaThanhToan(HoaDon hoaDon) {
+        return laVnpay(hoaDon) && !daThanhToanThanhCong(hoaDon);
+    }
+
+    private boolean laVnpay(HoaDon hoaDon) {
+        return hoaDon.getIdPhuongThucThanhToan() != null
+                && hoaDon.getIdPhuongThucThanhToan().getMa() != null
+                && MA_VNPAY.equalsIgnoreCase(hoaDon.getIdPhuongThucThanhToan().getMa());
+    }
+
     private void hoanTonKho(HoaDon hoaDon) {
         for (HoaDonChiTiet chiTiet : hoaDonChiTietRepository.findByIdHoaDon(hoaDon)) {
-            loHangService.hoanTon(chiTiet.getIdChiTietSanPham().getId(), chiTiet.getSoLuong());
+            loHangService.hoanTonTheoChiTiet(chiTiet);
         }
     }
 
@@ -102,7 +221,7 @@ public class OnlineOrderLifecycleService {
         lichSu.setIdHoaDon(hoaDon);
         lichSu.setTrangThai(trangThai);
         lichSu.setGhiChu(ghiChu);
-        lichSu.setThoiGian(LocalDateTime.now());
+        lichSu.setThoiGian(java.time.LocalDateTime.now());
         lichSuDonHangRepository.save(lichSu);
     }
 }

@@ -1,11 +1,17 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import OrderCard from '@/components/storefront/OrderCard.vue'
 import ProductReviewModal from '@/components/storefront/ProductReviewModal.vue'
+import ReturnRequestCodModal from '@/components/storefront/ReturnRequestCodModal.vue'
+import ReturnRequestWalletModal from '@/components/storefront/ReturnRequestWalletModal.vue'
 import { confirm } from '@/composables/useConfirm'
+import { getCustomerId } from '@/composables/useAuth'
+import { toast } from '@/composables/useToast'
+import { subscribeCustomerOrders } from '@/composables/useRealtime'
 import { fetchChiTietDonCuaToi, fetchDonCuaToi, huyDonCuaToi } from '@/api/donHangApi'
+import { taoVanDonTra } from '@/api/traHangApi'
 import { formatVND } from '@/utils/formatVND'
 import { formatOrderDate, orderStatusClass, orderStatusLabel } from '@/utils/orderStatus'
 
@@ -21,8 +27,44 @@ const reviewNotice = ref('')
 const cancelLoading = ref(false)
 const cancelNotice = ref('')
 const cancelError = ref('')
+const showReturnModal = ref(false)
+const returnOrder = ref(null)
+const returnActionLoading = ref(false)
+const returnNotice = ref('')
 
-onMounted(loadList)
+let unsubscribeRealtime = null
+
+onMounted(() => {
+  loadList()
+  unsubscribeRealtime = subscribeCustomerOrders(async (event) => {
+    if (!event?.idHoaDon) return
+    const orderId = Number(event.idHoaDon)
+    const idx = orders.value.findIndex((item) => Number(item.id) === orderId)
+    if (idx >= 0) {
+      orders.value[idx] = {
+        ...orders.value[idx],
+        trangThai: event.trangThai ?? orders.value[idx].trangThai,
+        trangThaiLabel: event.trangThaiLabel ?? orders.value[idx].trangThaiLabel,
+      }
+    } else if (event.type === 'ORDER_CREATED') {
+      await loadList()
+    }
+    if (Number(selectedId.value) === orderId) {
+      await reloadDetail(orderId)
+    }
+    if (event.type === 'ORDER_STATUS_CHANGED') {
+      toast(
+        event.message || `Đơn ${event.maHoaDon || ''} đã cập nhật trạng thái`,
+        'info',
+      )
+    }
+  })
+})
+
+onUnmounted(() => {
+  unsubscribeRealtime?.()
+  unsubscribeRealtime = null
+})
 
 async function loadList() {
   loading.value = true
@@ -57,6 +99,24 @@ async function openDetail(id) {
   }
 }
 
+async function reloadDetail(id) {
+  if (!id) return
+  try {
+    const res = await fetchChiTietDonCuaToi(id)
+    detail.value = res.data
+    const idx = orders.value.findIndex((item) => item.id === id)
+    if (idx >= 0 && res.data) {
+      orders.value[idx] = {
+        ...orders.value[idx],
+        trangThai: res.data.trangThai,
+        trangThaiLabel: res.data.trangThaiLabel,
+      }
+    }
+  } catch {
+    // giữ nguyên detail cũ
+  }
+}
+
 function openReview(line) {
   reviewLine.value = line
   showReviewModal.value = true
@@ -73,6 +133,61 @@ function onReviewSubmitted({ lineId }) {
   if (line) {
     line.daDanhGia = true
     line.trangThaiDanhGia = 'CHO_DUYET'
+  }
+}
+
+function openReturn(order) {
+  returnOrder.value = order
+  showReturnModal.value = true
+}
+
+function closeReturn() {
+  showReturnModal.value = false
+  returnOrder.value = null
+}
+
+async function onReturnSubmitted() {
+  returnNotice.value = 'Đã gửi yêu cầu trả hàng. Cửa hàng sẽ sớm phản hồi.'
+  await reloadDetail(selectedId.value || returnOrder.value?.id)
+}
+
+async function handleCreateReturnLabel(order) {
+  if (!order?.idYeuCauTraHang || returnActionLoading.value) return
+
+  const idKhachHang = getCustomerId()
+  if (!idKhachHang) {
+    toast('Vui lòng đăng nhập để tạo vận đơn hoàn hàng.', 'warn')
+    return
+  }
+
+  const ok = await confirm({
+    title: 'Tạo vận đơn hoàn hàng',
+    message: `Tạo vận đơn GHN để gửi hàng hoàn cho đơn ${order.maHoaDon}?`,
+    confirmText: 'Tạo vận đơn',
+  })
+  if (!ok) return
+
+  returnActionLoading.value = true
+  try {
+    const res = await taoVanDonTra(order.idYeuCauTraHang, idKhachHang)
+    const updated = res.data
+    if (detail.value && updated) {
+      detail.value = {
+        ...detail.value,
+        trangThaiTraHang: updated.trangThai,
+        trangThaiTraHangLabel: updated.trangThaiLabel,
+        maVanDonTra: updated.maVanDonTra,
+        idYeuCauTraHang: updated.id,
+      }
+    }
+    returnNotice.value = updated?.maVanDonTra
+      ? `Đã tạo vận đơn hoàn: ${updated.maVanDonTra}`
+      : 'Đã tạo vận đơn hoàn hàng.'
+    toast(returnNotice.value, 'info')
+  } catch (err) {
+    toast(typeof err === 'string' ? err : 'Không tạo được vận đơn hoàn hàng.', 'warn')
+  } finally {
+    returnActionLoading.value = false
   }
 }
 
@@ -126,6 +241,7 @@ async function handleCancelOrder(order) {
       <p v-if="cancelError" class="sf-order-msg sf-order-msg--err">{{ cancelError }}</p>
       <p v-if="reviewNotice" class="sf-order-msg sf-order-msg--ok">{{ reviewNotice }}</p>
       <p v-if="cancelNotice" class="sf-order-msg sf-order-msg--ok">{{ cancelNotice }}</p>
+      <p v-if="returnNotice" class="sf-order-msg sf-order-msg--ok">{{ returnNotice }}</p>
 
       <div v-if="loading" class="sf-order-skeleton" />
 
@@ -167,8 +283,11 @@ async function handleCancelOrder(order) {
             v-else-if="detail"
             :order="detail"
             :cancel-loading="cancelLoading"
+            :return-action-loading="returnActionLoading"
             @review="openReview"
             @cancel-order="handleCancelOrder"
+            @request-return="openReturn"
+            @create-return-label="handleCreateReturnLabel"
           />
         </div>
       </div>
@@ -179,6 +298,21 @@ async function handleCancelOrder(order) {
       :line="reviewLine"
       @close="closeReview"
       @submitted="onReviewSubmitted"
+    />
+
+    <ReturnRequestCodModal
+      v-if="returnOrder && String(returnOrder.maPhuongThucThanhToan || '').toUpperCase() === 'COD'"
+      :visible="showReturnModal"
+      :order="returnOrder"
+      @close="closeReturn"
+      @submitted="onReturnSubmitted"
+    />
+    <ReturnRequestWalletModal
+      v-else-if="returnOrder"
+      :visible="showReturnModal"
+      :order="returnOrder"
+      @close="closeReturn"
+      @submitted="onReturnSubmitted"
     />
   </div>
 </template>
