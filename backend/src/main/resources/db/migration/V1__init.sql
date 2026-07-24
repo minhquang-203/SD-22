@@ -681,6 +681,7 @@ INSERT INTO san_pham (ma_san_pham, ten, id_thuong_hieu, id_danh_muc, id_dang_san
 ('SP003', N'Skin1004 Madagascar Centella Air-fit Suncream',4, 1, 2, 'SPF50+','PA++++', 'VAT_LY', 0, N'Kem chống nắng chứa rau má, làm dịu da', 0),
 ('SP004', N'Sunplay Skin Aqua UV Spray',                 5, 2, 4, 'SPF50+', 'PA++++', 'HOA_HOC', 1, N'Xịt chống nắng tiện lợi cho cơ thể', 0),
 ('SP005', N'Vichy Capital Soleil UV Age Daily',          3, 3, 2, 'SPF50+', 'PA++++', 'HOA_HOC', 0, N'Kem chống nắng nâng tông, chống lão hóa', 0);
+
 GO
 
 -- SẢN PHẨM - LOẠI DA

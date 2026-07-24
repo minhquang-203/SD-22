@@ -18,7 +18,7 @@
             <span>Nhiệt độ hiện tại ({{ searchCity }})</span>
             <strong>{{ weatherData.temp }}°C</strong>
           </div>
-          
+
           <div class="metric-row">
             <span>Chỉ số UV (UVI)</span>
             <strong :class="{'uv-high': isHighAlert}">{{ weatherData.uvIndex }}</strong>
@@ -30,12 +30,12 @@
 
           <h4 class="mt-4">✨ Sản phẩm phù hợp với UV {{ weatherData.uvIndex }}:</h4>
           <div class="product-grid" v-if="suggestedProducts && suggestedProducts.length > 0">
-            <div v-for="sp in suggestedProducts" :key="sp.ma_san_pham" class="product-card">
+            <div v-for="sp in suggestedProducts" :key="sp.maSanPham" class="product-card">
               <div class="sp-info">
                 <p class="sp-title">{{ sp.ten }}</p>
-                <span class="sp-spf">SPF: {{ sp.chi_so_spf }}</span>
+                <span class="sp-spf">SPF: {{ sp.chiSoSpf }}</span>
               </div>
-              <button class="btn-detail" @click="viewDetail(sp.ma_san_pham)">✏️</button>
+              <button class="btn-detail" @click="viewDetail(sp.maSanPham)">✏️</button>
             </div>
           </div>
           <div v-else class="empty-state">
@@ -62,6 +62,8 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 
+const API_BASE = 'http://localhost:8080/api/v1'
+
 const weatherData = ref(null)
 const suggestedProducts = ref([])
 const loading = ref(true)
@@ -72,20 +74,51 @@ const configForm = ref({ uvHighThreshold: 6.0 })
 const loadData = async () => {
   loading.value = true
   try {
-    const res = await axios.get(`http://localhost:8080/api/v1/weather/current?city=${searchCity.value}`)
+    const res = await axios.get(`${API_BASE}/weather/current`, {
+      params: { city: searchCity.value }
+    })
     weatherData.value = res.data.weather
     isHighAlert.value = res.data.isHighAlert
-    
-    const sRes = await axios.get(`http://localhost:8080/api/v1/weather/suggest?uvIndex=${weatherData.value.uvIndex}`)
+
+    const sRes = await axios.get(`${API_BASE}/weather/suggest`, {
+      params: { uvIndex: weatherData.value.uvIndex }
+    })
     suggestedProducts.value = sRes.data
-  } catch (err) { console.error(err) }
-  finally { loading.value = false }
+  } catch (err) {
+    console.error('Lỗi tải dữ liệu thời tiết/gợi ý:', err)
+    weatherData.value = null
+    suggestedProducts.value = []
+  } finally {
+    loading.value = false
+  }
 }
 
-const saveConfiguration = () => alert('✅ Đã lưu cấu hình!')
+const loadConfig = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/admin/config/uv`)
+    configForm.value.uvHighThreshold = res.data.uvHighThreshold
+  } catch (err) {
+    console.error('Lỗi tải cấu hình:', err)
+  }
+}
+
+const saveConfiguration = async () => {
+  try {
+    await axios.put(`${API_BASE}/admin/config/uv`, configForm.value)
+    alert('✅ Đã lưu cấu hình!')
+    await loadData() // load lại để cập nhật cảnh báo theo ngưỡng mới
+  } catch (err) {
+    console.error('Lỗi lưu cấu hình:', err)
+    alert('❌ Lưu cấu hình thất bại!')
+  }
+}
+
 const viewDetail = (id) => window.location.href = `/admin/products/detail/${id}`
 
-onMounted(loadData)
+onMounted(async () => {
+  await loadConfig()
+  await loadData()
+})
 </script>
 
 <style scoped>
@@ -94,16 +127,13 @@ onMounted(loadData)
 .admin-card { background: #18181b; padding: 24px; border-radius: 12px; border: 1px solid #3f3f46; }
 .search-box { display: flex; gap: 10px; margin: 20px 0; }
 .search-box input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #3f3f46; background: #09090b; color: white; }
-/* CÁC NÚT CSS CỦA BẠN */
 .btn-search, .btn-save { background: #6366f1; color: white; padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; transition: 0.3s; font-weight: 500; }
 .btn-search:hover, .btn-save:hover { background: #4f46e5; }
 .btn-detail { background: transparent; color: #a1a1aa; border: none; cursor: pointer; font-size: 16px; transition: 0.2s; }
 .btn-detail:hover { color: #f43f5e; }
-/* CẢNH BÁO */
 .uv-high { color: #ef4444 !important; font-size: 24px; font-weight: bold; }
 .alert-box { background: #991b1b; color: white; padding: 10px; border-radius: 8px; margin: 10px 0; text-align: center; animation: pulse 1.5s infinite; font-weight: 600; }
 @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
-/* CÁC STYLE KHÁC */
 .metric-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #27272a; }
 .product-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px; }
 .product-card { background: #27272a; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
