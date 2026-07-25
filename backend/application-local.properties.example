@@ -11,6 +11,13 @@
 # spring.mail.username=${MAIL_USERNAME}
 # spring.mail.password=${MAIL_PASSWORD}
 
+# --- Gemini Chat AI ---
+# GEMINI_API_KEY=your-key-here
+# GEMINI_MODEL=gemini-flash-latest
+
+# --- OpenWeather ---
+# WEATHER_API_KEY=your-openweather-key
+
 # --- VNPay IPN / QR: URL public HTTPS (ngrok / cloudflare) ---
 # 1. Chạy backend port 8080
 # 2. Tunnel: ngrok http 8080  hoặc  cloudflared tunnel --url http://localhost:8080

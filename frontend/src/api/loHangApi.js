@@ -7,3 +7,11 @@ export function getLoHangByChiTiet(idChiTietSanPham) {
 export function nhapLoHang(payload) {
   return request.post('/lo-hang', payload)
 }
+
+export function capNhatLoHang(id, payload) {
+  return request.put(`/lo-hang/${id}`, payload)
+}
+
+export function xoaLoHang(id) {
+  return request.delete(`/lo-hang/${id}`)
+}

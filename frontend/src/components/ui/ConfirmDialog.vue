@@ -42,6 +42,7 @@ const { visible, options } = useConfirmState()
   line-height: 1.55;
   color: rgba(30, 21, 16, 0.72);
   margin-bottom: 1.5rem;
+  white-space: pre-line;
 }
 .confirm-dialog-actions {
   display: flex;

@@ -48,6 +48,17 @@ public interface ChiTietSanPhamRepository extends JpaRepository<ChiTietSanPham, 
             + "FROM ChiTietSanPham c WHERE c.trangThai = true GROUP BY c.sanPham.id")
     List<VariantAgg> aggregateActiveVariants();
 
+    interface DungTichAgg {
+        Integer getSpId();
+        BigDecimal getDungTichMin();
+        BigDecimal getDungTichMax();
+    }
+
+    @Query("SELECT c.sanPham.id AS spId, MIN(c.dungTichMl) AS dungTichMin, MAX(c.dungTichMl) AS dungTichMax "
+            + "FROM ChiTietSanPham c WHERE c.trangThai = true AND c.dungTichMl IS NOT NULL "
+            + "GROUP BY c.sanPham.id")
+    List<DungTichAgg> aggregateDungTich();
+
     @Query("SELECT c FROM ChiTietSanPham c JOIN FETCH c.sanPham sp LEFT JOIN FETCH c.mauSac ms "
             + "WHERE c.trangThai = true AND sp.trangThai = true AND ("
             + "LOWER(c.sku) LIKE LOWER(CONCAT('%', :keyword, '%')) OR "

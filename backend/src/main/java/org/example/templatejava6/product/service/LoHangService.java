@@ -18,6 +18,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class LoHangService {
@@ -33,6 +34,7 @@ public class LoHangService {
         getChiTietOrThrow(idChiTietSanPham);
         return loHangRepository.findByChiTietSanPham_IdOrderByNgayNhapDescHanSuDungAsc(idChiTietSanPham)
                 .stream()
+                .filter(l -> Boolean.TRUE.equals(l.getTrangThai()))
                 .map(LoHangResponse::new)
                 .toList();
     }
@@ -43,9 +45,7 @@ public class LoHangService {
         if (!Boolean.TRUE.equals(ct.getTrangThai())) {
             throw new ApiException("Biến thể không còn hoạt động", "INACTIVE_SKU");
         }
-        if (request.getSoLuongNhap() == null || request.getSoLuongNhap() <= 0) {
-            throw new ApiException("Số lượng nhập phải lớn hơn 0", "VALIDATION_ERROR");
-        }
+        validateSoLuongVaHsd(request);
 
         LoHang lo = new LoHang();
         lo.setChiTietSanPham(ct);
@@ -86,6 +86,59 @@ public class LoHangService {
             row.setSoLuong(item.soLuong());
             hoaDonChiTietLoRepository.save(row);
         }
+    }
+
+    @Transactional
+    public LoHangResponse capNhatLo(Integer id, LoHangRequest request) {
+        LoHang lo = getLoOrThrow(id);
+        if (!Boolean.TRUE.equals(lo.getTrangThai())) {
+            throw new ApiException("Lô hàng không còn hoạt động", "NOT_FOUND");
+        }
+        validateSoLuongVaHsd(request);
+
+        int soLuongNhapCu = lo.getSoLuongNhap() != null ? lo.getSoLuongNhap() : 0;
+        int soLuongCon = lo.getSoLuongCon() != null ? lo.getSoLuongCon() : 0;
+        boolean daBan = soLuongCon < soLuongNhapCu;
+
+        lo.setSoLo(request.getSoLo().trim());
+        lo.setNgayNhap(request.getNgayNhap());
+        lo.setHanSuDung(request.getHanSuDung());
+
+        if (daBan) {
+            if (!Objects.equals(request.getSoLuongNhap(), soLuongNhapCu)) {
+                throw new ApiException(
+                        "Lô đã phát sinh bán, không thể sửa số lượng nhập",
+                        "LOT_ALREADY_SOLD");
+            }
+            // Đã bán: không đụng soLuongNhap / soLuongCon / ghiChu
+        } else {
+            lo.setSoLuongNhap(request.getSoLuongNhap());
+            lo.setSoLuongCon(request.getSoLuongNhap());
+            lo.setGhiChu(request.getGhiChu());
+        }
+
+        lo = loHangRepository.save(lo);
+        syncTonKho(lo.getChiTietSanPham().getId());
+        return new LoHangResponse(lo);
+    }
+
+    @Transactional
+    public void xoaLo(Integer id) {
+        LoHang lo = getLoOrThrow(id);
+        if (!Boolean.TRUE.equals(lo.getTrangThai())) {
+            return;
+        }
+        int soLuongNhap = lo.getSoLuongNhap() != null ? lo.getSoLuongNhap() : 0;
+        int soLuongCon = lo.getSoLuongCon() != null ? lo.getSoLuongCon() : 0;
+        if (soLuongCon < soLuongNhap) {
+            throw new ApiException(
+                    "Lô đã phát sinh bán, không thể xóa",
+                    "LOT_ALREADY_SOLD");
+        }
+        Integer idCts = lo.getChiTietSanPham().getId();
+        lo.setTrangThai(false);
+        loHangRepository.save(lo);
+        syncTonKho(idCts);
     }
 
     /**
@@ -240,5 +293,20 @@ public class LoHangService {
     private ChiTietSanPham getChiTietOrThrow(Integer id) {
         return chiTietSanPhamRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Không tìm thấy biến thể sản phẩm", "NOT_FOUND"));
+    }
+
+    private LoHang getLoOrThrow(Integer id) {
+        return loHangRepository.findById(id)
+                .orElseThrow(() -> new ApiException("Không tìm thấy lô hàng", "NOT_FOUND"));
+    }
+
+    private void validateSoLuongVaHsd(LoHangRequest request) {
+        if (request.getSoLuongNhap() == null || request.getSoLuongNhap() <= 0) {
+            throw new ApiException("Số lượng nhập phải lớn hơn 0", "VALIDATION_ERROR");
+        }
+        if (request.getHanSuDung() != null && request.getNgayNhap() != null
+                && !request.getHanSuDung().isAfter(request.getNgayNhap())) {
+            throw new ApiException("Hạn sử dụng phải sau ngày nhập", "VALIDATION_ERROR");
+        }
     }
 }

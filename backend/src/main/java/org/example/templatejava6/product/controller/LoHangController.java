@@ -25,4 +25,15 @@ public class LoHangController {
     public LoHangResponse nhapLo(@Valid @RequestBody LoHangRequest request) {
         return loHangService.nhapLo(request);
     }
+
+    @PutMapping("{id}")
+    public LoHangResponse capNhatLo(@PathVariable("id") Integer id,
+                                    @Valid @RequestBody LoHangRequest request) {
+        return loHangService.capNhatLo(id, request);
+    }
+
+    @DeleteMapping("{id}")
+    public void xoaLo(@PathVariable("id") Integer id) {
+        loHangService.xoaLo(id);
+    }
 }

@@ -1,5 +1,4 @@
 <script setup>
-import { ref, watch } from 'vue'
 import { formatDate } from '@/utils/format'
 
 const props = defineProps({
@@ -9,12 +8,20 @@ const props = defineProps({
   lots: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['close', 'open-nhap'])
+const emit = defineEmits(['close', 'open-nhap', 'edit', 'delete'])
+
+function isUnsold(lot) {
+  return Number(lot?.soLuongCon) === Number(lot?.soLuongNhap)
+}
+
+function isSold(lot) {
+  return Number(lot?.soLuongCon) < Number(lot?.soLuongNhap)
+}
 </script>
 
 <template>
   <div v-if="open" class="modal-overlay" @click.self="emit('close')">
-    <div class="modal-panel" style="max-width: 720px">
+    <div class="modal-panel" style="max-width: 820px">
       <div class="px-5 py-4 border-b flex justify-between items-center" style="border-color: var(--admin-border)">
         <div>
           <h2 class="text-lg font-semibold">Lô hàng — {{ variant?.sku }}</h2>
@@ -36,14 +43,15 @@ const emit = defineEmits(['close', 'open-nhap'])
               <th>HSD</th>
               <th>SL nhập</th>
               <th>Còn lại</th>
+              <th class="text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="loading">
-              <td colspan="5" class="text-center py-8 text-[var(--admin-muted)]">Đang tải...</td>
+              <td colspan="6" class="text-center py-8 text-[var(--admin-muted)]">Đang tải...</td>
             </tr>
             <tr v-else-if="lots.length === 0">
-              <td colspan="5" class="text-center py-8 text-[var(--admin-muted)]">Chưa có lô hàng. Nhấn "Nhập lô" để thêm.</td>
+              <td colspan="6" class="text-center py-8 text-[var(--admin-muted)]">Chưa có lô hàng. Nhấn "Nhập lô" để thêm.</td>
             </tr>
             <tr v-for="lot in lots" :key="lot.id">
               <td class="font-medium">{{ lot.soLo }}</td>
@@ -59,6 +67,24 @@ const emit = defineEmits(['close', 'open-nhap'])
               </td>
               <td>{{ lot.soLuongNhap }}</td>
               <td class="font-semibold text-[var(--admin-primary)]">{{ lot.soLuongCon }}</td>
+              <td class="text-right whitespace-nowrap">
+                <button
+                  type="button"
+                  class="admin-btn admin-btn-default !px-2 !py-1 text-xs"
+                  @click="emit('edit', lot)"
+                >
+                  Sửa
+                </button>
+                <button
+                  type="button"
+                  class="admin-btn admin-btn-default !px-2 !py-1 text-xs ml-1"
+                  :disabled="!isUnsold(lot)"
+                  :title="isSold(lot) ? 'Lô đã phát sinh bán, không thể xóa' : 'Xóa lô'"
+                  @click="isUnsold(lot) && emit('delete', lot)"
+                >
+                  Xóa
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>

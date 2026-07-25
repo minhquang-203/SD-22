@@ -54,6 +54,31 @@ GO
 
 Commit + push → đồng đội chỉ cần `pull` và chạy lại app.
 
+## Chat AI (Google Gemini)
+
+Chat tư vấn storefront gọi **Gemini native** (`generativelanguage.googleapis.com`), model Flash mặc định `gemini-2.5-flash`.
+
+Key đời mới dạng `AQ.*` **chỉ** chạy endpoint native (header `x-goog-api-key`). Không dùng đường OpenAI-compatible.
+
+### Cấu hình key (không commit key vào git)
+
+1. Sao chép `application-local.properties.example` → `src/main/resources/application-local.properties`
+2. Điền:
+
+```properties
+app.gemini.api-key=AQ.your_key_here
+app.gemini.model=gemini-2.5-flash
+```
+
+Hoặc set biến môi trường trước khi chạy backend:
+
+```bat
+set GEMINI_API_KEY=AQ.your_key_here
+```
+
+`application.properties` đọc: `app.gemini.api-key=${GEMINI_API_KEY:}`  
+Thiếu key / lỗi 401·429·timeout → fallback rule-based, app không chết.
+
 ## File hiện có
 
 | File | Mô tả |

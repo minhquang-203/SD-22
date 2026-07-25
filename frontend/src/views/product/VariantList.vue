@@ -8,7 +8,7 @@ import LoHangLotModal from '@/components/products/LoHangLotModal.vue'
 import { getMauSacList } from '@/api/danhMucApi'
 import { getProductDetail } from '@/api/sanPhamApi'
 import { addChiTiet, hideChiTiet, updateChiTiet } from '@/api/sanPhamApi'
-import { getLoHangByChiTiet, nhapLoHang } from '@/api/loHangApi'
+import { getLoHangByChiTiet, nhapLoHang, capNhatLoHang, xoaLoHang } from '@/api/loHangApi'
 import { formatCurrency, formatDate } from '@/utils/format'
 import { confirm } from '@/composables/useConfirm'
 
@@ -45,6 +45,8 @@ const editingVariant = ref(null)
 
 const lotListOpen = ref(false)
 const lotFormOpen = ref(false)
+const lotFormMode = ref('add')
+const editingLot = ref(null)
 const activeVariant = ref(null)
 const activeLots = ref([])
 
@@ -165,20 +167,52 @@ async function loadLots(idChiTiet) {
 }
 
 function openNhapLo() {
+  lotFormMode.value = 'add'
+  editingLot.value = null
   lotFormOpen.value = true
 }
 
-async function handleNhapLo(payload) {
+function openEditLot(lot) {
+  lotFormMode.value = 'edit'
+  editingLot.value = lot
+  lotFormOpen.value = true
+}
+
+async function handleLotSubmit(payload) {
   saving.value = true
   try {
-    await nhapLoHang(payload)
-    notify('Nhập lô thành công')
+    if (lotFormMode.value === 'edit' && editingLot.value?.id) {
+      await capNhatLoHang(editingLot.value.id, payload)
+      notify('Cập nhật lô thành công')
+    } else {
+      await nhapLoHang(payload)
+      notify('Nhập lô thành công')
+    }
     lotFormOpen.value = false
+    editingLot.value = null
     await Promise.all([loadLots(activeVariant.value.id), loadProductDetail()])
   } catch (err) {
     notify(String(err), 'error')
   } finally {
     saving.value = false
+  }
+}
+
+async function handleDeleteLot(lot) {
+  const ok = await confirm({
+    title: 'Xóa lô',
+    message: `Xóa lô ${lot.soLo}? Thao tác này ẩn lô khỏi kho.`,
+    confirmText: 'Xóa',
+    cancelText: 'Hủy',
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    await xoaLoHang(lot.id)
+    notify('Đã xóa lô')
+    await Promise.all([loadLots(activeVariant.value.id), loadProductDetail()])
+  } catch (err) {
+    notify(String(err), 'error')
   }
 }
 
@@ -436,14 +470,19 @@ onMounted(async () => {
       :lots="activeLots"
       @close="lotListOpen = false"
       @open-nhap="openNhapLo"
+      @edit="openEditLot"
+      @delete="handleDeleteLot"
     />
 
     <LoHangLotModal
       :open="lotFormOpen"
       :loading="saving"
+      :mode="lotFormMode"
       :variant="activeVariant"
-      @close="lotFormOpen = false"
-      @submit="handleNhapLo"
+      :ten-san-pham="productInfo.ten || ''"
+      :initial="editingLot"
+      @close="lotFormOpen = false; editingLot = null"
+      @submit="handleLotSubmit"
     />
   </div>
 </template>

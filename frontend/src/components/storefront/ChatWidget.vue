@@ -116,10 +116,10 @@ const viewProduct = (productId) => {
             
             <!-- Thẻ sản phẩm gợi ý -->
             <div v-if="msg.sanPhamGoiY" class="chat-product-card" @click="viewProduct(msg.sanPhamGoiY.id)">
-              <img :src="productImageUrl(msg.sanPhamGoiY.anhUrl)" alt="Product">
+              <img :src="productImageUrl(msg.sanPhamGoiY.anhChinhUrl || msg.sanPhamGoiY.anhUrl)" alt="Product">
               <div class="chat-product-info">
-                <strong>{{ msg.sanPhamGoiY.tenSanPham }}</strong>
-                <span>{{ formatVND(msg.sanPhamGoiY.giaBanNhoNhat) }}</span>
+                <strong>{{ msg.sanPhamGoiY.ten || msg.sanPhamGoiY.tenSanPham }}</strong>
+                <span>{{ formatVND(msg.sanPhamGoiY.giaMin ?? msg.sanPhamGoiY.giaBanNhoNhat) }}</span>
               </div>
             </div>
 
