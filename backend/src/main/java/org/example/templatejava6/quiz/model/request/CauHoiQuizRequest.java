@@ -15,5 +15,6 @@ public class CauHoiQuizRequest {
         private String label;      // Noi dung dap an
         private Integer scoreValue; // Diem
         private Integer tagId;      // Chinh la id_loai_da
+        private String filterKeyword; // Từ khóa lọc cứng (VD: VAT_LY, HOA_HOC)
     }
 }

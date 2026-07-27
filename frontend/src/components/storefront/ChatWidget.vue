@@ -78,6 +78,22 @@ const viewProduct = (productId) => {
   router.push(`/san-pham/${productId}`);
 };
 
+const formatMessage = (text) => {
+  if (!text) return '';
+  return text.replace(/\n/g, '<br/>');
+};
+
+const handleChatClick = (e) => {
+  const link = e.target.closest('.ai-link');
+  if (link) {
+    e.preventDefault();
+    const href = link.getAttribute('href');
+    if (href) {
+      router.push(href);
+    }
+  }
+};
+
 </script>
 
 <template>
@@ -104,7 +120,7 @@ const viewProduct = (productId) => {
         <button class="chat-close-btn">&times;</button>
       </div>
 
-      <div class="chat-body" ref="messagesContainer">
+      <div class="chat-body" ref="messagesContainer" @click="handleChatClick">
         <div 
           v-for="(msg, idx) in messages" 
           :key="idx" 
@@ -112,14 +128,24 @@ const viewProduct = (productId) => {
           :class="msg.nguoiGui === 'KHACH' ? 'msg-user' : 'msg-ai'"
         >
           <div class="msg-bubble">
-            <p>{{ msg.noiDung }}</p>
+            <p v-html="formatMessage(msg.noiDung)"></p>
             
-            <!-- Thẻ sản phẩm gợi ý -->
-            <div v-if="msg.sanPhamGoiY" class="chat-product-card" @click="viewProduct(msg.sanPhamGoiY.id)">
-              <img :src="productImageUrl(msg.sanPhamGoiY.anhUrl)" alt="Product">
-              <div class="chat-product-info">
-                <strong>{{ msg.sanPhamGoiY.tenSanPham }}</strong>
-                <span>{{ formatVND(msg.sanPhamGoiY.giaBanNhoNhat) }}</span>
+            <!-- Danh sách thẻ sản phẩm gợi ý -->
+            <div 
+              v-if="msg.danhSachSanPhamGoiY && msg.danhSachSanPhamGoiY.length > 0" 
+              class="chat-product-list"
+            >
+              <div 
+                v-for="sp in msg.danhSachSanPhamGoiY" 
+                :key="sp.id" 
+                class="chat-product-card" 
+                @click="viewProduct(sp.id)"
+              >
+                <img :src="productImageUrl(sp.anhUrl)" alt="Product">
+                <div class="chat-product-info">
+                  <strong>{{ sp.tenSanPham }}</strong>
+                  <span>{{ formatVND(sp.giaBanNhoNhat) }}</span>
+                </div>
               </div>
             </div>
 

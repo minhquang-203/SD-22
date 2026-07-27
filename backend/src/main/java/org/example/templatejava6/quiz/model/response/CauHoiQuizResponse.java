@@ -15,5 +15,6 @@ public class CauHoiQuizResponse {
         private String label;
         private Integer scoreValue;
         private Integer tagId;
+        private String filterKeyword;
     }
 }

@@ -115,7 +115,7 @@ public class ChatAiService {
             String systemPrompt = "Bạn là trợ lý AI tư vấn bán hàng của cửa hàng mỹ phẩm SUNOVA. " +
                     "Hãy tư vấn thân thiện, ngắn gọn và tự nhiên. Dưới đây là danh sách sản phẩm kem chống nắng của cửa hàng:\n" +
                     sb.toString() +
-                    "\nKhi bạn quyết định gợi ý một sản phẩm nào đó cho khách, HÃY GHI KÈM mã ID của sản phẩm đó ở dạng `[PRODUCT_ID: xxx]` vào cuối câu trả lời của bạn. Chỉ được tư vấn các sản phẩm trong danh sách.";
+                    "\nKhi bạn quyết định gợi ý hay liệt kê các sản phẩm cho khách, HÃY GHI KÈM mã ID của TẤT CẢ các sản phẩm đó ở dạng `[PRODUCT_ID: xxx]` vào cuối câu trả lời của bạn. Bạn không cần dùng thẻ HTML links nữa, hệ thống sẽ tự động hiển thị thẻ sản phẩm. Chỉ được tư vấn các sản phẩm trong danh sách.";
 
             RestTemplate restTemplate = new RestTemplate();
             
@@ -155,18 +155,18 @@ public class ChatAiService {
             
             String aiText = choicesNode.get(0).path("message").path("content").asText();
             
-            SanPham spGoiY = null;
+            java.util.List<String> foundIds = new java.util.ArrayList<>();
             java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\[PRODUCT_ID:\\s*(\\d+)\\]");
             java.util.regex.Matcher matcher = pattern.matcher(aiText);
-            if (matcher.find()) {
-                String idStr = matcher.group(1);
-                Integer idSp = Integer.parseInt(idStr);
-                spGoiY = sanPhamRepository.findById(idSp).orElse(null);
-                aiText = aiText.replace(matcher.group(0), "").trim();
+            while (matcher.find()) {
+                foundIds.add(matcher.group(1));
+            }
+            if (!foundIds.isEmpty()) {
+                ai.setDanhSachSpGoiY(String.join(",", foundIds));
+                aiText = matcher.replaceAll("").trim();
             }
 
             ai.setNoiDung(aiText);
-            ai.setSanPhamGoiY(spGoiY);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -236,14 +236,29 @@ public class ChatAiService {
     }
 
     private ChatResponseDto mapToDto(TinNhanChatAi entity) {
-        SanPhamResponse spRes = null;
+        java.util.List<SanPhamResponse> listSpRes = new java.util.ArrayList<>();
+        List<SanPhamResponse> allSp = sanPhamService.getAll();
+        
+        // Hỗ trợ cột cũ (nếu có)
         if (entity.getSanPhamGoiY() != null) {
-            // Re-fetch using service to get all mapped fields like anhUrl
-            List<SanPhamResponse> allSp = sanPhamService.getAll();
-            spRes = allSp.stream()
+            allSp.stream()
                 .filter(s -> s.getId().equals(entity.getSanPhamGoiY().getId()))
                 .findFirst()
-                .orElse(null);
+                .ifPresent(listSpRes::add);
+        }
+
+        // Hỗ trợ cột mới (nhiều ID)
+        if (entity.getDanhSachSpGoiY() != null && !entity.getDanhSachSpGoiY().isEmpty()) {
+            String[] ids = entity.getDanhSachSpGoiY().split(",");
+            for (String idStr : ids) {
+                try {
+                    Integer id = Integer.parseInt(idStr.trim());
+                    allSp.stream()
+                        .filter(s -> s.getId().equals(id))
+                        .findFirst()
+                        .ifPresent(listSpRes::add);
+                } catch (Exception ignored) {}
+            }
         }
 
         return ChatResponseDto.builder()
@@ -251,7 +266,8 @@ public class ChatAiService {
                 .idPhien(entity.getPhienChatAi().getId())
                 .nguoiGui(entity.getNguoiGui())
                 .noiDung(entity.getNoiDung())
-                .sanPhamGoiY(spRes)
+                .sanPhamGoiY(listSpRes.isEmpty() ? null : listSpRes.get(0)) // Giữ tương thích cũ
+                .danhSachSanPhamGoiY(listSpRes) // Trả về danh sách đầy đủ
                 .thoiGian(entity.getThoiGian() != null ? entity.getThoiGian() : LocalDateTime.now())
                 .build();
     }

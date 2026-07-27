@@ -41,10 +41,13 @@ public class CauHoiQuizService {
             dapAn.setIcon(ansReq.getIcon());
             dapAn.setNoiDung(ansReq.getLabel());
             dapAn.setDiem(ansReq.getScoreValue());
+            dapAn.setFilterKeyword(ansReq.getFilterKeyword());
 
-            LoaiDa loaiDa = new LoaiDa();
-            loaiDa.setId(ansReq.getTagId());
-            dapAn.setLoaiDa(loaiDa);
+            if (ansReq.getTagId() != null) {
+                LoaiDa loaiDa = new LoaiDa();
+                loaiDa.setId(ansReq.getTagId());
+                dapAn.setLoaiDa(loaiDa);
+            }
 
             dapAn.setCauHoi(cauHoi);
             dapAnList.add(dapAn);
@@ -70,10 +73,13 @@ public class CauHoiQuizService {
             dapAn.setIcon(ansReq.getIcon());
             dapAn.setNoiDung(ansReq.getLabel());
             dapAn.setDiem(ansReq.getScoreValue());
+            dapAn.setFilterKeyword(ansReq.getFilterKeyword());
 
-            LoaiDa loaiDa = new LoaiDa();
-            loaiDa.setId(ansReq.getTagId());
-            dapAn.setLoaiDa(loaiDa);
+            if (ansReq.getTagId() != null) {
+                LoaiDa loaiDa = new LoaiDa();
+                loaiDa.setId(ansReq.getTagId());
+                dapAn.setLoaiDa(loaiDa);
+            }
 
             dapAn.setCauHoi(cauHoi);
             cauHoi.getDapAns().add(dapAn);
@@ -103,6 +109,7 @@ public class CauHoiQuizService {
                 ansRes.setLabel(ans.getNoiDung());
                 ansRes.setScoreValue(ans.getDiem());
                 ansRes.setTagId(ans.getLoaiDa() != null ? ans.getLoaiDa().getId() : null);
+                ansRes.setFilterKeyword(ans.getFilterKeyword());
                 ansResponses.add(ansRes);
             }
         }

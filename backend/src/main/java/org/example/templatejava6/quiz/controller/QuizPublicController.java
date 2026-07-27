@@ -2,14 +2,17 @@ package org.example.templatejava6.quiz.controller;
 
 import org.example.templatejava6.quiz.entity.CauHoiQuiz;
 import org.example.templatejava6.quiz.entity.DapAnQuiz;
+import org.example.templatejava6.quiz.model.request.KetQuaQuizRequest;
 import org.example.templatejava6.quiz.model.response.CauHoiQuizResponse;
 import org.example.templatejava6.quiz.repository.CauHoiQuizRepository;
+import org.example.templatejava6.quiz.service.KetQuaQuizService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -19,6 +22,9 @@ public class QuizPublicController {
 
     @Autowired
     private CauHoiQuizRepository cauHoiQuizRepository;
+
+    @Autowired
+    private KetQuaQuizService ketQuaQuizService;
 
     @GetMapping
     public ResponseEntity<?> getActiveQuizzes() {
@@ -42,10 +48,17 @@ public class QuizPublicController {
                 ansRes.setLabel(ans.getNoiDung());
                 ansRes.setScoreValue(ans.getDiem());
                 ansRes.setTagId(ans.getLoaiDa() != null ? ans.getLoaiDa().getId() : null);
+                ansRes.setFilterKeyword(ans.getFilterKeyword());
                 ansResponses.add(ansRes);
             }
         }
         response.setAnswers(ansResponses);
         return response;
+    }
+
+    @PostMapping("/ket-qua")
+    public ResponseEntity<?> luuKetQua(@RequestBody KetQuaQuizRequest request) {
+        ketQuaQuizService.luuKetQua(request);
+        return ResponseEntity.ok(Map.of("message", "Đã lưu kết quả quiz"));
     }
 }

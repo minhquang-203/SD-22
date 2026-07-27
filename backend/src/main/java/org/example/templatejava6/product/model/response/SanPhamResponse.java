@@ -6,6 +6,7 @@ import org.example.templatejava6.product.entity.SanPham;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -38,6 +39,8 @@ public class SanPhamResponse {
     private BigDecimal giaSauGiamMax;
     /** Phần trăm giảm của đợt khuyến mãi đang áp dụng */
     private BigDecimal phanTramGiam;
+    /** Danh sách ID loại da phù hợp — dùng cho thuật toán Quiz gợi ý sản phẩm */
+    private List<Integer> idLoaiDas;
 
     public SanPhamResponse(SanPham sp) {
         this.id = sp.getId();

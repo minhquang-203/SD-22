@@ -66,9 +66,14 @@
           </button>
           <div v-else class="sg-progress__back-placeholder"></div>
 
-          <div class="sg-progress__track">
-            <div class="sg-progress__fill" :style="{ width: progressPercentage + '%' }">
-              <div class="sg-progress__sun">☀️</div>
+          <div class="sg-progress__track-wrapper" style="flex: 1; display: flex; flex-direction: column; gap: 12px; width: 100%;">
+            <div class="sg-progress__track" style="width: 100%; flex: none;">
+              <div class="sg-progress__fill" :style="{ width: progressPercentage + '%' }">
+                <div class="sg-progress__sun">☀️</div>
+              </div>
+            </div>
+            <div style="font-size: 13px; color: var(--sq-cream); text-align: center; font-weight: 600; letter-spacing: 1px;">
+              BẠN ĐÃ HOÀN THÀNH {{ Math.round(progressPercentage) }}%
             </div>
           </div>
         </div>
@@ -143,7 +148,7 @@
             <h2 class="sg-result__hero-label">SẢN PHẨM CHÂN ÁI CỦA BẠN</h2>
             <div class="sg-hero-card" @click="goToProduct(recommendedProducts[0].id)">
               <div class="sg-hero-card__img">
-                <img v-if="recommendedProducts[0].hinhAnh" :src="getImageUrl(recommendedProducts[0].hinhAnh)" :alt="recommendedProducts[0].ten" />
+                <img v-if="recommendedProducts[0].anhChinhUrl" :src="getImageUrl(recommendedProducts[0].anhChinhUrl)" :alt="recommendedProducts[0].ten" />
                 <div v-else class="sg-hero-card__placeholder">SUNOVA</div>
               </div>
               <div class="sg-hero-card__info">
@@ -179,10 +184,33 @@
             </div>
           </div>
 
-          <!-- BÁN CHÉO ROUTINE (SẢN PHẨM DÙNG KÈM) -->
-          <div class="sg-result__routine" v-if="recommendedProducts.length > 1">
-            <h3 class="sg-result__routine-title">HOÀN THIỆN QUY TRÌNH CỦA BẠN</h3>
-            <p class="sg-result__routine-subtitle">Kết hợp cùng các sản phẩm sau để bảo vệ da toàn diện suốt cả ngày dài.</p>
+          <!-- ROUTINE COMBO (TỪ ADMIN) -->
+          <div class="sg-result__routine" v-if="routineCombo">
+            <h3 class="sg-result__routine-title">COMBO DÀNH RIÊNG CHO BẠN</h3>
+            <p class="sg-result__routine-subtitle"><strong>{{ routineCombo.ten }}</strong>: {{ routineCombo.moTa }}</p>
+            <div class="sg-routine-grid">
+              <div
+                v-for="ct in routineCombo.chiTiets"
+                :key="ct.idSanPham"
+                class="sg-routine-card"
+                @click="goToProduct(ct.idSanPham)"
+              >
+                <div class="sg-routine-step">BƯỚC {{ ct.thuTu }}</div>
+                <div class="sg-routine-card__img">
+                  <img v-if="ct.anhChinhUrl" :src="getImageUrl(ct.anhChinhUrl)" :alt="ct.tenSanPham" />
+                  <div v-else class="sg-routine-card__placeholder">SUNOVA</div>
+                </div>
+                <h4 class="sg-routine-card__name">{{ ct.tenSanPham }}</h4>
+                <p style="font-size: 11px; color: #a09488; text-align: center; margin-top: 5px;">{{ ct.ghiChu }}</p>
+                <a class="sg-routine-card__link">XEM THÊM</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- FALLBACK NẾU KHÔNG CÓ ROUTINE COMBO -> HIỂN THỊ CÁC GỢI Ý THAY THẾ -->
+          <div class="sg-result__routine" v-else-if="recommendedProducts.length > 1">
+            <h3 class="sg-result__routine-title">CÁC LỰA CHỌN THAY THẾ KHÁC</h3>
+            <p class="sg-result__routine-subtitle">Dưới đây là các sản phẩm cũng có độ tương thích rất cao với làn da của bạn.</p>
             <div class="sg-routine-grid">
               <div
                 v-for="(product, index) in recommendedProducts.slice(1)"
@@ -190,9 +218,9 @@
                 class="sg-routine-card"
                 @click="goToProduct(product.id)"
               >
-                <div class="sg-routine-step">BƯỚC {{ index + 1 }}</div>
+                <div class="sg-routine-step">LỰA CHỌN {{ index + 2 }}</div>
                 <div class="sg-routine-card__img">
-                  <img v-if="product.hinhAnh" :src="getImageUrl(product.hinhAnh)" :alt="product.ten" />
+                  <img v-if="product.anhChinhUrl" :src="getImageUrl(product.anhChinhUrl)" :alt="product.ten" />
                   <div v-else class="sg-routine-card__placeholder">SUNOVA</div>
                 </div>
                 <h4 class="sg-routine-card__name">{{ product.ten }}</h4>
@@ -220,7 +248,8 @@ import { Icon } from '@iconify/vue';
 // CHUẨN KIẾN TRÚC GỌI API (Đã thay đổi theo hướng dẫn đồ án)
 
 import { getProducts } from '@/api/sanPhamApi';
-import { getQuizQuestions } from '@/api/quizApi';
+import { getQuizQuestions, saveQuizResult } from '@/api/quizApi';
+import { getRoutinesByLoaiDa } from '@/api/routineApi';
 
 const router = useRouter();
 
@@ -239,6 +268,7 @@ const resultData = ref({ skinName: '', description: '' });
 const scoreMap = ref({});
 const recommendedProducts = ref([]);
 const allProducts = ref([]);
+const routineCombo = ref(null); // Lưu routine lấy từ admin
 
 // Biến điều khiển Router Guard
 const pendingNavigation = ref(null);
@@ -279,7 +309,7 @@ const QUOTES = [
 
 const totalSteps = computed(() => questions.value.length);
 const currentQuestion = computed(() => questions.value[currentStep.value - 1] || { title: '', answers: [] });
-const progressPercentage = computed(() => totalSteps.value > 0 ? (currentStep.value / totalSteps.value) * 100 : 0);
+const progressPercentage = computed(() => totalSteps.value > 0 ? Math.min(100, ((currentStep.value - 1) / totalSteps.value) * 100) : 0);
 const isLastStep = computed(() => currentStep.value === totalSteps.value);
 
 // Kiểm tra xem khách có đang ở màn hình Quiz không
@@ -413,11 +443,19 @@ const handleNext = () => {
 
 const calculateResult = () => {
   const scores = {};
+  const collectedFilters = []; // Thu thập tất cả Từ khóa lọc cứng mà khách đã chọn
 
   Object.values(selectedAnswers.value).forEach(answer => {
     const tagId = answer.tagId || answer.idLoaiDa;
     const points = answer.scoreValue || answer.diem || 0;
-    if (tagId) {
+
+    // Thu thập filterKeyword (nếu có)
+    if (answer.filterKeyword) {
+      collectedFilters.push(answer.filterKeyword);
+    }
+
+    // Chỉ cộng điểm nếu có tagId VÀ điểm > 0 (bỏ qua câu hỏi Filter thuần túy)
+    if (tagId && points > 0) {
       if (!scores[tagId]) {
         const info = LOAI_DA_INFO[tagId] || { name: `Loại da #${tagId}` };
         scores[tagId] = { name: info.name, points: 0 };
@@ -456,13 +494,54 @@ const calculateResult = () => {
   }
 
   resultData.value = { skinName: skinNames, description: skinDesc };
-  recommendProducts(); 
+  recommendProducts(collectedFilters); 
+
+  // FETCH ROUTINE COMBO TỪ ADMIN DÀNH CHO LOẠI DA NÀY
+  getRoutinesByLoaiDa(topSkinTypes[0]).then(res => {
+    if (res.data && res.data.length > 0) {
+      const fetchedRoutine = res.data[0];
+      let isRoutineValid = true;
+
+      // KIỂM TRA QUYỀN PHỦ QUYẾT Y KHOA (Medical Filter)
+      if (collectedFilters.length > 0 && fetchedRoutine.chiTiets) {
+        for (const ct of fetchedRoutine.chiTiets) {
+          const p = allProducts.value.find(x => x.id === ct.idSanPham);
+          if (p && p.loaiChongNang) {
+            const passed = collectedFilters.some(f => {
+              if (f === 'VAT_LY') return p.loaiChongNang === 'VAT_LY' || p.loaiChongNang === 'LAI';
+              if (f === 'HOA_HOC') return p.loaiChongNang === 'HOA_HOC' || p.loaiChongNang === 'LAI';
+              return p.loaiChongNang === f;
+            });
+            if (!passed) {
+              isRoutineValid = false;
+              break;
+            }
+          }
+        }
+      }
+
+      if (isRoutineValid) {
+        routineCombo.value = fetchedRoutine;
+      } else {
+        console.warn("Routine bị từ chối do vi phạm bộ lọc y khoa của khách hàng.");
+        routineCombo.value = null; // Lùi về gợi ý tự động
+      }
+    } else {
+      routineCombo.value = null;
+    }
+  }).catch(err => {
+    console.error("Lỗi lấy routine", err);
+    routineCombo.value = null;
+  });
+
+  // Lưu kết quả vào DB ngầm
+  saveQuizResult({ idLoaiDa: topSkinTypes[0] }).catch(err => console.error("Lỗi lưu quiz:", err));
 
   setTimeout(() => { analyzing.value = false; showResult.value = true; }, 2500);
 };
 
-const recommendProducts = () => {
-  // THUẬT TOÁN MATCH SCORE CHÍNH THỨC
+const recommendProducts = (filters = []) => {
+  // BƯỚC 1: THUẬT TOÁN MATCH SCORE (Tính điểm tương thích theo loại da)
   const scoredProducts = allProducts.value.map(product => {
     let matchScore = 0;
     
@@ -488,6 +567,26 @@ const recommendProducts = () => {
   // Fallback nếu không có sản phẩm nào hợp
   if (suitableProducts.length === 0) {
     suitableProducts = scoredProducts;
+  }
+
+  // BƯỚC 2: PHỄU LỌC CỨNG (Filter Keyword) - Quyền Phủ Quyết Y Khoa
+  if (filters.length > 0) {
+    // Lọc sản phẩm phải khớp với ÍT NHẤT 1 filterKeyword mà khách đã chọn
+    // filterKeyword chính là giá trị loaiChongNang (VAT_LY / HOA_HOC / LAI)
+    const filtered = suitableProducts.filter(p => {
+      if (!p.loaiChongNang) return false; // Sản phẩm không có thông tin loại chống nắng -> loại bỏ
+      // Nếu khách chọn VAT_LY, chỉ giữ sản phẩm VAT_LY hoặc LAI (vì LAI cũng chứa thành phần vật lý)
+      return filters.some(f => {
+        if (f === 'VAT_LY') return p.loaiChongNang === 'VAT_LY' || p.loaiChongNang === 'LAI';
+        if (f === 'HOA_HOC') return p.loaiChongNang === 'HOA_HOC' || p.loaiChongNang === 'LAI';
+        return p.loaiChongNang === f;
+      });
+    });
+
+    // Chỉ áp dụng nếu còn sản phẩm sau khi lọc (tránh trường hợp lọc sạch bách)
+    if (filtered.length > 0) {
+      suitableProducts = filtered;
+    }
   }
 
   // Sắp xếp theo điểm tương thích (Match Score) từ cao xuống thấp
@@ -523,6 +622,7 @@ const retakeQuiz = () => {
   scoreMap.value = {};
   resultData.value = { skinName: '', description: '' };
   recommendedProducts.value = [];
+  routineCombo.value = null;
   showResult.value = false;
   analyzing.value = false;
   currentStep.value = 1;
@@ -690,7 +790,7 @@ const retakeQuiz = () => {
 .sg-progress__back-placeholder { width: 42px; flex-shrink: 0; }
 .sg-progress__track { flex: 1; height: 10px; background: rgba(249,245,240,0.12); border-radius: 10px; position: relative; overflow: visible; }
 .sg-progress__fill { height: 100%; background: linear-gradient(90deg, var(--sq-gold-dark), var(--sq-gold)); border-radius: 10px; transition: width 0.5s ease-out; position: relative; min-width: 10px; }
-.sg-progress__sun { position: absolute; top: -16px; right: -18px; font-size: 36px; filter: drop-shadow(0 2px 8px rgba(201,169,110,0.5)); animation: sun-spin 4s linear infinite; }
+.sg-progress__sun { position: absolute; top: 50%; margin-top: -18px; right: -18px; font-size: 36px; line-height: 1; filter: drop-shadow(0 2px 8px rgba(201,169,110,0.5)); animation: sun-spin 4s linear infinite; }
 @keyframes sun-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
 /* Question Layout */

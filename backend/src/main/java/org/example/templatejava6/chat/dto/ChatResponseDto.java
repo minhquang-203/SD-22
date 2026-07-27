@@ -15,6 +15,7 @@ public class ChatResponseDto {
     private Integer idPhien;
     private String nguoiGui;
     private String noiDung;
-    private SanPhamResponse sanPhamGoiY; // DTO trả về thông tin thẻ sản phẩm nếu có
+    private SanPhamResponse sanPhamGoiY; // Giữ lại dự phòng
+    private java.util.List<SanPhamResponse> danhSachSanPhamGoiY; // Danh sách nhiều sản phẩm
     private LocalDateTime thoiGian;
 }

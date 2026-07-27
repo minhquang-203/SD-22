@@ -8,9 +8,14 @@ import {
   doiMatKhauToi,
   fetchDiaChiToi,
   updateDiaChiToi,
+  fetchMyQuizResult,
 } from '@/api/khachHangApi'
 import { useAuth } from '@/composables/useAuth'
 import CheckoutRecipientModal from '@/components/storefront/CheckoutRecipientModal.vue'
+import { getProducts } from '@/api/sanPhamApi'
+import { getRoutinesByLoaiDa } from '@/api/routineApi'
+import { formatVND } from '@/utils/formatVND'
+import { productImageUrl } from '@/utils/productImage'
 
 const router = useRouter()
 const { dangXuat, updateHoTen } = useAuth()
@@ -53,6 +58,7 @@ const menuItems = [
   { id: 'info', label: 'Thông tin tài khoản', icon: 'solar:user-circle-linear' },
   { id: 'addresses', label: 'Địa chỉ', icon: 'solar:map-point-linear' },
   { id: 'orders', label: 'Đơn hàng của tôi', icon: 'solar:bag-check-linear', to: '/don-hang' },
+  { id: 'quiz', label: 'Hồ sơ da (Quiz)', icon: 'solar:clipboard-list-linear' },
   { id: 'password', label: 'Đổi mật khẩu', icon: 'solar:lock-keyhole-linear' },
 ]
 
@@ -95,6 +101,52 @@ async function loadProfile() {
     profileError.value = typeof e === 'string' ? e : 'Không tải được thông tin tài khoản'
   } finally {
     loading.value = false
+  }
+}
+
+const quizData = ref(null)
+const quizLoading = ref(false)
+const quizError = ref('')
+const recommendedProducts = ref([])
+const routineCombo = ref(null)
+
+async function loadQuizResult() {
+  quizLoading.value = true
+  quizError.value = ''
+  try {
+    const res = await fetchMyQuizResult()
+    quizData.value = res.data
+
+    if (quizData.value && quizData.value.idLoaiDa) {
+      try {
+        const routineRes = await getRoutinesByLoaiDa(quizData.value.idLoaiDa)
+        if (routineRes.data && routineRes.data.length > 0) {
+          routineCombo.value = routineRes.data[0]
+        } else {
+          routineCombo.value = null
+        }
+      } catch (err) {
+        routineCombo.value = null
+      }
+
+      const productRes = await getProducts()
+      const allProds = productRes.data || []
+      
+      // Lọc các sản phẩm hỗ trợ loại da này
+      let suitable = allProds.filter(p => p.trangThai !== false && p.idLoaiDas && p.idLoaiDas.includes(quizData.value.idLoaiDa))
+      
+      // Nếu không có sản phẩm nào hợp chuẩn, lấy top bán chạy hoặc lấy đại
+      if (suitable.length === 0) {
+        suitable = allProds.filter(p => p.trangThai !== false).slice(0, 4)
+      } else {
+        suitable = suitable.slice(0, 4) // Lấy tối đa 4 sản phẩm
+      }
+      recommendedProducts.value = suitable
+    }
+  } catch (e) {
+    quizError.value = typeof e === 'string' ? e : 'Không tải được kết quả quiz'
+  } finally {
+    quizLoading.value = false
   }
 }
 
@@ -236,6 +288,8 @@ function selectSection(id) {
   addressError.value = ''
   if (id === 'addresses') {
     void loadAddresses()
+  } else if (id === 'quiz') {
+    void loadQuizResult()
   }
 }
 
@@ -266,7 +320,7 @@ onMounted(loadProfile)
               :to="item.to"
               class="sf-account-sidebar__item"
             >
-              <Icon :icon="item.icon" width="18" />
+              <Icon v-if="item.icon" :icon="item.icon" width="18" />
               {{ item.label }}
             </RouterLink>
             <button
@@ -276,7 +330,7 @@ onMounted(loadProfile)
               :class="{ active: activeSection === item.id }"
               @click="selectSection(item.id)"
             >
-              <Icon :icon="item.icon" width="18" />
+              <Icon v-if="item.icon" :icon="item.icon" width="18" />
               {{ item.label }}
             </button>
           </template>
@@ -415,6 +469,81 @@ onMounted(loadProfile)
               @select="onRecipientSelected"
               @saved="onRecipientSaved"
             />
+          </template>
+
+          <template v-else-if="activeSection === 'quiz'">
+            <h2 class="sf-account-main__heading">Hồ sơ da (Quiz)</h2>
+            <p class="sf-account-main__sub">Kết quả bài phân tích da gần nhất của bạn.</p>
+            
+            <div v-if="quizLoading" class="sf-account-alert">Đang tải...</div>
+            <div v-else-if="quizError" class="sf-account-alert sf-account-alert--err">{{ quizError }}</div>
+            <div v-else-if="quizData" class="sf-account-card" style="padding: 24px; background: #fff; border-radius: 8px; border: 1px solid var(--border-color);">
+              <h3 style="font-size: 1.25rem; margin-bottom: 8px;">Loại da của bạn: <strong style="color: var(--primary-color);">{{ quizData.tenLoaiDa }}</strong></h3>
+              <p style="color: #666; margin-bottom: 16px;">{{ quizData.moTaLoaiDa }}</p>
+              <p style="font-size: 0.875rem; color: #999; margin-bottom: 24px;">Ngày làm bài: {{ new Date(quizData.thoiGianLam).toLocaleString('vi-VN') }}</p>
+              
+              <!-- Hiển thị sản phẩm gợi ý ngay tại đây -->
+              <div v-if="routineCombo" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee;">
+                <h4 style="font-size: 1.1rem; margin-bottom: 8px; color: var(--text-color);">Combo dành riêng cho bạn</h4>
+                <p style="color: #666; margin-bottom: 16px;"><strong>{{ routineCombo.ten }}</strong>: {{ routineCombo.moTa }}</p>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                  <div 
+                    v-for="ct in routineCombo.chiTiets" 
+                    :key="ct.idSanPham" 
+                    style="border: 1px solid #eee; border-radius: 8px; padding: 12px; cursor: pointer; transition: transform 0.2s;"
+                    @click="router.push(`/san-pham/${ct.idSanPham}`)"
+                    onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'"
+                    onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'"
+                  >
+                    <div style="width: 100%; aspect-ratio: 1; margin-bottom: 12px; background: #f9f9f9; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                      <img v-if="ct.anhChinhUrl" :src="productImageUrl(ct.anhChinhUrl)" :alt="ct.tenSanPham" style="width: 100%; height: 100%; object-fit: contain;" />
+                    </div>
+                    <div style="font-size: 0.9rem; font-weight: 600; color: #333; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                      Bước {{ ct.thuTu }}: {{ ct.tenSanPham }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else-if="recommendedProducts.length > 0" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee;">
+                <h4 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--text-color);">Sản phẩm chân ái dành cho bạn</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                  <div 
+                    v-for="product in recommendedProducts" 
+                    :key="product.id" 
+                    style="border: 1px solid #eee; border-radius: 8px; padding: 12px; cursor: pointer; transition: transform 0.2s;"
+                    @click="router.push(`/san-pham/${product.id}`)"
+                    onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'"
+                    onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'"
+                  >
+                    <div style="width: 100%; aspect-ratio: 1; margin-bottom: 12px; background: #f9f9f9; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                      <img v-if="product.anhChinhUrl" :src="productImageUrl(product.anhChinhUrl)" :alt="product.ten" style="width: 100%; height: 100%; object-fit: contain;" />
+                    </div>
+                    <div style="font-size: 0.9rem; font-weight: 600; color: #333; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                      {{ product.ten }}
+                    </div>
+                    <div style="font-size: 0.9rem; font-weight: 700; color: var(--primary-color);">
+                      {{ formatVND(product.giaSauGiamMin || product.giaMin || 0) }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 12px;">
+                <RouterLink to="/quiz" class="sf-btn-primary">
+                  Làm lại Quiz
+                </RouterLink>
+                <RouterLink :to="`/san-pham?loaiDa=${quizData.idLoaiDa}`" class="sf-btn-outline">
+                  Xem tất cả sản phẩm
+                </RouterLink>
+              </div>
+            </div>
+            <div v-else class="sf-account-card" style="padding: 24px; text-align: center; background: #fff; border-radius: 8px; border: 1px solid var(--border-color);">
+              <p style="margin-bottom: 16px; color: #666;">Bạn chưa thực hiện bài kiểm tra da nào.</p>
+              <RouterLink to="/quiz" class="sf-btn-primary">
+                Làm Quiz ngay
+              </RouterLink>
+            </div>
           </template>
 
           <template v-else-if="activeSection === 'password'">

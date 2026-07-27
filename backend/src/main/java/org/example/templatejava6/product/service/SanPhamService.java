@@ -331,6 +331,10 @@ public class SanPhamService {
     private SanPhamResponse toListResponse(SanPham sp, Map<Integer, VariantAgg> variantAggMap) {
         SanPhamResponse response = new SanPhamResponse(sp);
         response.setAnhChinhUrl(resolveMainImageUrl(sp.getId()));
+        response.setIdLoaiDas(
+                sanPhamLoaiDaRepository.findBySanPham(sp).stream()
+                        .map(spld -> spld.getLoaiDa().getId())
+                        .toList());
         VariantAgg agg = variantAggMap.get(sp.getId());
         if (agg != null) {
             response.setGiaMin(agg.getGiaMin());

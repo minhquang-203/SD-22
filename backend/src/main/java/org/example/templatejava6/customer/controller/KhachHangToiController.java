@@ -8,12 +8,17 @@ import org.example.templatejava6.customer.model.response.DiaChiResponse;
 import org.example.templatejava6.customer.model.response.KhachHangToiResponse;
 import org.example.templatejava6.customer.service.DiaChiKhachHangToiService;
 import org.example.templatejava6.customer.service.KhachHangToiService;
+import org.example.templatejava6.quiz.model.response.KetQuaQuizToiResponse;
+import org.example.templatejava6.quiz.service.KetQuaQuizService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("api/khach-hang/toi")
 public class KhachHangToiController {
+
+    @Autowired
+    private KetQuaQuizService ketQuaQuizService;
 
     @Autowired
     private KhachHangToiService khachHangToiService;
@@ -49,5 +54,10 @@ public class KhachHangToiController {
     @PutMapping("dia-chi/{id}")
     public DiaChiResponse capNhatDiaChi(@PathVariable Integer id, @Valid @RequestBody DiaChiKhachHangRequest request) {
         return diaChiKhachHangToiService.capNhat(id, request);
+    }
+
+    @GetMapping("quiz")
+    public KetQuaQuizToiResponse layKetQuaQuiz() {
+        return ketQuaQuizService.layKetQuaQuizCuaToi();
     }
 }

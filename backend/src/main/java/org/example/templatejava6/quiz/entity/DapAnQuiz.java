@@ -30,4 +30,7 @@ public class DapAnQuiz {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_loai_da")
     private LoaiDa loaiDa;
+
+    @Column(name = "filter_keyword", length = 100)
+    private String filterKeyword;
 }

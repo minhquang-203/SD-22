@@ -9,6 +9,11 @@ export function getQuizQuestions() {
   return request.get("/khach/quiz");
 }
 
+// Lưu kết quả Quiz vào Database
+export function saveQuizResult(data) {
+  return request.post("/khach/quiz/ket-qua", data);
+}
+
 // API DÀNH CHO ADMIN (QUẢN TRỊ VIÊN)
 
 // Lấy toàn bộ danh sách câu hỏi

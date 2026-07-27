@@ -33,28 +33,28 @@
             <tr v-for="routine in routines" :key="routine.id">
               <td>
                 <div class="routine-info">
-                  <span class="routine-name">{{ routine.name }}</span>
+                  <span class="routine-name">{{ routine.ten }}</span>
                   <span class="routine-id">ID: {{ routine.id }}</span>
                 </div>
               </td>
               <td>
                 <div class="product-pills">
-                  <span v-for="p in routine.products" :key="p" class="p-pill">
-                    📦 {{ p }}
+                  <span v-for="ct in routine.chiTiets" :key="ct.idSanPham" class="p-pill">
+                    📦 {{ ct.tenSanPham }}
                   </span>
                 </div>
               </td>
               <td>
-                <span class="skin-tag">{{ routine.targetSkin }}</span>
+                <span class="skin-tag">{{ getSkinName(routine.idLoaiDa) }}</span>
               </td>
               <td>
-                <span class="status-badge" :class="routine.isActive ? 'active' : 'inactive'">
-                  {{ routine.isActive ? 'Đang dùng' : 'Tạm ẩn' }}
+                <span class="status-badge" :class="routine.trangThai ? 'active' : 'inactive'">
+                  {{ routine.trangThai ? 'Đang dùng' : 'Tạm ẩn' }}
                 </span>
               </td>
               <td class="actions-col">
                 <button class="btn-icon" @click="editRoutine(routine)">✏️</button>
-                <button class="btn-icon" @click="deleteRoutine(routine.id)">🗑️</button>
+                <button class="btn-icon" @click="confirmDeleteRoutine(routine.id)">🗑️</button>
               </td>
             </tr>
           </tbody>
@@ -72,30 +72,36 @@
         <div class="modal-body">
           <div class="form-group">
             <label>Tên bộ Routine <span class="required">*</span></label>
-            <input type="text" v-model="currentRoutine.name" placeholder="VD: Combo Chống Nắng Cho Da Dầu Mụn">
+            <input type="text" v-model="currentRoutine.ten" placeholder="VD: Combo Chống Nắng Cho Da Dầu Mụn">
           </div>
 
           <div class="form-group">
             <label>Mô tả ngắn gọn</label>
-            <textarea v-model="currentRoutine.description" rows="2" placeholder="Giải thích lý do combo này hiệu quả..."></textarea>
+            <textarea v-model="currentRoutine.moTa" rows="2" placeholder="Giải thích lý do combo này hiệu quả..."></textarea>
           </div>
 
           <div class="form-group">
             <label>Chọn loại da mục tiêu</label>
-            <select v-model="currentRoutine.targetSkin">
-              <option value="Da Dầu">Da Dầu</option>
-              <option value="Da Khô">Da Khô</option>
-              <option value="Da Nhạy Cảm">Da Nhạy Cảm</option>
-              <option value="Da Hỗn Hợp">Da Hỗn Hợp</option>
+            <select v-model="currentRoutine.idLoaiDa">
+              <option v-for="tag in availableTags" :key="tag.id" :value="tag.id">
+                {{ tag.name }}
+              </option>
             </select>
           </div>
 
           <div class="form-group">
-            <label>Danh sách sản phẩm trong bộ (Chọn 3 ảnh bạn đã gửi)</label>
+            <label>Trạng thái</label>
+            <label style="display: flex; gap: 8px; font-weight: normal;">
+              <input type="checkbox" v-model="currentRoutine.trangThai" style="width: auto;"> Đang hoạt động
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label>Danh sách sản phẩm trong bộ</label>
             <div class="product-selector">
-              <label v-for="p in availableProducts" :key="p" class="product-checkbox">
-                <input type="checkbox" :value="p" v-model="currentRoutine.products">
-                <span class="p-name">{{ p }}</span>
+              <label v-for="p in availableProducts" :key="p.id" class="product-checkbox">
+                <input type="checkbox" :value="p.id" v-model="selectedProductIds">
+                <span class="p-name">{{ p.ten }}</span>
               </label>
             </div>
           </div>
@@ -111,58 +117,88 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { confirm } from '@/composables/useConfirm';
+import { getAllRoutinesAdmin, createRoutineAdmin, updateRoutineAdmin, deleteRoutineAdmin } from '@/api/routineApi';
+import { getProducts } from '@/api/sanPhamApi';
 
-const routines = ref([
-  {
-    id: 'RT001',
-    name: 'Combo Chống Nắng Da Dầu (Best Seller)',
-    description: 'Sự kết hợp giữa La Roche-Posay và dưỡng ẩm nhẹ.',
-    products: ['La Roche-Posay Anthelios', 'Sữa rửa mặt Cetaphil'],
-    targetSkin: 'Da Dầu',
-    isActive: true
-  },
-  {
-    id: 'RT002',
-    name: 'Combo Bảo Vệ Mạnh Mẽ Ngoài Trời',
-    description: 'Dành cho người hay vận động ngoài trời, đi biển.',
-    products: ['Sunplay Super Block', 'Xịt khoáng'],
-    targetSkin: 'Da Hỗn Hợp',
-    isActive: true
-  }
+const routines = ref([]);
+const availableProducts = ref([]);
+const availableTags = ref([
+  { id: 1, name: 'Da Dầu' },      
+  { id: 2, name: 'Da Khô' },
+  { id: 3, name: 'Da Hỗn Hợp' },
+  { id: 4, name: 'Da Thường' },
+  { id: 5, name: 'Da Nhạy Cảm' },
 ]);
 
-const availableProducts = ['La Roche-Posay Anthelios', 'Sunplay Super Block', 'Skin1004 Madagascar Centella', 'Sữa rửa mặt', 'Toner'];
 const isModalOpen = ref(false);
 const isEditing = ref(false);
-const currentRoutine = ref({ name: '', description: '', products: [], targetSkin: 'Da Dầu', isActive: true });
+const currentRoutine = ref({ id: null, ten: '', moTa: '', idLoaiDa: 1, trangThai: true, chiTiets: [] });
+
+// Dùng mảng tạm để bind checkbox v-model với id sản phẩm
+const selectedProductIds = ref([]);
+
+const loadData = async () => {
+  try {
+    const [routineRes, productRes] = await Promise.all([
+      getAllRoutinesAdmin(),
+      getProducts()
+    ]);
+    routines.value = routineRes.data;
+    availableProducts.value = productRes.data || [];
+  } catch (error) {
+    console.error("Lỗi tải dữ liệu Routine:", error);
+  }
+};
+
+onMounted(() => loadData());
 
 const openAddModal = () => {
   isEditing.value = false;
-  currentRoutine.value = { name: '', description: '', products: [], targetSkin: 'Da Dầu', isActive: true };
+  currentRoutine.value = { id: null, ten: '', moTa: '', idLoaiDa: 1, trangThai: true, chiTiets: [] };
+  selectedProductIds.value = [];
   isModalOpen.value = true;
 };
 
 const editRoutine = (routine) => {
   isEditing.value = true;
-  currentRoutine.value = { ...routine };
+  currentRoutine.value = { 
+    id: routine.id, 
+    ten: routine.ten, 
+    moTa: routine.moTa, 
+    idLoaiDa: routine.idLoaiDa, 
+    trangThai: routine.trangThai,
+    chiTiets: [...routine.chiTiets] 
+  };
+  selectedProductIds.value = routine.chiTiets.map(ct => ct.idSanPham);
   isModalOpen.value = true;
 };
 
 const closeModal = () => isModalOpen.value = false;
 
-const saveRoutine = () => {
-  if (isEditing.value) {
-    const idx = routines.value.findIndex(r => r.id === currentRoutine.value.id);
-    routines.value[idx] = { ...currentRoutine.value };
-  } else {
-    routines.value.push({ ...currentRoutine.value, id: 'RT' + Date.now() });
+const saveRoutine = async () => {
+  if (!currentRoutine.value.ten.trim()) { alert("Vui lòng nhập tên Routine!"); return; }
+  
+  // Chuyển selectedProductIds thành mảng chiTiets
+  currentRoutine.value.chiTiets = selectedProductIds.value.map((id, index) => {
+    return { idSanPham: id, thuTu: index + 1, ghiChu: '' };
+  });
+
+  try {
+    if (isEditing.value) {
+      await updateRoutineAdmin(currentRoutine.value.id, currentRoutine.value);
+    } else {
+      await createRoutineAdmin(currentRoutine.value);
+    }
+    closeModal();
+    loadData();
+  } catch (error) {
+    alert("Có lỗi xảy ra khi lưu: " + error);
   }
-  closeModal();
 };
 
-const deleteRoutine = async (id) => {
+const confirmDeleteRoutine = async (id) => {
   const ok = await confirm({
     title: 'Xóa combo',
     message: 'Xóa combo routine này?',
@@ -170,7 +206,19 @@ const deleteRoutine = async (id) => {
     danger: true,
   });
   if (!ok) return;
-  routines.value = routines.value.filter(r => r.id !== id);
+  
+  try {
+    await deleteRoutineAdmin(id);
+    loadData();
+  } catch (error) {
+    alert("Lỗi khi xóa: " + error);
+  }
+};
+
+// Helper hiển thị
+const getSkinName = (id) => {
+  const t = availableTags.value.find(x => x.id === id);
+  return t ? t.name : 'Chưa rõ';
 };
 </script>
 

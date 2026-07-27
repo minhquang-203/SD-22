@@ -31,8 +31,14 @@
                 <input type="text" v-model="ans.label" placeholder="Nội dung đáp án" class="flex-2">
                 <input type="number" v-model="ans.scoreValue" placeholder="Điểm" class="flex-1 text-center">
                 <select v-model="ans.tagId" class="flex-1">
-                  <option value="" disabled>-- Loại Da --</option>
+                  <option :value="null">-- Không gắn --</option>
                   <option v-for="tag in availableTags" :key="tag.id" :value="tag.id">{{ tag.name }}</option>
+                </select>
+                <select v-model="ans.filterKeyword" class="flex-1" title="Bộ lọc ép buộc loại chống nắng">
+                  <option :value="null">-- Bộ lọc --</option>
+                  <option value="VAT_LY">Vật lý</option>
+                  <option value="HOA_HOC">Hóa học</option>
+                  <option value="LAI">Lai</option>
                 </select>
                 <button class="btn-remove-ans" @click="removeAnswer(aIndex)" title="Xóa đáp án">✖</button>
               </div>
@@ -59,6 +65,7 @@
                 <span v-for="(ans, aIndex) in q.answers" :key="aIndex" class="preview-badge">
                   <span v-if="ans.icon" class="text-xs mr-1 opacity-70">[{{ ans.icon }}]</span>
                   {{ ans.label }} ({{ ans.scoreValue }}đ)
+                  <span v-if="ans.filterKeyword" class="text-xs ml-1" style="color: #e67e22;">[🔍{{ ans.filterKeyword }}]</span>
                 </span>
               </div>
             </div>
@@ -79,8 +86,14 @@
               <input type="text" v-model="ans.label" placeholder="Nội dung đáp án" class="flex-2">
               <input type="number" v-model="ans.scoreValue" placeholder="Điểm" class="flex-1 text-center">
               <select v-model="ans.tagId" class="flex-1">
-                <option value="" disabled>-- Chọn --</option>
+                <option :value="null">-- Không gắn --</option>
                 <option v-for="tag in availableTags" :key="tag.id" :value="tag.id">{{ tag.name }}</option>
+              </select>
+              <select v-model="ans.filterKeyword" class="flex-1" title="Bộ lọc ép buộc loại chống nắng">
+                <option :value="null">-- Bộ lọc --</option>
+                <option value="VAT_LY">Vật lý</option>
+                <option value="HOA_HOC">Hóa học</option>
+                <option value="LAI">Lai</option>
               </select>
               <button class="btn-remove-ans" @click="removeAnswer(aIndex)">✖</button>
             </div>
@@ -182,7 +195,7 @@ const cancelEdit = () => {
   currentQuestion.value = null;
 };
 
-const addAnswer = () => { currentQuestion.value.answers.push({ label: '', icon: '', tagId: '', scoreValue: 10 }); };
+const addAnswer = () => { currentQuestion.value.answers.push({ label: '', icon: '', tagId: null, scoreValue: 10, filterKeyword: null }); };
 const removeAnswer = (index) => { currentQuestion.value.answers.splice(index, 1); };
 
 const saveQuestion = async () => {

@@ -29,7 +29,10 @@ public class TinNhanChatAi {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_san_pham_goi_y")
-    private SanPham sanPhamGoiY;
+    private SanPham sanPhamGoiY; // Cột cũ, giữ nguyên để không lỗi dữ liệu cũ
+
+    @Column(name = "danh_sach_sp_goi_y", length = 255)
+    private String danhSachSpGoiY;
 
     @Column(name = "thoi_gian", insertable = false, updatable = false)
     private LocalDateTime thoiGian;
