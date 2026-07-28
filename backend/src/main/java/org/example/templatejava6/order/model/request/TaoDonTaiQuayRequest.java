@@ -21,11 +21,12 @@ public class TaoDonTaiQuayRequest {
 
 
     private List<ThanhToanItemRequest> danhSachThanhToan;
+
     @Getter
     @Setter
-    public static  class ThanhToanItemRequest {
+    public static class ThanhToanItemRequest {
         private Integer idPhuongThucThanhToan;
-        private BigDecimal SoTien;
+        private BigDecimal soTien;
         private BigDecimal soTienKhachDua;
         private String maGiaoDich;
     }
