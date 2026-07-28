@@ -166,61 +166,61 @@ public class ChatAiService {
         ai.setNguoiGui("AI");
         ai.setThoiGian(LocalDateTime.now());
 
+        String apiKey = resolveGeminiApiKey();
+        if (apiKey == null) {
+            log.warn("Gemini API key chưa cấu hình (GEMINI_API_KEY / .env) — fallback");
+            return generateRuleBasedResponse(noiDung, phien, catalog);
+        }
+
         try {
             String catalogText = catalog.stream()
                     .map(ProductCatalogItem::promptLine)
                     .collect(Collectors.joining("\n"));
-            // Lấy system prompt đã có sẵn
             String systemPrompt = buildSystemPrompt(catalogText);
-            
-            // Bổ sung hướng dẫn trả về ID giống code của bạn của USER
-            systemPrompt += "\nKhi bạn quyết định gợi ý hay liệt kê các sản phẩm cho khách, HÃY GHI KÈM mã ID của TẤT CẢ các sản phẩm đó ở dạng `[PRODUCT_ID: xxx]` vào cuối câu trả lời của bạn. Bạn không cần dùng thẻ HTML links nữa, hệ thống sẽ tự động hiển thị thẻ sản phẩm. Chỉ được tư vấn các sản phẩm trong danh sách.";
+            systemPrompt += """
+
+                    Khi gợi ý sản phẩm, ghi kèm [PRODUCT_ID: xxx] cho TẤT CẢ sản phẩm được đề cập (có thể nhiều ID).
+                    Không dùng link HTML; hệ thống tự hiển thị thẻ sản phẩm. Chỉ tư vấn sản phẩm trong danh sách.""";
 
             ObjectNode rootNode = objectMapper.createObjectNode();
-            ArrayNode messagesNode = rootNode.putArray("messages");
+            ObjectNode systemInstruction = rootNode.putObject("system_instruction");
+            systemInstruction.putArray("parts").addObject().put("text", systemPrompt);
 
-            // System message
-            ObjectNode sysMessage = messagesNode.addObject();
-            sysMessage.put("role", "system");
-            sysMessage.put("content", systemPrompt);
+            ArrayNode contents = rootNode.putArray("contents");
+            appendGeminiHistory(contents, history);
+            ObjectNode userTurn = contents.addObject();
+            userTurn.put("role", "user");
+            userTurn.putArray("parts").addObject().put("text", noiDung != null ? noiDung : "");
 
-            // Lịch sử chat
-            if (history != null) {
-                for (TinNhanChatAi old : history) {
-                    if (old.getNoiDung() == null || old.getNoiDung().isBlank()) continue;
-                    String role = "AI".equalsIgnoreCase(old.getNguoiGui()) ? "assistant" : "user";
-                    ObjectNode msgNode = messagesNode.addObject();
-                    msgNode.put("role", role);
-                    msgNode.put("content", old.getNoiDung());
+            ObjectNode generationConfig = rootNode.putObject("generationConfig");
+            generationConfig.put("temperature", 0.7);
+            generationConfig.put("maxOutputTokens", 2048);
+
+            String body = objectMapper.writeValueAsString(rootNode);
+            String preferred = (geminiModel == null || geminiModel.isBlank())
+                    ? "gemini-flash-latest" : geminiModel.trim();
+            List<String> modelsToTry = new ArrayList<>(
+                    new LinkedHashSet<>(List.of(preferred, "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash-lite")));
+
+            String aiText = null;
+            Exception lastError = null;
+            for (String model : modelsToTry) {
+                try {
+                    aiText = callGeminiGenerateContent(model, apiKey, body);
+                    if (aiText != null && !aiText.isBlank()) {
+                        log.info("Gemini OK với model={}", model);
+                        break;
+                    }
+                } catch (Exception ex) {
+                    lastError = ex;
+                    log.warn("Gemini model={} lỗi: {}", model, ex.getMessage());
                 }
             }
-
-            // Tin nhắn hiện tại của User
-            ObjectNode userMessage = messagesNode.addObject();
-            userMessage.put("role", "user");
-            userMessage.put("content", noiDung != null ? noiDung : "");
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<String> request = new HttpEntity<>(objectMapper.writeValueAsString(rootNode), headers);
-
-            // Sử dụng Pollinations AI (Miễn phí, không cần API Key)
-            String url = "https://text.pollinations.ai/openai";
-            String responseStr = restTemplate.postForObject(url, request, String.class);
-            
-            if (responseStr == null || responseStr.isBlank()) {
-                throw new IllegalStateException("API trả về rỗng");
+            if (aiText == null || aiText.isBlank()) {
+                throw lastError != null ? lastError : new IllegalStateException("Gemini không trả được nội dung");
             }
 
-            JsonNode resNode = objectMapper.readTree(responseStr);
-            JsonNode choicesNode = resNode.path("choices");
-            if (choicesNode.isMissingNode() || !choicesNode.isArray() || choicesNode.isEmpty()) {
-                throw new IllegalStateException("API response format invalid: " + responseStr);
-            }
-
-            String aiText = choicesNode.get(0).path("message").path("content").asText();
-
-            java.util.List<String> foundIds = new java.util.ArrayList<>();
+            List<String> foundIds = new ArrayList<>();
             SanPham spGoiY = null;
             Matcher matcher = PRODUCT_ID_PATTERN.matcher(aiText);
             while (matcher.find()) {
@@ -258,6 +258,12 @@ public class ChatAiService {
             log.warn("Gemini lỗi — fallback: {}", e.getMessage());
             return generateRuleBasedResponse(noiDung, phien, catalog);
         }
+    }
+
+    @jakarta.annotation.PostConstruct
+    void logGeminiConfig() {
+        String key = resolveGeminiApiKey();
+        log.info("Chat AI Gemini: model={}, keyConfigured={}", geminiModel, key != null);
     }
 
     private String resolveGeminiApiKey() {
@@ -392,7 +398,7 @@ public class ChatAiService {
                 kháng nước nếu ra ngoài lâu. Sau đó mới chọn sản phẩm khớp từ danh sách.
 
                 === GỢI Ý SẢN PHẨM ===
-                CHỈ gắn [PRODUCT_ID: x] khi THỰC SỰ gợi ý 1 sản phẩm cụ thể từ danh sách.
+                Gắn [PRODUCT_ID: x] cho mỗi sản phẩm cụ thể được gợi ý (có thể nhiều ID).
                 Không có sản phẩm phù hợp thì nói thật, KHÔNG bịa ID / thông số.
                 TUYỆT ĐỐI không bịa SPF/PA/thành phần ngoài danh sách được cấp.
                 Không tư vấn y tế hay thuốc chữa bệnh; da có vấn đề nghiêm trọng -> khuyên gặp bác sĩ da liễu.
@@ -437,7 +443,7 @@ public class ChatAiService {
                     + "ra ngoài trong ngày, vẫn nên bôi chống nắng buổi sáng với lớp mỏng nhẹ.");
             return ai;
         }
-        if (containsAny(nd, "chào", "hello", "hi ", "xin chào")) {
+        if (containsAny(nd, "chào", "chao", "hello", "hi", "hii", "xin chào", "xin chao", "hey")) {
             ai.setNoiDung("Chào bạn! Tôi là chuyên viên tư vấn chống nắng SUNOVA. "
                     + "Bạn muốn hỏi kiến thức (SPF/PA, cách bôi…) hay cần gợi ý sản phẩm theo loại da?");
             return ai;
@@ -513,6 +519,178 @@ public class ChatAiService {
                 "ở ", " o ", "tại ", "tai ");
         boolean sunscreen = containsAny(nd, "chống nắng", "chong nang", "kcn", "kem chống");
         return askWhich && (hasPlaceCue || sunscreen);
+    }
+
+    private ProductCatalogItem findBestForVietnamClimate(List<ProductCatalogItem> catalog) {
+        return catalog.stream()
+                .filter(c -> isHighSpf(c.spf()) && isHighPa(c.pa()))
+                .sorted((a, b) -> Boolean.compare(
+                        Boolean.TRUE.equals(b.khangNuoc()),
+                        Boolean.TRUE.equals(a.khangNuoc())))
+                .findFirst()
+                .or(() -> catalog.stream().filter(c -> isHighSpf(c.spf())).findFirst())
+                .orElse(null);
+    }
+
+    private ProductCatalogItem findBySkinOrBenefit(
+            List<ProductCatalogItem> catalog,
+            List<String> skinKeys,
+            List<String> benefitKeys) {
+        for (ProductCatalogItem item : catalog) {
+            String skin = normalize(item.loaiDa());
+            String benefits = normalize(item.congDung() + " " + item.thanhPhan() + " " + item.ten());
+            boolean skinOk = skinKeys.isEmpty() || skinKeys.stream().anyMatch(skin::contains);
+            boolean benefitOk = benefitKeys.isEmpty() || benefitKeys.stream().anyMatch(benefits::contains);
+            if (skinOk && benefitOk) {
+                return item;
+            }
+        }
+        for (ProductCatalogItem item : catalog) {
+            String skin = normalize(item.loaiDa());
+            if (!skinKeys.isEmpty() && skinKeys.stream().anyMatch(skin::contains)) {
+                return item;
+            }
+        }
+        for (ProductCatalogItem item : catalog) {
+            String benefits = normalize(item.congDung());
+            if (!benefitKeys.isEmpty() && benefitKeys.stream().anyMatch(benefits::contains)) {
+                return item;
+            }
+        }
+        return null;
+    }
+
+    private boolean isHighSpf(String spf) {
+        if (spf == null) return false;
+        String s = spf.toUpperCase(Locale.ROOT).replace("SPF", "").trim();
+        try {
+            return Integer.parseInt(s.replace("+", "").replaceAll("[^0-9]", "")) >= 50;
+        } catch (Exception e) {
+            return s.contains("50");
+        }
+    }
+
+    private boolean isHighPa(String pa) {
+        if (pa == null) return false;
+        String s = pa.toUpperCase(Locale.ROOT).replace("PA", "").trim();
+        return s.contains("++++") || s.equals("++++");
+    }
+
+    private boolean containsAny(String text, String... keys) {
+        if (text == null) return false;
+        for (String k : keys) {
+            if (text.contains(k)) return true;
+        }
+        return false;
+    }
+
+    private String normalize(String s) {
+        return s == null ? "" : s.toLowerCase(Locale.ROOT);
+    }
+
+    private List<ProductCatalogItem> loadActiveCatalog() {
+        CachedCatalog cached = catalogCache.get();
+        long now = Instant.now().toEpochMilli();
+        if (cached != null && now - cached.loadedAtMs() < CATALOG_TTL_MS) {
+            return cached.items();
+        }
+
+        List<SanPhamResponse> all = sanPhamService.getAll().stream()
+                .filter(sp -> Boolean.TRUE.equals(sp.getTrangThai()))
+                .filter(sp -> sp.getTongTon() != null && sp.getTongTon() > 0)
+                .toList();
+
+        Map<Integer, Set<String>> congDungMap = new HashMap<>();
+        for (SanPhamCongDung row : sanPhamCongDungRepository.findAllWithCongDung()) {
+            if (row.getSanPham() == null || row.getCongDung() == null) continue;
+            congDungMap.computeIfAbsent(row.getSanPham().getId(), k -> new LinkedHashSet<>())
+                    .add(row.getCongDung().getTen());
+        }
+
+        Map<Integer, Set<String>> loaiDaMap = new HashMap<>();
+        for (SanPhamLoaiDa row : sanPhamLoaiDaRepository.findAllWithLoaiDa()) {
+            if (row.getSanPham() == null || row.getLoaiDa() == null) continue;
+            loaiDaMap.computeIfAbsent(row.getSanPham().getId(), k -> new LinkedHashSet<>())
+                    .add(row.getLoaiDa().getTen());
+        }
+
+        Map<Integer, Set<String>> thanhPhanMap = new HashMap<>();
+        for (SanPhamThanhPhan row : sanPhamThanhPhanRepository.findAllWithThanhPhan()) {
+            if (row.getSanPham() == null || row.getThanhPhan() == null) continue;
+            thanhPhanMap.computeIfAbsent(row.getSanPham().getId(), k -> new LinkedHashSet<>())
+                    .add(row.getThanhPhan().getTen());
+        }
+
+        Map<Integer, String> dungTichMap = new HashMap<>();
+        for (ChiTietSanPhamRepository.DungTichAgg agg : chiTietSanPhamRepository.aggregateDungTich()) {
+            dungTichMap.put(agg.getSpId(), formatDungTich(agg.getDungTichMin(), agg.getDungTichMax()));
+        }
+
+        List<ProductCatalogItem> items = new ArrayList<>();
+        for (SanPhamResponse sp : all) {
+            items.add(new ProductCatalogItem(
+                    sp.getId(),
+                    sp,
+                    sp.getTen(),
+                    nullToDash(sp.getTenThuongHieu()),
+                    nullToDash(sp.getTenDangSanPham()),
+                    nullToDash(sp.getChiSoSpf()),
+                    nullToDash(sp.getChiSoPa()),
+                    formatLoaiChongNang(sp.getLoaiChongNang()),
+                    Boolean.TRUE.equals(sp.getKhangNuoc()),
+                    joinNames(congDungMap.get(sp.getId())),
+                    joinNames(loaiDaMap.get(sp.getId())),
+                    joinNames(thanhPhanMap.get(sp.getId())),
+                    dungTichMap.getOrDefault(sp.getId(), "—"),
+                    formatGia(sp.getGiaMin())
+            ));
+        }
+
+        catalogCache.set(new CachedCatalog(items, now));
+        return items;
+    }
+
+    private Map<Integer, SanPhamResponse> catalogById() {
+        return loadActiveCatalog().stream()
+                .collect(Collectors.toMap(ProductCatalogItem::id, ProductCatalogItem::response, (a, b) -> a));
+    }
+
+    private String joinNames(Set<String> names) {
+        if (names == null || names.isEmpty()) return "—";
+        return String.join(", ", names);
+    }
+
+    private String nullToDash(String s) {
+        return s == null || s.isBlank() ? "—" : s.trim();
+    }
+
+    private String formatLoaiChongNang(String raw) {
+        if (raw == null || raw.isBlank()) return "—";
+        String v = raw.trim().toLowerCase(Locale.ROOT);
+        return switch (v) {
+            case "vat_ly", "vật lý", "vat ly" -> "Vật lý";
+            case "hoa_hoc", "hóa học", "hoa hoc" -> "Hóa học";
+            case "lai", "hybrid" -> "Lai";
+            default -> raw;
+        };
+    }
+
+    private String formatDungTich(BigDecimal min, BigDecimal max) {
+        if (min == null && max == null) return "—";
+        if (min != null && (max == null || min.compareTo(max) == 0)) {
+            return strip(min) + "ml";
+        }
+        return strip(min) + "-" + strip(max) + "ml";
+    }
+
+    private String strip(BigDecimal v) {
+        if (v == null) return "?";
+        return v.stripTrailingZeros().toPlainString();
+    }
+
+    private String formatGia(BigDecimal gia) {
+        if (gia == null) return "—";
+        return VND.format(gia.setScale(0, RoundingMode.HALF_UP)) + "đ";
     }
 
     private ChatResponseDto mapToDto(TinNhanChatAi entity, Map<Integer, SanPhamResponse> byId) {

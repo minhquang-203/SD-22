@@ -19,6 +19,17 @@ public class TaoDonTaiQuayRequest {
     private String ghiChu;
     private Integer idHoaDonCho;
 
+
+    private List<ThanhToanItemRequest> danhSachThanhToan;
+    @Getter
+    @Setter
+    public static  class ThanhToanItemRequest {
+        private Integer idPhuongThucThanhToan;
+        private BigDecimal SoTien;
+        private BigDecimal soTienKhachDua;
+        private String maGiaoDich;
+    }
+
     @Getter
     @Setter
     public static class ItemRequest {

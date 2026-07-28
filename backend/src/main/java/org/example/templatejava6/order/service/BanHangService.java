@@ -69,6 +69,8 @@ public class BanHangService {
     private static final String TRANG_THAI_THANH_CONG = "THANH_CONG";
     private static final String MA_TIEN_MAT = "TIEN_MAT";
     private static final String MA_VNPAY = "VNPAY";
+    private static final String MA_CHUYEN_KHOAN = "CHUYEN-KHOAN";
+    private static final Set <String>  SPLIT_ALLWOED_METHODS = Set.of(MA_TIEN_MAT, MA_CHUYEN_KHOAN);
     private static final String MA_COD = "COD";
     private static final String TRANG_THAI_CHO_THANH_TOAN = "CHO_THANH_TOAN";
     private static final String TRANG_THAI_THAT_BAI = "THAT_BAI";
@@ -283,6 +285,7 @@ public class BanHangService {
         if (req.getItems() == null || req.getItems().isEmpty()) {
             throw new ApiException("Giỏ hàng trống. Vui lòng thêm sản phẩm.", "EMPTY_CART");
         }
+        Boolean isSplitPayment = req.getDanhSachThanhToan() != null && !req.getDanhSachThanhToan().isEmpty();
         if (req.getIdPhuongThucThanhToan() == null) {
             throw new ApiException("Vui lòng chọn phương thức thanh toán.", "MISSING_PAYMENT");
         }
@@ -321,7 +324,7 @@ public class BanHangService {
 
         BigDecimal soTienKhachDua = null;
         BigDecimal tienThua = null;
-        if (MA_TIEN_MAT.equals(pttt.getMa())) {
+        if (!isSplitPayment && MA_TIEN_MAT.equals(pttt.getMa())) {
             if (req.getSoTienKhachDua() == null) {
                 throw new ApiException("Vui lòng nhập tiền khách đưa.", "MISSING_CASH");
             }
@@ -386,6 +389,22 @@ public class BanHangService {
             ghiNhatKy(hoaDon, "AP_MA",
                     "Áp mã giảm giá " + phieu.getMa() + " (−" + tienGiamGia.toPlainString() + "đ)",
                     nhanVien, now);
+        }
+        if(isSplitPayment) {
+            if(req.getDanhSachThanhToan().size()<2 ){
+                throw new ApiException(
+                        "Thanh toán cần ít nhất 2 phương thức.",
+                        "SPLIT_MIN_METHODS");
+            }
+        }
+
+        BigDecimal tongSplit = BigDecimal.ZERO;
+        ThanhToanHoaDon ttTienMat = null;
+
+        for (TaoDonTaiQuayRequest.ThanhToanItemRequest item : req.getDanhSachThanhToan()) {
+            if(item.getIdPhuongThucThanhToan() == null || item.getSoTien() == null){
+                throw new ApiException("Thiếu thông tin khách thanh toán.", "SPLIT_INVALID_ITEM");
+            }
         }
 
         if (isVnpay) {
