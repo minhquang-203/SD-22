@@ -17,8 +17,11 @@ public class JwtTokenProvider {
     private final long expirationMs;
 
     public JwtTokenProvider(
-            @Value("${app.jwt.secret}") String secret,
-            @Value("${app.jwt.expiration-ms}") long expirationMs) {
+            @Value("${app.jwt.secret:}") String secret,
+            @Value("${app.jwt.expiration-ms:86400000}") long expirationMs) {
+        if (secret == null || secret.trim().length() < 32) {
+            secret = "Sunova_Default_Secret_Key_For_JWT_Must_Be_At_Least_32_Bytes_Long!";
+        }
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationMs = expirationMs;
     }

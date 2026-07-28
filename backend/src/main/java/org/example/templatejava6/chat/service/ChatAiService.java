@@ -200,6 +200,8 @@ public class ChatAiService {
             userMessage.put("role", "user");
             userMessage.put("content", noiDung != null ? noiDung : "");
 
+            rootNode.put("model", "openai"); // Pollinations AI yêu cầu trường model
+
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<String> request = new HttpEntity<>(objectMapper.writeValueAsString(rootNode), headers);
@@ -515,6 +517,179 @@ public class ChatAiService {
         return askWhich && (hasPlaceCue || sunscreen);
     }
 
+    private ProductCatalogItem findBestForVietnamClimate(List<ProductCatalogItem> catalog) {
+        return catalog.stream()
+                .filter(c -> isHighSpf(c.spf()) && isHighPa(c.pa()))
+                .sorted((a, b) -> Boolean.compare(
+                        Boolean.TRUE.equals(b.khangNuoc()),
+                        Boolean.TRUE.equals(a.khangNuoc())))
+                .findFirst()
+                .or(() -> catalog.stream().filter(c -> isHighSpf(c.spf())).findFirst())
+                .orElse(null);
+    }
+
+    private ProductCatalogItem findBySkinOrBenefit(
+            List<ProductCatalogItem> catalog,
+            List<String> skinKeys,
+            List<String> benefitKeys) {
+        for (ProductCatalogItem item : catalog) {
+            String skin = normalize(item.loaiDa());
+            String benefits = normalize(item.congDung() + " " + item.thanhPhan() + " " + item.ten());
+            boolean skinOk = skinKeys.isEmpty() || skinKeys.stream().anyMatch(skin::contains);
+            boolean benefitOk = benefitKeys.isEmpty() || benefitKeys.stream().anyMatch(benefits::contains);
+            if (skinOk && benefitOk) {
+                return item;
+            }
+        }
+        // Chỉ khớp loại da
+        for (ProductCatalogItem item : catalog) {
+            String skin = normalize(item.loaiDa());
+            if (!skinKeys.isEmpty() && skinKeys.stream().anyMatch(skin::contains)) {
+                return item;
+            }
+        }
+        // Chỉ khớp công dụng
+        for (ProductCatalogItem item : catalog) {
+            String benefits = normalize(item.congDung());
+            if (!benefitKeys.isEmpty() && benefitKeys.stream().anyMatch(benefits::contains)) {
+                return item;
+            }
+        }
+        return null; // không lấy tạm sản phẩm đầu tiên
+    }
+
+    private boolean isHighSpf(String spf) {
+        if (spf == null) return false;
+        String s = spf.toUpperCase(Locale.ROOT).replace("SPF", "").trim();
+        try {
+            return Integer.parseInt(s.replace("+", "").replaceAll("[^0-9]", "")) >= 50;
+        } catch (Exception e) {
+            return s.contains("50");
+        }
+    }
+
+    private boolean isHighPa(String pa) {
+        if (pa == null) return false;
+        String s = pa.toUpperCase(Locale.ROOT).replace("PA", "").trim();
+        return s.contains("++++") || s.equals("++++");
+    }
+
+    private boolean containsAny(String text, String... keys) {
+        if (text == null) return false;
+        for (String k : keys) {
+            if (text.contains(k)) return true;
+        }
+        return false;
+    }
+
+    private String normalize(String s) {
+        return s == null ? "" : s.toLowerCase(Locale.ROOT);
+    }
+
+    private List<ProductCatalogItem> loadActiveCatalog() {
+        CachedCatalog cached = catalogCache.get();
+        long now = Instant.now().toEpochMilli();
+        if (cached != null && now - cached.loadedAtMs() < CATALOG_TTL_MS) {
+            return cached.items();
+        }
+
+        List<SanPhamResponse> all = sanPhamService.getAll().stream()
+                .filter(sp -> Boolean.TRUE.equals(sp.getTrangThai()))
+                .filter(sp -> sp.getTongTon() != null && sp.getTongTon() > 0)
+                .toList();
+
+        Map<Integer, Set<String>> congDungMap = new HashMap<>();
+        for (SanPhamCongDung row : sanPhamCongDungRepository.findAllWithCongDung()) {
+            if (row.getSanPham() == null || row.getCongDung() == null) continue;
+            congDungMap.computeIfAbsent(row.getSanPham().getId(), k -> new LinkedHashSet<>())
+                    .add(row.getCongDung().getTen());
+        }
+
+        Map<Integer, Set<String>> loaiDaMap = new HashMap<>();
+        for (SanPhamLoaiDa row : sanPhamLoaiDaRepository.findAllWithLoaiDa()) {
+            if (row.getSanPham() == null || row.getLoaiDa() == null) continue;
+            loaiDaMap.computeIfAbsent(row.getSanPham().getId(), k -> new LinkedHashSet<>())
+                    .add(row.getLoaiDa().getTen());
+        }
+
+        Map<Integer, Set<String>> thanhPhanMap = new HashMap<>();
+        for (SanPhamThanhPhan row : sanPhamThanhPhanRepository.findAllWithThanhPhan()) {
+            if (row.getSanPham() == null || row.getThanhPhan() == null) continue;
+            thanhPhanMap.computeIfAbsent(row.getSanPham().getId(), k -> new LinkedHashSet<>())
+                    .add(row.getThanhPhan().getTen());
+        }
+
+        Map<Integer, String> dungTichMap = new HashMap<>();
+        for (ChiTietSanPhamRepository.DungTichAgg agg : chiTietSanPhamRepository.aggregateDungTich()) {
+            dungTichMap.put(agg.getSpId(), formatDungTich(agg.getDungTichMin(), agg.getDungTichMax()));
+        }
+
+        List<ProductCatalogItem> items = new ArrayList<>();
+        for (SanPhamResponse sp : all) {
+            items.add(new ProductCatalogItem(
+                    sp.getId(),
+                    sp,
+                    sp.getTen(),
+                    nullToDash(sp.getTenThuongHieu()),
+                    nullToDash(sp.getTenDangSanPham()),
+                    nullToDash(sp.getChiSoSpf()),
+                    nullToDash(sp.getChiSoPa()),
+                    formatLoaiChongNang(sp.getLoaiChongNang()),
+                    Boolean.TRUE.equals(sp.getKhangNuoc()),
+                    joinNames(congDungMap.get(sp.getId())),
+                    joinNames(loaiDaMap.get(sp.getId())),
+                    joinNames(thanhPhanMap.get(sp.getId())),
+                    dungTichMap.getOrDefault(sp.getId(), "—"),
+                    formatGia(sp.getGiaMin())
+            ));
+        }
+
+        catalogCache.set(new CachedCatalog(items, now));
+        return items;
+    }
+
+    private Map<Integer, SanPhamResponse> catalogById() {
+        return loadActiveCatalog().stream()
+                .collect(Collectors.toMap(ProductCatalogItem::id, ProductCatalogItem::response, (a, b) -> a));
+    }
+
+    private String joinNames(Set<String> names) {
+        if (names == null || names.isEmpty()) return "—";
+        return String.join(", ", names);
+    }
+
+    private String nullToDash(String s) {
+        return s == null || s.isBlank() ? "—" : s.trim();
+    }
+
+    private String formatLoaiChongNang(String raw) {
+        if (raw == null || raw.isBlank()) return "—";
+        String v = raw.trim().toLowerCase(Locale.ROOT);
+        return switch (v) {
+            case "vat_ly", "vật lý", "vat ly" -> "Vật lý";
+            case "hoa_hoc", "hóa học", "hoa hoc" -> "Hóa học";
+            case "lai", "hybrid" -> "Lai";
+            default -> raw;
+        };
+    }
+
+    private String formatDungTich(BigDecimal min, BigDecimal max) {
+        if (min == null && max == null) return "—";
+        if (min != null && (max == null || min.compareTo(max) == 0)) {
+            return strip(min) + "ml";
+        }
+        return strip(min) + "-" + strip(max) + "ml";
+    }
+
+    private String strip(BigDecimal v) {
+        if (v == null) return "?";
+        return v.stripTrailingZeros().toPlainString();
+    }
+
+    private String formatGia(BigDecimal gia) {
+        if (gia == null) return "—";
+        return VND.format(gia.setScale(0, RoundingMode.HALF_UP)) + "đ";
+    }
     private ChatResponseDto mapToDto(TinNhanChatAi entity, Map<Integer, SanPhamResponse> byId) {
         java.util.List<SanPhamResponse> listSpRes = new java.util.ArrayList<>();
         
