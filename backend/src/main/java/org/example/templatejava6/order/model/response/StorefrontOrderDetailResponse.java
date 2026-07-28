@@ -39,6 +39,8 @@ public class StorefrontOrderDetailResponse {
     private String trangThaiTraHang;
     private String trangThaiTraHangLabel;
     private String maVanDonTra;
+    private String pickShiftLabel;
+    private String ghnTrangThaiTraLabel;
     private String trangThaiHoanTien;
     private String trangThaiHoanTienLabel;
     private String maGiaoDichHoan;

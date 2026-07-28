@@ -1,7 +1,6 @@
 package org.example.templatejava6.order.service;
 
 import org.example.templatejava6.common.entity.NhanVien;
-import org.example.templatejava6.common.enums.LoaiHoanTien;
 import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.example.templatejava6.common.enums.TrangThaiTraHang;
 import org.example.templatejava6.common.exception.ApiException;
@@ -28,6 +27,7 @@ import org.example.templatejava6.realtime.service.OrderRealtimeService;
 import org.example.templatejava6.shipping.model.request.CreateShippingOrderRequest;
 import org.example.templatejava6.shipping.model.request.ReturnShippingOrderRequest;
 import org.example.templatejava6.shipping.model.response.CreateShippingOrderResponse;
+import org.example.templatejava6.shipping.model.response.GhnPickShiftResponse;
 import org.example.templatejava6.shipping.service.ShippingService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,11 +38,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Quan ly luong tra hang sau khi khach da nhan hang:
- * - Chuyen khoan: khach gui yeu cau -> admin duyet -> khach tao van don hoan
- *   -> admin xac nhan nhan hang -> TRA_HANG + hoan ton + yeu cau hoan tien thu cong.
- * - VNPAY: khach gui yeu cau -> admin duyet -> hoan tien API ngay (DA_DUYET)
- *   -> khach tao van don / admin xac nhan nhan hang -> hoan ton + HOAN_TAT.
+ * Quan ly luong tra hang sau khi khach da nhan hang. Luong giong nhau cho moi phuong thuc thanh toan:
+ * <ol>
+ *   <li>Khach gui yeu cau -> {@code CHO_DUYET}.</li>
+ *   <li>Admin duyet -> {@code DA_DUYET} va bao khach de khach tao van don hoan. Khong hoan tien o buoc nay.</li>
+ *   <li>Khach tao van don GHN hoan hang kem ca lay hang (pick_shift) -> {@code DANG_HOAN_HANG}.</li>
+ *   <li>Van don hoan hoan thanh (GHN {@code delivered} hoac admin xac nhan) -> {@code DA_NHAN_HANG}:
+ *       hoan ton kho, don chuyen {@code TRA_HANG} va tao ban ghi hoan tien {@code CHO_XU_LY}.</li>
+ *   <li>Admin quyet dinh hoan tien hay tu choi tai trang hoan tien -> {@code HOAN_TAT}
+ *       (xem {@link RefundService}).</li>
+ * </ol>
  */
 @Service
 public class ReturnRequestService {
@@ -50,6 +55,9 @@ public class ReturnRequestService {
     private static final String LOAI_DON_ONLINE = "ONLINE";
     private static final String MA_VNPAY = "VNPAY";
     private static final int MIN_RETURN_IMAGES = 2;
+
+    /** Trang thai GHN cho biet kien hang hoan da ve tay shop. */
+    private static final List<String> GHN_TRANG_THAI_DA_VE_SHOP = List.of("delivered", "returned");
 
     private final YeuCauTraHangRepository yeuCauTraHangRepository;
     private final AnhYeuCauTraHangRepository anhYeuCauTraHangRepository;
@@ -59,6 +67,7 @@ public class ReturnRequestService {
     private final NhanVienRepository nhanVienRepository;
     private final LoHangService loHangService;
     private final ShippingService shippingService;
+    private final GhnTrackingService ghnTrackingService;
     private final RefundService refundService;
     private final ThongBaoService thongBaoService;
     private final OrderMailService orderMailService;
@@ -73,6 +82,7 @@ public class ReturnRequestService {
                                 NhanVienRepository nhanVienRepository,
                                 LoHangService loHangService,
                                 ShippingService shippingService,
+                                GhnTrackingService ghnTrackingService,
                                 RefundService refundService,
                                 ThongBaoService thongBaoService,
                                 OrderMailService orderMailService,
@@ -86,6 +96,7 @@ public class ReturnRequestService {
         this.nhanVienRepository = nhanVienRepository;
         this.loHangService = loHangService;
         this.shippingService = shippingService;
+        this.ghnTrackingService = ghnTrackingService;
         this.refundService = refundService;
         this.thongBaoService = thongBaoService;
         this.orderMailService = orderMailService;
@@ -107,9 +118,7 @@ public class ReturnRequestService {
                 idHoaDon, List.of(TrangThaiTraHang.TU_CHOI))) {
             throw new ApiException("Đơn hàng đã có yêu cầu trả hàng đang xử lý.", "RETURN_ALREADY_EXISTS");
         }
-        boolean laVnpay = hoaDon.getIdPhuongThucThanhToan() != null
-                && MA_VNPAY.equalsIgnoreCase(hoaDon.getIdPhuongThucThanhToan().getMa());
-        if (!laVnpay && (request.getSoTaiKhoan() == null || request.getSoTaiKhoan().isBlank())) {
+        if (!laVnpay(hoaDon) && (request.getSoTaiKhoan() == null || request.getSoTaiKhoan().isBlank())) {
             throw new ApiException(
                     "Vui lòng cung cấp thông tin tài khoản ngân hàng để nhận tiền hoàn.",
                     "BANK_INFO_REQUIRED");
@@ -170,9 +179,9 @@ public class ReturnRequestService {
     }
 
     /**
-     * Admin duyet yeu cau tra hang.
-     * - VNPAY: goi refund API ngay, giu DA_DUYET de cho hang ve roi moi hoan ton.
-     * - Khac (chuyen khoan): chi danh dau DA_DUYET, cho khach giao hang ve roi moi hoan ton/tien.
+     * Admin duyet yeu cau tra hang: danh dau {@code DA_DUYET}, chuyen hoa don sang {@code TRA_HANG}
+     * de khach thay trang thai tren storefront, roi bao khach tao van don hoan.
+     * Khong hoan tien o buoc nay — hoan tien chi duoc xem xet sau khi shop nhan lai hang.
      */
     @Transactional
     public YeuCauTraHangResponse duyet(Integer id, Integer idNhanVien, String ghiChu) {
@@ -183,27 +192,18 @@ public class ReturnRequestService {
         HoaDon hoaDon = yc.getIdHoaDon();
         yc.setIdNhanVienDuyet(resolveNhanVien(idNhanVien));
         yc.setGhiChuAdmin(ghiChu);
+        yc.setTrangThai(TrangThaiTraHang.DA_DUYET);
         yc.setNgayCapNhat(LocalDateTime.now());
+        YeuCauTraHang saved = yeuCauTraHangRepository.save(yc);
 
-        if (laVnpay(hoaDon)) {
-            // Hoàn tiền ngay; tồn kho chỉ hoàn khi đã nhận lại hàng (xacNhanNhanHang).
-            yc.setTrangThai(TrangThaiTraHang.DA_DUYET);
-            YeuCauTraHang saved = yeuCauTraHangRepository.save(yc);
-            ghiNhatKy(hoaDon, "TRA_HANG_DA_DUYET", "Duyệt trả hàng VNPAY — hoàn tiền tự động, chờ nhận hàng để hoàn kho");
-            refundService.taoVaHoanTuDong(
-                    hoaDon,
-                    LoaiHoanTien.TRA_HANG,
-                    refundService.resolveSoTienHoan(hoaDon),
-                    saved,
-                    null, null, null,
-                    idNhanVien);
-            orderMailService.guiYeuCauTraHangDuocDuyet(hoaDon);
-            return toResponse(saved);
+        TrangThaiDonHang trangThaiCu = hoaDon.getTrangThai();
+        if (trangThaiCu != TrangThaiDonHang.TRA_HANG) {
+            hoaDon.setTrangThai(TrangThaiDonHang.TRA_HANG);
+            hoaDonRepository.save(hoaDon);
+            orderRealtimeService.publishStatusChanged(hoaDon, trangThaiCu);
         }
 
-        yc.setTrangThai(TrangThaiTraHang.DA_DUYET);
-        YeuCauTraHang saved = yeuCauTraHangRepository.save(yc);
-        ghiNhatKy(hoaDon, "TRA_HANG_DA_DUYET", "Duyệt yêu cầu trả hàng");
+        ghiNhatKy(hoaDon, "TRA_HANG_DA_DUYET", "Duyệt yêu cầu trả hàng — đơn chuyển TRA_HANG, chờ khách tạo vận đơn hoàn hàng");
         orderMailService.guiYeuCauTraHangDuocDuyet(hoaDon);
         return toResponse(saved);
     }
@@ -226,9 +226,18 @@ public class ReturnRequestService {
         return toResponse(saved);
     }
 
-    /** Khach tao van don GHN hoan tra hang ve shop (sau khi da duoc duyet). */
+    /** Danh sach ca lay hang GHN de khach chon thoi diem shipper den lay hang tra. */
+    @Transactional(readOnly = true)
+    public List<GhnPickShiftResponse> danhSachCaLayHang() {
+        return shippingService.getPickShifts();
+    }
+
+    /**
+     * Khach tao van don GHN hoan tra hang ve shop (sau khi da duoc duyet),
+     * kem ca lay hang GHN de chon thoi diem shipper den lay.
+     */
     @Transactional
-    public YeuCauTraHangResponse taoVanDonTra(Integer idKhachHang, Integer idYeuCau) {
+    public YeuCauTraHangResponse taoVanDonTra(Integer idKhachHang, Integer idYeuCau, Integer pickShiftId) {
         YeuCauTraHang yc = load(idYeuCau);
         HoaDon hoaDon = yc.getIdHoaDon();
         if (hoaDon.getIdKhachHang() == null || !hoaDon.getIdKhachHang().getId().equals(idKhachHang)) {
@@ -242,6 +251,7 @@ public class ReturnRequestService {
             throw new ApiException(
                     "Thiếu địa chỉ (quận/huyện, phường/xã) để lấy hàng trả.", "GHN_MISSING_ADDRESS");
         }
+        GhnPickShiftResponse caLayHang = resolveCaLayHang(pickShiftId);
 
         ReturnShippingOrderRequest req = new ReturnShippingOrderRequest();
         req.setFromName(orElse(hoaDon.getTenNguoiNhan(),
@@ -252,46 +262,116 @@ public class ReturnRequestService {
         req.setFromDistrictId(yc.getGhnDistrictId());
         req.setFromWardCode(yc.getGhnWardCode());
         req.setItems(buildItems(hoaDon));
+        if (caLayHang != null) {
+            req.setPickShiftId(caLayHang.getId());
+        }
 
         CreateShippingOrderResponse response = shippingService.createReturnOrder(req);
         yc.setMaVanDonTra(response.getOrderCode());
         yc.setTrangThai(TrangThaiTraHang.DANG_HOAN_HANG);
+        if (caLayHang != null) {
+            yc.setPickShiftId(caLayHang.getId());
+            yc.setPickShiftLabel(caLayHang.getTitle());
+        }
         yc.setNgayCapNhat(LocalDateTime.now());
         YeuCauTraHang saved = yeuCauTraHangRepository.save(yc);
-        ghiNhatKy(hoaDon, "TRA_HANG_DANG_HOAN", "Đã tạo vận đơn hoàn trả GHN: " + response.getOrderCode());
+        ghiNhatKy(hoaDon, "TRA_HANG_DANG_HOAN", "Đã tạo vận đơn hoàn trả GHN: " + response.getOrderCode()
+                + (caLayHang != null ? " — " + caLayHang.getTitle() : ""));
         return toResponse(saved);
     }
 
-    /** Admin xac nhan da nhan lai hang: hoan ton kho, don TRA_HANG, tao yeu cau hoan tien neu chua. */
+    /**
+     * Dong bo trang thai van don hoan tu GHN. Khi kien hang da ve shop (GHN {@code delivered})
+     * thi tu dong ghi nhan da nhan hang de mo buoc quyet dinh hoan tien.
+     */
+    @Transactional
+    public YeuCauTraHangResponse dongBoVanDonTra(Integer id, Integer idNhanVien) {
+        YeuCauTraHang yc = load(id);
+        String maVanDon = yc.getMaVanDonTra();
+        if (maVanDon == null || maVanDon.isBlank()) {
+            throw new ApiException(
+                    "Yêu cầu trả hàng chưa có vận đơn hoàn để đồng bộ.", "RETURN_NO_TRACKING");
+        }
+        String trangThaiGhn = ghnTrackingService.track(maVanDon)
+                .map(GhnTrackingService.TrackingInfo::status)
+                .orElseThrow(() -> new ApiException(
+                        "Không lấy được trạng thái vận đơn hoàn từ GHN.", "GHN_ERROR"));
+
+        yc.setGhnTrangThaiTra(trangThaiGhn);
+        yc.setNgayCapNhat(LocalDateTime.now());
+        YeuCauTraHang saved = yeuCauTraHangRepository.save(yc);
+
+        boolean daVeShop = GHN_TRANG_THAI_DA_VE_SHOP.contains(trangThaiGhn);
+        boolean choNhanHang = saved.getTrangThai() == TrangThaiTraHang.DANG_HOAN_HANG;
+        if (daVeShop && choNhanHang) {
+            return toResponse(ghiNhanDaNhanHang(saved, idNhanVien,
+                    "Vận đơn hoàn GHN " + maVanDon + " đã hoàn thành ("
+                            + GhnTrackingService.labelOf(trangThaiGhn) + ")"));
+        }
+        return toResponse(saved);
+    }
+
+    /** Admin xac nhan thu cong da nhan lai hang tra (khi khong doi duoc trang thai GHN). */
     @Transactional
     public YeuCauTraHangResponse xacNhanNhanHang(Integer id, Integer idNhanVien) {
         YeuCauTraHang yc = load(id);
-        if (yc.getTrangThai() != TrangThaiTraHang.DANG_HOAN_HANG
-                && yc.getTrangThai() != TrangThaiTraHang.DA_DUYET) {
+        if (yc.getTrangThai() != TrangThaiTraHang.DANG_HOAN_HANG) {
             throw new ApiException(
-                    "Yêu cầu trả hàng không ở trạng thái có thể xác nhận nhận hàng.", "INVALID_RETURN_STATUS");
+                    "Chỉ xác nhận nhận hàng khi khách đã tạo vận đơn hoàn (đang hoàn hàng).",
+                    "INVALID_RETURN_STATUS");
         }
+        if (yc.getMaVanDonTra() == null || yc.getMaVanDonTra().isBlank()) {
+            throw new ApiException(
+                    "Khách chưa tạo vận đơn hoàn hàng. Không thể xác nhận đã nhận hàng.",
+                    "RETURN_NO_TRACKING");
+        }
+        return toResponse(ghiNhanDaNhanHang(yc, idNhanVien, "Admin xác nhận đã nhận lại hàng trả"));
+    }
+
+    /**
+     * Ghi nhan shop da nhan lai hang: hoan ton kho, don chuyen {@code TRA_HANG},
+     * yeu cau tra hang sang {@code DA_NHAN_HANG} va tao ban ghi hoan tien {@code CHO_XU_LY}
+     * de admin quyet dinh hoan tien hay tu choi.
+     */
+    private YeuCauTraHang ghiNhanDaNhanHang(YeuCauTraHang yc, Integer idNhanVien, String ghiChu) {
         HoaDon hoaDon = yc.getIdHoaDon();
         TrangThaiDonHang trangThaiCu = hoaDon.getTrangThai();
 
         hoanTonKho(hoaDon);
-        hoaDon.setTrangThai(TrangThaiDonHang.TRA_HANG);
-        hoaDonRepository.save(hoaDon);
-        orderRealtimeService.publishStatusChanged(hoaDon, trangThaiCu);
+        if (trangThaiCu != TrangThaiDonHang.TRA_HANG) {
+            hoaDon.setTrangThai(TrangThaiDonHang.TRA_HANG);
+            hoaDonRepository.save(hoaDon);
+            orderRealtimeService.publishStatusChanged(hoaDon, trangThaiCu);
+        }
 
-        yc.setTrangThai(TrangThaiTraHang.HOAN_TAT);
-        yc.setIdNhanVienDuyet(resolveNhanVien(idNhanVien));
-        yc.setNgayCapNhat(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        yc.setTrangThai(TrangThaiTraHang.DA_NHAN_HANG);
+        yc.setNgayNhanHang(now);
+        yc.setNgayCapNhat(now);
+        NhanVien nhanVien = resolveNhanVien(idNhanVien);
+        if (nhanVien != null) {
+            yc.setIdNhanVienDuyet(nhanVien);
+        }
         YeuCauTraHang saved = yeuCauTraHangRepository.save(yc);
 
-        ghiNhatKy(hoaDon, "TRA_HANG", "Đã nhận lại hàng trả, hoàn tồn kho");
-        if (!laVnpay(hoaDon)) {
-            // VNPAY đã hoàn tiền lúc duyệt; chuyển khoản tạo yêu cầu hoàn sau khi nhận hàng.
-            refundService.taoHoanTienChoXuLy(
-                    hoaDon, LoaiHoanTien.TRA_HANG, hoaDon.getThanhTien(), saved,
-                    yc.getTenNganHang(), yc.getSoTaiKhoan(), yc.getChuTaiKhoan());
+        ghiNhatKy(hoaDon, "TRA_HANG_DA_NHAN_HANG", ghiChu + " — hoàn tồn kho, chờ quyết định hoàn tiền");
+        refundService.taoHoanTienTraHangNeuChua(
+                hoaDon, refundService.resolveSoTienHoan(hoaDon), saved,
+                yc.getTenNganHang(), yc.getSoTaiKhoan(), yc.getChuTaiKhoan());
+        orderMailService.guiDaNhanHangTra(hoaDon);
+        return saved;
+    }
+
+    /** Kiem tra ca lay hang khach chon con nam trong danh sach GHN dang mo. */
+    private GhnPickShiftResponse resolveCaLayHang(Integer pickShiftId) {
+        if (pickShiftId == null) {
+            return null;
         }
-        return toResponse(saved);
+        return shippingService.getPickShifts().stream()
+                .filter(shift -> pickShiftId.equals(shift.getId()))
+                .findFirst()
+                .orElseThrow(() -> new ApiException(
+                        "Ca lấy hàng không còn hiệu lực, vui lòng chọn lại.", "GHN_INVALID_PICK_SHIFT"));
     }
 
     private YeuCauTraHangResponse toResponse(YeuCauTraHang yc) {

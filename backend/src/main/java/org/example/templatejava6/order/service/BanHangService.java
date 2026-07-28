@@ -390,20 +390,16 @@ public class BanHangService {
                     "Áp mã giảm giá " + phieu.getMa() + " (−" + tienGiamGia.toPlainString() + "đ)",
                     nhanVien, now);
         }
-        if(isSplitPayment) {
-            if(req.getDanhSachThanhToan().size()<2 ){
+        if (isSplitPayment) {
+            if (req.getDanhSachThanhToan().size() < 2) {
                 throw new ApiException(
                         "Thanh toán cần ít nhất 2 phương thức.",
                         "SPLIT_MIN_METHODS");
             }
-        }
-
-        BigDecimal tongSplit = BigDecimal.ZERO;
-        ThanhToanHoaDon ttTienMat = null;
-
-        for (TaoDonTaiQuayRequest.ThanhToanItemRequest item : req.getDanhSachThanhToan()) {
-            if(item.getIdPhuongThucThanhToan() == null || item.getSoTien() == null){
-                throw new ApiException("Thiếu thông tin khách thanh toán.", "SPLIT_INVALID_ITEM");
+            for (TaoDonTaiQuayRequest.ThanhToanItemRequest item : req.getDanhSachThanhToan()) {
+                if (item.getIdPhuongThucThanhToan() == null || item.getSoTien() == null) {
+                    throw new ApiException("Thiếu thông tin khách thanh toán.", "SPLIT_INVALID_ITEM");
+                }
             }
         }
 
@@ -488,6 +484,49 @@ public class BanHangService {
                     thanhToan.setThoiGian(LocalDateTime.now());
                     thanhToanHoaDonRepository.save(thanhToan);
                 });
+    }
+
+    /**
+     * Hoàn tất thanh toán VNPAY tại quầy thủ công (khi chưa có IPN).
+     * Nhân viên xác nhận khách đã quét QR / thanh toán thành công trên app.
+     */
+    @Transactional
+    public PosThanhToanStatusResponse hoanTatThanhToanVnpayTaiQuay(Integer idHoaDon) {
+        HoaDon hoaDon = hoaDonRepository.findById(idHoaDon)
+                .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn.", "NOT_FOUND"));
+        if (!LOAI_TAI_QUAY.equalsIgnoreCase(hoaDon.getLoaiDon())) {
+            throw new ApiException("Không phải hóa đơn tại quầy.", "INVALID_ORDER_TYPE");
+        }
+        if (hoaDon.getTrangThai() == TrangThaiDonHang.HOAN_THANH) {
+            return kiemTraThanhToanTaiQuay(idHoaDon);
+        }
+        if (hoaDon.getTrangThai() == null || hoaDon.getTrangThai().laTrangThaiKetThuc()) {
+            throw new ApiException("Đơn hàng đã kết thúc, không thể hoàn tất thanh toán.", "ORDER_CLOSED");
+        }
+
+        ThanhToanHoaDon thanhToan = thanhToanHoaDonRepository
+                .findLatestByHoaDonAndTrangThai(hoaDon, TRANG_THAI_CHO_THANH_TOAN)
+                .orElseThrow(() -> new ApiException(
+                        "Không có giao dịch VNPAY đang chờ thanh toán.", "PAYMENT_NOT_PENDING"));
+
+        NhanVien nhanVien = currentNhanVien();
+        LocalDateTime now = LocalDateTime.now();
+
+        thanhToan.setTrangThai(TRANG_THAI_THANH_CONG);
+        thanhToan.setThoiGian(now);
+        thanhToanHoaDonRepository.save(thanhToan);
+
+        posOrderLifecycleService.hoanThanhDonVnpay(hoaDon);
+        ghiNhatKy(hoaDon, "THANH_TOAN",
+                "Nhân viên xác nhận thanh toán VNPAY tại quầy (không qua IPN)",
+                nhanVien, now);
+
+        List<BanHangChiTietResponse> lines = hoaDonChiTietRepository.findByIdHoaDon(hoaDon).stream()
+                .map(BanHangChiTietResponse::new)
+                .toList();
+        BanHangHoaDonResponse hoaDonResponse = BanHangHoaDonResponse.from(hoaDon, thanhToan, lines);
+        hoaDonResponse.setTrangThaiThanhToan(TRANG_THAI_THANH_CONG);
+        return PosThanhToanStatusResponse.of(hoaDon.getId(), hoaDon.getMaHoaDon(), TRANG_THAI_THANH_CONG, hoaDonResponse);
     }
 
     private HoaDon loadDonCho(Integer id) {

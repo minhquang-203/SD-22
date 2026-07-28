@@ -58,6 +58,12 @@ public class BanHangController {
         banHangService.huyThanhToanVnpayTaiQuay(id);
     }
 
+    /** Hoàn tất thủ công khi chưa cấu hình IPN VNPAY — nhân viên xác nhận khách đã quét QR thành công. */
+    @PostMapping("tai-quay/{id}/hoan-tat-thanh-toan")
+    public PosThanhToanStatusResponse hoanTatThanhToan(@PathVariable("id") Integer id) {
+        return banHangService.hoanTatThanhToanVnpayTaiQuay(id);
+    }
+
     @PostMapping("cho")
     public GiuDonChoResponse giuDonCho(@RequestBody GiuDonChoRequest request) {
         return banHangService.giuDonCho(request);

@@ -17,7 +17,7 @@ public class HoanTatHoanTienRequest {
      */
     private String maGiaoDichHoan;
 
-    /** Cho phep admin dieu chinh so tien hoan truoc khi xac nhan. */
+    /** Cho phep admin dieu chinh so tien hoan (chi dung VNPAY neu can). COD khong nhap so tien. */
     private BigDecimal soTien;
 
     private String ghiChu;

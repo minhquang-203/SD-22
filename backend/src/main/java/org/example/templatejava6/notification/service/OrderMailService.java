@@ -83,16 +83,37 @@ public class OrderMailService {
         }
     }
 
-    /** Bao khach yeu cau tra hang da duoc duyet, huong dan tao van don tra ve shop. */
+    /** Bao khach yeu cau tra hang da duoc duyet, huong dan tao van don va chon ca lay hang. */
     public void guiYeuCauTraHangDuocDuyet(HoaDon hoaDon) {
         String noiDung = """
                 <p style="margin:0 0 14px;color:#4b5563;line-height:1.6;">
                   Yêu cầu trả hàng cho đơn <strong>%s</strong> đã được <strong>duyệt</strong>.
-                  Vui lòng tạo vận đơn hoàn trả để gửi sản phẩm về cửa hàng. Sau khi cửa hàng nhận được
-                  hàng, chúng tôi sẽ tiến hành hoàn tiền cho bạn.
                 </p>
+                <p style="margin:0 0 14px;color:#4b5563;line-height:1.6;">
+                  Bước tiếp theo: vào <strong>Đơn hàng của tôi</strong> và bấm
+                  <strong>Tạo vận đơn hoàn hàng</strong>, sau đó chọn <strong>ca lấy hàng</strong>
+                  bạn muốn Giao Hàng Nhanh đến lấy sản phẩm.
+                </p>
+                <div style="background:#f9fafb;border:1px solid #eef0f3;border-radius:10px;padding:12px 16px;color:#4b5563;">
+                  Sau khi cửa hàng nhận được hàng và kiểm tra sản phẩm, chúng tôi sẽ thông báo
+                  kết quả xử lý hoàn tiền cho bạn.
+                </div>
                 """.formatted(esc(safe(hoaDon != null ? hoaDon.getMaHoaDon() : "")));
         guiEmailThongBao(hoaDon, "Yêu cầu trả hàng đã được duyệt", "Yêu cầu trả hàng được duyệt", noiDung);
+    }
+
+    /** Bao khach shop da nhan lai hang tra va dang xem xet hoan tien. */
+    public void guiDaNhanHangTra(HoaDon hoaDon) {
+        String noiDung = """
+                <p style="margin:0 0 14px;color:#4b5563;line-height:1.6;">
+                  Cửa hàng đã <strong>nhận được hàng hoàn</strong> của đơn <strong>%s</strong>.
+                </p>
+                <div style="background:#f9fafb;border:1px solid #eef0f3;border-radius:10px;padding:12px 16px;color:#4b5563;">
+                  Chúng tôi đang kiểm tra sản phẩm để quyết định hoàn tiền. Bạn sẽ nhận được email
+                  ngay khi có kết quả.
+                </div>
+                """.formatted(esc(safe(hoaDon != null ? hoaDon.getMaHoaDon() : "")));
+        guiEmailThongBao(hoaDon, "Đã nhận được hàng hoàn", "Đã nhận được hàng hoàn", noiDung);
     }
 
     /** Bao khach yeu cau tra hang bi tu choi kem ly do. */

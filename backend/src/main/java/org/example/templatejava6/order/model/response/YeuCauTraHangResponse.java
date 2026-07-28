@@ -3,6 +3,7 @@ package org.example.templatejava6.order.model.response;
 import lombok.Getter;
 import lombok.Setter;
 import org.example.templatejava6.order.entity.YeuCauTraHang;
+import org.example.templatejava6.order.service.GhnTrackingService;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -21,6 +22,11 @@ public class YeuCauTraHangResponse {
     private String trangThai;
     private String trangThaiLabel;
     private String maVanDonTra;
+    private Integer pickShiftId;
+    private String pickShiftLabel;
+    private String ghnTrangThaiTra;
+    private String ghnTrangThaiTraLabel;
+    private LocalDateTime ngayNhanHang;
     private Integer ghnDistrictId;
     private String ghnWardCode;
     private String diaChiTra;
@@ -52,6 +58,11 @@ public class YeuCauTraHangResponse {
             this.trangThaiLabel = yc.getTrangThai().getLabel();
         }
         this.maVanDonTra = yc.getMaVanDonTra();
+        this.pickShiftId = yc.getPickShiftId();
+        this.pickShiftLabel = yc.getPickShiftLabel();
+        this.ghnTrangThaiTra = yc.getGhnTrangThaiTra();
+        this.ghnTrangThaiTraLabel = GhnTrackingService.labelOf(yc.getGhnTrangThaiTra());
+        this.ngayNhanHang = yc.getNgayNhanHang();
         this.ghnDistrictId = yc.getGhnDistrictId();
         this.ghnWardCode = yc.getGhnWardCode();
         this.diaChiTra = yc.getDiaChiTra();

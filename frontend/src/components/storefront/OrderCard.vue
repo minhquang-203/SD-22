@@ -216,6 +216,10 @@ function canReview(line) {
         </div>
         <p v-if="order.maVanDonTra" class="sf-order-return-tracking">
           Mã vận đơn hoàn: <strong>{{ order.maVanDonTra }}</strong>
+          <template v-if="order.ghnTrangThaiTraLabel"> · {{ order.ghnTrangThaiTraLabel }}</template>
+        </p>
+        <p v-if="order.pickShiftLabel" class="sf-order-return-tracking">
+          Ca lấy hàng: <strong>{{ order.pickShiftLabel }}</strong>
         </p>
         <div v-if="order.trangThaiHoanTien" class="sf-order-return-row">
           <span class="sf-order-return-label">Hoàn tiền</span>
@@ -267,7 +271,8 @@ function canReview(line) {
           Đơn đã giao thành công — bạn có thể gửi yêu cầu trả hàng.
         </p>
         <p v-if="canCreateReturnLabel" class="sf-order-card__cancel-hint">
-          Yêu cầu đã được duyệt — tạo vận đơn để gửi hàng về cửa hàng.
+          Yêu cầu đã được duyệt — tạo vận đơn và chọn ca lấy hàng để gửi sản phẩm về cửa hàng.
+          Cửa hàng sẽ xử lý hoàn tiền sau khi nhận và kiểm tra hàng.
         </p>
       </div>
     </div>

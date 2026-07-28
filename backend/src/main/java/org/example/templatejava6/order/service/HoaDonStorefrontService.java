@@ -161,6 +161,8 @@ public class HoaDonStorefrontService {
                 r.setTrangThaiTraHangLabel(moiNhat.getTrangThai().getLabel());
             }
             r.setMaVanDonTra(moiNhat.getMaVanDonTra());
+            r.setPickShiftLabel(moiNhat.getPickShiftLabel());
+            r.setGhnTrangThaiTraLabel(GhnTrackingService.labelOf(moiNhat.getGhnTrangThaiTra()));
         }
 
         List<HoanTien> hoanTiens = hoanTienRepository.findByIdHoaDonOrderByNgayTaoDesc(hd);

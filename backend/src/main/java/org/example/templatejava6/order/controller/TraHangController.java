@@ -60,4 +60,14 @@ public class TraHangController {
                 id,
                 request != null ? request.getIdNhanVien() : null);
     }
+
+    /** Dong bo trang thai van don hoan tu GHN; tu ghi nhan da nhan hang khi kien hang da ve shop. */
+    @PostMapping("/{id}/dong-bo-ghn")
+    public YeuCauTraHangResponse dongBoGhn(
+            @PathVariable Integer id,
+            @RequestBody(required = false) DuyetTraHangRequest request) {
+        return returnRequestService.dongBoVanDonTra(
+                id,
+                request != null ? request.getIdNhanVien() : null);
+    }
 }

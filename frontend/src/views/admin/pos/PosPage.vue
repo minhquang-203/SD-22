@@ -12,6 +12,7 @@ import {
   tinhGiaTaiQuay,
   kiemTraThanhToanPos,
   huyThanhToanPos,
+  hoanTatThanhToanPos,
   giuDon,
   dsDonCho,
   layDonCho,
@@ -69,6 +70,7 @@ const qrAmount = ref(0)
 const qrTransactionRef = ref('')
 const qrStatus = ref('CHO_THANH_TOAN')
 const qrPolling = ref(false)
+const qrCompleting = ref(false)
 
 let searchTimer = null
 let qrPollTimer = null
@@ -636,6 +638,35 @@ async function cancelQrPayment() {
   }
 }
 
+/** Hoàn tất thủ công (chưa có IPN VNPAY) — nhân viên xác nhận khách đã thanh toán xong. */
+async function completeQrPayment() {
+  if (!qrOrderId.value || qrCompleting.value) return
+  const ok = await confirm({
+    title: 'Hoàn tất thanh toán',
+    message: 'Xác nhận khách đã thanh toán thành công trên app VNPay / ngân hàng?',
+    confirmText: 'Thanh toán',
+  })
+  if (!ok) return
+  qrCompleting.value = true
+  try {
+    const res = await hoanTatThanhToanPos(qrOrderId.value)
+    stopQrPolling()
+    showQrModal.value = false
+    qrPaymentUrl.value = ''
+    qrOrderId.value = null
+    if (res.data?.hoaDon) {
+      receipt.value = res.data.hoaDon
+      showReceipt.value = true
+    }
+    void loadProducts()
+    notify('Thanh toán QR thành công!')
+  } catch (err) {
+    notify(String(err), 'error')
+  } finally {
+    qrCompleting.value = false
+  }
+}
+
 function closeQrModal() {
   if (qrStatus.value === 'CHO_THANH_TOAN') {
     void cancelQrPayment()
@@ -1000,10 +1031,10 @@ onBeforeUnmount(() => {
           <input v-model="transferRef" type="text" class="admin-input w-full" placeholder="Mã GD / tham chiếu..." />
         </div>
 
-        <div v-else-if="isVnpay" class="mb-4 pos-qr-hint">
+        <!-- <div v-else-if="isVnpay" class="mb-4 pos-qr-hint">
           <Icon icon="solar:qr-code-linear" class="text-xl shrink-0" />
           <p>Khách quét mã QR VNPay trên điện thoại. Hệ thống tự xác nhận khi thanh toán thành công.</p>
-        </div>
+        </div> -->
 
         <div class="pos-checkout-row">
           <button
@@ -1163,7 +1194,8 @@ onBeforeUnmount(() => {
               Mã GD: <strong>{{ qrTransactionRef }}</strong>
             </p>
             <p class="pos-qr-modal__hint">
-              Khách mở app ngân hàng / VNPay và quét mã. Màn hình sẽ tự cập nhật khi thanh toán xong.
+              Khách mở app ngân hàng / VNPay và quét mã. Sau khi khách thanh toán xong, bấm
+              <strong>Thanh toán</strong> để hoàn tất giao dịch.
             </p>
           </div>
 
@@ -1172,17 +1204,19 @@ onBeforeUnmount(() => {
               v-if="qrStatus === 'CHO_THANH_TOAN'"
               type="button"
               class="soleil-btn-outline flex-1"
+              :disabled="qrCompleting"
               @click="cancelQrPayment"
             >
               Hủy thanh toán
             </button>
             <button
+              v-if="qrStatus === 'CHO_THANH_TOAN'"
               type="button"
               class="soleil-btn-primary flex-1"
-              :disabled="qrPolling"
-              @click="pollQrPaymentStatus"
+              :disabled="qrCompleting"
+              @click="completeQrPayment"
             >
-              {{ qrPolling ? 'Đang kiểm tra...' : 'Kiểm tra lại' }}
+              {{ qrCompleting ? 'Đang hoàn tất...' : 'Thanh toán' }}
             </button>
           </div>
         </div>

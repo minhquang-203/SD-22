@@ -4,10 +4,13 @@ import org.example.templatejava6.common.entity.NhanVien;
 import org.example.templatejava6.common.enums.LoaiHoanTien;
 import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.example.templatejava6.common.enums.TrangThaiHoanTien;
+import org.example.templatejava6.common.enums.TrangThaiTraHang;
 import org.example.templatejava6.common.exception.ApiException;
+import org.example.templatejava6.common.service.ProductFileStorageService;
 import org.example.templatejava6.notification.enums.LoaiThongBao;
 import org.example.templatejava6.notification.service.OrderMailService;
 import org.example.templatejava6.notification.service.ThongBaoService;
+import org.example.templatejava6.order.entity.AnhHoanTien;
 import org.example.templatejava6.order.entity.HoaDon;
 import org.example.templatejava6.order.entity.HoanTien;
 import org.example.templatejava6.order.entity.LichSuDonHang;
@@ -15,33 +18,42 @@ import org.example.templatejava6.order.entity.ThanhToanHoaDon;
 import org.example.templatejava6.order.entity.YeuCauTraHang;
 import org.example.templatejava6.order.model.request.HoanTatHoanTienRequest;
 import org.example.templatejava6.order.model.response.HoanTienResponse;
+import org.example.templatejava6.order.repository.AnhHoanTienRepository;
 import org.example.templatejava6.order.repository.HoaDonRepository;
 import org.example.templatejava6.order.repository.HoanTienRepository;
 import org.example.templatejava6.order.repository.LichSuDonHangRepository;
 import org.example.templatejava6.order.repository.NhanVienRepository;
 import org.example.templatejava6.order.repository.ThanhToanHoaDonRepository;
+import org.example.templatejava6.order.repository.YeuCauTraHangRepository;
 import org.example.templatejava6.payment.gateway.RefundCommand;
 import org.example.templatejava6.payment.gateway.RefundGateway;
 import org.example.templatejava6.payment.gateway.RefundGatewayRegistry;
 import org.example.templatejava6.payment.gateway.RefundResult;
 import org.example.templatejava6.realtime.service.OrderRealtimeService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Quan ly hoan tien: tao ban ghi CHO_XU_LY khi huy don / tra hang;
- * khi admin xac nhan — neu co RefundGateway (VNPAY) thi goi API tu dong,
- * nguoc lai (CHUYEN_KHOAN) thi admin nhap ma giao dich thu cong.
- * Khi hoan thanh cong: ban ghi hoan_tien = DA_HOAN va hoa don = TRA_HANG.
+ * Quan ly hoan tien: tao ban ghi CHO_XU_LY khi huy don, hoac khi shop da nhan lai hang tra.
+ * Hoan tien luon do admin quyet dinh — khong bao gio tu dong goi cong thanh toan.
+ * Khi admin xac nhan: co RefundGateway (VNPAY) thi goi API tu dong, nguoc lai (CHUYEN_KHOAN)
+ * admin nhap ma giao dich thu cong. Thanh cong: hoan_tien = DA_HOAN va hoa don = TRA_HANG.
+ * Voi hoan tien tra hang, ca hai quyet dinh (hoan tat / tu choi) deu dong yeu cau tra hang sang HOAN_TAT.
  */
 @Service
 public class RefundService {
+
+    private static final Logger log = LoggerFactory.getLogger(RefundService.class);
 
     private static final String MA_VNPAY = "VNPAY";
     private static final String PHUONG_THUC_VNPAY = "VNPAY";
@@ -49,30 +61,39 @@ public class RefundService {
     private static final String TRANG_THAI_THANH_CONG = "THANH_CONG";
 
     private final HoanTienRepository hoanTienRepository;
+    private final AnhHoanTienRepository anhHoanTienRepository;
     private final HoaDonRepository hoaDonRepository;
     private final ThanhToanHoaDonRepository thanhToanHoaDonRepository;
     private final LichSuDonHangRepository lichSuDonHangRepository;
     private final NhanVienRepository nhanVienRepository;
+    private final YeuCauTraHangRepository yeuCauTraHangRepository;
     private final RefundGatewayRegistry refundGatewayRegistry;
+    private final ProductFileStorageService productFileStorageService;
     private final ThongBaoService thongBaoService;
     private final OrderMailService orderMailService;
     private final OrderRealtimeService orderRealtimeService;
 
     public RefundService(HoanTienRepository hoanTienRepository,
+                         AnhHoanTienRepository anhHoanTienRepository,
                          HoaDonRepository hoaDonRepository,
                          ThanhToanHoaDonRepository thanhToanHoaDonRepository,
                          LichSuDonHangRepository lichSuDonHangRepository,
                          NhanVienRepository nhanVienRepository,
+                         YeuCauTraHangRepository yeuCauTraHangRepository,
                          RefundGatewayRegistry refundGatewayRegistry,
+                         ProductFileStorageService productFileStorageService,
                          ThongBaoService thongBaoService,
                          OrderMailService orderMailService,
                          OrderRealtimeService orderRealtimeService) {
         this.hoanTienRepository = hoanTienRepository;
+        this.anhHoanTienRepository = anhHoanTienRepository;
         this.hoaDonRepository = hoaDonRepository;
         this.thanhToanHoaDonRepository = thanhToanHoaDonRepository;
         this.lichSuDonHangRepository = lichSuDonHangRepository;
         this.nhanVienRepository = nhanVienRepository;
+        this.yeuCauTraHangRepository = yeuCauTraHangRepository;
         this.refundGatewayRegistry = refundGatewayRegistry;
+        this.productFileStorageService = productFileStorageService;
         this.thongBaoService = thongBaoService;
         this.orderMailService = orderMailService;
         this.orderRealtimeService = orderRealtimeService;
@@ -126,42 +147,49 @@ public class RefundService {
         List<HoanTien> list = trangThai != null
                 ? hoanTienRepository.findByTrangThaiOrderByNgayTaoDesc(trangThai)
                 : hoanTienRepository.findAllByOrderByNgayTaoDesc();
-        return list.stream().map(HoanTienResponse::new).toList();
+        return list.stream().map(this::toResponse).toList();
     }
 
     /**
-     * Tao ban ghi hoan tien va goi cong refund ngay (dung cho VNPAY khi duyet tra hang).
-     * Thanh cong: hoan_tien = DA_HOAN, hoa_don = TRA_HANG, co maGiaoDichHoan.
+     * Tao ban ghi hoan tien tra hang cho admin quyet dinh, bo qua neu don da co ban ghi hoan tien
+     * dang cho / da hoan. Dung khi shop nhan lai hang tra.
      */
     @Transactional
-    public HoanTienResponse taoVaHoanTuDong(HoaDon hoaDon, LoaiHoanTien loai, BigDecimal soTien,
-                                            YeuCauTraHang yeuCau,
-                                            String tenNganHang, String soTaiKhoan, String chuTaiKhoan,
-                                            Integer idNhanVien) {
-        HoanTien ht = taoHoanTienChoXuLy(hoaDon, loai, soTien, yeuCau, tenNganHang, soTaiKhoan, chuTaiKhoan);
-        HoanTatHoanTienRequest request = new HoanTatHoanTienRequest();
-        request.setIdNhanVien(idNhanVien);
-        return hoanTatInternal(ht, request);
+    public HoanTien taoHoanTienTraHangNeuChua(HoaDon hoaDon, BigDecimal soTien, YeuCauTraHang yeuCau,
+                                              String tenNganHang, String soTaiKhoan, String chuTaiKhoan) {
+        if (hoaDon == null) {
+            return null;
+        }
+        if (hoanTienRepository.existsByIdHoaDon_IdAndTrangThaiNot(hoaDon.getId(), TrangThaiHoanTien.TU_CHOI)) {
+            log.info("Đơn {} đã có bản ghi hoàn tiền, bỏ qua tạo mới khi nhận hàng trả.",
+                    hoaDon.getMaHoaDon());
+            return null;
+        }
+        return taoHoanTienChoXuLy(
+                hoaDon, LoaiHoanTien.TRA_HANG, soTien, yeuCau, tenNganHang, soTaiKhoan, chuTaiKhoan);
     }
 
     /**
      * Admin xac nhan hoan tien.
      * - Co RefundGateway (VNPAY): goi API, tu dien maGiaoDichHoan.
-     * - Khong co gateway (CHUYEN_KHOAN): yeu cau admin nhap maGiaoDichHoan.
+     * - Khong co gateway (CHUYEN_KHOAN/COD): yeu cau admin nhap maGiaoDichHoan, co the dinh kem anh.
      * Thanh cong: hoan_tien = DA_HOAN, hoa_don = TRA_HANG.
      */
     @Transactional
-    public HoanTienResponse hoanTat(Integer id, HoanTatHoanTienRequest request) {
+    public HoanTienResponse hoanTat(Integer id, HoanTatHoanTienRequest request, List<MultipartFile> files) {
         HoanTien ht = hoanTienRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Không tìm thấy yêu cầu hoàn tiền.", "NOT_FOUND"));
-        return hoanTatInternal(ht, request);
+        return hoanTatInternal(ht, request, files);
     }
 
-    private HoanTienResponse hoanTatInternal(HoanTien ht, HoanTatHoanTienRequest request) {
+    private HoanTienResponse hoanTatInternal(HoanTien ht, HoanTatHoanTienRequest request,
+                                             List<MultipartFile> files) {
         if (ht.getTrangThai() != TrangThaiHoanTien.CHO_XU_LY) {
             throw new ApiException("Yêu cầu hoàn tiền đã được xử lý.", "REFUND_ALREADY_PROCESSED");
         }
-        if (request != null && request.getSoTien() != null
+        // VNPAY co the dieu chinh so tien; COD/chuyen khoan giu so tien da tao san.
+        boolean laVnpay = PHUONG_THUC_VNPAY.equalsIgnoreCase(ht.getPhuongThuc());
+        if (laVnpay && request != null && request.getSoTien() != null
                 && request.getSoTien().compareTo(BigDecimal.ZERO) >= 0) {
             ht.setSoTien(request.getSoTien());
         }
@@ -179,9 +207,12 @@ public class RefundService {
         ht.setNgayHoan(LocalDateTime.now());
         HoanTien saved = hoanTienRepository.save(ht);
 
+        List<String> anhUrls = luuAnhChungTu(saved, files);
+
         HoaDon hoaDon = saved.getIdHoaDon();
         if (saved.getLoai() == LoaiHoanTien.TRA_HANG) {
             capNhatHoaDonTraHang(hoaDon);
+            ketThucYeuCauTraHang(saved.getIdYeuCauTraHang());
         }
         ghiNhatKy(hoaDon, "HOAN_TIEN_HOAN_TAT",
                 "Đã hoàn tiền " + dinhDangTien(saved.getSoTien())
@@ -194,7 +225,37 @@ public class RefundService {
                 saved.getId(),
                 hoaDon.getMaHoaDon());
         orderMailService.guiHoanTienHoanTat(hoaDon, saved.getSoTien(), saved.getMaGiaoDichHoan());
-        return new HoanTienResponse(saved);
+        return new HoanTienResponse(saved, anhUrls);
+    }
+
+    private HoanTienResponse toResponse(HoanTien ht) {
+        List<String> anhUrls = anhHoanTienRepository
+                .findByIdHoanTien_IdOrderByIdAsc(ht.getId())
+                .stream()
+                .map(AnhHoanTien::getDuongDan)
+                .toList();
+        return new HoanTienResponse(ht, anhUrls);
+    }
+
+    private List<String> luuAnhChungTu(HoanTien hoanTien, List<MultipartFile> files) {
+        List<String> urls = new ArrayList<>();
+        if (files == null || files.isEmpty()) {
+            return urls;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        for (MultipartFile file : files) {
+            if (file == null || file.isEmpty()) {
+                continue;
+            }
+            String path = productFileStorageService.store(file);
+            AnhHoanTien anh = new AnhHoanTien();
+            anh.setIdHoanTien(hoanTien);
+            anh.setDuongDan(path);
+            anh.setNgayTao(now);
+            anhHoanTienRepository.save(anh);
+            urls.add(path);
+        }
+        return urls;
     }
 
     /** Admin tu choi hoan tien kem ly do. */
@@ -211,7 +272,23 @@ public class RefundService {
         HoanTien saved = hoanTienRepository.save(ht);
         ghiNhatKy(saved.getIdHoaDon(), "HOAN_TIEN_TU_CHOI",
                 "Từ chối hoàn tiền" + (lyDo != null && !lyDo.isBlank() ? ": " + lyDo : ""));
+        if (saved.getLoai() == LoaiHoanTien.TRA_HANG) {
+            ketThucYeuCauTraHang(saved.getIdYeuCauTraHang());
+        }
         return new HoanTienResponse(saved);
+    }
+
+    /**
+     * Dong yeu cau tra hang sau khi admin da quyet dinh hoan tien hay khong:
+     * {@code DA_NHAN_HANG} -> {@code HOAN_TAT}.
+     */
+    private void ketThucYeuCauTraHang(YeuCauTraHang yeuCau) {
+        if (yeuCau == null || yeuCau.getTrangThai() != TrangThaiTraHang.DA_NHAN_HANG) {
+            return;
+        }
+        yeuCau.setTrangThai(TrangThaiTraHang.HOAN_TAT);
+        yeuCau.setNgayCapNhat(LocalDateTime.now());
+        yeuCauTraHangRepository.save(yeuCau);
     }
 
     /** Khi hoan tien thanh cong: hoa don chuyen TRA_HANG (neu chua). */

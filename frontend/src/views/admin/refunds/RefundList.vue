@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
@@ -11,6 +11,7 @@ import {
   tuChoiHoanTien,
 } from '@/api/hoanTienApi'
 import { formatCurrency } from '@/utils/format'
+import { productImageUrl } from '@/utils/productImage'
 import { useAdminBadges } from '@/composables/useAdminBadges'
 import {
   hoanTienStatusLabel,
@@ -45,9 +46,12 @@ const showCompleteModal = ref(false)
 const completeTarget = ref(null)
 const completeForm = ref({
   maGiaoDichHoan: '',
-  soTien: '',
   ghiChu: '',
 })
+const proofFiles = ref([])
+const proofPreviews = ref([])
+const fileInputRef = ref(null)
+const MAX_PROOF_IMAGES = 6
 
 const showRejectModal = ref(false)
 const rejectTarget = ref(null)
@@ -144,37 +148,78 @@ function openComplete(item) {
   completeTarget.value = item
   completeForm.value = {
     maGiaoDichHoan: '',
-    soTien: item.soTien != null ? String(item.soTien) : '',
     ghiChu: '',
   }
+  clearProofImages()
   showCompleteModal.value = true
+}
+
+function clearProofImages() {
+  proofPreviews.value.forEach((url) => {
+    if (url) URL.revokeObjectURL(url)
+  })
+  proofFiles.value = []
+  proofPreviews.value = []
+  if (fileInputRef.value) fileInputRef.value.value = ''
 }
 
 function closeComplete() {
   showCompleteModal.value = false
   completeTarget.value = null
+  clearProofImages()
+}
+
+function onProofFileChange(event) {
+  const incoming = Array.from(event.target.files || []).filter((f) => f?.type?.startsWith('image/'))
+  if (event.target) event.target.value = ''
+  if (!incoming.length) return
+  const remaining = MAX_PROOF_IMAGES - proofFiles.value.length
+  if (remaining <= 0) {
+    notify(`Chỉ được tải tối đa ${MAX_PROOF_IMAGES} ảnh.`, 'error')
+    return
+  }
+  const toAdd = incoming.slice(0, remaining)
+  proofFiles.value = [...proofFiles.value, ...toAdd]
+  proofPreviews.value = [
+    ...proofPreviews.value,
+    ...toAdd.map((f) => URL.createObjectURL(f)),
+  ]
+}
+
+function removeProofImage(index) {
+  const url = proofPreviews.value[index]
+  if (url) URL.revokeObjectURL(url)
+  proofFiles.value = proofFiles.value.filter((_, i) => i !== index)
+  proofPreviews.value = proofPreviews.value.filter((_, i) => i !== index)
 }
 
 async function confirmComplete() {
   const item = completeTarget.value
   if (!item) return
 
+  const isVnpay = item.phuongThuc === 'VNPAY'
+  if (!isVnpay && !completeForm.value.maGiaoDichHoan.trim()) {
+    notify('Vui lòng nhập mã giao dịch hoàn tiền.', 'error')
+    return
+  }
+
   const ok = await confirm({
     title: 'Hoàn tất hoàn tiền',
-    message: `Xác nhận đã hoàn tiền cho đơn ${item.maHoaDon}?`,
+    message: isVnpay
+      ? `Hoàn tiền VNPAY cho đơn ${item.maHoaDon}? Hệ thống sẽ gọi API hoàn tiền ngay bây giờ.`
+      : `Xác nhận đã hoàn tiền cho đơn ${item.maHoaDon}?`,
     confirmText: 'Hoàn tất',
   })
   if (!ok) return
 
   actionLoading.value = item.id
   try {
-    const soTienRaw = completeForm.value.soTien.trim()
     const payload = staffPayload({
+      phuongThuc: item.phuongThuc,
       maGiaoDichHoan: completeForm.value.maGiaoDichHoan.trim() || null,
       ghiChu: completeForm.value.ghiChu.trim() || null,
-      soTien: soTienRaw ? Number(soTienRaw) : null,
     })
-    await hoanTatHoanTien(item.id, payload)
+    await hoanTatHoanTien(item.id, payload, isVnpay ? [] : proofFiles.value)
     notify(`Đã hoàn tất hoàn tiền đơn ${item.maHoaDon}.`)
     closeComplete()
     await loadList()
@@ -218,6 +263,7 @@ watch(filteredItems, () => {
 })
 
 onMounted(loadList)
+onUnmounted(clearProofImages)
 </script>
 
 <template>
@@ -353,6 +399,7 @@ onMounted(loadList)
               <tr v-if="expandedId === item.id" class="detail-row">
                 <td colspan="7">
                   <div class="detail-grid">
+                    <div><strong>Số tiền:</strong> {{ formatCurrency(item.soTien) }}</div>
                     <div><strong>Mã GD hoàn:</strong> {{ item.maGiaoDichHoan || '—' }}</div>
                     <div><strong>Ngân hàng:</strong> {{ item.tenNganHang || '—' }}</div>
                     <div><strong>STK:</strong> {{ item.soTaiKhoan || '—' }}</div>
@@ -361,6 +408,21 @@ onMounted(loadList)
                     <div><strong>Ngày hoàn:</strong> {{ formatDateTime(item.ngayHoan) }}</div>
                     <div><strong>Ghi chú:</strong> {{ item.ghiChu || '—' }}</div>
                     <div><strong>ID yêu cầu trả:</strong> {{ item.idYeuCauTraHang ?? '—' }}</div>
+                  </div>
+                  <div v-if="item.anhUrls?.length" class="proof-images">
+                    <strong class="proof-images__label">Ảnh chứng từ:</strong>
+                    <div class="proof-images__grid">
+                      <a
+                        v-for="(url, idx) in item.anhUrls"
+                        :key="`${item.id}-anh-${idx}`"
+                        :href="productImageUrl(url)"
+                        target="_blank"
+                        rel="noopener"
+                        class="proof-images__item"
+                      >
+                        <img :src="productImageUrl(url)" :alt="`Chứng từ ${idx + 1}`" />
+                      </a>
+                    </div>
                   </div>
                 </td>
               </tr>
@@ -383,42 +445,89 @@ onMounted(loadList)
     <div v-if="showCompleteModal" class="modal-overlay" @click.self="closeComplete">
       <div class="modal-card">
         <h3>Hoàn tất hoàn tiền</h3>
-        <p class="modal-sub">Đơn {{ completeTarget?.maHoaDon }} · {{ phuongThucLabel(completeTarget?.phuongThuc) }}</p>
-
-        <label v-if="completeTarget?.phuongThuc !== 'VNPAY'" class="soleil-toolbar__label">Mã giao dịch hoàn</label>
-        <input
-          v-if="completeTarget?.phuongThuc !== 'VNPAY'"
-          v-model="completeForm.maGiaoDichHoan"
-          class="soleil-toolbar__input modal-input"
-          type="text"
-          placeholder="Mã chuyển khoản"
-        />
-        <p v-else class="modal-sub" style="margin-top: 0">
-          VNPAY sẽ gọi API hoàn tiền tự động và lưu mã giao dịch refund.
+        <p class="modal-sub">
+          Đơn {{ completeTarget?.maHoaDon }} · {{ phuongThucLabel(completeTarget?.phuongThuc) }}
+          <template v-if="completeTarget?.soTien != null">
+            · {{ formatCurrency(completeTarget.soTien) }}
+          </template>
         </p>
-        <label class="soleil-toolbar__label">Số tiền hoàn</label>
-        <input
-          v-model="completeForm.soTien"
-          class="soleil-toolbar__input modal-input"
-          type="number"
-          min="0"
-          step="1000"
-        />
 
-        <label class="soleil-toolbar__label">Ghi chú</label>
-        <textarea
-          v-model="completeForm.ghiChu"
-          class="soleil-toolbar__input modal-textarea"
-          rows="2"
-          placeholder="Ghi chú (tùy chọn)..."
-        />
+        <template v-if="completeTarget?.phuongThuc !== 'VNPAY'">
+          <label class="soleil-toolbar__label">
+            Mã giao dịch hoàn <span class="req-mark">*</span>
+          </label>
+          <input
+            v-model="completeForm.maGiaoDichHoan"
+            class="soleil-toolbar__input modal-input"
+            type="text"
+            required
+            placeholder="Bắt buộc — mã chuyển khoản"
+          />
+
+          <label class="soleil-toolbar__label">Ghi chú & ảnh chứng từ</label>
+          <div class="proof-box">
+            <textarea
+              v-model="completeForm.ghiChu"
+              class="proof-box__textarea"
+              rows="3"
+              placeholder="Ghi chú (tùy chọn)..."
+            />
+            <div class="proof-box__footer">
+              <input
+                ref="fileInputRef"
+                type="file"
+                class="proof-box__file"
+                accept="image/*"
+                multiple
+                @change="onProofFileChange"
+              />
+              <button
+                type="button"
+                class="proof-box__upload"
+                :disabled="proofPreviews.length >= MAX_PROOF_IMAGES"
+                @click="fileInputRef?.click()"
+              >
+                <Icon icon="icon-park-outline:upload-picture" width="16" />
+                Thêm ảnh
+              </button>
+              <span class="proof-box__count">
+                {{ proofPreviews.length }}/{{ MAX_PROOF_IMAGES }} ảnh
+              </span>
+            </div>
+            <div v-if="proofPreviews.length" class="proof-previews">
+              <div
+                v-for="(url, index) in proofPreviews"
+                :key="`${url}-${index}`"
+                class="proof-preview"
+              >
+                <img :src="url" alt="Chứng từ" />
+                <button type="button" class="proof-preview__remove" @click="removeProofImage(index)">×</button>
+              </div>
+            </div>
+          </div>
+        </template>
+        <template v-else>
+          <p class="modal-sub" style="margin-top: 0">
+            Khi xác nhận, hệ thống mới gọi API hoàn tiền VNPAY và lưu mã giao dịch refund.
+          </p>
+          <label class="soleil-toolbar__label">Ghi chú</label>
+          <textarea
+            v-model="completeForm.ghiChu"
+            class="soleil-toolbar__input modal-textarea"
+            rows="2"
+            placeholder="Ghi chú (tùy chọn)..."
+          />
+        </template>
 
         <div class="modal-actions">
           <button type="button" class="soleil-btn-outline" @click="closeComplete">Hủy</button>
           <button
             type="button"
             class="act-btn act-btn--ok"
-            :disabled="actionLoading === completeTarget?.id"
+            :disabled="
+              actionLoading === completeTarget?.id
+              || (completeTarget?.phuongThuc !== 'VNPAY' && !completeForm.maGiaoDichHoan.trim())
+            "
             @click="confirmComplete"
           >
             Xác nhận hoàn tất
@@ -572,8 +681,121 @@ onMounted(loadList)
 }
 .modal-card h3 { margin: 0 0 4px; font-size: 16px; }
 .modal-sub { margin: 0 0 14px; font-size: 13px; color: #64748b; }
+.req-mark { color: #dc2626; }
 .modal-input { width: 100%; margin: 6px 0 12px; }
-.modal-textarea { width: 100%; min-height: 72px; resize: vertical; margin: 6px 0 0; }
+.modal-textarea { width: 100%; min-height: 72px; resize: vertical; margin: 6px 0 12px; }
+.proof-box {
+  margin: 6px 0 0;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+.proof-box:focus-within {
+  border-color: #c49554;
+  box-shadow: 0 0 0 3px rgba(196, 149, 84, 0.18);
+}
+.proof-box__textarea {
+  display: block;
+  width: 100%;
+  min-height: 72px;
+  border: none;
+  resize: vertical;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+  background: transparent;
+  box-sizing: border-box;
+}
+.proof-box__textarea:focus {
+  outline: none;
+}
+.proof-box__footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-top: 1px solid #eee;
+  background: #fafafa;
+}
+.proof-box__file {
+  display: none;
+}
+.proof-box__upload {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid rgba(166, 124, 61, 0.35);
+  border-radius: 999px;
+  background: rgba(196, 149, 84, 0.1);
+  color: #8a6428;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.proof-box__upload:hover:not(:disabled) {
+  background: rgba(196, 149, 84, 0.18);
+}
+.proof-box__upload:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.proof-box__count {
+  font-size: 12px;
+  color: #64748b;
+}
+.proof-previews,
+.proof-images__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.proof-box .proof-previews {
+  padding: 0 10px 10px;
+}
+.proof-images {
+  margin-top: 12px;
+}
+.proof-images__label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.proof-preview,
+.proof-images__item {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  display: block;
+  padding: 0;
+}
+.proof-preview img,
+.proof-images__item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.proof-preview__remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
 .modal-actions {
   display: flex;
   justify-content: flex-end;

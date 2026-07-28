@@ -47,6 +47,23 @@ public class YeuCauTraHang {
     @Column(name = "ma_van_don_tra", length = 50)
     private String maVanDonTra;
 
+    /** Ca lay hang GHN khach chon khi tao van don hoan (GHN pick_shift). */
+    @Column(name = "pick_shift_id")
+    private Integer pickShiftId;
+
+    @Size(max = 100)
+    @Nationalized
+    @Column(name = "pick_shift_label", length = 100)
+    private String pickShiftLabel;
+
+    /** Trang thai moi nhat cua van don hoan ben GHN (vd: picking, delivered). */
+    @Size(max = 50)
+    @Column(name = "ghn_trang_thai_tra", length = 50)
+    private String ghnTrangThaiTra;
+
+    @Column(name = "ngay_nhan_hang")
+    private LocalDateTime ngayNhanHang;
+
     @Column(name = "ghn_district_id")
     private Integer ghnDistrictId;
 

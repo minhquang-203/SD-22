@@ -27,6 +27,10 @@ export const kiemTraThanhToanPos = (idHoaDon) =>
 export const huyThanhToanPos = (idHoaDon) =>
   request.post(`/ban-hang/tai-quay/${idHoaDon}/huy-thanh-toan`)
 
+/** Hoàn tất thủ công khi chưa có IPN VNPAY */
+export const hoanTatThanhToanPos = (idHoaDon) =>
+  request.post(`/ban-hang/tai-quay/${idHoaDon}/hoan-tat-thanh-toan`)
+
 export const giuDon = (payload) => request.post('/ban-hang/cho', payload)
 
 export const dsDonCho = () => request.get('/ban-hang/cho')

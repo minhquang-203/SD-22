@@ -66,8 +66,9 @@ const {
 
         <div class="sf-return-modal__body">
           <p class="sf-return-info">
-            Đơn thanh toán VNPAY sẽ được hoàn về tài khoản đã dùng để thanh toán.
-            Bạn không cần nhập thông tin ngân hàng.
+            Sau khi yêu cầu được duyệt, bạn tạo vận đơn hoàn hàng và chọn ca lấy hàng.
+            Cửa hàng xét hoàn tiền khi đã nhận và kiểm tra sản phẩm — tiền được hoàn về
+            tài khoản VNPAY đã dùng để thanh toán, bạn không cần nhập thông tin ngân hàng.
           </p>
 
           <div class="sf-return-form-group">

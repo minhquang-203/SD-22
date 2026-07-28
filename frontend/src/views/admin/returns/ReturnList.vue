@@ -7,6 +7,7 @@ import { confirm } from '@/composables/useConfirm'
 import { useAdminAuth } from '@/composables/useAdminAuth'
 import {
   daNhanHangTraHang,
+  dongBoVanDonTra,
   duyetTraHang,
   fetchTraHangList,
   tuChoiTraHang,
@@ -34,6 +35,7 @@ const tabs = [
   { value: 'CHO_DUYET', label: 'Chờ duyệt' },
   { value: 'DA_DUYET', label: 'Đã duyệt' },
   { value: 'DANG_HOAN_HANG', label: 'Đang hoàn hàng' },
+  { value: 'DA_NHAN_HANG', label: 'Đã nhận hàng' },
   { value: 'HOAN_TAT', label: 'Hoàn tất' },
   { value: 'TU_CHOI', label: 'Từ chối' },
 ]
@@ -144,12 +146,10 @@ function openOrder(item) {
 }
 
 async function handleDuyet(item) {
-  const isVnpay = String(item.phuongThucThanhToan || '').toUpperCase() === 'VNPAY'
   const ok = await confirm({
     title: 'Duyệt yêu cầu trả hàng',
-    message: isVnpay
-      ? `Duyệt đơn ${item.maHoaDon}? Hệ thống sẽ hoàn tiền VNPAY tự động. Tồn kho được hoàn sau khi xác nhận đã nhận hàng trả.`
-      : `Duyệt yêu cầu trả hàng cho đơn ${item.maHoaDon}?`,
+    message: `Duyệt đơn ${item.maHoaDon}? Khách sẽ được thông báo để tạo vận đơn hoàn hàng.`
+      + ' Hoàn tiền chỉ được xét sau khi cửa hàng nhận lại hàng.',
     confirmText: 'Duyệt',
   })
   if (!ok) return
@@ -157,11 +157,7 @@ async function handleDuyet(item) {
   actionLoading.value = item.id
   try {
     await duyetTraHang(item.id, staffPayload())
-    notify(
-      isVnpay
-        ? `Đã duyệt và hoàn tiền VNPAY cho đơn ${item.maHoaDon}.`
-        : `Đã duyệt yêu cầu trả hàng đơn ${item.maHoaDon}.`,
-    )
+    notify(`Đã duyệt yêu cầu trả hàng đơn ${item.maHoaDon}. Chờ khách tạo vận đơn hoàn hàng.`)
     await loadList()
   } catch (err) {
     notify(String(err), 'error')
@@ -199,9 +195,14 @@ async function confirmReject() {
 }
 
 async function handleDaNhanHang(item) {
+  if (!item?.maVanDonTra) {
+    notify('Khách chưa tạo vận đơn hoàn hàng. Không thể xác nhận đã nhận hàng.', 'error')
+    return
+  }
   const ok = await confirm({
     title: 'Xác nhận đã nhận hàng',
-    message: `Xác nhận đã nhận hàng hoàn của đơn ${item.maHoaDon}? Hệ thống sẽ hoàn kho và tạo yêu cầu hoàn tiền.`,
+    message: `Xác nhận đã nhận hàng hoàn của đơn ${item.maHoaDon}? Hệ thống sẽ hoàn kho và tạo`
+      + ' yêu cầu hoàn tiền chờ xử lý — bạn quyết định hoàn tiền hay từ chối ở trang Hoàn tiền.',
     confirmText: 'Đã nhận hàng',
   })
   if (!ok) return
@@ -209,7 +210,27 @@ async function handleDaNhanHang(item) {
   actionLoading.value = item.id
   try {
     await daNhanHangTraHang(item.id, staffPayload())
-    notify(`Đã xác nhận nhận hàng đơn ${item.maHoaDon}.`)
+    notify(`Đã xác nhận nhận hàng đơn ${item.maHoaDon}. Vào trang Hoàn tiền để quyết định hoàn tiền.`)
+    await loadList()
+  } catch (err) {
+    notify(String(err), 'error')
+  } finally {
+    actionLoading.value = null
+  }
+}
+
+async function handleDongBoGhn(item) {
+  actionLoading.value = item.id
+  try {
+    const res = await dongBoVanDonTra(item.id, staffPayload())
+    const updated = res.data
+    if (updated?.trangThai === 'DA_NHAN_HANG') {
+      notify(`Vận đơn hoàn đơn ${item.maHoaDon} đã về cửa hàng — đã hoàn kho và tạo yêu cầu hoàn tiền.`)
+    } else {
+      notify(
+        `Vận đơn hoàn đơn ${item.maHoaDon}: ${updated?.ghnTrangThaiTraLabel || 'chưa có cập nhật mới'}.`,
+      )
+    }
     await loadList()
   } catch (err) {
     notify(String(err), 'error')
@@ -322,7 +343,15 @@ onMounted(() => {
                     {{ item.trangThaiLabel || traHangStatusLabel(item.trangThai) }}
                   </span>
                 </td>
-                <td class="soleil-col-text text-sm">{{ item.maVanDonTra || '—' }}</td>
+                <td class="soleil-col-text text-sm">
+                  <template v-if="item.maVanDonTra">
+                    {{ item.maVanDonTra }}
+                    <span v-if="item.ghnTrangThaiTraLabel" class="ghn-status">
+                      {{ item.ghnTrangThaiTraLabel }}
+                    </span>
+                  </template>
+                  <template v-else>—</template>
+                </td>
                 <td class="soleil-col-text text-sm text-[var(--admin-muted)]">
                   {{ formatDateTime(item.ngayTao) }}
                 </td>
@@ -355,13 +384,31 @@ onMounted(() => {
                       </button>
                     </template>
                     <button
-                      v-if="item.trangThai === 'DANG_HOAN_HANG' || item.trangThai === 'DA_DUYET'"
+                      v-if="item.maVanDonTra && item.trangThai === 'DANG_HOAN_HANG'"
+                      type="button"
+                      class="act-btn act-btn--info"
+                      :disabled="actionLoading === item.id"
+                      @click="handleDongBoGhn(item)"
+                    >
+                      Đồng bộ GHN
+                    </button>
+                    <button
+                      v-if="item.trangThai === 'DANG_HOAN_HANG' && item.maVanDonTra"
                       type="button"
                       class="act-btn act-btn--ok"
                       :disabled="actionLoading === item.id"
                       @click="handleDaNhanHang(item)"
                     >
                       Đã nhận hàng
+                    </button>
+                    <button
+                      v-if="item.trangThai === 'DA_NHAN_HANG'"
+                      type="button"
+                      class="act-btn act-btn--info"
+                      title="Quyết định hoàn tiền hay từ chối"
+                      @click="router.push('/admin/hoan-tien')"
+                    >
+                      Xử lý hoàn tiền
                     </button>
                   </div>
                 </td>
@@ -372,6 +419,9 @@ onMounted(() => {
                     <div><strong>Mô tả:</strong> {{ item.moTa || '—' }}</div>
                     <div><strong>Địa chỉ trả:</strong> {{ item.diaChiTra || '—' }}</div>
                     <div><strong>Phương thức TT:</strong> {{ item.phuongThucThanhToan || '—' }}</div>
+                    <div><strong>Ca lấy hàng:</strong> {{ item.pickShiftLabel || '—' }}</div>
+                    <div><strong>Trạng thái vận đơn hoàn:</strong> {{ item.ghnTrangThaiTraLabel || '—' }}</div>
+                    <div><strong>Nhận lại hàng lúc:</strong> {{ formatDateTime(item.ngayNhanHang) }}</div>
                     <div><strong>Ngân hàng:</strong> {{ item.tenNganHang || '—' }}</div>
                     <div><strong>STK:</strong> {{ item.soTaiKhoan || '—' }}</div>
                     <div><strong>Chủ TK:</strong> {{ item.chuTaiKhoan || '—' }}</div>
@@ -545,6 +595,12 @@ onMounted(() => {
 .act-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .act-btn--ok { background: rgba(72, 140, 82, 0.14); color: #3d7a4a; }
 .act-btn--danger { background: rgba(180, 72, 72, 0.12); color: #a83a3a; }
+.act-btn--info { background: rgba(72, 120, 180, 0.12); color: #3a6ea8; }
+.ghn-status {
+  display: block;
+  font-size: 11px;
+  color: rgba(30, 21, 16, 0.5);
+}
 .link-btn {
   background: none;
   border: none;
