@@ -74,6 +74,8 @@ public class HoaDonStorefrontService {
         KhachHang kh = getKhachDangNhap();
         return hoaDonRepository.findByIdKhachHang_IdOrderByNgayTaoDesc(kh.getId())
                 .stream()
+                // VNPAY chưa thanh toán: coi như chưa đặt — không hiện ở tra cứu / đơn hàng.
+                .filter(hd -> !onlineOrderLifecycleService.laVnpayChuaThanhToan(hd))
                 .map(this::buildSummary)
                 .toList();
     }
@@ -83,6 +85,9 @@ public class HoaDonStorefrontService {
         KhachHang kh = getKhachDangNhap();
         HoaDon hd = hoaDonRepository.findByIdAndIdKhachHang_Id(id, kh.getId())
                 .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng", "NOT_FOUND"));
+        if (onlineOrderLifecycleService.laVnpayChuaThanhToan(hd)) {
+            throw new ApiException("Không tìm thấy đơn hàng", "NOT_FOUND");
+        }
         return buildDetail(hd);
     }
 

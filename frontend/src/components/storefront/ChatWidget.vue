@@ -141,10 +141,10 @@ const handleChatClick = (e) => {
                 class="chat-product-card" 
                 @click="viewProduct(sp.id)"
               >
-                <img :src="productImageUrl(sp.anhUrl)" alt="Product">
+                <img :src="productImageUrl(sp.anhChinhUrl || sp.anhUrl)" alt="Product">
                 <div class="chat-product-info">
-                  <strong>{{ sp.tenSanPham }}</strong>
-                  <span>{{ formatVND(sp.giaBanNhoNhat) }}</span>
+                  <strong>{{ sp.ten || sp.tenSanPham }}</strong>
+                  <span>{{ formatVND(sp.giaMin ?? sp.giaBanNhoNhat) }}</span>
                 </div>
               </div>
             </div>

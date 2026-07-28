@@ -1,6 +1,5 @@
 package org.example.templatejava6.order.service;
 
-import org.example.templatejava6.cart.entity.ChiTietGioHang;
 import org.example.templatejava6.cart.entity.GioHang;
 import org.example.templatejava6.cart.repository.ChiTietGioHangRepository;
 import org.example.templatejava6.cart.repository.GioHangRepository;
@@ -22,9 +21,6 @@ import org.example.templatejava6.realtime.service.OrderRealtimeService;
 import org.example.templatejava6.voucher.repository.PhieuGiamGiaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 public class OnlineOrderLifecycleService {
@@ -89,7 +85,7 @@ public class OnlineOrderLifecycleService {
         }
 
         boolean daThanhToan = daThanhToanThanhCong(hoaDon);
-        // VNPAY chưa trả: xóa hẳn, không để DA_HUY ảo; hoàn giỏ.
+        // VNPAY chưa trả: xóa hẳn, không để DA_HUY ảo; hoàn tồn/voucher (giỏ vẫn nguyên).
         if (!daThanhToan && laVnpay(hoaDon)) {
             xoaDonChuaThanhToan(hoaDon);
             return true;
@@ -128,7 +124,7 @@ public class OnlineOrderLifecycleService {
 
     /**
      * Xóa hẳn đơn online VNPAY chưa thanh toán (hủy/thất bại/quá hạn).
-     * Hoàn tồn, voucher và trả lại giỏ hàng.
+     * Hoàn tồn và voucher. Không đụng giỏ hàng — giỏ chỉ bị trừ khi thanh toán thành công.
      * Caller phải gọi trong transaction với entity còn gắn session (hoặc dùng {@link #xoaDonChuaThanhToanNeuCan}).
      */
     @Transactional
@@ -143,15 +139,47 @@ public class OnlineOrderLifecycleService {
             throw new ApiException("Chỉ xóa được đơn VNPAY chưa thanh toán.", "INVALID_PAYMENT_METHOD");
         }
 
-        List<HoaDonChiTiet> chiTiets = hoaDonChiTietRepository.findByIdHoaDon(hoaDon);
         hoanTonKho(hoaDon);
         hoanLuotVoucher(hoaDon);
-        hoanGioHang(hoaDon, chiTiets);
 
         thanhToanHoaDonRepository.deleteByIdHoaDon(hoaDon);
         lichSuDonHangRepository.deleteByIdHoaDon_Id(hoaDon.getId());
         hoaDonChiTietRepository.deleteByIdHoaDon(hoaDon);
         hoaDonRepository.delete(hoaDon);
+    }
+
+    /**
+     * Trừ số lượng trong giỏ tương ứng dòng hóa đơn — gọi khi VNPAY thanh toán thành công.
+     */
+    @Transactional
+    public void truGioHangTheoDon(HoaDon hoaDon) {
+        KhachHang khachHang = hoaDon.getIdKhachHang();
+        if (khachHang == null) {
+            return;
+        }
+        GioHang gioHang = gioHangRepository.findFirstByKhachHang_IdOrderByIdAsc(khachHang.getId())
+                .orElse(null);
+        if (gioHang == null) {
+            return;
+        }
+
+        for (HoaDonChiTiet chiTiet : hoaDonChiTietRepository.findByIdHoaDon(hoaDon)) {
+            ChiTietSanPham chiTietSanPham = chiTiet.getIdChiTietSanPham();
+            if (chiTietSanPham == null || chiTiet.getSoLuong() == null || chiTiet.getSoLuong() <= 0) {
+                continue;
+            }
+            chiTietGioHangRepository
+                    .findByGioHang_IdAndChiTietSanPham_Id(gioHang.getId(), chiTietSanPham.getId())
+                    .ifPresent(existing -> {
+                        int remaining = existing.getSoLuong() - chiTiet.getSoLuong();
+                        if (remaining <= 0) {
+                            chiTietGioHangRepository.delete(existing);
+                        } else {
+                            existing.setSoLuong(remaining);
+                            chiTietGioHangRepository.save(existing);
+                        }
+                    });
+        }
     }
 
     @Transactional(readOnly = true)
@@ -170,41 +198,6 @@ public class OnlineOrderLifecycleService {
         return hoaDon.getIdPhuongThucThanhToan() != null
                 && hoaDon.getIdPhuongThucThanhToan().getMa() != null
                 && MA_VNPAY.equalsIgnoreCase(hoaDon.getIdPhuongThucThanhToan().getMa());
-    }
-
-    private void hoanGioHang(HoaDon hoaDon, List<HoaDonChiTiet> chiTiets) {
-        KhachHang khachHang = hoaDon.getIdKhachHang();
-        if (khachHang == null || chiTiets.isEmpty()) {
-            return;
-        }
-        GioHang gioHang = gioHangRepository.findFirstByKhachHang_IdOrderByIdAsc(khachHang.getId())
-                .orElseGet(() -> {
-                    GioHang moi = new GioHang();
-                    moi.setKhachHang(khachHang);
-                    moi.setNgayTao(LocalDateTime.now());
-                    return gioHangRepository.save(moi);
-                });
-
-        for (HoaDonChiTiet chiTiet : chiTiets) {
-            ChiTietSanPham chiTietSanPham = chiTiet.getIdChiTietSanPham();
-            if (chiTietSanPham == null || chiTiet.getSoLuong() == null || chiTiet.getSoLuong() <= 0) {
-                continue;
-            }
-            chiTietGioHangRepository
-                    .findByGioHang_IdAndChiTietSanPham_Id(gioHang.getId(), chiTietSanPham.getId())
-                    .ifPresentOrElse(
-                            existing -> {
-                                existing.setSoLuong(existing.getSoLuong() + chiTiet.getSoLuong());
-                                chiTietGioHangRepository.save(existing);
-                            },
-                            () -> {
-                                ChiTietGioHang item = new ChiTietGioHang();
-                                item.setGioHang(gioHang);
-                                item.setChiTietSanPham(chiTietSanPham);
-                                item.setSoLuong(chiTiet.getSoLuong());
-                                chiTietGioHangRepository.save(item);
-                            });
-        }
     }
 
     private void hoanTonKho(HoaDon hoaDon) {
@@ -228,7 +221,7 @@ public class OnlineOrderLifecycleService {
         lichSu.setIdHoaDon(hoaDon);
         lichSu.setTrangThai(trangThai);
         lichSu.setGhiChu(ghiChu);
-        lichSu.setThoiGian(LocalDateTime.now());
+        lichSu.setThoiGian(java.time.LocalDateTime.now());
         lichSuDonHangRepository.save(lichSu);
     }
 }

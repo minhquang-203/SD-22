@@ -233,6 +233,7 @@ public class PaymentService {
                     "Thanh toán " + provider + " thành công"
                             + formatProviderTransaction(callback.getProviderTransactionNo()));
             if (LOAI_DON_ONLINE.equalsIgnoreCase(hoaDon.getLoaiDon())) {
+                onlineOrderLifecycleService.truGioHangTheoDon(hoaDon);
                 thongBaoDonMoi(hoaDon);
                 orderMailService.guiHoaDonDatHangThanhCong(hoaDon);
                 orderRealtimeService.publishCreated(hoaDon);

@@ -83,7 +83,7 @@ const paymentMethods = [
     code: 'VNPAY',
     name: 'VNPay',
     icon: 'solar:card-transfer-linear',
-    description: 'Bạn sẽ được chuyển đến cổng VNPay sau khi tạo đơn.',
+    description: 'Chuyển đến VNPay để thanh toán. Đơn chỉ được tạo khi thanh toán thành công.',
   },
 ]
 
@@ -469,6 +469,8 @@ function parsePaymentCallback() {
     void syncAfterCheckout().catch(() => {})
     toast('Thanh toán thành công')
   } else {
+    // Thanh toán hủy/thất bại: đơn đã xóa phía server, giỏ vẫn nguyên — sync lại UI.
+    void refreshCart({ force: true }).catch(() => {})
     toast(paymentCallback.value.message || 'Thanh toán thất bại')
   }
 }
@@ -503,14 +505,15 @@ async function submitCheckout() {
     })
 
     orderResult.value = res.data
-    await syncAfterCheckout(purchasedIds)
 
     if (res.data?.paymentUrl) {
-      toast('Tạo đơn thành công. Đang chuyển sang VNPay...')
+      // Giữ giỏ nguyên đến khi VNPay thành công (callback).
+      toast('Đang chuyển sang cổng thanh toán VNPay...')
       window.location.assign(res.data.paymentUrl)
       return
     }
 
+    await syncAfterCheckout(purchasedIds)
     toast('Đặt hàng thành công')
   } catch (error) {
     toast(typeof error === 'string' ? error : 'Không thể đặt hàng, vui lòng thử lại')

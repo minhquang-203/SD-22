@@ -6,8 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 /**
- * Cau hinh tich hop Giao Hang Nhanh (GHN). Cac gia tri duoc nap tu application.properties
- * voi tien to "ghn.".
+ * Cau hinh tich hop Giao Hang Nhanh (GHN). Nap tu env / .env (prefix ghn.*).
  */
 @Getter
 @Setter
