@@ -1,8 +1,10 @@
 package org.example.templatejava6.realtime.listener;
 
 import org.example.templatejava6.realtime.event.AdminNotificationAppEvent;
+import org.example.templatejava6.realtime.event.HoTroRealtimeAppEvent;
 import org.example.templatejava6.realtime.event.OrderRealtimeAppEvent;
 import org.example.templatejava6.realtime.model.AdminNotificationEvent;
+import org.example.templatejava6.realtime.model.HoTroRealtimeEvent;
 import org.example.templatejava6.realtime.model.OrderRealtimeEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +18,7 @@ public class RealtimeEventListener {
 
     public static final String TOPIC_ADMIN_ORDERS = "/topic/admin/orders";
     public static final String TOPIC_ADMIN_NOTIFICATIONS = "/topic/admin/notifications";
+    public static final String TOPIC_HO_TRO_INBOX = "/topic/ho-tro/inbox";
 
     private static final Logger log = LoggerFactory.getLogger(RealtimeEventListener.class);
 
@@ -53,6 +56,20 @@ public class RealtimeEventListener {
             messagingTemplate.convertAndSend(TOPIC_ADMIN_NOTIFICATIONS, payload);
         } catch (Exception ex) {
             log.warn("Không gửi được realtime thông báo admin: {}", ex.getMessage());
+        }
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void onHoTroEvent(HoTroRealtimeAppEvent event) {
+        HoTroRealtimeEvent payload = event.getPayload();
+        if (payload == null || payload.getIdPhien() == null) {
+            return;
+        }
+        try {
+            messagingTemplate.convertAndSend("/topic/ho-tro/" + payload.getIdPhien(), payload);
+            messagingTemplate.convertAndSend(TOPIC_HO_TRO_INBOX, payload);
+        } catch (Exception ex) {
+            log.warn("Không gửi được realtime hỗ trợ phiên {}: {}", payload.getIdPhien(), ex.getMessage());
         }
     }
 }

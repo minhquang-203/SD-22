@@ -4,6 +4,7 @@ import '@/styles/soleil-storefront.css'
 import TheNavbar from '@/components/storefront/TheNavbar.vue'
 import TheFooter from '@/components/storefront/TheFooter.vue'
 import AuthModal from '@/components/storefront/AuthModal.vue'
+import WelcomeModal from '@/components/storefront/WelcomeModal.vue'
 import CartToast from '@/components/storefront/CartToast.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import ChatWidget from '@/components/storefront/ChatWidget.vue'
@@ -17,6 +18,7 @@ import ChatWidget from '@/components/storefront/ChatWidget.vue'
     </main>
     <TheFooter />
     <AuthModal />
+    <WelcomeModal />
     <CartToast />
     <ConfirmDialog />
     <ChatWidget />

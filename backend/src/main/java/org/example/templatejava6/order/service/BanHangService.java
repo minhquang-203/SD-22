@@ -434,6 +434,7 @@ public class BanHangService {
             PhuongThucThanhToan ptttLonNhat = null;
             BigDecimal soTienLonNhat = BigDecimal.valueOf(-1);
             ThanhToanHoaDon ttDaiDien = null;
+            List<ThanhToanHoaDon> cacDongThanhToan = new ArrayList<>();
 
             for (int i = 0; i < req.getDanhSachThanhToan().size(); i++) {
                 TaoDonTaiQuayRequest.ThanhToanItemRequest item = req.getDanhSachThanhToan().get(i);
@@ -450,6 +451,7 @@ public class BanHangService {
                 tt.setTrangThai(TRANG_THAI_THANH_CONG);
                 tt.setThoiGian(now);
                 tt = thanhToanHoaDonRepository.save(tt);
+                cacDongThanhToan.add(tt);
 
                 if (ttDaiDien == null || item.getSoTien().compareTo(soTienLonNhat) > 0) {
                     soTienLonNhat = item.getSoTien();
@@ -482,7 +484,7 @@ public class BanHangService {
                 khachHangRepository.save(khachHang);
             }
 
-            return BanHangHoaDonResponse.from(hoaDon, ttDaiDien, lineResponses);
+            return BanHangHoaDonResponse.from(hoaDon, ttDaiDien, lineResponses, cacDongThanhToan);
         }
 
         if (isVnpay) {
@@ -548,7 +550,9 @@ public class BanHangService {
             List<BanHangChiTietResponse> lines = hoaDonChiTietRepository.findByIdHoaDon(hoaDon).stream()
                     .map(BanHangChiTietResponse::new)
                     .toList();
-            hoaDonResponse = BanHangHoaDonResponse.from(hoaDon, thanhToan, lines);
+            List<ThanhToanHoaDon> tatCaThanhToan =
+                    thanhToanHoaDonRepository.findByIdHoaDonOrderByThoiGianDesc(hoaDon);
+            hoaDonResponse = BanHangHoaDonResponse.from(hoaDon, thanhToan, lines, tatCaThanhToan);
             hoaDonResponse.setTrangThaiThanhToan(TRANG_THAI_THANH_CONG);
         }
 
@@ -606,7 +610,10 @@ public class BanHangService {
         List<BanHangChiTietResponse> lines = hoaDonChiTietRepository.findByIdHoaDon(hoaDon).stream()
                 .map(BanHangChiTietResponse::new)
                 .toList();
-        BanHangHoaDonResponse hoaDonResponse = BanHangHoaDonResponse.from(hoaDon, thanhToan, lines);
+        List<ThanhToanHoaDon> tatCaThanhToan =
+                thanhToanHoaDonRepository.findByIdHoaDonOrderByThoiGianDesc(hoaDon);
+        BanHangHoaDonResponse hoaDonResponse =
+                BanHangHoaDonResponse.from(hoaDon, thanhToan, lines, tatCaThanhToan);
         hoaDonResponse.setTrangThaiThanhToan(TRANG_THAI_THANH_CONG);
         return PosThanhToanStatusResponse.of(hoaDon.getId(), hoaDon.getMaHoaDon(), TRANG_THAI_THANH_CONG, hoaDonResponse);
     }

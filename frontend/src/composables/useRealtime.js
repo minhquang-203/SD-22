@@ -120,3 +120,24 @@ export function subscribeCustomerOrders(handler) {
     getCustomerToken,
   )
 }
+
+export function subscribeHoTroPhien(idPhien, handler, getToken) {
+  if (!idPhien) return () => {}
+  return (getToken === getAdminToken ? adminSession : customerSession).subscribe(
+    `/topic/ho-tro/${idPhien}`,
+    handler,
+    getToken,
+  )
+}
+
+export function subscribeCustomerHoTroPhien(idPhien, handler) {
+  return subscribeHoTroPhien(idPhien, handler, getCustomerToken)
+}
+
+export function subscribeAdminHoTroPhien(idPhien, handler) {
+  return subscribeHoTroPhien(idPhien, handler, getAdminToken)
+}
+
+export function subscribeAdminHoTroInbox(handler) {
+  return adminSession.subscribe('/topic/ho-tro/inbox', handler, getAdminToken)
+}

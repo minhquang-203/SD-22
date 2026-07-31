@@ -1,14 +1,16 @@
 <script setup>
-import { computed, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, onUnmounted, reactive, ref, watch, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useAuthModal } from '@/composables/useAuthModal'
+import { useWelcomeModal } from '@/composables/useWelcomeModal'
 import { quenMatKhauKhach, datLaiMatKhauKhach } from '@/api/authApi'
 
 const router = useRouter()
 const { dangNhap, dangKy } = useAuth()
 const { visible, tab, redirectAfter, closeAuthModal } = useAuthModal()
+const { openWelcomeModal } = useWelcomeModal()
 
 const loginForm = reactive({ taiKhoan: '', matKhau: '' })
 const registerForm = reactive({
@@ -241,6 +243,8 @@ async function handleLogin() {
     await dangNhap(loginForm.taiKhoan.trim(), loginForm.matKhau)
     const dest = redirectAfter.value || '/'
     closeAuthModal()
+    await nextTick()
+    openWelcomeModal()
     if (dest && dest !== router.currentRoute.value.fullPath) {
       router.push(dest)
     }
@@ -265,6 +269,8 @@ async function handleRegister() {
     })
     const dest = redirectAfter.value || '/'
     closeAuthModal()
+    await nextTick()
+    openWelcomeModal()
     if (dest && dest !== router.currentRoute.value.fullPath) {
       router.push(dest)
     }

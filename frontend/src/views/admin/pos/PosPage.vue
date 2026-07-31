@@ -1350,7 +1350,18 @@ onBeforeUnmount(() => {
             <div v-if="receipt.tienThua != null" class="flex justify-between">
               <span>Tiền thối</span><span>{{ formatCurrency(receipt.tienThua) }}</span>
             </div>
-            <div class="mt-1">PTTT: {{ receipt.tenPhuongThucThanhToan }}</div>
+            <template v-if="receipt.danhSachThanhToan && receipt.danhSachThanhToan.length > 1">
+              <div class="mt-1">Thanh toán:</div>
+              <div
+                v-for="(tt, ttIdx) in receipt.danhSachThanhToan"
+                :key="ttIdx"
+                class="flex justify-between"
+              >
+                <span>{{ tt.tenPhuongThucThanhToan }}</span>
+                <span>{{ formatCurrency(tt.soTien) }}</span>
+              </div>
+            </template>
+            <div v-else class="mt-1">PTTT: {{ receipt.tenPhuongThucThanhToan }}</div>
           </div>
           <p class="pos-receipt-print__thanks">Cảm ơn quý khách!</p>
         </div>

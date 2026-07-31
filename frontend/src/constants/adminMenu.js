@@ -193,13 +193,6 @@ export const ADMIN_MENU = [
         roles: MANAGER_AND_OWNER,
       },
       {
-        key: "reports",
-        label: "Báo cáo",
-        icon: "icon-park-outline:file-excel",
-        path: "/admin/reports",
-        roles: MANAGER_AND_OWNER,
-      },
-      {
         key: "discounts",
         label: "Khuyến mãi & Voucher",
         icon: "carbon:ticket",
@@ -241,13 +234,6 @@ export const ADMIN_MENU = [
         label: "Quản lý nhân viên",
         icon: "icon-park-outline:user-business",
         path: "/admin/staff",
-        roles: MANAGER_AND_OWNER,
-      },
-      {
-        key: "config",
-        label: "Cấu hình hệ thống",
-        icon: "icon-park-outline:setting-config",
-        path: "/admin/config",
         roles: MANAGER_AND_OWNER,
       },
     ],

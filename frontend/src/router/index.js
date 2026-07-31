@@ -277,18 +277,6 @@ const router = createRouter({
           component: () => import('@/views/admin/support/SupportPage.vue'),
           meta: { title: 'Hỗ trợ khách hàng', breadcrumb: 'Hỗ trợ khách hàng' },
         },
-        {
-          path: 'reports',
-          name: 'AdminReports',
-          component: () => import('@/views/admin/report/ReportPage.vue'),
-          meta: { title: 'Báo cáo', breadcrumb: 'Báo cáo', role: ADMIN_ROLES.QUAN_LY },
-        },
-        {
-          path: 'config',
-          name: 'AdminConfig',
-          component: () => import('@/views/admin/config/SystemConfig.vue'),
-          meta: { title: 'Cấu hình hệ thống', breadcrumb: 'Cấu hình hệ thống', role: ADMIN_ROLES.QUAN_LY },
-        },
       ],
     },
   ],

@@ -225,6 +225,169 @@ export const blogPosts = [
       },
     ],
   },
+  {
+    id: 7,
+    slug: 'cach-chon-kem-chong-nang-cho-da-dau-mun',
+    title: 'Cách chọn kem chống nắng cho da dầu mụn',
+    excerpt:
+      'Da dầu mụn cần lớp chống nắng mỏng nhẹ, ít gây bí tắc nhưng vẫn đủ SPF và PA. Đây là tiêu chí chọn sản phẩm và cách thoa để hạn chế bóng nhờn, mụn viêm trong khí hậu nóng ẩm.',
+    category: 'huong-dan-chon',
+    icon: 'droplet',
+    readTime: '7 phút đọc',
+    publishDate: '2026-07-05',
+    author: 'Đội ngũ biên tập SUNOVA',
+    tag: 'Hướng dẫn chọn',
+    sections: [
+      {
+        heading: 'Vì sao da dầu mụn dễ “kỵ” kem chống nắng',
+        paragraphs: [
+          'Da dầu có tuyến bã hoạt động mạnh, đặc biệt ở vùng chữ T. Khi thêm một lớp kem chống nắng đặc hoặc nhiều dầu, lỗ chân lông dễ bị bịt kín, cộng thêm mồ hôi và bụi bẩn trong ngày khiến tình trạng mụn viêm, mụn đầu đen dễ nặng hơn.',
+          'Điều đó không có nghĩa là bỏ chống nắng. Tia UV vẫn gây sạm, thâm sau mụn và làm da dễ kích ứng hơn về lâu dài. Mục tiêu là chọn kết cấu phù hợp và thoa đúng lượng thay vì bỏ bước bảo vệ.',
+        ],
+      },
+      {
+        heading: 'Ưu tiên kết cấu và chỉ số nào',
+        paragraphs: [
+          'Với da dầu mụn, các dạng gel, sữa mỏng hoặc kem chống nắng “oil control / matte” thường dễ chịu hơn dạng kem đặc. Nhãn ghi không chứa dầu (oil-free), không gây mụn (non-comedogenic) là tín hiệu hữu ích, dù vẫn cần thử trên da thật để xác nhận.',
+          'Về chỉ số, SPF 30–50 kèm PA+++ trở lên vẫn là mức phù hợp cho sinh hoạt ngoài trời ở Việt Nam. Không nhất thiết phải chọn SPF cao nhất nếu sản phẩm quá đặc và khiến bạn ngại thoa lại — sự đều đặn quan trọng hơn con số trên bao bì.',
+        ],
+      },
+      {
+        heading: 'Thứ tự chăm sóc và lượng thoa hợp lý',
+        paragraphs: [
+          'Sau bước làm sạch và dưỡng ẩm nhẹ (ưu tiên gel hoặc lotion không dầu), thoa kem chống nắng như lớp cuối cùng buổi sáng trước trang điểm. Lượng gợi ý cho mặt khoảng hai đốt ngón tay — thoa quá mỏng sẽ làm giảm hiệu quả bảo vệ dù SPF ghi trên hộp rất cao.',
+          'Nếu da dễ bóng giữa ngày, có thể thấm dầu bằng giấy thấm trước rồi thoa lại lớp mỏng vùng chữ T, hoặc dùng sản phẩm chống nắng dạng xịt/phấn bổ sung ngoài trời. Tránh chồng nhiều lớp kem đặc liên tục vì dễ gây bí và bong cục.',
+        ],
+      },
+      {
+        heading: 'Khi nào nên đổi sản phẩm hoặc gặp bác sĩ da liễu',
+        paragraphs: [
+          'Nếu sau 1–2 tuần dùng vẫn nổi nhiều mụn viêm mới, ngứa hoặc đỏ kéo dài, hãy dừng sản phẩm và thử lại với kết cấu mỏng hơn hoặc công thức dành riêng cho da mụn. Trường hợp mụn đang điều trị bằng thuốc bôi/uống, nên hỏi bác sĩ trước khi đổi kem chống nắng để tránh kích ứng chồng chéo.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 8,
+    slug: 'chong-nang-cho-da-khi-di-mua-va-loi-nuoc',
+    title: 'Chống nắng cho da khi đi mưa và lội nước',
+    excerpt:
+      'Mưa và nước làm lớp kem chống nắng mỏng đi nhanh hơn bạn nghĩ. Bài viết giải thích vì sao vẫn cần chống nắng ngày mưa, và cách duy trì bảo vệ khi ướt áo, lội nước hoặc đi dưới mưa phùn.',
+    category: 'mua-mua',
+    icon: 'cloud-rain',
+    readTime: '6 phút đọc',
+    publishDate: '2026-07-12',
+    author: 'Đội ngũ biên tập SUNOVA',
+    tag: 'Mùa mưa',
+    sections: [
+      {
+        heading: 'Đi mưa vẫn có tia UV',
+        paragraphs: [
+          'Mây và mưa làm giảm một phần ánh sáng nhìn thấy, nhưng tia UV vẫn có thể xuyên xuống mặt đất ở mức đáng kể, nhất là khi trời sáng dịu hoặc mưa phùn mỏng. Khoảng thời gian hửng nắng giữa các cơn mưa còn khiến chỉ số UV tăng nhanh trong thời gian ngắn.',
+          'Vì vậy, bỏ hẳn kem chống nắng chỉ vì trời âm u là thói quen dễ khiến da sạm và cháy nắng nhẹ sau những ngày mưa xen nắng quen thuộc ở nhiều tỉnh thành Việt Nam.',
+        ],
+      },
+      {
+        heading: 'Nước và mồ hôi làm lớp bảo vệ mỏng nhanh',
+        paragraphs: [
+          'Kem chống nắng “chống nước” không có nghĩa là không bị trôi. Khi da ướt, lau khăn hoặc lội nước, một phần màng chống nắng bị loại bỏ. Nhà sản xuất thường khuyến nghị thoa lại sau khi ra khỏi nước hoặc sau khoảng thời gian tiếp xúc nước liên tục.',
+          'Áo mưa và mũ giúp che mưa nhưng không thay thế hoàn toàn lớp chống nắng trên vùng da hở như mặt, cổ, tai và mu bàn tay — những vị trí vẫn tiếp xúc ánh sáng và phản xạ từ mặt đường ướt.',
+        ],
+      },
+      {
+        heading: 'Gợi ý thực tế cho ngày mưa phải ra ngoài',
+        paragraphs: [
+          'Buổi sáng vẫn nên thoa đủ lượng kem chống nắng phổ rộng trước khi ra đường. Chọn kết cấu bền nước vừa phải nhưng không quá đặc nếu độ ẩm cao khiến da dễ đổ dầu. Mang theo tuýp nhỏ để thoa lại sau khi áo mưa ướt, lau mặt hoặc ngồi lâu gần cửa sổ xe/bus.',
+          'Nếu phải lội nước hoặc đi dưới mưa lâu, ưu tiên thoa lại vùng mặt và cổ ngay khi có điều kiện lau khô da. Kết hợp thêm phụ kiện che nắng (mũ rộng vành, áo dài tay mỏng) sẽ giảm tải cho lớp kem và giúp da dễ chịu hơn trong ngày ẩm ướt.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 9,
+    slug: 'tre-em-va-chong-nang-do-tuoi-nao-bat-dau',
+    title: 'Trẻ em và chống nắng: độ tuổi nào bắt đầu',
+    excerpt:
+      'Da trẻ mỏng và nhạy cảm hơn người lớn, nhưng cách bảo vệ cần phù hợp từng độ tuổi. Bài viết tóm tắt nguyên tắc che nắng, dùng kem và thói quen an toàn theo từng giai đoạn phát triển.',
+    category: 'cham-soc-da',
+    icon: 'sun',
+    readTime: '7 phút đọc',
+    publishDate: '2026-07-18',
+    author: 'Đội ngũ biên tập SUNOVA',
+    tag: 'Chăm sóc da',
+    sections: [
+      {
+        heading: 'Trẻ sơ sinh và giai dưới 6 tháng',
+        paragraphs: [
+          'Với trẻ rất nhỏ, ưu tiên hàng đầu là tránh nắng trực tiếp: ở trong bóng râm, dùng mũ, áo dài tay mỏng và hạn chế ra ngoài vào khung giờ UV cao. Nhiều hướng dẫn da liễu khuyến cáo hạn chế dùng kem chống nắng hóa học trên trẻ dưới 6 tháng trừ khi không còn cách che chắn khác và có chỉ định của bác sĩ.',
+          'Nếu buộc phải ra ngoài ngắn, hãy ưu tiên bóng râm và trang phục che phủ thay vì dựa vào kem chống nắng như người lớn.',
+        ],
+      },
+      {
+        heading: 'Từ khoảng 6 tháng tuổi trở đi',
+        paragraphs: [
+          'Khi trẻ lớn hơn, có thể bắt đầu dùng kem chống nắng dành riêng cho trẻ em, thường ưu tiên công thức vật lý (khoáng) dịu da và ít hương liệu. Vẫn nên kết hợp mũ, kính (nếu phù hợp), áo chống nắng và tránh phơi nắng giữa trưa.',
+          'Thoa thử một lượng nhỏ ở vùng da kín trước lần dùng đầu để theo dõi kích ứng. Thoa đủ lượng vùng da hở và thoa lại sau khi chơi nước, đổ mồ hôi nhiều hoặc lau khăn.',
+        ],
+      },
+      {
+        heading: 'Trẻ lớn và học sinh: xây thói quen bền vững',
+        paragraphs: [
+          'Ở độ tuổi đi học, ngoài kem chống nắng buổi sáng, phụ huynh nên nhắc trẻ đội mũ khi ra sân và thoa lại sau giờ thể dục nếu da ướt mồ hôi. Chọn sản phẩm dễ thoa, ít bết dính sẽ giúp trẻ hợp tác hơn thay vì dùng loại quá đặc.',
+          'Không dùng chung kem chống nắng người lớn có nồng độ hoạt chất cao hoặc nhiều thành phần dễ kích ứng nếu chưa phù hợp da trẻ. Khi trẻ có bệnh da, dị ứng hoặc đang điều trị, hãy hỏi bác sĩ trước khi chọn sản phẩm mới.',
+        ],
+      },
+      {
+        heading: 'Những dấu hiệu cần dừng và đi khám',
+        paragraphs: [
+          'Nếu sau khi thoa kem xuất hiện mẩn đỏ, ngứa, sưng hoặc nổi mụn nước, hãy rửa sạch vùng da, dừng sản phẩm và đưa trẻ đi khám nếu triệu chứng kéo dài. Cháy nắng ở trẻ cũng cần được xử lý sớm: vào bóng râm, làm mát da và tránh nắng thêm cho đến khi da hồi phục.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 10,
+    slug: 'sai-lam-thuong-gap-khi-boi-kem-chong-nang',
+    title: 'Sai lầm thường gặp khi bôi kem chống nắng',
+    excerpt:
+      'Chọn SPF cao chưa đủ nếu thoa sai cách. Dưới đây là những lỗi phổ biến khiến lớp bảo vệ kém hiệu quả — và cách chỉnh lại thói quen hàng ngày cho khí hậu Việt Nam.',
+    category: 'kien-thuc-spf',
+    icon: 'shield',
+    readTime: '6 phút đọc',
+    publishDate: '2026-07-25',
+    author: 'Đội ngũ biên tập SUNOVA',
+    tag: 'Kiến thức',
+    sections: [
+      {
+        heading: 'Thoa quá mỏng và bỏ sót vùng da',
+        paragraphs: [
+          'Nhiều người chỉ chấm vài điểm kem rồi xoa nhanh, lượng thực tế thấp hơn nhiều so với mức dùng khi đo SPF trong điều kiện chuẩn. Hệ quả là bảo vệ yếu hơn đáng kể dù hộp ghi SPF 50.',
+          'Nên thoa đều mặt, tai, cổ, gáy và mu bàn tay — những vùng dễ cháy nắng nhưng thường bị quên. Với môi và mí mắt, dùng sản phẩm phù hợp hoặc son/kem có SPF nếu da vùng đó nhạy cảm.',
+        ],
+      },
+      {
+        heading: 'Chỉ thoa một lần buổi sáng rồi quên cả ngày',
+        paragraphs: [
+          'Kem chống nắng bị mồ hôi, ma sát khẩu trang, lau mặt và ánh nắng làm mỏng dần theo thời gian. Một lần thoa lúc 7 giờ sáng thường không đủ cho cả buổi chiều ngoài trời.',
+          'Hãy đặt mốc thoa lại theo hoạt động: khoảng vài giờ một lần khi ở ngoài trời, và ngay sau khi đổ nhiều mồ hôi, bơi hoặc lau khăn. Trong văn phòng gần cửa sổ lớn, vẫn nên duy trì lớp buổi sáng và cân nhắc thoa lại nếu ngồi cạnh kính nhiều giờ.',
+        ],
+      },
+      {
+        heading: 'Nhầm lẫn SPF cao với “không cần thoa lại”',
+        paragraphs: [
+          'SPF cao hơn không đồng nghĩa với thời gian bảo vệ vô hạn. Nó chủ yếu nói lên mức lọc tia UVB khi thoa đủ lượng; hiệu quả vẫn phụ thuộc vào việc duy trì lớp kem trên da.',
+          'Tương tự, trời mát, ngồi trong xe hoặc đứng dưới mái hiên không có nghĩa là UV bằng không. Kính xe và bóng râm chỉ giảm một phần bức xạ — vùng da hở vẫn nên được bảo vệ.',
+        ],
+      },
+      {
+        heading: 'Bôi kem chống nắng lên da chưa ổn định',
+        paragraphs: [
+          'Thoa kem chống nắng ngay trên da đang kích ứng mạnh, vừa peel hóa chất, hoặc chưa chờ dưỡng ẩm thấm có thể gây bóng cục, không đều và dễ khó chịu. Nên chờ lớp dưỡng thẩm thấu vài phút rồi mới thoa chống nắng.',
+          'Cuối ngày, hãy làm sạch nhẹ nhàng để loại bỏ kem chống nắng và bụi bẩn; để lớp kem qua đêm dễ bí da và không giúp “chống nắng thêm” khi đã không còn tiếp xúc nắng.',
+        ],
+      },
+    ],
+  },
 ]
 
 export function getPostBySlug(slug) {

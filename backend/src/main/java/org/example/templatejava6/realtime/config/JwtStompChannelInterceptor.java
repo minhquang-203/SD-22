@@ -110,6 +110,18 @@ public class JwtStompChannelInterceptor implements ChannelInterceptor {
             String customerId = slash >= 0 ? rest.substring(0, slash) : rest;
             return customerId.equals(String.valueOf(auth.getName()));
         }
+        // Chat hỗ trợ: inbox chỉ nhân viên; /topic/ho-tro/{idPhien} cho cả khách và nhân viên
+        if ("/topic/ho-tro/inbox".equals(destination)) {
+            return ADMIN_ROLES.contains(role);
+        }
+        if (destination.startsWith("/topic/ho-tro/")) {
+            String rest = destination.substring("/topic/ho-tro/".length());
+            if (rest.isBlank() || rest.contains("/")) {
+                return false;
+            }
+            // rest = id phiên (số)
+            return "KHACH_HANG".equals(role) || ADMIN_ROLES.contains(role);
+        }
         return false;
     }
 
