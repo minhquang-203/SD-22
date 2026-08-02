@@ -186,6 +186,13 @@ export const ADMIN_MENU = [
     label: "Quản trị (Quản lý)",
     children: [
       {
+        key: "nhap-hang",
+        label: "Nhập hàng",
+        icon: "icon-park-outline:inbox-in",
+        path: "/admin/nhap-hang",
+        roles: MANAGER_AND_OWNER,
+      },
+      {
         key: "stats",
         label: "Thống kê",
         icon: "icon-park-outline:analysis",

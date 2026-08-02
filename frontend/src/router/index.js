@@ -150,6 +150,24 @@ const router = createRouter({
           redirect: () => getAdminHomePath(useAdminAuth().vaiTro.value),
         },
         {
+          path: 'nhap-hang',
+          name: 'AdminNhapHang',
+          component: () => import('@/views/admin/nhaphang/PhieuNhapList.vue'),
+          meta: { title: 'Nhập hàng', breadcrumb: 'Nhập hàng', role: ADMIN_ROLES.QUAN_LY },
+        },
+        {
+          path: 'nhap-hang/tao',
+          name: 'AdminNhapHangTao',
+          component: () => import('@/views/admin/nhaphang/PhieuNhapForm.vue'),
+          meta: { title: 'Tạo phiếu nhập', breadcrumb: 'Nhập hàng / Tạo phiếu', role: ADMIN_ROLES.QUAN_LY },
+        },
+        {
+          path: 'nhap-hang/:id',
+          name: 'AdminNhapHangSua',
+          component: () => import('@/views/admin/nhaphang/PhieuNhapForm.vue'),
+          meta: { title: 'Phiếu nhập', breadcrumb: 'Nhập hàng / Chi tiết', role: ADMIN_ROLES.QUAN_LY },
+        },
+        {
           path: 'stats',
           name: 'AdminStats',
           component: () => import('@/views/admin/stats/StatsDashboard.vue'),

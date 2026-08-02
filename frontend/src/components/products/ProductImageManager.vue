@@ -97,7 +97,12 @@ function moveImage(index, delta) {
 
 function onColorChange(img, event) {
   const raw = event.target.value
-  img.idMauSac = raw === '' || raw === 'null' ? null : Number(raw)
+  if (raw === '' || raw === 'null') {
+    img.idMauSac = null
+    return
+  }
+  const n = Number(raw)
+  img.idMauSac = Number.isFinite(n) ? n : null
 }
 </script>
 

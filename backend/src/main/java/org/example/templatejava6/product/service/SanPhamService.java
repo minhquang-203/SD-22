@@ -405,7 +405,10 @@ public class SanPhamService {
                 anh.setUrl(url);
                 anh.setLaAnhChinh(anhReq.getLaAnhChinh() != null ? anhReq.getLaAnhChinh() : false);
                 anh.setThuTu(anhReq.getThuTu() != null ? anhReq.getThuTu() : 0);
-                anh.setMauSac(categoryService.getMauSacOrNull(anhReq.getIdMauSac()));
+                anh.setMauSac(categoryService.getMauSacOrNull(
+                        anhReq.getIdMauSac() != null && anhReq.getIdMauSac() > 0
+                                ? anhReq.getIdMauSac()
+                                : null));
                 anhSanPhamRepository.save(anh);
             }
         }

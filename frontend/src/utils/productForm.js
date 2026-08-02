@@ -120,6 +120,10 @@ export function validateProductForm(form) {
 function buildAnhPayload(anhs) {
   const files = []
   const payload = anhs.map((img, index) => {
+    const idMauSac =
+      img.idMauSac == null || img.idMauSac === '' || Number.isNaN(Number(img.idMauSac))
+        ? null
+        : Number(img.idMauSac)
     if (img.file) {
       const fileIndex = files.length
       files.push(img.file)
@@ -128,14 +132,14 @@ function buildAnhPayload(anhs) {
         fileIndex,
         laAnhChinh: img.laAnhChinh ?? false,
         thuTu: img.thuTu ?? index,
-        idMauSac: img.idMauSac ?? null,
+        idMauSac,
       }
     }
     return {
       url: img.url?.trim() || null,
       laAnhChinh: img.laAnhChinh ?? false,
       thuTu: img.thuTu ?? index,
-      idMauSac: img.idMauSac ?? null,
+      idMauSac,
     }
   })
   return { anhs: payload, files }

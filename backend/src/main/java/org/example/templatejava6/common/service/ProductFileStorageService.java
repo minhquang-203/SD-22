@@ -38,16 +38,24 @@ public class ProductFileStorageService {
         try {
             Path dir = Paths.get(productsDir).toAbsolutePath().normalize();
             Files.createDirectories(dir);
+            if (!Files.isWritable(dir)) {
+                throw new ApiException("Thư mục lưu ảnh không ghi được: " + dir, "STORAGE_ERROR");
+            }
 
             String original = file.getOriginalFilename();
             String safeName = sanitizeFilename(original);
             String storedName = UUID.randomUUID() + "_" + safeName;
-            Path target = dir.resolve(storedName);
-            file.transferTo(target.toFile());
+            Path target = dir.resolve(storedName).normalize();
+            if (!target.startsWith(dir)) {
+                throw new ApiException("Tên file ảnh không hợp lệ", "VALIDATION_ERROR");
+            }
+            file.transferTo(target);
 
             return "/uploads/products/" + storedName;
+        } catch (ApiException ex) {
+            throw ex;
         } catch (IOException ex) {
-            throw new ApiException("Không thể lưu file ảnh", "STORAGE_ERROR");
+            throw new ApiException("Không thể lưu file ảnh. Kiểm tra thư mục uploads/products.", "STORAGE_ERROR");
         }
     }
 
