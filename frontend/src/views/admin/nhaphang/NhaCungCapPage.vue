@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref } from 'vue'
 import {
   createNhaCungCap,
   deleteNhaCungCap,
@@ -13,15 +13,17 @@ const loading = ref(false)
 const saving = ref(false)
 const rows = ref([])
 const keyword = ref('')
-let searchTimer = null
 
-const showModal = ref(false)
-const editId = ref(null)
-const form = ref(emptyForm())
-
-function emptyForm() {
-  return { ma: '(tự sinh)', ten: '', soDienThoai: '', email: '', diaChi: '', ghiChu: '' }
-}
+const showForm = ref(false)
+const editingId = ref(null)
+const formMa = ref('(tự sinh)')
+const form = ref({
+  ten: '',
+  soDienThoai: '',
+  email: '',
+  diaChi: '',
+  ghiChu: '',
+})
 
 async function load() {
   loading.value = true
@@ -36,27 +38,32 @@ async function load() {
 }
 
 function openCreate() {
-  editId.value = null
-  form.value = emptyForm()
-  showModal.value = true
+  editingId.value = null
+  formMa.value = '(tự sinh khi lưu)'
+  form.value = { ten: '', soDienThoai: '', email: '', diaChi: '', ghiChu: '' }
+  showForm.value = true
 }
 
 function openEdit(row) {
-  editId.value = row.id
+  editingId.value = row.id
+  formMa.value = row.ma || '—'
   form.value = {
-    ma: row.ma || '',
     ten: row.ten || '',
     soDienThoai: row.soDienThoai || '',
     email: row.email || '',
     diaChi: row.diaChi || '',
     ghiChu: row.ghiChu || '',
   }
-  showModal.value = true
+  showForm.value = true
 }
 
-async function save() {
+function closeForm() {
+  showForm.value = false
+}
+
+async function saveForm() {
   if (!form.value.ten?.trim()) {
-    toast('Tên nhà cung cấp là bắt buộc', 'warn')
+    toast('Nhập tên nhà cung cấp', 'warn')
     return
   }
   saving.value = true
@@ -68,14 +75,14 @@ async function save() {
       diaChi: form.value.diaChi || null,
       ghiChu: form.value.ghiChu || null,
     }
-    if (editId.value) {
-      await updateNhaCungCap(editId.value, payload)
+    if (editingId.value) {
+      await updateNhaCungCap(editingId.value, payload)
       toast('Đã cập nhật nhà cung cấp', 'success')
     } else {
       await createNhaCungCap(payload)
       toast('Đã thêm nhà cung cấp', 'success')
     }
-    showModal.value = false
+    showForm.value = false
     await load()
   } catch (e) {
     toast(formatApiError(e, 'Không lưu được nhà cung cấp'), 'error')
@@ -84,23 +91,17 @@ async function save() {
   }
 }
 
-async function onToggle(row) {
-  const active = row.trangThai !== false
-  const action = active ? 'ngừng dùng' : 'khôi phục'
-  if (!confirm(`${active ? 'Ngừng dùng' : 'Khôi phục'} nhà cung cấp «${row.ten}»?`)) return
+async function onDelete(row) {
+  if (!row.trangThai) return
+  if (!confirm(`Ngừng dùng nhà cung cấp ${row.ma} — ${row.ten}?`)) return
   try {
     await deleteNhaCungCap(row.id)
-    toast(active ? 'Đã ngừng dùng NCC' : 'Đã khôi phục NCC', 'success')
+    toast('Đã ngừng dùng nhà cung cấp', 'success')
     await load()
   } catch (e) {
-    toast(formatApiError(e, `Không ${action} được NCC`), 'error')
+    toast(formatApiError(e, 'Không xóa được nhà cung cấp'), 'error')
   }
 }
-
-watch(keyword, () => {
-  clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => load(), 350)
-})
 
 onMounted(load)
 </script>
@@ -117,17 +118,26 @@ onMounted(load)
       </button>
     </div>
 
-    <div class="admin-card ncc-toolbar">
-      <input
-        v-model="keyword"
-        class="admin-input"
-        placeholder="Tìm theo mã hoặc tên…"
-      />
+    <div class="ncc-filters admin-card">
+      <label>
+        <span>Tìm theo mã / tên</span>
+        <div class="ncc-filters__row">
+          <input
+            v-model="keyword"
+            class="admin-input"
+            placeholder="VD: NCC0001 hoặc Công ty…"
+            @keyup.enter="load"
+          />
+          <button type="button" class="admin-btn admin-btn-default" @click="load">Tìm</button>
+        </div>
+      </label>
     </div>
 
     <div class="admin-card ncc-table-wrap">
       <div v-if="loading" class="ncc-empty">Đang tải…</div>
-      <div v-else-if="!rows.length" class="ncc-empty">Chưa có nhà cung cấp.</div>
+      <div v-else-if="!rows.length" class="ncc-empty">
+        Chưa có nhà cung cấp. Bấm «＋ Thêm nhà cung cấp» để tạo.
+      </div>
       <table v-else class="ncc-table">
         <thead>
           <tr>
@@ -150,9 +160,9 @@ onMounted(load)
             <td>
               <span
                 class="ncc-badge"
-                :class="row.trangThai !== false ? 'ncc-badge--ok' : 'ncc-badge--muted'"
+                :class="row.trangThai ? 'ncc-badge--ok' : 'ncc-badge--muted'"
               >
-                {{ row.trangThai !== false ? 'Đang dùng' : 'Ngừng dùng' }}
+                {{ row.trangThai ? 'Đang dùng' : 'Ngừng' }}
               </span>
             </td>
             <td class="ncc-actions">
@@ -160,12 +170,12 @@ onMounted(load)
                 Sửa
               </button>
               <button
+                v-if="row.trangThai"
                 type="button"
-                class="admin-btn"
-                :class="row.trangThai !== false ? 'admin-btn-danger' : 'admin-btn-default'"
-                @click="onToggle(row)"
+                class="admin-btn admin-btn-danger"
+                @click="onDelete(row)"
               >
-                {{ row.trangThai !== false ? 'Xóa' : 'Khôi phục' }}
+                Xóa
               </button>
             </td>
           </tr>
@@ -173,16 +183,16 @@ onMounted(load)
       </table>
     </div>
 
-    <div v-if="showModal" class="ncc-modal" @click.self="showModal = false">
+    <div v-if="showForm" class="ncc-modal" @click.self="closeForm">
       <div class="ncc-modal__panel">
         <div class="ncc-modal__head">
-          <h3>{{ editId ? 'Sửa nhà cung cấp' : 'Thêm nhà cung cấp' }}</h3>
-          <button type="button" class="admin-btn admin-btn-default" @click="showModal = false">✕</button>
+          <h3>{{ editingId ? 'Sửa nhà cung cấp' : 'Thêm nhà cung cấp' }}</h3>
+          <button type="button" class="admin-btn admin-btn-default" @click="closeForm">✕</button>
         </div>
 
         <label class="ncc-field">
           <span>Mã</span>
-          <input class="admin-input" :value="form.ma" readonly />
+          <input class="admin-input" :value="formMa" readonly />
         </label>
         <label class="ncc-field">
           <span>Tên *</span>
@@ -202,12 +212,12 @@ onMounted(load)
         </label>
         <label class="ncc-field">
           <span>Ghi chú</span>
-          <textarea v-model="form.ghiChu" class="admin-input" rows="2" />
+          <input v-model="form.ghiChu" class="admin-input" />
         </label>
 
         <div class="ncc-modal__actions">
-          <button type="button" class="admin-btn admin-btn-default" @click="showModal = false">Hủy</button>
-          <button type="button" class="admin-btn admin-btn-primary" :disabled="saving" @click="save">
+          <button type="button" class="admin-btn admin-btn-default" @click="closeForm">Hủy</button>
+          <button type="button" class="admin-btn admin-btn-primary" :disabled="saving" @click="saveForm">
             {{ saving ? 'Đang lưu…' : 'Lưu' }}
           </button>
         </div>
@@ -244,8 +254,23 @@ onMounted(load)
   color: var(--admin-muted, #8a7b6a);
 }
 
-.ncc-toolbar {
-  padding: 0.85rem 1rem;
+.ncc-filters {
+  padding: 1rem 1.15rem;
+}
+
+.ncc-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--admin-muted, #8a7b6a);
+}
+
+.ncc-filters__row {
+  display: flex;
+  gap: 0.5rem;
+  max-width: 480px;
 }
 
 .ncc-table-wrap {

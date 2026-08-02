@@ -28,8 +28,7 @@ const idNhaCungCap = ref(null)
 const soHoaDonDauVao = ref('')
 const giamGia = ref(0)
 const ghiChu = ref('')
-const ngayNhap = ref(new Date().toISOString().slice(0, 10))
-const maxNgayNhap = new Date().toISOString().slice(0, 10)
+const ngayNhap = ref(todayLocal())
 const nccOptions = ref([])
 
 const showSkuModal = ref(false)
@@ -42,10 +41,20 @@ const showNccModal = ref(false)
 const nccForm = ref({ ten: '', soDienThoai: '', email: '', diaChi: '', ghiChu: '' })
 const nccSaving = ref(false)
 
+const maxNgayNhap = todayLocal()
+
 const tongTien = computed(() =>
   lines.value.reduce((sum, row) => sum + Number(row.soLuong || 0) * Number(row.donGia || 0), 0),
 )
 const canTraNcc = computed(() => Math.max(0, tongTien.value - Number(giamGia.value || 0)))
+
+function todayLocal() {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
 
 function formatMoney(v) {
   return Number(v || 0).toLocaleString('vi-VN') + ' ₫'
@@ -89,7 +98,7 @@ async function loadDetail(id) {
     soHoaDonDauVao.value = p.soHoaDonDauVao || ''
     giamGia.value = Number(p.giamGia || 0)
     ghiChu.value = p.ghiChu || ''
-    ngayNhap.value = p.ngayTao ? String(p.ngayTao).slice(0, 10) : new Date().toISOString().slice(0, 10)
+    ngayNhap.value = p.ngayTao ? String(p.ngayTao).slice(0, 10) : todayLocal()
     lines.value = (p.chiTiets || []).map((d) => ({
       idChiTietSanPham: d.idChiTietSanPham,
       sku: d.sku,
@@ -178,12 +187,16 @@ async function saveNcc() {
 }
 
 function validateBeforeSave(requireHsd) {
-  if (ngayNhap.value && ngayNhap.value > maxNgayNhap) {
-    toast('Ngày nhập không được lớn hơn ngày hiện tại', 'warn')
-    return false
-  }
   if (!lines.value.length) {
     toast('Thêm ít nhất 1 dòng hàng', 'warn')
+    return false
+  }
+  if (!ngayNhap.value) {
+    toast('Chọn ngày nhập', 'warn')
+    return false
+  }
+  if (ngayNhap.value > todayLocal()) {
+    toast('Ngày nhập không được lớn hơn ngày hiện tại', 'warn')
     return false
   }
   for (const row of lines.value) {
@@ -312,7 +325,7 @@ onMounted(async () => {
                 <th>SKU</th>
                 <th>Tên hàng</th>
                 <th>SL</th>
-                <th>Đơn giá nhập</th>
+                <th>Đơn giá</th>
                 <th>HSD</th>
                 <th>Thành tiền</th>
                 <th></th>

@@ -89,6 +89,9 @@ public class PhieuNhapService {
         }
 
         LocalDate ngayNhap = p.getNgayTao() != null ? p.getNgayTao().toLocalDate() : LocalDate.now();
+        if (ngayNhap.isAfter(LocalDate.now())) {
+            throw new ApiException("Ngày nhập không được lớn hơn ngày hiện tại", "VALIDATION_ERROR");
+        }
         int stt = 1;
         for (ChiTietPhieuNhap dong : p.getChiTiets()) {
             if (dong.getHanSuDung() == null) {

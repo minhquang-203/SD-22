@@ -47,11 +47,10 @@ public class NhaCungCapService {
         return new NhaCungCapResponse(nhaCungCapRepository.save(n));
     }
 
-    /** Xóa mềm: lật trang_thai (đang dùng ↔ ngừng dùng). */
     @Transactional
     public void softDelete(Integer id) {
         NhaCungCap n = getOrThrow(id);
-        n.setTrangThai(!Boolean.TRUE.equals(n.getTrangThai()));
+        n.setTrangThai(false);
         nhaCungCapRepository.save(n);
     }
 

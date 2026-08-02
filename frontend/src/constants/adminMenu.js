@@ -195,7 +195,7 @@ export const ADMIN_MENU = [
       {
         key: "nha-cung-cap",
         label: "Nhà cung cấp",
-        icon: "icon-park-outline:city",
+        icon: "icon-park-outline:truck",
         path: "/admin/nha-cung-cap",
         roles: MANAGER_AND_OWNER,
       },

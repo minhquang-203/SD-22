@@ -1,6 +1,5 @@
 import request from './request'
 
-/** activeOnly=true: chỉ NCC đang dùng (dropdown phiếu). false: cả ngừng dùng (trang quản lý). */
 export const getNhaCungCapList = (q, activeOnly = true) =>
   request.get('/nha-cung-cap', {
     params: {
