@@ -424,7 +424,6 @@ public class ReturnRequestService {
         if (trangThaiCu != TrangThaiDonHang.TRA_HANG) {
             hoaDon.setTrangThai(TrangThaiDonHang.TRA_HANG);
             hoaDonRepository.save(hoaDon);
-            orderRealtimeService.publishStatusChanged(hoaDon, trangThaiCu);
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -436,6 +435,10 @@ public class ReturnRequestService {
             yc.setIdNhanVienDuyet(nhanVien);
         }
         YeuCauTraHang saved = yeuCauTraHangRepository.save(yc);
+
+        // Luôn phát realtime khi admin xác nhận đã nhận hàng — kể cả khi đơn đã ở TRA_HANG
+        // từ lúc duyệt — để storefront reload trạng thái trả hàng (DA_NHAN_HANG) và vận đơn.
+        orderRealtimeService.publishStatusChanged(hoaDon, trangThaiCu);
 
         ghiNhatKy(hoaDon, "TRA_HANG_DA_NHAN_HANG", ghiChu + " — hoàn tồn theo lô, chờ quyết định hoàn tiền");
         refundService.taoHoanTienTraHangNeuChua(

@@ -460,6 +460,10 @@ onUnmounted(() => {
             <span class="hoa-don-summary__label">Thanh toán</span>
             <span>{{ detail.tenPhuongThucThanhToan }}</span>
           </div>
+          <div v-if="detail.diaChiGiao" class="hoa-don-summary__meta-item">
+            <span class="hoa-don-summary__label">Địa chỉ nhận hàng</span>
+            <span>{{ detail.diaChiGiao }}</span>
+          </div>
         </div>
 
         <div class="hoa-don-summary__footer">
@@ -829,8 +833,9 @@ onUnmounted(() => {
 
 .hoa-don-summary__meta {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-  gap: 1rem;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 1.5rem;
   margin-bottom: 1.25rem;
 }
 .hoa-don-summary__meta-item {
@@ -838,6 +843,17 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 0.15rem;
   font-size: 0.9rem;
+  min-width: 0;
+}
+.hoa-don-summary__meta-item > span:not(.hoa-don-summary__label) {
+  word-break: break-word;
+}
+@media (max-width: 640px) {
+  .hoa-don-summary__meta {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    grid-template-columns: 1fr;
+  }
 }
 .hoa-don-summary__label {
   font-size: 0.7rem;

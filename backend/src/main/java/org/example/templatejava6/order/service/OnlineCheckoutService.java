@@ -42,6 +42,7 @@ import org.example.templatejava6.shipping.model.response.ShippingFeeResponse;
 import org.example.templatejava6.shipping.service.ShippingService;
 import org.example.templatejava6.voucher.model.response.VariantSaleInfo;
 import org.example.templatejava6.voucher.repository.PhieuGiamGiaRepository;
+import org.example.templatejava6.voucher.service.PhieuGiamGiaService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,6 +75,7 @@ public class OnlineCheckoutService {
     private final ThanhToanHoaDonRepository thanhToanHoaDonRepository;
     private final LichSuDonHangRepository lichSuDonHangRepository;
     private final PhieuGiamGiaRepository phieuGiamGiaRepository;
+    private final PhieuGiamGiaService phieuGiamGiaService;
     private final LoHangService loHangService;
     private final PaymentService paymentService;
     private final OnlineOrderLifecycleService onlineOrderLifecycleService;
@@ -93,6 +95,7 @@ public class OnlineCheckoutService {
             ThanhToanHoaDonRepository thanhToanHoaDonRepository,
             LichSuDonHangRepository lichSuDonHangRepository,
             PhieuGiamGiaRepository phieuGiamGiaRepository,
+            PhieuGiamGiaService phieuGiamGiaService,
             LoHangService loHangService,
             PaymentService paymentService,
             OnlineOrderLifecycleService onlineOrderLifecycleService,
@@ -110,6 +113,7 @@ public class OnlineCheckoutService {
         this.thanhToanHoaDonRepository = thanhToanHoaDonRepository;
         this.lichSuDonHangRepository = lichSuDonHangRepository;
         this.phieuGiamGiaRepository = phieuGiamGiaRepository;
+        this.phieuGiamGiaService = phieuGiamGiaService;
         this.loHangService = loHangService;
         this.paymentService = paymentService;
         this.onlineOrderLifecycleService = onlineOrderLifecycleService;
@@ -154,6 +158,11 @@ public class OnlineCheckoutService {
         if (thanhTien.compareTo(BigDecimal.ZERO) < 0) {
             thanhTien = BigDecimal.ZERO;
         }
+        if (isVnpay && thanhTien.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ApiException(
+                    "Đơn miễn phí không thể thanh toán qua VNPAY. Vui lòng chọn COD.",
+                    "INVALID_PAYMENT_AMOUNT");
+        }
 
         LocalDateTime now = LocalDateTime.now();
         HoaDon hoaDon = new HoaDon();
@@ -188,8 +197,7 @@ public class OnlineCheckoutService {
         }
 
         if (phieu != null) {
-            phieu.setSoLuong(phieu.getSoLuong() - 1);
-            phieuGiamGiaRepository.save(phieu);
+            phieuGiamGiaService.consumeOne(phieu.getId());
         }
 
         // COD: trừ giỏ ngay. VNPAY: giữ giỏ nguyên đến khi thanh toán thành công.
@@ -312,7 +320,7 @@ public class OnlineCheckoutService {
             validateChiTietSanPham(chiTietSanPham, item.getSoLuong());
             int soLuong = item.getSoLuong();
             BigDecimal donGia = checkoutPricingService.resolveDonGia(chiTietSanPham, saleMap);
-            if (donGia == null || donGia.compareTo(BigDecimal.ZERO) <= 0) {
+            if (donGia == null || donGia.compareTo(BigDecimal.ZERO) < 0) {
                 throw new ApiException("Giá bán SKU " + chiTietSanPham.getSku() + " không hợp lệ.", "INVALID_PRICE");
             }
             LineCalc existing = lines.get(chiTietSanPham.getId());

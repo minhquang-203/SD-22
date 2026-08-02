@@ -18,7 +18,7 @@ import org.example.templatejava6.order.repository.ThanhToanHoaDonRepository;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
 import org.example.templatejava6.product.service.LoHangService;
 import org.example.templatejava6.realtime.service.OrderRealtimeService;
-import org.example.templatejava6.voucher.repository.PhieuGiamGiaRepository;
+import org.example.templatejava6.voucher.service.PhieuGiamGiaService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,7 +33,7 @@ public class OnlineOrderLifecycleService {
     private final HoaDonChiTietRepository hoaDonChiTietRepository;
     private final ThanhToanHoaDonRepository thanhToanHoaDonRepository;
     private final LichSuDonHangRepository lichSuDonHangRepository;
-    private final PhieuGiamGiaRepository phieuGiamGiaRepository;
+    private final PhieuGiamGiaService phieuGiamGiaService;
     private final GioHangRepository gioHangRepository;
     private final ChiTietGioHangRepository chiTietGioHangRepository;
     private final LoHangService loHangService;
@@ -45,7 +45,7 @@ public class OnlineOrderLifecycleService {
             HoaDonChiTietRepository hoaDonChiTietRepository,
             ThanhToanHoaDonRepository thanhToanHoaDonRepository,
             LichSuDonHangRepository lichSuDonHangRepository,
-            PhieuGiamGiaRepository phieuGiamGiaRepository,
+            PhieuGiamGiaService phieuGiamGiaService,
             GioHangRepository gioHangRepository,
             ChiTietGioHangRepository chiTietGioHangRepository,
             LoHangService loHangService,
@@ -55,7 +55,7 @@ public class OnlineOrderLifecycleService {
         this.hoaDonChiTietRepository = hoaDonChiTietRepository;
         this.thanhToanHoaDonRepository = thanhToanHoaDonRepository;
         this.lichSuDonHangRepository = lichSuDonHangRepository;
-        this.phieuGiamGiaRepository = phieuGiamGiaRepository;
+        this.phieuGiamGiaService = phieuGiamGiaService;
         this.gioHangRepository = gioHangRepository;
         this.chiTietGioHangRepository = chiTietGioHangRepository;
         this.loHangService = loHangService;
@@ -208,12 +208,10 @@ public class OnlineOrderLifecycleService {
 
     private void hoanLuotVoucher(HoaDon hoaDon) {
         PhieuGiamGia phieu = hoaDon.getIdPhieuGiamGia();
-        if (phieu == null) {
+        if (phieu == null || phieu.getId() == null) {
             return;
         }
-        int soLuong = phieu.getSoLuong() != null ? phieu.getSoLuong() : 0;
-        phieu.setSoLuong(soLuong + 1);
-        phieuGiamGiaRepository.save(phieu);
+        phieuGiamGiaService.restoreOne(phieu.getId());
     }
 
     private void ghiNhatKy(HoaDon hoaDon, String trangThai, String ghiChu) {

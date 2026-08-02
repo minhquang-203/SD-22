@@ -115,7 +115,7 @@
           <div class="sd-panel sd-panel--compact">
             <h3 class="sd-panel__title">Lưu ý</h3>
             <ul class="sd-conditions">
-              <li>Không dùng chung với mã giảm giá khác</li>
+              <li>Có thể dùng chung với phiếu giảm giá (stack)</li>
               <li>Giá sau giảm được tính tự động theo đợt</li>
             </ul>
           </div>

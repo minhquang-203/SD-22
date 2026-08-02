@@ -5,6 +5,7 @@ import org.example.templatejava6.common.enums.LoaiPhieuGiamGia;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -23,6 +24,24 @@ public interface PhieuGiamGiaRepository extends JpaRepository<PhieuGiamGia, Inte
     boolean existsByMaAndIdNot(String ma, Integer id);
 
     Optional<PhieuGiamGia> findByMa(String ma);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        UPDATE PhieuGiamGia v
+        SET v.soLuong = v.soLuong - 1
+        WHERE v.id = :id
+          AND v.soLuong IS NOT NULL
+          AND v.soLuong > 0
+        """)
+    int decrementSoLuongIfAvailable(@Param("id") Integer id);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        UPDATE PhieuGiamGia v
+        SET v.soLuong = COALESCE(v.soLuong, 0) + 1
+        WHERE v.id = :id
+        """)
+    int incrementSoLuong(@Param("id") Integer id);
 
     @Query("""
     SELECT v FROM PhieuGiamGia v

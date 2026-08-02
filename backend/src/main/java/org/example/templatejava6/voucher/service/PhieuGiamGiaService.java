@@ -46,7 +46,7 @@ public class PhieuGiamGiaService {
     @Transactional
     public void add(PhieuGiamGiaRequest request) {
         normalizeRequest(request);
-        validateRequest(request);
+        validateRequest(request, true);
         if (phieuGiamGiaRepository.existsByMa(request.getMa())) {
             throw new ApiException("Mã phiếu giảm giá đã tồn tại", "DUPLICATE");
         }
@@ -63,7 +63,7 @@ public class PhieuGiamGiaService {
     public void update(Integer id, PhieuGiamGiaRequest request) {
         PhieuGiamGia pgg = getPhieuGiamGiaOrThrow(id);
         normalizeRequest(request);
-        validateRequest(request);
+        validateRequest(request, false);
         if (phieuGiamGiaRepository.existsByMaAndIdNot(request.getMa(), id)) {
             throw new ApiException("Mã phiếu giảm giá đã tồn tại", "DUPLICATE");
         }
@@ -75,6 +75,31 @@ public class PhieuGiamGiaService {
         phieuGiamGiaRepository.save(pgg);
     }
 
+    /**
+     * Trừ 1 lượt dùng phiếu một cách atomic để tránh race condition khi nhiều đơn cùng lúc.
+     */
+    @Transactional
+    public void consumeOne(Integer id) {
+        if (id == null) {
+            return;
+        }
+        int updated = phieuGiamGiaRepository.decrementSoLuongIfAvailable(id);
+        if (updated == 0) {
+            throw new ApiException("Mã giảm giá đã hết lượt sử dụng.", "INVALID_VOUCHER");
+        }
+    }
+
+    /**
+     * Hoàn lại 1 lượt dùng phiếu (khi hủy đơn / thanh toán thất bại).
+     */
+    @Transactional
+    public void restoreOne(Integer id) {
+        if (id == null) {
+            return;
+        }
+        phieuGiamGiaRepository.incrementSoLuong(id);
+    }
+
     private void normalizeRequest(PhieuGiamGiaRequest request) {
         if (request.getMa() != null) {
             request.setMa(request.getMa().trim().toUpperCase());
@@ -84,7 +109,7 @@ public class PhieuGiamGiaService {
         }
     }
 
-    private void validateRequest(PhieuGiamGiaRequest request) {
+    private void validateRequest(PhieuGiamGiaRequest request, boolean isCreate) {
         if (request.getLoai() == null) {
             throw new ApiException("Loại phiếu giảm giá không được để trống", "VALIDATION_ERROR");
         }
@@ -93,6 +118,13 @@ public class PhieuGiamGiaService {
         }
         if (request.getNgayKetThuc().isBefore(request.getNgayBatDau())) {
             throw new ApiException("Ngày kết thúc phải sau hoặc bằng ngày bắt đầu", "VALIDATION_ERROR");
+        }
+        java.time.LocalDate today = java.time.LocalDate.now();
+        if (isCreate && request.getNgayBatDau().toLocalDate().isBefore(today)) {
+            throw new ApiException("Ngày bắt đầu không được nhỏ hơn ngày hiện tại", "VALIDATION_ERROR");
+        }
+        if (request.getNgayKetThuc().toLocalDate().isBefore(today)) {
+            throw new ApiException("Ngày kết thúc không được nhỏ hơn ngày hiện tại", "VALIDATION_ERROR");
         }
         if (request.getSoLuong() == null || request.getSoLuong() < 1) {
             throw new ApiException("Số lượng phải lớn hơn hoặc bằng 1", "VALIDATION_ERROR");

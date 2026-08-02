@@ -39,6 +39,8 @@ const timelineSteps = computed(() => {
 
 const isCancelled = computed(() => props.order?.trangThai === 'DA_HUY')
 
+const isReturned = computed(() => props.order?.trangThai === 'TRA_HANG')
+
 const canCancel = computed(() => coTheHuyDon(props.order?.trangThai))
 
 const canRequestReturn = computed(() => props.order?.coTheYeuCauTraHang === true)
@@ -56,17 +58,38 @@ const productPreview = computed(() => {
   }
 })
 
+// Trả hàng đã hoàn tất khi cửa hàng đã nhận lại hàng (hoặc đã hoàn tất).
+const returnReceived = computed(() =>
+  ['DA_NHAN_HANG', 'HOAN_TAT'].includes(props.order?.trangThaiTraHang),
+)
+
 const shippingText = computed(() => {
   const order = props.order || {}
+  // Nhãn giao hàng dựa trên trạng thái thực tế để tránh hiện "Chờ lấy hàng" khi đã giao/đã trả.
+  let statusLabel = order.ghnTrangThaiLabel
+  if (returnReceived.value) {
+    statusLabel = 'Đã trả hàng'
+  } else if (order.trangThai === 'HOAN_THANH' || order.trangThai === 'TRA_HANG') {
+    // Đơn đã giao xong (kể cả đang trong quá trình trả) → hiển thị "Đã giao".
+    statusLabel = 'Đã giao'
+  }
   if (order.maVanDon) {
     const carrier = order.donViVanChuyen || 'Giao hàng nhanh'
-    const status = order.ghnTrangThaiLabel ? ` · ${order.ghnTrangThaiLabel}` : ''
+    const status = statusLabel ? ` · ${statusLabel}` : ''
     return `${carrier} · Mã vận đơn: ${order.maVanDon}${status}`
   }
   if (order.phiVanChuyen > 0) {
     return `Phí vận chuyển ${formatVND(order.phiVanChuyen)}`
   }
   return 'Chưa có thông tin vận chuyển'
+})
+
+// Trạng thái vận đơn hoàn: khi cửa hàng đã nhận, hiển thị rõ thay vì nhãn GHN cũ ("Chờ lấy hàng").
+const returnTrackingStatus = computed(() => {
+  if (returnReceived.value) {
+    return 'Đã nhận hàng về cửa hàng'
+  }
+  return props.order?.ghnTrangThaiTraLabel || ''
 })
 
 function toggleOpen() {
@@ -107,7 +130,7 @@ function canReview(line) {
     </button>
 
     <div class="sf-order-card__body">
-      <div v-if="!isCancelled" class="sf-order-timeline">
+      <div v-if="!isCancelled && !isReturned" class="sf-order-timeline">
         <div class="sf-order-timeline__row">
           <div
             v-for="(step, idx) in steps"
@@ -137,7 +160,10 @@ function canReview(line) {
         <div class="sf-order-detail-block">
           <label>Vận chuyển</label>
           <p>{{ shippingText }}</p>
-          <p v-if="order.ghnHenGiao" class="sf-order-detail-block__muted">
+          <p
+            v-if="order.ghnHenGiao && order.trangThai !== 'HOAN_THANH' && order.trangThai !== 'TRA_HANG'"
+            class="sf-order-detail-block__muted"
+          >
             Dự kiến giao: {{ formatOrderDate(order.ghnHenGiao) }}
           </p>
         </div>
@@ -216,7 +242,7 @@ function canReview(line) {
         </div>
         <p v-if="order.maVanDonTra" class="sf-order-return-tracking">
           Mã vận đơn hoàn: <strong>{{ order.maVanDonTra }}</strong>
-          <template v-if="order.ghnTrangThaiTraLabel"> · {{ order.ghnTrangThaiTraLabel }}</template>
+          <template v-if="returnTrackingStatus"> · {{ returnTrackingStatus }}</template>
         </p>
         <p v-if="order.pickShiftLabel" class="sf-order-return-tracking">
           Ca lấy hàng: <strong>{{ order.pickShiftLabel }}</strong>

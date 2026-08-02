@@ -40,6 +40,7 @@ import org.example.templatejava6.payment.service.PaymentService;
 import org.example.templatejava6.payment.vnpay.VnpayGateway;
 import org.example.templatejava6.voucher.model.response.VariantSaleInfo;
 import org.example.templatejava6.voucher.repository.PhieuGiamGiaRepository;
+import org.example.templatejava6.voucher.service.PhieuGiamGiaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -84,6 +85,7 @@ public class BanHangService {
     @Autowired private LichSuDonHangRepository lichSuDonHangRepository;
     @Autowired private PhuongThucThanhToanRepository phuongThucThanhToanRepository;
     @Autowired private PhieuGiamGiaRepository phieuGiamGiaRepository;
+    @Autowired private PhieuGiamGiaService phieuGiamGiaService;
     @Autowired private KhachHangRepository khachHangRepository;
     @Autowired private NhanVienRepository nhanVienRepository;
     @Autowired private LoHangService loHangService;
@@ -321,6 +323,11 @@ public class BanHangService {
         }
 
         boolean isVnpay = MA_VNPAY.equals(pttt.getMa());
+        if (isVnpay && thanhTien.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ApiException(
+                    "Đơn miễn phí không thể thanh toán qua VNPAY. Vui lòng chọn tiền mặt hoặc chuyển khoản.",
+                    "INVALID_PAYMENT_AMOUNT");
+        }
 
         BigDecimal soTienKhachDua = null;
         BigDecimal tienThua = null;
@@ -473,8 +480,7 @@ public class BanHangService {
             ghiNhatKy(hoaDon, "HOAN_THANH", "Hoàn thành đơn", nhanVien, now);
 
             if (phieu != null) {
-                phieu.setSoLuong(phieu.getSoLuong() - 1);
-                phieuGiamGiaRepository.save(phieu);
+                phieuGiamGiaService.consumeOne(phieu.getId());
             }
 
             if (khachHang != null) {
@@ -489,8 +495,7 @@ public class BanHangService {
 
         if (isVnpay) {
             if (phieu != null) {
-                phieu.setSoLuong(phieu.getSoLuong() - 1);
-                phieuGiamGiaRepository.save(phieu);
+                phieuGiamGiaService.consumeOne(phieu.getId());
             }
             TaoThanhToanRequest paymentRequest = new TaoThanhToanRequest();
             paymentRequest.setIdHoaDon(hoaDon.getId());
@@ -519,8 +524,7 @@ public class BanHangService {
         ghiNhatKy(hoaDon, "HOAN_THANH", "Hoàn thành đơn", nhanVien, now);
 
         if (phieu != null) {
-            phieu.setSoLuong(phieu.getSoLuong() - 1);
-            phieuGiamGiaRepository.save(phieu);
+            phieuGiamGiaService.consumeOne(phieu.getId());
         }
 
         if (khachHang != null) {
@@ -664,7 +668,7 @@ public class BanHangService {
                 }
             }
             BigDecimal donGia = checkoutPricingService.resolveDonGia(cts, saleMap);
-            if (donGia == null || donGia.compareTo(BigDecimal.ZERO) <= 0) {
+            if (donGia == null || donGia.compareTo(BigDecimal.ZERO) < 0) {
                 throw new ApiException("Giá bán SKU " + cts.getSku() + " không hợp lệ.", "INVALID_PRICE");
             }
             BigDecimal thanhTienDong = donGia.multiply(BigDecimal.valueOf(soLuong));
