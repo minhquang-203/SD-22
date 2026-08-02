@@ -14,6 +14,7 @@ import {
   fetchThuongHieuList,
   searchProducts,
 } from '@/api/storefrontApi'
+import { rankProductsByQuiz, resolveQuizProfile } from '@/utils/quizRecommend'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,6 +23,7 @@ const loading = ref(true)
 const enriching = ref(false)
 const allProducts = ref([])
 const detailMap = ref({})
+const quizProfile = ref(null)
 
 const danhMucList = ref([])
 const thuongHieuList = ref([])
@@ -40,6 +42,7 @@ const appliedPriceMin = ref('')
 const appliedPriceMax = ref('')
 const filterNoiBat = ref(false)
 const isKhuyenMaiPage = computed(() => route.path === '/san-pham/khuyen-mai')
+const isGoiYPage = computed(() => route.path === '/san-pham/goi-y' || route.meta.goiY === true)
 const sortBy = ref('newest')
 const priceAsc = ref(true)
 const viewMode = ref('grid')
@@ -75,9 +78,34 @@ async function loadMeta() {
   congDungList.value = (cd.data || []).filter((d) => d.trangThai !== false)
 }
 
+function listBasePath() {
+  if (isGoiYPage.value) return '/san-pham/goi-y'
+  if (isKhuyenMaiPage.value) return '/san-pham/khuyen-mai'
+  return '/san-pham'
+}
+
 async function loadProducts() {
   loading.value = true
   try {
+    if (isGoiYPage.value) {
+      sortBy.value = 'relevance'
+      const profile = await resolveQuizProfile()
+      quizProfile.value = profile
+      if (!profile) {
+        allProducts.value = []
+        return
+      }
+      const res = await fetchAllProducts({ excludeKhuyenMai: true })
+      allProducts.value = rankProductsByQuiz(activeProducts(res.data || []), {
+        scoreMap: profile.scoreMap,
+        filters: profile.filters,
+      })
+      return
+    }
+
+    quizProfile.value = null
+    if (sortBy.value === 'relevance') sortBy.value = 'newest'
+
     if (isKhuyenMaiPage.value) {
       const res = await fetchSaleProducts()
       allProducts.value = activeProducts(res.data || [])
@@ -121,6 +149,12 @@ function applyRouteQuery() {
 const keywordFromRoute = computed(() => (route.query.q ? String(route.query.q) : ''))
 
 const pageTitle = computed(() => {
+  if (isGoiYPage.value) {
+    if (quizProfile.value?.tenLoaiDa) {
+      return `Sản phẩm gợi ý — ${quizProfile.value.tenLoaiDa}`
+    }
+    return 'Sản phẩm gợi ý'
+  }
   if (isKhuyenMaiPage.value) {
     return 'Sản phẩm khuyến mãi'
   }
@@ -130,8 +164,19 @@ const pageTitle = computed(() => {
   return 'Sản phẩm chống nắng'
 })
 
+const breadcrumbLabel = computed(() => {
+  if (isGoiYPage.value) return 'Sản phẩm gợi ý'
+  if (isKhuyenMaiPage.value) return 'Khuyến mãi'
+  return 'Sản phẩm'
+})
+
 const filtered = computed(() => {
   let list = [...allProducts.value]
+
+  if (isGoiYPage.value && searchQuery.value.trim()) {
+    const q = searchQuery.value.trim().toLowerCase()
+    list = list.filter((p) => (p.ten || '').toLowerCase().includes(q))
+  }
 
   if (selectedDanhMuc.value.length) {
     const names = selectedDanhMuc.value
@@ -173,11 +218,16 @@ const filtered = computed(() => {
     const ids = selectedLoaiDa.value.map(Number)
     list = list.filter((p) => {
       const d = detailMap.value[p.id]
-      return d?.idLoaiDas?.some((id) => ids.includes(id))
+      const fromDetail = d?.idLoaiDas?.some((id) => ids.includes(id))
+      const fromList = p.idLoaiDas?.some((id) => ids.includes(id))
+      return fromDetail || fromList
     })
   }
 
   switch (sortBy.value) {
+    case 'relevance':
+      list.sort((a, b) => Number(b.matchScore || 0) - Number(a.matchScore || 0))
+      break
     case 'price':
       list.sort((a, b) => {
         const diff = Number(a.giaMin || 0) - Number(b.giaMin || 0)
@@ -237,7 +287,8 @@ function resetFilters() {
   filterNoiBat.value = false
   searchQuery.value = ''
   page.value = 1
-  router.replace({ path: isKhuyenMaiPage.value ? '/san-pham/khuyen-mai' : '/san-pham' })
+  if (isGoiYPage.value) sortBy.value = 'relevance'
+  router.replace({ path: listBasePath() })
 }
 
 watch([selectedCongDung, selectedLoaiDa], () => {
@@ -254,7 +305,10 @@ watch(
 )
 
 watch(searchQuery, () => {
-  if (isKhuyenMaiPage.value) return
+  if (isKhuyenMaiPage.value || isGoiYPage.value) {
+    page.value = 1
+    return
+  }
   clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
     page.value = 1
@@ -283,9 +337,12 @@ onMounted(async () => {
         <nav class="sf-breadcrumb sf-breadcrumb--light">
           <RouterLink to="/">Trang chủ</RouterLink>
           <span>/</span>
-          <span>{{ isKhuyenMaiPage ? 'Khuyến mãi' : 'Sản phẩm' }}</span>
+          <span>{{ breadcrumbLabel }}</span>
         </nav>
         <h1 class="sf-plp__title">{{ pageTitle }}</h1>
+        <p v-if="isGoiYPage && quizProfile" class="sf-plp__goi-y-hint">
+          Sắp xếp mặc định theo độ phù hợp từ kết quả quiz (cao → thấp). Bạn vẫn có thể lọc và sắp xếp như trang sản phẩm thường.
+        </p>
         <div class="sf-plp__result-tabs">
           <button type="button" class="active">Sản phẩm ({{ filtered.length }})</button>
           <button type="button" class="sf-plp__tab--disabled" disabled title="Sắp ra mắt">Bài viết</button>
@@ -293,7 +350,13 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div class="sf-container sf-plp__layout">
+    <div v-if="isGoiYPage && !loading && !quizProfile" class="sf-container sf-plp__quiz-empty">
+      <h2>Bạn chưa có kết quả quiz</h2>
+      <p>Làm quiz da ngắn để SUNOVA phân tích làn da và gợi ý sản phẩm chống nắng phù hợp nhất với bạn.</p>
+      <RouterLink to="/quiz" class="btn-soleil">Làm Quiz ngay</RouterLink>
+    </div>
+
+    <div v-else class="sf-container sf-plp__layout">
       <aside class="sf-plp__sidebar">
         <div class="sf-filter-block">
           <label class="sf-filter-label">Tìm kiếm</label>
@@ -369,6 +432,14 @@ onMounted(async () => {
         <div class="sf-plp__toolbar">
           <div class="sf-sort-tabs">
             <span class="sf-sort-tabs__label">Sắp xếp</span>
+            <button
+              v-if="isGoiYPage"
+              type="button"
+              :class="{ active: sortBy === 'relevance' }"
+              @click="setSort('relevance')"
+            >
+              Phù hợp
+            </button>
             <button type="button" :class="{ active: sortBy === 'popular' }" @click="setSort('popular')">Phổ biến</button>
             <button type="button" :class="{ active: sortBy === 'newest' }" @click="setSort('newest')">Mới nhất</button>
             <button type="button" :class="{ active: sortBy === 'bestseller' }" @click="setSort('bestseller')">Bán chạy</button>
@@ -400,8 +471,19 @@ onMounted(async () => {
           />
         </div>
         <div v-else class="sf-empty-state">
-          <p>{{ isKhuyenMaiPage ? 'Hiện chưa có sản phẩm trong đợt khuyến mãi đang hoạt động.' : 'Không tìm thấy sản phẩm phù hợp.' }}</p>
+          <p>
+            {{
+              isKhuyenMaiPage
+                ? 'Hiện chưa có sản phẩm trong đợt khuyến mãi đang hoạt động.'
+                : isGoiYPage
+                  ? 'Không tìm thấy sản phẩm phù hợp với bộ lọc hiện tại.'
+                  : 'Không tìm thấy sản phẩm phù hợp.'
+            }}
+          </p>
           <button type="button" class="btn-soleil-outline" @click="resetFilters">Xóa bộ lọc</button>
+          <RouterLink v-if="isGoiYPage" to="/quiz" class="btn-soleil-outline" style="margin-left: 8px">
+            Làm lại Quiz
+          </RouterLink>
         </div>
 
         <div v-if="totalPages > 1 && !loading" class="sf-pagination">
@@ -413,3 +495,34 @@ onMounted(async () => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.sf-plp__goi-y-hint {
+  margin: 8px 0 0;
+  max-width: 640px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.sf-plp__quiz-empty {
+  padding: 64px 16px 80px;
+  text-align: center;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.sf-plp__quiz-empty h2 {
+  margin: 0 0 12px;
+  font-size: 24px;
+  font-weight: 600;
+  color: #1a1412;
+}
+
+.sf-plp__quiz-empty p {
+  margin: 0 0 28px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #64748b;
+}
+</style>

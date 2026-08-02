@@ -69,6 +69,12 @@ const router = createRouter({
           meta: { title: 'Khuyến mãi — SUNOVA', khuyenMai: true },
         },
         {
+          path: 'san-pham/goi-y',
+          name: 'SanPhamGoiY',
+          component: () => import('@/views/storefront/ProductList.vue'),
+          meta: { title: 'Sản phẩm gợi ý — SUNOVA', goiY: true },
+        },
+        {
           path: 'san-pham/:id',
           name: 'ProductDetail',
           component: () => import('@/views/storefront/ProductDetail.vue'),
@@ -252,6 +258,12 @@ const router = createRouter({
           name: 'AdminRoutine',
           component: () => import('@/views/admin/recommendation/RoutineManager.vue'),
           meta: { title: 'Routine chống nắng', breadcrumb: 'Gợi ý & Cá nhân hóa / Routine chống nắng', role: ADMIN_ROLES.QUAN_LY },
+        },
+        {
+          path: 'banners',
+          name: 'AdminBanners',
+          component: () => import('@/views/admin/content/BannerManager.vue'),
+          meta: { title: 'Banner trang chủ', breadcrumb: 'Gợi ý & Cá nhân hóa / Banner trang chủ', role: ADMIN_ROLES.QUAN_LY },
         },
         {
           path: 'uv',

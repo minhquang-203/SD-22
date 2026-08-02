@@ -250,6 +250,7 @@ import { Icon } from '@iconify/vue';
 import { getProducts } from '@/api/sanPhamApi';
 import { getQuizQuestions, saveQuizResult } from '@/api/quizApi';
 import { getRoutinesByLoaiDa } from '@/api/routineApi';
+import { rankProductsByQuiz, saveQuizProfile } from '@/utils/quizRecommend';
 
 const router = useRouter();
 
@@ -494,7 +495,14 @@ const calculateResult = () => {
   }
 
   resultData.value = { skinName: skinNames, description: skinDesc };
-  recommendProducts(collectedFilters); 
+  recommendProducts(collectedFilters);
+
+  saveQuizProfile({
+    idLoaiDa: topSkinTypes[0],
+    tenLoaiDa: skinNames,
+    scoreMap: scores,
+    filters: collectedFilters,
+  });
 
   // FETCH ROUTINE COMBO TỪ ADMIN DÀNH CHO LOẠI DA NÀY
   getRoutinesByLoaiDa(topSkinTypes[0]).then(res => {
@@ -541,59 +549,12 @@ const calculateResult = () => {
 };
 
 const recommendProducts = (filters = []) => {
-  // BƯỚC 1: THUẬT TOÁN MATCH SCORE (Tính điểm tương thích theo loại da)
-  const scoredProducts = allProducts.value.map(product => {
-    let matchScore = 0;
-    
-    // Nếu sản phẩm có danh sách loại da hỗ trợ
-    if (product.idLoaiDas && Array.isArray(product.idLoaiDas)) {
-      product.idLoaiDas.forEach(loaiDaId => {
-        // Cộng dồn điểm tương ứng từ kết quả làm bài của khách
-        if (scoreMap.value[loaiDaId]) {
-          matchScore += scoreMap.value[loaiDaId].points;
-        }
-      });
-    }
-
-    return {
-      ...product,
-      matchScore: matchScore
-    };
+  const ranked = rankProductsByQuiz(allProducts.value, {
+    scoreMap: scoreMap.value,
+    filters,
   });
-
-  // Lọc bỏ các sản phẩm 0 điểm
-  let suitableProducts = scoredProducts.filter(p => p.matchScore > 0);
-
-  // Fallback nếu không có sản phẩm nào hợp
-  if (suitableProducts.length === 0) {
-    suitableProducts = scoredProducts;
-  }
-
-  // BƯỚC 2: PHỄU LỌC CỨNG (Filter Keyword) - Quyền Phủ Quyết Y Khoa
-  if (filters.length > 0) {
-    // Lọc sản phẩm phải khớp với ÍT NHẤT 1 filterKeyword mà khách đã chọn
-    // filterKeyword chính là giá trị loaiChongNang (VAT_LY / HOA_HOC / LAI)
-    const filtered = suitableProducts.filter(p => {
-      if (!p.loaiChongNang) return false; // Sản phẩm không có thông tin loại chống nắng -> loại bỏ
-      // Nếu khách chọn VAT_LY, chỉ giữ sản phẩm VAT_LY hoặc LAI (vì LAI cũng chứa thành phần vật lý)
-      return filters.some(f => {
-        if (f === 'VAT_LY') return p.loaiChongNang === 'VAT_LY' || p.loaiChongNang === 'LAI';
-        if (f === 'HOA_HOC') return p.loaiChongNang === 'HOA_HOC' || p.loaiChongNang === 'LAI';
-        return p.loaiChongNang === f;
-      });
-    });
-
-    // Chỉ áp dụng nếu còn sản phẩm sau khi lọc (tránh trường hợp lọc sạch bách)
-    if (filtered.length > 0) {
-      suitableProducts = filtered;
-    }
-  }
-
-  // Sắp xếp theo điểm tương thích (Match Score) từ cao xuống thấp
-  suitableProducts.sort((a, b) => b.matchScore - a.matchScore);
-
-  // Lấy 4 sản phẩm top đầu
-  recommendedProducts.value = suitableProducts.slice(0, 4);
+  // Màn kết quả quiz giữ layout top 4; trang /san-pham/goi-y hiện toàn bộ
+  recommendedProducts.value = ranked.slice(0, 4);
 };
 
 // ============================================

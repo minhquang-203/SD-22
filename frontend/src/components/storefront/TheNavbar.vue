@@ -25,6 +25,7 @@ const navLinks = [
   { to: '/quiz', label: 'Quiz da' },
   { to: '/blog', label: 'Blog' },
   { to: '/tra-cuu-don', label: 'Tra cứu đơn', requiresAuth: true },
+  { to: '/san-pham/goi-y', label: 'Sản phẩm gợi ý' },
 ]
 
 onMounted(async () => {
@@ -104,6 +105,9 @@ function isLinkActive(link) {
   }
   if (link.to === '/tra-cuu-don') {
     return path === '/tra-cuu-don'
+  }
+  if (link.to === '/san-pham/goi-y') {
+    return path === '/san-pham/goi-y'
   }
   if (link.to === '/don-hang') {
     return path === '/don-hang'

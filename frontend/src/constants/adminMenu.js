@@ -216,6 +216,13 @@ export const ADMIN_MENU = [
       },
       RECOMMENDATION_MENU,
       {
+        key: "banners",
+        label: "Banner trang chủ",
+        icon: "icon-park-outline:picture-one",
+        path: "/admin/banners",
+        roles: MANAGER_AND_OWNER,
+      },
+      {
         key: "uv",
         label: "UV & Thời tiết",
         icon: "icon-park-outline:cloudy",

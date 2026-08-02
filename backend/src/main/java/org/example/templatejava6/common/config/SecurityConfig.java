@@ -46,6 +46,7 @@ public class SecurityConfig {
                     .requestMatchers("/api/auth/khach/**").permitAll()
                     .requestMatchers("/api/khach/quiz/**").permitAll()
                     .requestMatchers("/api/khach/routines/**").permitAll()
+                    .requestMatchers("/api/khach/banners/**").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/auth/nhan-vien/dang-nhap").permitAll()
 
                     // 2. MỞ CỬA TỰ DO CHO API THỜI TIẾT VÀ CẤU HÌNH UV
