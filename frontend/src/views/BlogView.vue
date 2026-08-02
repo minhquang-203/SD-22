@@ -2,39 +2,67 @@
   <div class="blog-page">
     <BlogIconSprite />
 
-    <!-- Hero -->
     <section class="blog-hero">
-      <p class="blog-hero__eyebrow">SUNOVA BLOG</p>
+      <p class="blog-hero__eyebrow">SUNOVA Blog</p>
       <h1 class="blog-hero__title">
-        Kiến thức chống nắng &amp; thời tiết, dễ hiểu, dễ áp dụng
+        Kiến thức chống nắng dễ hiểu, dễ áp dụng
       </h1>
       <p class="blog-hero__subtitle">
-        Những bài viết giúp bạn hiểu đúng về chỉ số UV, thời tiết bốn mùa và cách chọn,
-        sử dụng kem chống nắng phù hợp với khí hậu Việt Nam.
+        Hiểu UV, thời tiết bốn mùa và cách chọn kem chống nắng phù hợp khí hậu Việt Nam —
+        ngắn gọn, thực tế.
       </p>
 
       <div class="blog-hero__search">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <circle cx="7" cy="7" r="5.2" stroke="currentColor" stroke-width="1.4" />
-          <line
-            x1="11"
-            y1="11"
-            x2="15"
-            y2="15"
-            stroke="currentColor"
-            stroke-width="1.4"
-            stroke-linecap="round"
-          />
-        </svg>
+        <Icon icon="solar:magnifer-linear" width="18" />
         <input
           v-model="searchTerm"
           type="text"
-          placeholder="Tìm bài viết về kem chống nắng, UV, thời tiết..."
+          placeholder="Tìm bài viết về SPF, UV, thời tiết..."
         />
       </div>
     </section>
 
-    <!-- Category filter -->
+    <section class="blog-intro" aria-label="Dẫn nhập nhanh về chống nắng">
+      <h2 class="blog-intro__title">Trước khi đọc, nắm nhanh vài điều</h2>
+      <p class="blog-intro__lead">
+        Chống nắng không chỉ cho ngày hè hay lúc ra biển. Ở Việt Nam nắng mạnh gần như quanh năm,
+        nên hiểu đúng vài điều cơ bản sẽ giúp bạn chọn và dùng kem chống nắng hiệu quả hơn.
+      </p>
+
+      <div class="blog-intro__grid">
+        <article class="blog-intro__card">
+          <span class="blog-intro__num" aria-hidden="true">1</span>
+          <h3 class="blog-intro__card-title">Nắng quanh năm</h3>
+          <p class="blog-intro__card-text">
+            Tia UV ở Việt Nam thường cao cả ngày thường lẫn ngày râm mát, không chỉ khi trời nắng gắt.
+          </p>
+        </article>
+        <article class="blog-intro__card">
+          <span class="blog-intro__num" aria-hidden="true">2</span>
+          <h3 class="blog-intro__card-title">Mây không cản được UV</h3>
+          <p class="blog-intro__card-text">
+            Tới 80% tia UV vẫn xuyên qua mây, nên trời mưa hay âm u vẫn cần chống nắng.
+          </p>
+        </article>
+        <article class="blog-intro__card">
+          <span class="blog-intro__num" aria-hidden="true">3</span>
+          <h3 class="blog-intro__card-title">SPF và PA khác nhau</h3>
+          <p class="blog-intro__card-text">
+            SPF chống tia UVB (gây bỏng, đen da), PA chống tia UVA (gây lão hóa). Cần cả hai.
+          </p>
+        </article>
+        <article class="blog-intro__card">
+          <span class="blog-intro__num" aria-hidden="true">4</span>
+          <h3 class="blog-intro__card-title">Bôi đủ và thoa lại</h3>
+          <p class="blog-intro__card-text">
+            Bôi đủ lượng và thoa lại sau mỗi 2–3 giờ khi ra ngoài thì kem mới thật sự bảo vệ.
+          </p>
+        </article>
+      </div>
+
+      <p class="blog-intro__outro">Muốn hiểu sâu hơn? Cùng đọc các bài viết bên dưới.</p>
+    </section>
+
     <nav class="blog-filter" aria-label="Lọc bài viết theo chủ đề">
       <button
         v-for="cat in blogCategories"
@@ -48,44 +76,39 @@
       </button>
     </nav>
 
-    <!-- Featured post -->
     <section v-if="featuredPost" class="blog-featured">
-      <RouterLink :to="`/blog/${featuredPost.slug}`" class="blog-featured__media">
+      <RouterLink
+        :to="`/blog/${featuredPost.slug}`"
+        class="blog-featured__media"
+        :class="`blog-featured__media--${featuredTone}`"
+      >
+        <span class="blog-featured__glow" aria-hidden="true" />
         <svg viewBox="0 0 48 48" fill="none" class="blog-featured__icon">
           <use :href="`#blog-icon-${featuredPost.icon}`" />
         </svg>
       </RouterLink>
       <div class="blog-featured__content">
-        <span class="blog-featured__badge">Bài viết nổi bật</span>
+        <span class="blog-featured__badge">{{ featuredPost.tag }}</span>
         <h2 class="blog-featured__title">
           <RouterLink :to="`/blog/${featuredPost.slug}`">{{ featuredPost.title }}</RouterLink>
         </h2>
         <p class="blog-featured__excerpt">{{ featuredPost.excerpt }}</p>
         <div class="blog-featured__meta">
           <span>{{ formatDate(featuredPost.publishDate) }}</span>
-          <span class="blog-card__dot">·</span>
+          <span>·</span>
           <span>{{ featuredPost.readTime }}</span>
         </div>
         <RouterLink :to="`/blog/${featuredPost.slug}`" class="blog-featured__cta">
           Đọc bài viết
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path
-              d="M2.5 7H11.5M11.5 7L7.5 3M11.5 7L7.5 11"
-              stroke="currentColor"
-              stroke-width="1.4"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+          <Icon icon="solar:arrow-right-linear" width="16" />
         </RouterLink>
       </div>
     </section>
 
-    <!-- Post grid -->
     <section class="blog-grid-section">
       <div class="blog-grid-section__head">
         <h2>Tất cả bài viết</h2>
-        <span class="blog-grid-section__count">{{ filteredPosts.length }} bài viết</span>
+        <span class="blog-grid-section__count">{{ filteredPosts.length }} bài</span>
       </div>
 
       <div v-if="filteredPosts.length" class="blog-grid">
@@ -101,6 +124,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { Icon } from '@iconify/vue'
 import { blogCategories, blogPosts } from '@/constants/blogPosts'
 import BlogCard from '@/components/storefront/blog/BlogCard.vue'
 import BlogIconSprite from '@/components/storefront/blog/BlogIconSprite.vue'
@@ -108,7 +132,16 @@ import BlogIconSprite from '@/components/storefront/blog/BlogIconSprite.vue'
 const activeCategory = ref('tat-ca')
 const searchTerm = ref('')
 
+const CAT_TONE = {
+  'kien-thuc-spf': 'gold',
+  'thoi-tiet-da': 'sky',
+  'huong-dan-chon': 'sage',
+  'mua-mua': 'teal',
+  'cham-soc-da': 'coral',
+}
+
 const featuredPost = computed(() => blogPosts[0])
+const featuredTone = computed(() => CAT_TONE[featuredPost.value?.category] || 'gold')
 
 const filteredPosts = computed(() => {
   const term = searchTerm.value.trim().toLowerCase()
@@ -138,63 +171,53 @@ function formatDate(dateStr) {
 
 <style scoped>
 .blog-page {
-  --sn-bg: #1b130c;
-  --sn-bg-elevated: #241a12;
-  --sn-border: rgba(201, 163, 106, 0.18);
-  --sn-gold: #c9a36a;
-  --sn-gold-bright: #e0bb84;
-  --sn-text: #f3ead9;
-  --sn-text-muted: #b8a890;
-  --sn-font-display: 'Playfair Display', Georgia, serif;
-  --sn-font-body: 'Be Vietnam Pro', 'Inter', sans-serif;
-
-  max-width: 1280px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 48px 24px 96px;
-  color: var(--sn-text);
-  font-family: var(--sn-font-body);
+  padding: 2.5rem 1.25rem 5rem;
+  color: var(--sf-charcoal, #1a1814);
+  font-family: var(--sf-font-body, 'Be Vietnam Pro', sans-serif);
 }
 
-/* Hero */
 .blog-hero {
-  max-width: 760px;
-  margin-bottom: 40px;
+  max-width: 720px;
+  margin-bottom: 2rem;
 }
 
 .blog-hero__eyebrow {
-  font-size: 12px;
-  letter-spacing: 0.18em;
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--sn-gold);
-  margin: 0 0 14px;
+  color: var(--sf-gold-dark, #9e7340);
+  font-weight: 600;
+  margin: 0 0 0.75rem;
 }
 
 .blog-hero__title {
-  font-family: var(--sn-font-display);
-  font-size: clamp(30px, 4vw, 44px);
+  font-family: var(--sf-font-display, 'Playfair Display', serif);
+  font-size: clamp(1.85rem, 4vw, 2.65rem);
   line-height: 1.2;
   font-weight: 600;
-  margin: 0 0 16px;
-  color: var(--sn-text);
+  margin: 0 0 0.85rem;
+  color: var(--sf-espresso, #241a12);
 }
 
 .blog-hero__subtitle {
-  font-size: 15px;
+  font-size: 1rem;
   line-height: 1.7;
-  color: var(--sn-text-muted);
-  margin: 0 0 28px;
+  color: var(--sf-mid, #5a5248);
+  margin: 0 0 1.5rem;
 }
 
 .blog-hero__search {
   display: flex;
   align-items: center;
-  gap: 10px;
-  max-width: 460px;
-  padding: 12px 16px;
-  background: var(--sn-bg-elevated);
-  border: 1px solid var(--sn-border);
+  gap: 0.65rem;
+  max-width: 440px;
+  padding: 0.75rem 1rem;
+  background: var(--sf-warm-white, #fffdfa);
+  border: 1px solid var(--sf-hairline, #ede5d8);
   border-radius: 999px;
-  color: var(--sn-text-muted);
+  color: var(--sf-light-mid, #8a8278);
 }
 
 .blog-hero__search input {
@@ -202,200 +225,302 @@ function formatDate(dateStr) {
   background: transparent;
   border: none;
   outline: none;
-  color: var(--sn-text);
-  font-family: var(--sn-font-body);
-  font-size: 13.5px;
+  color: var(--sf-charcoal, #1a1814);
+  font-family: inherit;
+  font-size: 0.9rem;
 }
 
-.blog-hero__search input::placeholder {
-  color: var(--sn-text-muted);
+.blog-intro {
+  margin: 0 0 2rem;
+  padding: 1.5rem 0 0.25rem;
+  border-top: 1px solid var(--sf-hairline, #ede5d8);
 }
 
-/* Category filter */
+.blog-intro__title {
+  font-family: var(--sf-font-display, 'Playfair Display', serif);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--sf-espresso, #241a12);
+  margin: 0 0 0.65rem;
+}
+
+.blog-intro__lead {
+  margin: 0 0 1.25rem;
+  max-width: 52rem;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--sf-mid, #5a5248);
+}
+
+.blog-intro__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.blog-intro__card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1rem 1.05rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid var(--sf-hairline, #ede5d8);
+  background: linear-gradient(160deg, #fffdfa 0%, var(--sf-cream, #f9f5f0) 55%, #f3e8d6 100%);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.blog-intro__card:hover {
+  transform: translateY(-3px);
+  border-color: var(--sf-gold, #c9a96e);
+  box-shadow: 0 8px 20px rgba(36, 26, 18, 0.07);
+}
+
+.blog-intro__num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--sf-espresso, #241a12);
+  background: rgba(201, 169, 110, 0.4);
+  margin-bottom: 0.15rem;
+}
+
+.blog-intro__card-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--sf-espresso, #241a12);
+}
+
+.blog-intro__card-text {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--sf-mid, #5a5248);
+}
+
+.blog-intro__outro {
+  margin: 1.15rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--sf-gold-dark, #9e7340);
+}
+
 .blog-filter {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 40px;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
 }
 
 .blog-filter__pill {
-  padding: 9px 18px;
+  padding: 0.5rem 1rem;
   border-radius: 999px;
-  border: 1px solid var(--sn-border);
-  background: transparent;
-  color: var(--sn-text-muted);
-  font-family: var(--sn-font-body);
-  font-size: 13px;
+  border: 1px solid var(--sf-hairline, #ede5d8);
+  background: var(--sf-warm-white, #fffdfa);
+  color: var(--sf-mid, #5a5248);
+  font-family: inherit;
+  font-size: 0.8125rem;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .blog-filter__pill:hover {
-  border-color: var(--sn-gold);
-  color: var(--sn-text);
+  border-color: var(--sf-gold, #c9a96e);
+  color: var(--sf-espresso, #241a12);
 }
 
 .blog-filter__pill.is-active {
-  background: var(--sn-gold);
-  border-color: var(--sn-gold);
-  color: #1b130c;
+  background: var(--sf-gold, #c9a96e);
+  border-color: var(--sf-gold, #c9a96e);
+  color: var(--sf-espresso, #241a12);
   font-weight: 600;
 }
 
-/* Featured post */
 .blog-featured {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.15fr);
   gap: 0;
-  background: var(--sn-bg-elevated);
-  border: 1px solid var(--sn-border);
-  border-radius: 4px;
+  background: var(--sf-warm-white, #fffdfa);
+  border: 1px solid var(--sf-hairline, #ede5d8);
+  border-radius: 16px;
   overflow: hidden;
-  margin-bottom: 56px;
+  margin-bottom: 3rem;
+  box-shadow: 0 8px 28px rgba(36, 26, 18, 0.05);
 }
 
 .blog-featured__media {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 280px;
-  background: radial-gradient(
-      circle at 25% 20%,
-      rgba(201, 163, 106, 0.2),
-      transparent 60%
-    ),
-    #1b130c;
-  border-right: 1px solid var(--sn-border);
+  min-height: 300px;
+  text-decoration: none;
+}
+
+.blog-featured__glow {
+  position: absolute;
+  inset: -10%;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.65), transparent 55%);
+  pointer-events: none;
+}
+
+.blog-featured__media--gold {
+  background: linear-gradient(145deg, #f6ead4, #e2c892);
+}
+.blog-featured__media--sky {
+  background: linear-gradient(145deg, #e4f0f7, #9fc0d8);
+}
+.blog-featured__media--sage {
+  background: linear-gradient(145deg, #eaf1e4, #b3c9a4);
+}
+.blog-featured__media--teal {
+  background: linear-gradient(145deg, #e2f1f0, #8fc4c1);
+}
+.blog-featured__media--coral {
+  background: linear-gradient(145deg, #f8e8e1, #d9a694);
 }
 
 .blog-featured__icon {
+  position: relative;
+  z-index: 1;
   width: 96px;
   height: 96px;
-  color: var(--sn-gold);
+  color: var(--sf-espresso, #241a12);
 }
 
 .blog-featured__content {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 14px;
-  padding: 40px 44px;
+  gap: 0.85rem;
+  padding: 2rem 2.25rem;
 }
 
 .blog-featured__badge {
-  align-self: flex-start;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #1b130c;
-  background: var(--sn-gold);
-  padding: 5px 12px;
+  display: inline-flex;
+  width: fit-content;
+  padding: 0.3rem 0.75rem;
   border-radius: 999px;
-  font-weight: 600;
+  background: rgba(201, 169, 110, 0.18);
+  color: var(--sf-gold-dark, #9e7340);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .blog-featured__title {
-  font-family: var(--sn-font-display);
-  font-size: clamp(22px, 2.6vw, 30px);
+  font-family: var(--sf-font-display, 'Playfair Display', serif);
+  font-size: clamp(1.4rem, 2.5vw, 1.85rem);
   line-height: 1.3;
+  font-weight: 600;
   margin: 0;
 }
 
 .blog-featured__title a {
-  color: var(--sn-text);
+  color: var(--sf-espresso, #241a12);
   text-decoration: none;
 }
 
 .blog-featured__title a:hover {
-  color: var(--sn-gold-bright);
+  color: var(--sf-gold-dark, #9e7340);
 }
 
 .blog-featured__excerpt {
-  font-size: 14.5px;
-  line-height: 1.7;
-  color: var(--sn-text-muted);
   margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--sf-mid, #5a5248);
 }
 
 .blog-featured__meta {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
-  color: var(--sn-text-muted);
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  color: var(--sf-light-mid, #8a8278);
 }
 
 .blog-featured__cta {
-  margin-top: 8px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
   width: fit-content;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--sn-gold);
+  color: var(--sf-gold-dark, #9e7340);
   text-decoration: none;
 }
 
-/* Grid */
+.blog-featured__cta:hover {
+  color: var(--sf-accent, #a33b1c);
+}
+
 .blog-grid-section__head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  margin-bottom: 24px;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
 }
 
 .blog-grid-section__head h2 {
-  font-family: var(--sn-font-display);
-  font-size: 26px;
-  font-weight: 600;
+  font-family: var(--sf-font-display, 'Playfair Display', serif);
+  font-size: 1.5rem;
   margin: 0;
-  color: var(--sn-text);
+  color: var(--sf-espresso, #241a12);
 }
 
 .blog-grid-section__count {
-  font-size: 13px;
-  color: var(--sn-text-muted);
+  font-size: 0.8125rem;
+  color: var(--sf-light-mid, #8a8278);
 }
 
 .blog-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
+  gap: 1.25rem;
 }
 
 .blog-empty {
-  padding: 60px 0;
+  padding: 2.5rem 1rem;
   text-align: center;
-  color: var(--sn-text-muted);
+  color: var(--sf-mid, #5a5248);
+  background: var(--sf-cream, #f9f5f0);
+  border-radius: 12px;
+  border: 1px dashed var(--sf-hairline, #ede5d8);
 }
 
-@media (max-width: 980px) {
+@media (max-width: 900px) {
+  .blog-intro__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .blog-featured {
     grid-template-columns: 1fr;
   }
-
   .blog-featured__media {
-    border-right: none;
-    border-bottom: 1px solid var(--sn-border);
     min-height: 200px;
   }
-
   .blog-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 640px) {
-  .blog-grid {
+@media (max-width: 600px) {
+  .blog-intro__grid {
     grid-template-columns: 1fr;
   }
-
-  .blog-featured__content {
-    padding: 28px 24px;
+  .blog-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

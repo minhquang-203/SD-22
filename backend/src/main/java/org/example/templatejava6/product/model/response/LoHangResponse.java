@@ -18,6 +18,7 @@ public class LoHangResponse {
     private LocalDate hanSuDung;
     private Integer soLuongNhap;
     private Integer soLuongCon;
+    private Integer soLuongLoi;
     private String ghiChu;
     private Boolean trangThai;
     private Boolean sapHetHan;
@@ -30,6 +31,7 @@ public class LoHangResponse {
         this.hanSuDung = lo.getHanSuDung();
         this.soLuongNhap = lo.getSoLuongNhap();
         this.soLuongCon = lo.getSoLuongCon();
+        this.soLuongLoi = lo.getSoLuongLoi() != null ? lo.getSoLuongLoi() : 0;
         this.ghiChu = lo.getGhiChu();
         this.trangThai = lo.getTrangThai();
         this.sapHetHan = isSapHetHan(lo.getHanSuDung());

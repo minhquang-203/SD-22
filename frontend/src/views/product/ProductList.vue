@@ -42,7 +42,11 @@ const filters = ref({
   chiSoSpf: '',
   chiSoPa: '',
   trangThai: null,
+  /** null | 'sapHetHang' | 'canHan' — lọc nhanh cảnh báo */
+  canhBao: null,
 })
+
+const LOW_STOCK_THRESHOLD = 10
 
 const page = ref(1)
 const pageSize = ref(10)
@@ -92,9 +96,32 @@ const filteredProducts = computed(() => {
   if (filters.value.trangThai !== null) {
     list = list.filter((p) => (p.trangThai !== false) === filters.value.trangThai)
   }
+  if (filters.value.canhBao === 'sapHetHang') {
+    list = list.filter((p) => Number(p.tongTon ?? 0) <= LOW_STOCK_THRESHOLD)
+  } else if (filters.value.canhBao === 'canHan') {
+    list = list.filter((p) => p.coLoCanHan === true)
+  }
 
   return list
 })
+
+const countSapHetHang = computed(
+  () => allProducts.value.filter((p) => Number(p.tongTon ?? 0) <= LOW_STOCK_THRESHOLD).length,
+)
+
+const countCanHan = computed(
+  () => allProducts.value.filter((p) => p.coLoCanHan === true).length,
+)
+
+function formatWarnBadge(n) {
+  if (!n || n <= 0) return '0'
+  return n > 99 ? '99+' : String(n)
+}
+
+function toggleCanhBao(type) {
+  filters.value.canhBao = filters.value.canhBao === type ? null : type
+  page.value = 1
+}
 
 const totalPages = computed(() =>
   Math.max(1, Math.ceil(filteredProducts.value.length / pageSize.value)),
@@ -174,6 +201,7 @@ function resetFilters() {
     chiSoSpf: '',
     chiSoPa: '',
     trangThai: null,
+    canhBao: null,
   }
   loadProducts()
 }
@@ -363,10 +391,30 @@ onMounted(async () => {
     <div class="soleil-table-card">
       <div class="soleil-table-card__head">
         <span class="soleil-label" style="margin: 0">Danh sách sản phẩm</span>
-        <button type="button" class="soleil-btn-outline" style="margin-left: auto" @click="loadProducts">
-          <Icon icon="icon-park-outline:refresh" />
-          Tải lại
-        </button>
+        <div class="product-warn-actions">
+          <button
+            type="button"
+            class="soleil-btn-outline product-warn-btn"
+            :class="{ 'product-warn-btn--active': filters.canhBao === 'sapHetHang' }"
+            @click="toggleCanhBao('sapHetHang')"
+          >
+            Sắp hết hàng
+            <span class="product-warn-badge">{{ formatWarnBadge(countSapHetHang) }}</span>
+          </button>
+          <button
+            type="button"
+            class="soleil-btn-outline product-warn-btn"
+            :class="{ 'product-warn-btn--active': filters.canhBao === 'canHan' }"
+            @click="toggleCanhBao('canHan')"
+          >
+            Cận hạn
+            <span class="product-warn-badge">{{ formatWarnBadge(countCanHan) }}</span>
+          </button>
+          <button type="button" class="soleil-btn-outline" @click="loadProducts">
+            <Icon icon="icon-park-outline:refresh" />
+            Tải lại
+          </button>
+        </div>
         <span class="text-xs text-[rgba(30,21,16,0.45)]">Trang {{ page }} / {{ totalPages }}</span>
       </div>
 
@@ -424,3 +472,37 @@ onMounted(async () => {
     />
   </div>
 </template>
+
+<style scoped>
+.product-warn-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.product-warn-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.product-warn-btn--active {
+  border-color: var(--coral, #d4624a) !important;
+  color: var(--coral, #d4624a) !important;
+  background: rgba(212, 98, 74, 0.08);
+}
+.product-warn-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--coral, #d4624a);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+}
+</style>

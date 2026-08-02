@@ -2,6 +2,9 @@ import request from './request'
 
 export const getProducts = () => request.get('/san-pham')
 
+/** Đếm SP sắp hết hàng / cận hạn — badge sidebar */
+export const getSanPhamCanhBaoCount = () => request.get('/san-pham/canh-bao-count')
+
 export const getMaTiepTheo = () => request.get('/san-pham/ma-tiep-theo')
 
 export const searchProducts = (keyword) =>

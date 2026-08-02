@@ -32,7 +32,8 @@ const thanhPhanList = ref([])
 const selectedVariantId = ref(null)
 const quantity = ref(1)
 const activeTab = ref('moTa')
-const activeImage = ref('')
+const activeImageIndex = ref(0)
+const galleryFading = ref(false)
 const toast = ref('')
 
 const variants = computed(() => product.value?.chiTiets?.filter((v) => v.trangThai !== false) || [])
@@ -53,11 +54,69 @@ const variantOriginalPrice = computed(() => {
 
 const variantSalePrice = computed(() => formatVND(selectedVariant.value?.giaSauGiam))
 
+/** Gallery theo màu đang chọn: ưu tiên ảnh riêng màu → fallback ảnh chung → anhChinhUrl */
 const galleryImages = computed(() => {
-  const urls = (product.value?.anhs || []).map((a) => a.url).filter(Boolean)
+  const all = [...(product.value?.anhs || [])].filter((a) => a?.url)
+  const colorId = selectedVariant.value?.idMauSac ?? null
+
+  const sortAnhs = (list) =>
+    [...list].sort((a, b) => {
+      const mainA = a.laAnhChinh ? 0 : 1
+      const mainB = b.laAnhChinh ? 0 : 1
+      if (mainA !== mainB) return mainA - mainB
+      return (a.thuTu ?? 0) - (b.thuTu ?? 0)
+    })
+
+  let list = []
+  if (colorId != null) {
+    list = sortAnhs(all.filter((a) => a.idMauSac === colorId))
+  }
+  if (!list.length) {
+    list = sortAnhs(all.filter((a) => a.idMauSac == null))
+  }
+  if (!list.length) {
+    list = sortAnhs(all)
+  }
+
+  const urls = list.map((a) => a.url)
   if (!urls.length && product.value?.anhChinhUrl) urls.push(product.value.anhChinhUrl)
-  return urls.length ? urls : [null]
+  return urls
 })
+
+const activeImage = computed(() => {
+  const url = galleryImages.value[activeImageIndex.value]
+  return url ? productImageUrl(url) : productImageUrl(product.value?.anhChinhUrl)
+})
+
+const hasGalleryNav = computed(() => galleryImages.value.length > 1)
+
+function setActiveImage(index) {
+  if (index < 0 || index >= galleryImages.value.length) return
+  if (index === activeImageIndex.value) return
+  galleryFading.value = true
+  window.setTimeout(() => {
+    activeImageIndex.value = index
+    galleryFading.value = false
+  }, 150)
+}
+
+function nextImage() {
+  if (!hasGalleryNav.value) return
+  setActiveImage((activeImageIndex.value + 1) % galleryImages.value.length)
+}
+
+function prevImage() {
+  if (!hasGalleryNav.value) return
+  const n = galleryImages.value.length
+  setActiveImage((activeImageIndex.value - 1 + n) % n)
+}
+
+watch(
+  () => selectedVariant.value?.idMauSac,
+  () => {
+    activeImageIndex.value = 0
+  },
+)
 
 const colors = computed(() => {
   const map = new Map()
@@ -173,7 +232,7 @@ async function loadProduct(id) {
     if (product.value?.chiTiets?.length) {
       selectedVariantId.value = product.value.chiTiets[0].id
     }
-    activeImage.value = galleryImages.value[0] ? productImageUrl(galleryImages.value[0]) : ''
+    activeImageIndex.value = 0
 
     const allRes = await fetchAllProducts()
     const sameCat = (allRes.data || []).filter(
@@ -240,16 +299,29 @@ onUnmounted(() => {
       <div class="sf-container sf-pdp__grid">
         <div class="sf-pdp__gallery">
           <div class="sf-pdp__main-img">
-            <img :src="activeImage || productImageUrl(product.anhChinhUrl)" :alt="product.ten" />
+            <img
+              :src="activeImage || productImageUrl(product.anhChinhUrl)"
+              :alt="product.ten"
+              :class="{ 'is-fading': galleryFading }"
+            />
+            <template v-if="hasGalleryNav">
+              <button type="button" class="sf-pdp__nav sf-pdp__nav--prev" aria-label="Ảnh trước" @click="prevImage">
+                ‹
+              </button>
+              <button type="button" class="sf-pdp__nav sf-pdp__nav--next" aria-label="Ảnh sau" @click="nextImage">
+                ›
+              </button>
+            </template>
           </div>
-          <div v-if="galleryImages.length > 1" class="sf-pdp__thumbs">
+          <div v-if="hasGalleryNav" class="sf-pdp__thumbs">
             <button
               v-for="(url, idx) in galleryImages"
               :key="idx"
               type="button"
               class="sf-pdp__thumb"
-              :class="{ active: activeImage === productImageUrl(url) }"
-              @click="activeImage = productImageUrl(url)"
+              :class="{ active: activeImageIndex === idx }"
+              @click="setActiveImage(idx)"
+              @mouseenter="setActiveImage(idx)"
             >
               <img :src="productImageUrl(url)" :alt="`Ảnh ${idx + 1}`" />
             </button>

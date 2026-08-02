@@ -55,14 +55,11 @@ const weatherDesc = computed(() => {
   return 'Se lạnh'
 })
 
-const now = new Date()
-const timeLabel = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-const dateLabel = now.toLocaleDateString('vi-VN', { day: '2-digit', month: 'short', year: 'numeric' })
-
-const sideBanners = [
-  { title: 'Sản phẩm nổi bật', desc: 'Được chọn lọc bởi SUNOVA', to: '/san-pham?noiBat=1' },
-  { title: 'Khuyến mãi', desc: 'Đợt giảm giá đang diễn ra', to: '/san-pham/khuyen-mai' },
-]
+const blogBanner = {
+  title: 'Chưa biết chọn kem chống nắng?',
+  desc: 'Cẩm nang SUNOVA — hiểu SPF, PA và chọn đúng cho da bạn',
+  to: '/blog',
+}
 
 const promises = [
   { icon: 'solar:verified-check-linear', title: 'Chính hãng', desc: 'Nguồn gốc rõ ràng' },
@@ -109,66 +106,75 @@ onMounted(async () => {
 
 <template>
   <div class="sf-home">
-    <!-- Hero carousel + banner phụ -->
+    <!-- Hero: placeholder trái + 2 card phải -->
     <section class="sf-hero-split sf-container">
-      <div class="sf-hero-carousel">
-        <div class="sf-weather-card" v-if="!weatherLoading && weather">
-          <div class="sf-weather-card__sun" aria-hidden="true" />
+      <div class="sf-hero-placeholder" aria-hidden="true" />
 
-          <div class="sf-weather-card__top">
-            <span class="sf-weather-card__location">
-              <Icon icon="solar:map-point-linear" width="16" /> Hà Nội
-            </span>
-          </div>
-
-          <div class="sf-weather-card__main">
-            <span class="sf-weather-card__temp">{{ Math.round(weather.temp) }}°</span>
-            <div class="sf-weather-card__main-meta">
-              <span class="sf-weather-card__desc">{{ weatherDesc }}</span>
-              <span class="sf-weather-card__time">{{ timeLabel }}</span>
-              <span class="sf-weather-card__date">{{ dateLabel }}</span>
-            </div>
-          </div>
-
-          <div class="sf-weather-card__stats">
-            <div class="sf-weather-stat">
-              <div class="sf-weather-stat__head">
-                <span>Chỉ số UV</span>
-                <Icon icon="solar:sun-linear" width="18" />
-              </div>
-              <div class="sf-weather-stat__value">{{ weather.uvIndex }}</div>
-              <div class="sf-weather-stat__label">{{ uvInfo?.level }}</div>
-              <div class="sf-weather-stat__bar">
-                <div class="sf-weather-stat__bar-track" />
-                <div class="sf-weather-stat__bar-dot" :style="{ left: uvInfo?.percent + '%' }" />
-              </div>
-            </div>
-
-            <div class="sf-weather-stat">
-              <div class="sf-weather-stat__head">
-                <span>SPF khuyến nghị</span>
-                <Icon icon="solar:shield-check-linear" width="18" />
-              </div>
-              <div class="sf-weather-stat__value sf-weather-stat__value--sm">{{ uvInfo?.spf }}</div>
-              <div class="sf-weather-stat__label">{{ uvInfo?.pa || 'Dùng hàng ngày' }}</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="sf-weather-card sf-weather-card--loading" v-else-if="weatherLoading">
-          <span>Đang tải thời tiết Hà Nội…</span>
-        </div>
-      </div>
       <div class="sf-hero-side">
-        <RouterLink
-          v-for="banner in sideBanners"
-          :key="banner.title"
-          :to="banner.to"
-          class="sf-hero-side__card"
-        >
-          <p class="sf-eyebrow sf-eyebrow--light">{{ banner.desc }}</p>
-          <h2>{{ banner.title }}</h2>
+        <RouterLink :to="blogBanner.to" class="sf-hero-side__card sf-hero-side__card--blog">
+          <span class="sf-hero-side__blog-icon" aria-hidden="true">
+            <Icon icon="solar:notebook-bookmark-bold-duotone" width="22" />
+          </span>
+          <p class="sf-hero-side__kicker">{{ blogBanner.desc }}</p>
+          <h2 class="sf-hero-side__title">{{ blogBanner.title }}</h2>
+          <span class="sf-hero-side__cta">
+            Đọc blog <span aria-hidden="true">→</span>
+          </span>
         </RouterLink>
+
+        <div
+          class="sf-hero-side__card sf-hero-side__card--weather"
+          aria-live="polite"
+          :aria-busy="weatherLoading"
+        >
+          <div class="sf-hero-wx">
+            <div class="sf-hero-wx__top">
+              <span class="sf-hero-wx__loc">
+                <Icon icon="solar:map-point-bold" width="14" />
+                Hà Nội
+              </span>
+              <span
+                class="sf-hero-wx__sun"
+                :class="{ 'sf-hero-wx__sun--muted': weatherLoading || !weather }"
+                aria-hidden="true"
+              >
+                <Icon
+                  :icon="!weatherLoading && weather ? 'solar:sun-bold' : 'solar:sun-linear'"
+                  width="28"
+                />
+              </span>
+            </div>
+
+            <!-- Skeleton: khớp vị trí temp / desc / meta -->
+            <div v-if="weatherLoading" class="sf-hero-wx__body sf-hero-wx__body--skel" key="skel">
+              <span class="sf-skel sf-skel--temp" />
+              <span class="sf-skel sf-skel--desc" />
+              <div class="sf-hero-wx__meta sf-hero-wx__meta--skel">
+                <span class="sf-skel sf-skel--chip" />
+                <span class="sf-skel sf-skel--chip sf-skel--chip-sm" />
+              </div>
+            </div>
+
+            <!-- Data -->
+            <div
+              v-else-if="weather && uvInfo"
+              class="sf-hero-wx__body sf-hero-wx__body--fade"
+              key="data"
+            >
+              <div class="sf-hero-wx__temp">{{ Math.round(weather.temp) }}°</div>
+              <p class="sf-hero-wx__desc">{{ weatherDesc }}</p>
+              <div class="sf-hero-wx__meta">
+                <span>UV {{ weather.uvIndex }} · {{ uvInfo.level }}</span>
+                <span v-if="uvInfo.spf">{{ uvInfo.spf }}{{ uvInfo.pa ? ` ${uvInfo.pa}` : '' }}</span>
+              </div>
+            </div>
+
+            <!-- Lỗi / không data -->
+            <div v-else class="sf-hero-wx__body sf-hero-wx__body--error" key="err">
+              <p class="sf-hero-wx__error">Không tải được thời tiết</p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -295,171 +301,3 @@ onMounted(async () => {
     </section>
   </div>
 </template>
-
-<style scoped>
-/* --- Thẻ thời tiết + UV, lấp đầy chiều rộng khối hero --- */
-.sf-hero-carousel {
-  display: flex;
-}
-
-.sf-weather-card {
-  position: relative;
-  overflow: hidden;
-  width: 100%;
-  border-radius: 24px;
-  padding: 28px 28px 24px;
-  background: linear-gradient(135deg, #2b1a12 0%, #3d2417 55%, #5a3520 100%);
-  color: #f4f1ea;
-}
-
-.sf-weather-card--loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 320px;
-  color: rgba(244, 241, 234, 0.75);
-  font-style: italic;
-  background: linear-gradient(135deg, #2b1a12 0%, #4a2c1b 100%);
-}
-
-.sf-weather-card__sun {
-  position: absolute;
-  top: -30px;
-  left: -20px;
-  width: 150px;
-  height: 150px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 40% 40%, #f2b459, #d9822b 70%, rgba(217, 130, 43, 0) 100%);
-  filter: blur(1px);
-  z-index: 0;
-}
-
-.sf-weather-card__top,
-.sf-weather-card__main,
-.sf-weather-card__stats {
-  position: relative;
-  z-index: 1;
-}
-
-.sf-weather-card__top {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  font-size: 14px;
-}
-
-.sf-weather-card__location {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 600;
-}
-
-.sf-weather-card__main {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 14px;
-  margin: 28px 0 30px;
-}
-
-.sf-weather-card__temp {
-  font-size: 72px;
-  font-weight: 300;
-  line-height: 1;
-}
-
-.sf-weather-card__main-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  text-align: right;
-}
-
-.sf-weather-card__desc {
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.sf-weather-card__time {
-  font-size: 13px;
-  color: rgba(244, 241, 234, 0.85);
-}
-
-.sf-weather-card__date {
-  font-size: 12px;
-  color: rgba(244, 241, 234, 0.6);
-}
-
-.sf-weather-card__stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.sf-weather-stat {
-  background: rgba(244, 241, 234, 0.94);
-  color: #2b1a12;
-  border-radius: 18px;
-  padding: 16px 18px;
-}
-
-.sf-weather-stat__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 13px;
-  color: #8a7259;
-}
-
-.sf-weather-stat__value {
-  font-size: 28px;
-  font-weight: 700;
-  margin-top: 8px;
-}
-
-.sf-weather-stat__value--sm {
-  font-size: 20px;
-}
-
-.sf-weather-stat__label {
-  font-size: 13px;
-  color: #8a7259;
-  margin-top: 2px;
-}
-
-.sf-weather-stat__bar {
-  position: relative;
-  margin-top: 12px;
-  height: 6px;
-}
-
-.sf-weather-stat__bar-track {
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #22c55e, #eab308, #f97316, #dc2626);
-}
-
-.sf-weather-stat__bar-dot {
-  position: absolute;
-  top: 50%;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #f4f1ea;
-  border: 2px solid #2b1a12;
-  transform: translate(-50%, -50%);
-}
-
-@media (max-width: 640px) {
-  .sf-weather-card__temp {
-    font-size: 56px;
-  }
-
-  .sf-weather-card__stats {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

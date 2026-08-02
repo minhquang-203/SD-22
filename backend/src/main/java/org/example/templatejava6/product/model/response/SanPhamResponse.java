@@ -31,6 +31,8 @@ public class SanPhamResponse {
     private BigDecimal giaMax;
     private Long tongTon;
     private Long soBienThe;
+    /** True nếu sản phẩm có ít nhất 1 lô còn hàng, HSD còn ≤ 30 ngày. */
+    private Boolean coLoCanHan;
     /** Giá gốc min/max khi sản phẩm đang trong đợt giảm giá */
     private BigDecimal giaGocMin;
     private BigDecimal giaGocMax;

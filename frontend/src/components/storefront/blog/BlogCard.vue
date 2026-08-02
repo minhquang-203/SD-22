@@ -1,6 +1,11 @@
 <template>
-  <RouterLink :to="`/blog/${post.slug}`" class="blog-card">
-    <div class="blog-card__media">
+  <RouterLink
+    :to="`/blog/${post.slug}`"
+    class="blog-card"
+    :data-cat="post.category"
+  >
+    <div class="blog-card__media" :class="`blog-card__media--${tone}`">
+      <span class="blog-card__glow" aria-hidden="true" />
       <svg
         class="blog-card__icon"
         viewBox="0 0 48 48"
@@ -13,7 +18,9 @@
 
     <div class="blog-card__body">
       <div class="blog-card__meta">
-        <span class="blog-card__tag">{{ post.tag }}</span>
+        <span class="blog-card__tag" :class="`blog-card__tag--${tone}`">{{ post.tag }}</span>
+        <span class="blog-card__dot">·</span>
+        <span class="blog-card__date">{{ formatDate(post.publishDate) }}</span>
         <span class="blog-card__dot">·</span>
         <span class="blog-card__read-time">{{ post.readTime }}</span>
       </div>
@@ -38,12 +45,33 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
   post: {
     type: Object,
     required: true,
   },
 })
+
+const CAT_TONE = {
+  'kien-thuc-spf': 'gold',
+  'thoi-tiet-da': 'sky',
+  'huong-dan-chon': 'sage',
+  'mua-mua': 'teal',
+  'cham-soc-da': 'coral',
+}
+
+const tone = computed(() => CAT_TONE[props.post.category] || 'gold')
+
+function formatDate(dateStr) {
+  if (!dateStr) return ''
+  return new Date(dateStr).toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+}
 </script>
 
 <style scoped>
@@ -52,17 +80,18 @@ defineProps({
   flex-direction: column;
   text-decoration: none;
   color: inherit;
-  background: var(--sn-bg-elevated, #241a12);
-  border: 1px solid var(--sn-border, rgba(201, 163, 106, 0.18));
-  border-radius: 4px;
+  background: var(--sf-warm-white, #fffdfa);
+  border: 1px solid var(--sf-hairline, #ede5d8);
+  border-radius: 14px;
   overflow: hidden;
-  transition: border-color 0.25s ease, transform 0.25s ease;
+  transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
   height: 100%;
 }
 
 .blog-card:hover {
-  border-color: var(--sn-gold, #c9a36a);
-  transform: translateY(-3px);
+  border-color: var(--sf-gold, #c9a96e);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px rgba(36, 26, 18, 0.08);
 }
 
 .blog-card:hover .blog-card__icon {
@@ -70,23 +99,45 @@ defineProps({
 }
 
 .blog-card__media {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 140px;
-  background: radial-gradient(
-    circle at 30% 20%,
-    rgba(201, 163, 106, 0.16),
-    transparent 65%
-  ),
-  var(--sn-bg, #1b130c);
-  border-bottom: 1px solid var(--sn-border, rgba(201, 163, 106, 0.18));
+  height: 148px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--sf-hairline, #ede5d8);
+}
+
+.blog-card__glow {
+  position: absolute;
+  inset: -20%;
+  opacity: 0.55;
+  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.7), transparent 55%);
+  pointer-events: none;
+}
+
+.blog-card__media--gold {
+  background: linear-gradient(145deg, #f3e6cf 0%, #e8d5a8 55%, #dcc48a 100%);
+}
+.blog-card__media--sky {
+  background: linear-gradient(145deg, #dceaf3 0%, #b9d4e8 55%, #8fb8d4 100%);
+}
+.blog-card__media--sage {
+  background: linear-gradient(145deg, #e4ecdf 0%, #c5d6b8 55%, #a8c294 100%);
+}
+.blog-card__media--teal {
+  background: linear-gradient(145deg, #d7ebea 0%, #aed4d2 55%, #7fb8b5 100%);
+}
+.blog-card__media--coral {
+  background: linear-gradient(145deg, #f5e0d8 0%, #e8bfb2 55%, #d49a88 100%);
 }
 
 .blog-card__icon {
-  width: 44px;
-  height: 44px;
-  color: var(--sn-gold, #c9a36a);
+  position: relative;
+  z-index: 1;
+  width: 48px;
+  height: 48px;
+  color: var(--sf-espresso, #241a12);
   transition: transform 0.3s ease;
 }
 
@@ -94,63 +145,66 @@ defineProps({
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 20px 22px 22px;
+  padding: 1.15rem 1.25rem 1.35rem;
   flex: 1;
 }
 
 .blog-card__meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  font-family: var(--sn-font-body, 'Be Vietnam Pro', sans-serif);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--sn-gold, #c9a36a);
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--sf-light-mid, #8a8278);
 }
+
+.blog-card__tag {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.6875rem;
+}
+
+.blog-card__tag--gold { color: var(--sf-gold-dark, #9e7340); }
+.blog-card__tag--sky { color: #3a6ea8; }
+.blog-card__tag--sage { color: #4d6b45; }
+.blog-card__tag--teal { color: #2f6f6c; }
+.blog-card__tag--coral { color: var(--sf-accent, #a33b1c); }
 
 .blog-card__dot {
-  color: var(--sn-text-muted, #8a7a64);
-}
-
-.blog-card__read-time {
-  color: var(--sn-text-muted, #b8a890);
-  text-transform: none;
-  letter-spacing: normal;
+  opacity: 0.5;
 }
 
 .blog-card__title {
-  font-family: var(--sn-font-display, 'Playfair Display', serif);
-  font-size: 19px;
+  font-family: var(--sf-font-display, 'Playfair Display', serif);
+  font-size: 1.15rem;
   line-height: 1.35;
   font-weight: 600;
-  color: var(--sn-text, #f3ead9);
+  color: var(--sf-espresso, #241a12);
   margin: 0;
 }
 
 .blog-card__excerpt {
-  font-family: var(--sn-font-body, 'Be Vietnam Pro', sans-serif);
-  font-size: 13.5px;
-  line-height: 1.6;
-  color: var(--sn-text-muted, #b8a890);
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--sf-mid, #5a5248);
   margin: 0;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
 .blog-card__cta {
   margin-top: auto;
-  padding-top: 6px;
+  padding-top: 8px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--sn-font-body, 'Be Vietnam Pro', sans-serif);
-  font-size: 12.5px;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--sn-gold, #c9a36a);
+  color: var(--sf-gold-dark, #9e7340);
 }
 </style>

@@ -17,6 +17,7 @@ public class ChiTietSanPhamResponse {
     private BigDecimal giaBan;
     private Integer soLuongTon;
     private Boolean trangThai;
+    private Integer idMauSac;
     private String tenMauSac;
     private LocalDate hanSuDungGanNhat;
     private Boolean sapHetHan;
@@ -34,6 +35,7 @@ public class ChiTietSanPhamResponse {
         this.giaBan = ct.getGiaBan();
         this.soLuongTon = ct.getSoLuongTon();
         this.trangThai = ct.getTrangThai();
+        this.idMauSac = ct.getMauSac() != null ? ct.getMauSac().getId() : null;
         this.tenMauSac = ct.getMauSac() != null ? ct.getMauSac().getTen() : null;
     }
 }

@@ -43,15 +43,16 @@ function isSold(lot) {
               <th>HSD</th>
               <th>SL nhập</th>
               <th>Còn lại</th>
+              <th>SL lỗi</th>
               <th class="text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="loading">
-              <td colspan="6" class="text-center py-8 text-[var(--admin-muted)]">Đang tải...</td>
+              <td colspan="7" class="text-center py-8 text-[var(--admin-muted)]">Đang tải...</td>
             </tr>
             <tr v-else-if="lots.length === 0">
-              <td colspan="6" class="text-center py-8 text-[var(--admin-muted)]">Chưa có lô hàng. Nhấn "Nhập lô" để thêm.</td>
+              <td colspan="7" class="text-center py-8 text-[var(--admin-muted)]">Chưa có lô hàng. Nhấn "Nhập lô" để thêm.</td>
             </tr>
             <tr v-for="lot in lots" :key="lot.id">
               <td class="font-medium">{{ lot.soLo }}</td>
@@ -67,6 +68,19 @@ function isSold(lot) {
               </td>
               <td>{{ lot.soLuongNhap }}</td>
               <td class="font-semibold text-[var(--admin-primary)]">{{ lot.soLuongCon }}</td>
+              <td>
+                <span
+                  v-if="Number(lot.soLuongLoi) > 0"
+                  class="font-semibold text-[#a83a3a]"
+                  title="Hàng lỗi/hỏng đã ghi nhận — không bán lại"
+                >
+                  {{ lot.soLuongLoi }}
+                  <span class="ml-1 inline-block text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-800">
+                    Có lỗi
+                  </span>
+                </span>
+                <span v-else class="text-[var(--admin-muted)]">0</span>
+              </td>
               <td class="text-right whitespace-nowrap">
                 <button
                   type="button"

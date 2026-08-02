@@ -1,6 +1,7 @@
 package org.example.templatejava6.order.service;
 
 import org.example.templatejava6.common.entity.NhanVien;
+import org.example.templatejava6.common.enums.LoaiHangTra;
 import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.example.templatejava6.common.enums.TrangThaiTraHang;
 import org.example.templatejava6.common.exception.ApiException;
@@ -9,18 +10,26 @@ import org.example.templatejava6.notification.enums.LoaiThongBao;
 import org.example.templatejava6.notification.service.OrderMailService;
 import org.example.templatejava6.notification.service.ThongBaoService;
 import org.example.templatejava6.order.entity.AnhYeuCauTraHang;
+import org.example.templatejava6.order.entity.ChiTietTraHangLo;
 import org.example.templatejava6.order.entity.HoaDon;
 import org.example.templatejava6.order.entity.HoaDonChiTiet;
+import org.example.templatejava6.order.entity.HoaDonChiTietLo;
 import org.example.templatejava6.order.entity.LichSuDonHang;
 import org.example.templatejava6.order.entity.YeuCauTraHang;
+import org.example.templatejava6.order.model.request.NhanHangTraRequest;
 import org.example.templatejava6.order.model.request.TaoYeuCauTraHangRequest;
+import org.example.templatejava6.order.model.response.LoHangDonHangResponse;
 import org.example.templatejava6.order.model.response.YeuCauTraHangResponse;
 import org.example.templatejava6.order.repository.AnhYeuCauTraHangRepository;
+import org.example.templatejava6.order.repository.ChiTietTraHangLoRepository;
+import org.example.templatejava6.order.repository.HoaDonChiTietLoRepository;
 import org.example.templatejava6.order.repository.HoaDonChiTietRepository;
 import org.example.templatejava6.order.repository.HoaDonRepository;
 import org.example.templatejava6.order.repository.LichSuDonHangRepository;
 import org.example.templatejava6.order.repository.NhanVienRepository;
 import org.example.templatejava6.order.repository.YeuCauTraHangRepository;
+import org.example.templatejava6.product.entity.ChiTietSanPham;
+import org.example.templatejava6.product.entity.LoHang;
 import org.example.templatejava6.product.entity.SanPham;
 import org.example.templatejava6.product.service.LoHangService;
 import org.example.templatejava6.realtime.service.OrderRealtimeService;
@@ -35,7 +44,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Quan ly luong tra hang sau khi khach da nhan hang. Luong giong nhau cho moi phuong thuc thanh toan:
@@ -43,8 +57,9 @@ import java.util.List;
  *   <li>Khach gui yeu cau -> {@code CHO_DUYET}.</li>
  *   <li>Admin duyet -> {@code DA_DUYET} va bao khach de khach tao van don hoan. Khong hoan tien o buoc nay.</li>
  *   <li>Khach tao van don GHN hoan hang kem ca lay hang (pick_shift) -> {@code DANG_HOAN_HANG}.</li>
- *   <li>Van don hoan hoan thanh (GHN {@code delivered} hoac admin xac nhan) -> {@code DA_NHAN_HANG}:
- *       hoan ton kho, don chuyen {@code TRA_HANG} va tao ban ghi hoan tien {@code CHO_XU_LY}.</li>
+ *   <li>Van don hoan hoan thanh (GHN {@code delivered}) — cap nhat trang thai GHN;
+ *       nhan vien bam "Da nhan hang" kem phan loai lo TOT/LOI -> {@code DA_NHAN_HANG}:
+ *       TOT hoan ve dung lo, LOI tang so_luong_loi; tao ban ghi hoan tien {@code CHO_XU_LY}.</li>
  *   <li>Admin quyet dinh hoan tien hay tu choi tai trang hoan tien -> {@code HOAN_TAT}
  *       (xem {@link RefundService}).</li>
  * </ol>
@@ -63,6 +78,8 @@ public class ReturnRequestService {
     private final AnhYeuCauTraHangRepository anhYeuCauTraHangRepository;
     private final HoaDonRepository hoaDonRepository;
     private final HoaDonChiTietRepository hoaDonChiTietRepository;
+    private final HoaDonChiTietLoRepository hoaDonChiTietLoRepository;
+    private final ChiTietTraHangLoRepository chiTietTraHangLoRepository;
     private final LichSuDonHangRepository lichSuDonHangRepository;
     private final NhanVienRepository nhanVienRepository;
     private final LoHangService loHangService;
@@ -78,6 +95,8 @@ public class ReturnRequestService {
                                 AnhYeuCauTraHangRepository anhYeuCauTraHangRepository,
                                 HoaDonRepository hoaDonRepository,
                                 HoaDonChiTietRepository hoaDonChiTietRepository,
+                                HoaDonChiTietLoRepository hoaDonChiTietLoRepository,
+                                ChiTietTraHangLoRepository chiTietTraHangLoRepository,
                                 LichSuDonHangRepository lichSuDonHangRepository,
                                 NhanVienRepository nhanVienRepository,
                                 LoHangService loHangService,
@@ -92,6 +111,8 @@ public class ReturnRequestService {
         this.anhYeuCauTraHangRepository = anhYeuCauTraHangRepository;
         this.hoaDonRepository = hoaDonRepository;
         this.hoaDonChiTietRepository = hoaDonChiTietRepository;
+        this.hoaDonChiTietLoRepository = hoaDonChiTietLoRepository;
+        this.chiTietTraHangLoRepository = chiTietTraHangLoRepository;
         this.lichSuDonHangRepository = lichSuDonHangRepository;
         this.nhanVienRepository = nhanVienRepository;
         this.loHangService = loHangService;
@@ -301,19 +322,64 @@ public class ReturnRequestService {
         yc.setNgayCapNhat(LocalDateTime.now());
         YeuCauTraHang saved = yeuCauTraHangRepository.save(yc);
 
+        // Không tự hoàn kho — nhân viên phải xác nhận nhận hàng kèm phân loại TỐT/LỖI theo lô.
         boolean daVeShop = GHN_TRANG_THAI_DA_VE_SHOP.contains(trangThaiGhn);
         boolean choNhanHang = saved.getTrangThai() == TrangThaiTraHang.DANG_HOAN_HANG;
         if (daVeShop && choNhanHang) {
-            return toResponse(ghiNhanDaNhanHang(saved, idNhanVien,
-                    "Vận đơn hoàn GHN " + maVanDon + " đã hoàn thành ("
-                            + GhnTrackingService.labelOf(trangThaiGhn) + ")"));
+            ghiNhatKy(saved.getIdHoaDon(), "TRA_HANG_GHN_DA_VE",
+                    "Vận đơn hoàn GHN " + maVanDon + " đã về shop ("
+                            + GhnTrackingService.labelOf(trangThaiGhn)
+                            + ") — chờ nhân viên xác nhận nhận hàng và phân loại lô TỐT/LỖI");
         }
         return toResponse(saved);
     }
 
-    /** Admin xac nhan thu cong da nhan lai hang tra (khi khong doi duoc trang thai GHN). */
+    /**
+     * Danh sách lô mà đơn đã lấy (từ hoa_don_chi_tiet_lo) — để nhân viên chọn khi nhận hàng trả.
+     */
+    @Transactional(readOnly = true)
+    public List<LoHangDonHangResponse> danhSachLoCuaYeuCau(Integer idYeuCau) {
+        YeuCauTraHang yc = load(idYeuCau);
+        return danhSachLoCuaHoaDon(yc.getIdHoaDon());
+    }
+
+    @Transactional(readOnly = true)
+    public List<LoHangDonHangResponse> danhSachLoCuaHoaDon(HoaDon hoaDon) {
+        List<HoaDonChiTietLo> rows = hoaDonChiTietLoRepository.findByHoaDonFetchLo(hoaDon);
+        Map<Integer, LoHangDonHangResponse> byLot = new LinkedHashMap<>();
+        for (HoaDonChiTietLo row : rows) {
+            LoHang lo = row.getLoHang();
+            if (lo == null || lo.getId() == null) {
+                continue;
+            }
+            LoHangDonHangResponse item = byLot.get(lo.getId());
+            if (item == null) {
+                item = new LoHangDonHangResponse();
+                item.setIdLoHang(lo.getId());
+                item.setSoLo(lo.getSoLo());
+                item.setHanSuDung(lo.getHanSuDung());
+                item.setNgayNhap(lo.getNgayNhap());
+                item.setSoLuongDaBan(0);
+                HoaDonChiTiet ct = row.getHoaDonChiTiet();
+                ChiTietSanPham cts = ct != null ? ct.getIdChiTietSanPham() : null;
+                if (cts != null) {
+                    item.setIdChiTietSanPham(cts.getId());
+                    item.setSku(cts.getSku());
+                    SanPham sp = cts.getSanPham();
+                    item.setTenSanPham(sp != null ? sp.getTen() : null);
+                }
+                byLot.put(lo.getId(), item);
+            }
+            int add = row.getSoLuong() != null ? row.getSoLuong() : 0;
+            item.setSoLuongDaBan(item.getSoLuongDaBan() + add);
+        }
+        return new ArrayList<>(byLot.values());
+    }
+
+    /** Admin xac nhan thu cong da nhan lai hang tra (kem phan bo lo TOT/LOI). */
     @Transactional
-    public YeuCauTraHangResponse xacNhanNhanHang(Integer id, Integer idNhanVien) {
+    public YeuCauTraHangResponse xacNhanNhanHang(Integer id, Integer idNhanVien,
+                                                 List<NhanHangTraRequest.ChiTietLoRequest> chiTietLo) {
         YeuCauTraHang yc = load(id);
         if (yc.getTrangThai() != TrangThaiTraHang.DANG_HOAN_HANG) {
             throw new ApiException(
@@ -325,19 +391,21 @@ public class ReturnRequestService {
                     "Khách chưa tạo vận đơn hoàn hàng. Không thể xác nhận đã nhận hàng.",
                     "RETURN_NO_TRACKING");
         }
-        return toResponse(ghiNhanDaNhanHang(yc, idNhanVien, "Admin xác nhận đã nhận lại hàng trả"));
+        return toResponse(ghiNhanDaNhanHang(yc, idNhanVien,
+                "Admin xác nhận đã nhận lại hàng trả", chiTietLo));
     }
 
     /**
-     * Ghi nhan shop da nhan lai hang: hoan ton kho, don chuyen {@code TRA_HANG},
+     * Ghi nhan shop da nhan lai hang: hoan ton theo lo TOT/LOI, don chuyen {@code TRA_HANG},
      * yeu cau tra hang sang {@code DA_NHAN_HANG} va tao ban ghi hoan tien {@code CHO_XU_LY}
      * de admin quyet dinh hoan tien hay tu choi.
      */
-    private YeuCauTraHang ghiNhanDaNhanHang(YeuCauTraHang yc, Integer idNhanVien, String ghiChu) {
+    private YeuCauTraHang ghiNhanDaNhanHang(YeuCauTraHang yc, Integer idNhanVien, String ghiChu,
+                                            List<NhanHangTraRequest.ChiTietLoRequest> chiTietLo) {
         HoaDon hoaDon = yc.getIdHoaDon();
         TrangThaiDonHang trangThaiCu = hoaDon.getTrangThai();
 
-        hoanTonKho(hoaDon);
+        hoanTonTheoPhanBoTra(yc, hoaDon, chiTietLo);
         if (trangThaiCu != TrangThaiDonHang.TRA_HANG) {
             hoaDon.setTrangThai(TrangThaiDonHang.TRA_HANG);
             hoaDonRepository.save(hoaDon);
@@ -354,12 +422,108 @@ public class ReturnRequestService {
         }
         YeuCauTraHang saved = yeuCauTraHangRepository.save(yc);
 
-        ghiNhatKy(hoaDon, "TRA_HANG_DA_NHAN_HANG", ghiChu + " — hoàn tồn kho, chờ quyết định hoàn tiền");
+        ghiNhatKy(hoaDon, "TRA_HANG_DA_NHAN_HANG", ghiChu + " — hoàn tồn theo lô, chờ quyết định hoàn tiền");
         refundService.taoHoanTienTraHangNeuChua(
                 hoaDon, refundService.resolveSoTienHoan(hoaDon), saved,
                 yc.getTenNganHang(), yc.getSoTaiKhoan(), yc.getChuTaiKhoan());
         orderMailService.guiDaNhanHangTra(hoaDon);
         return saved;
+    }
+
+    /**
+     * Hoàn tồn theo phân bổ TỐT/LỖI nhân viên chọn.
+     * Đơn cũ không có hoa_don_chi_tiet_lo: fallback hoàn tất cả như hàng tốt.
+     */
+    private void hoanTonTheoPhanBoTra(YeuCauTraHang yc, HoaDon hoaDon,
+                                      List<NhanHangTraRequest.ChiTietLoRequest> chiTietLo) {
+        List<HoaDonChiTietLo> soldLots = hoaDonChiTietLoRepository.findByHoaDonFetchLo(hoaDon);
+        if (soldLots.isEmpty()) {
+            for (HoaDonChiTiet chiTiet : hoaDonChiTietRepository.findByIdHoaDon(hoaDon)) {
+                loHangService.hoanTonTheoChiTiet(chiTiet);
+            }
+            return;
+        }
+
+        if (chiTietLo == null || chiTietLo.isEmpty()) {
+            throw new ApiException(
+                    "Vui lòng phân bổ số lượng trả về từng lô (TỐT/LỖI).",
+                    "RETURN_LOT_REQUIRED");
+        }
+
+        Map<Integer, Integer> purchasedByLot = new HashMap<>();
+        Set<Integer> validLotIds = new HashSet<>();
+        for (HoaDonChiTietLo row : soldLots) {
+            Integer idLo = row.getLoHang() != null ? row.getLoHang().getId() : null;
+            if (idLo == null) {
+                continue;
+            }
+            validLotIds.add(idLo);
+            int qty = row.getSoLuong() != null ? row.getSoLuong() : 0;
+            purchasedByLot.merge(idLo, qty, Integer::sum);
+        }
+
+        Map<Integer, Integer> returnedByLot = new HashMap<>();
+        for (NhanHangTraRequest.ChiTietLoRequest item : chiTietLo) {
+            if (item == null || item.getIdLoHang() == null) {
+                throw new ApiException("Thiếu id lô hàng trong phân bổ trả.", "VALIDATION_ERROR");
+            }
+            if (item.getSoLuong() == null || item.getSoLuong() <= 0) {
+                throw new ApiException("Số lượng trả phải > 0.", "VALIDATION_ERROR");
+            }
+            if (item.getLoaiHang() == null) {
+                throw new ApiException("Thiếu loại hàng trả (TOT/LOI).", "VALIDATION_ERROR");
+            }
+            if (!validLotIds.contains(item.getIdLoHang())) {
+                throw new ApiException(
+                        "Lô #" + item.getIdLoHang() + " không thuộc đơn đang trả.",
+                        "RETURN_LOT_INVALID");
+            }
+            returnedByLot.merge(item.getIdLoHang(), item.getSoLuong(), Integer::sum);
+        }
+
+        for (Map.Entry<Integer, Integer> e : returnedByLot.entrySet()) {
+            int purchased = purchasedByLot.getOrDefault(e.getKey(), 0);
+            if (e.getValue() > purchased) {
+                throw new ApiException(
+                        "Số lượng trả lô #" + e.getKey() + " (" + e.getValue()
+                                + ") vượt số đã bán từ lô (" + purchased + ").",
+                        "RETURN_QTY_EXCEEDED");
+            }
+        }
+        for (Map.Entry<Integer, Integer> e : purchasedByLot.entrySet()) {
+            int returned = returnedByLot.getOrDefault(e.getKey(), 0);
+            if (returned != e.getValue()) {
+                throw new ApiException(
+                        "Phải phân bổ đủ số lượng đã bán của mỗi lô. Lô #" + e.getKey()
+                                + ": đã bán " + e.getValue() + ", đang phân bổ " + returned + ".",
+                        "RETURN_QTY_MISMATCH");
+            }
+        }
+
+        for (NhanHangTraRequest.ChiTietLoRequest item : chiTietLo) {
+            if (item.getLoaiHang() == LoaiHangTra.TOT) {
+                loHangService.hoanTonVaoLo(item.getIdLoHang(), item.getSoLuong());
+            } else {
+                loHangService.ghiNhanHangLoi(item.getIdLoHang(), item.getSoLuong());
+            }
+
+            ChiTietTraHangLo detail = new ChiTietTraHangLo();
+            detail.setYeuCauTraHang(yc);
+            LoHang loRef = loHangService.getLoHangRef(item.getIdLoHang());
+            detail.setLoHang(loRef);
+            detail.setSoLuong(item.getSoLuong());
+            detail.setLoai(item.getLoaiHang());
+            chiTietTraHangLoRepository.save(detail);
+        }
+
+        Set<Integer> clearedHdct = new HashSet<>();
+        for (HoaDonChiTietLo row : soldLots) {
+            HoaDonChiTiet ct = row.getHoaDonChiTiet();
+            if (ct == null || ct.getId() == null || !clearedHdct.add(ct.getId())) {
+                continue;
+            }
+            hoaDonChiTietLoRepository.deleteByHoaDonChiTiet(ct);
+        }
     }
 
     /** Kiem tra ca lay hang khach chon con nam trong danh sach GHN dang mo. */
@@ -415,12 +579,6 @@ public class ReturnRequestService {
         return hoaDon != null
                 && hoaDon.getIdPhuongThucThanhToan() != null
                 && MA_VNPAY.equalsIgnoreCase(hoaDon.getIdPhuongThucThanhToan().getMa());
-    }
-
-    private void hoanTonKho(HoaDon hoaDon) {
-        for (HoaDonChiTiet chiTiet : hoaDonChiTietRepository.findByIdHoaDon(hoaDon)) {
-            loHangService.hoanTonTheoChiTiet(chiTiet);
-        }
     }
 
     private List<CreateShippingOrderRequest.Item> buildItems(HoaDon hoaDon) {

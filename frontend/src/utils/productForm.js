@@ -59,6 +59,7 @@ export function detailToForm(detail, mauSacOptions = []) {
       previewUrl: null,
       laAnhChinh: img.laAnhChinh ?? false,
       thuTu: img.thuTu ?? 0,
+      idMauSac: img.idMauSac ?? null,
     })),
     idLoaiDas: detail.idLoaiDas || [],
     idCongDungs: detail.idCongDungs || [],
@@ -127,12 +128,14 @@ function buildAnhPayload(anhs) {
         fileIndex,
         laAnhChinh: img.laAnhChinh ?? false,
         thuTu: img.thuTu ?? index,
+        idMauSac: img.idMauSac ?? null,
       }
     }
     return {
       url: img.url?.trim() || null,
       laAnhChinh: img.laAnhChinh ?? false,
       thuTu: img.thuTu ?? index,
+      idMauSac: img.idMauSac ?? null,
     }
   })
   return { anhs: payload, files }

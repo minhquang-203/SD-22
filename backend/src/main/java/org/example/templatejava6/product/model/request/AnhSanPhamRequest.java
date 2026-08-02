@@ -19,4 +19,7 @@ public class AnhSanPhamRequest {
 
     private Boolean laAnhChinh;
     private Integer thuTu;
+
+    /** NULL = dùng chung mọi màu; có giá trị = ảnh thuộc màu đó */
+    private Integer idMauSac;
 }

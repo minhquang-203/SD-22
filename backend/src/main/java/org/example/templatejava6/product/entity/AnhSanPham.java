@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.example.templatejava6.category.entity.MauSac;
 
 @Getter
 @Setter
@@ -27,6 +28,11 @@ public class AnhSanPham {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_chi_tiet_san_pham")
     private ChiTietSanPham chiTietSanPham;
+
+    /** NULL = ảnh dùng chung mọi màu; có giá trị = ảnh riêng của màu đó */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_mau_sac")
+    private MauSac mauSac;
 
     @Column(name = "url", length = 255)
     private String url;

@@ -50,7 +50,12 @@ export function tuChoiTraHang(id, payload = {}) {
   return request.post(`/tra-hang/${id}/tu-choi`, payload)
 }
 
-/** Admin: xác nhận đã nhận hàng hoàn */
+/** Admin: danh sách lô đơn đã lấy (để chọn khi nhận hàng trả) */
+export function fetchLoHangTraHang(id) {
+  return request.get(`/tra-hang/${id}/lo-hang`)
+}
+
+/** Admin: xác nhận đã nhận hàng hoàn (kèm phân bổ lô TOT/LOI) */
 export function daNhanHangTraHang(id, payload = {}) {
   return request.post(`/tra-hang/${id}/da-nhan-hang`, payload)
 }

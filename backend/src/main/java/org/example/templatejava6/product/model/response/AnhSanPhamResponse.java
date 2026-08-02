@@ -13,6 +13,7 @@ public class AnhSanPhamResponse {
     private Boolean laAnhChinh;
     private Integer thuTu;
     private Integer idChiTietSanPham;
+    private Integer idMauSac;
 
     public AnhSanPhamResponse(AnhSanPham anh) {
         this.id = anh.getId();
@@ -20,5 +21,6 @@ public class AnhSanPhamResponse {
         this.laAnhChinh = anh.getLaAnhChinh();
         this.thuTu = anh.getThuTu();
         this.idChiTietSanPham = anh.getChiTietSanPham() != null ? anh.getChiTietSanPham().getId() : null;
+        this.idMauSac = anh.getMauSac() != null ? anh.getMauSac().getId() : null;
     }
 }

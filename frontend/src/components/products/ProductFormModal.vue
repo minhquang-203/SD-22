@@ -44,6 +44,19 @@ const thuongHieuSelectOptions = computed(() => mapSelectOptions(props.thuongHieu
 const danhMucSelectOptions = computed(() => mapSelectOptions(props.danhMucOptions))
 const dangSanPhamSelectOptions = computed(() => mapSelectOptions(props.dangSanPhamOptions))
 
+/** Màu từ biến thể đang có + màu đã gán trên ảnh (khi sửa) */
+const imageMauOptions = computed(() => {
+  const ids = new Set(
+    (form.value.chiTiets || [])
+      .map((ct) => ct.idMauSac)
+      .filter((id) => id != null),
+  )
+  ;(form.value.anhs || []).forEach((img) => {
+    if (img.idMauSac != null) ids.add(img.idMauSac)
+  })
+  return (props.mauSacOptions || []).filter((m) => ids.has(m.id))
+})
+
 const tabs = [
   { key: 'basic', label: 'Thông tin cơ bản' },
   { key: 'attributes', label: 'Thuộc tính' },
@@ -221,7 +234,13 @@ function handleSubmit() {
         </div>
 
         <div v-show="activeTab === 'images'">
-          <ProductImageManager v-model="form.anhs" />
+          <ProductImageManager v-model="form.anhs" :mau-options="imageMauOptions" />
+          <p
+            v-if="!imageMauOptions.length"
+            class="text-xs text-[var(--admin-muted)] mt-2"
+          >
+            Chưa có màu ở tab SKU — ảnh mặc định «Dùng chung». Thêm biến thể + màu để gán ảnh riêng.
+          </p>
         </div>
       </div>
 

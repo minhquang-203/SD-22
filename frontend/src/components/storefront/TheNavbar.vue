@@ -22,7 +22,6 @@ const navLinks = [
   { to: '/', label: 'Trang chủ', exact: true },
   { to: '/san-pham', label: 'Kem chống nắng' },
   { to: '/san-pham/khuyen-mai', label: 'Khuyến mãi' },
-  { to: '/san-pham', label: 'Thương hiệu', hash: 'brands' },
   { to: '/quiz', label: 'Quiz da' },
   { to: '/blog', label: 'Blog' },
   { to: '/tra-cuu-don', label: 'Tra cứu đơn', requiresAuth: true },
@@ -86,15 +85,6 @@ function handleNavClick(link, e) {
     router.push(link.to)
     return
   }
-  if (link.hash === 'brands') {
-    e.preventDefault()
-    if (route.path === '/') {
-      router.replace({ path: '/', hash: '#sf-brands' })
-      document.getElementById('sf-brands')?.scrollIntoView({ behavior: 'smooth' })
-    } else {
-      router.push({ path: '/', hash: '#sf-brands' })
-    }
-  }
 }
 
 function isLinkActive(link) {
@@ -108,10 +98,6 @@ function isLinkActive(link) {
   }
   if (link.label === 'Khuyến mãi') {
     return path === '/san-pham/khuyen-mai'
-  }
-  if (link.label === 'Thương hiệu') {
-    if (path === '/') return route.hash === '#sf-brands'
-    return path === '/san-pham' && Boolean(q.thuongHieu)
   }
   if (link.label === 'Quiz da') {
     return path === '/quiz'
