@@ -20,4 +20,13 @@ public interface NhaCungCapRepository extends JpaRepository<NhaCungCap, Integer>
             ORDER BY n.ten ASC
             """)
     List<NhaCungCap> searchActive(@Param("q") String q);
+
+    @Query("""
+            SELECT n FROM NhaCungCap n
+            WHERE (:q IS NULL OR :q = ''
+                   OR LOWER(n.ma) LIKE LOWER(CONCAT('%', :q, '%'))
+                   OR LOWER(n.ten) LIKE LOWER(CONCAT('%', :q, '%')))
+            ORDER BY n.trangThai DESC, n.ten ASC
+            """)
+    List<NhaCungCap> searchAll(@Param("q") String q);
 }

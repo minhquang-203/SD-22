@@ -193,6 +193,13 @@ export const ADMIN_MENU = [
         roles: MANAGER_AND_OWNER,
       },
       {
+        key: "nha-cung-cap",
+        label: "Nhà cung cấp",
+        icon: "icon-park-outline:city",
+        path: "/admin/nha-cung-cap",
+        roles: MANAGER_AND_OWNER,
+      },
+      {
         key: "stats",
         label: "Thống kê",
         icon: "icon-park-outline:analysis",

@@ -18,11 +18,17 @@ public class NhaCungCapService {
     @Autowired private NhaCungCapRepository nhaCungCapRepository;
 
     @Transactional(readOnly = true)
-    public List<NhaCungCapResponse> list(String keyword) {
-        return nhaCungCapRepository.searchActive(keyword == null ? "" : keyword.trim())
-                .stream()
-                .map(NhaCungCapResponse::new)
-                .toList();
+    public List<NhaCungCapResponse> list(String keyword, boolean activeOnly) {
+        String q = keyword == null ? "" : keyword.trim();
+        List<NhaCungCap> rows = activeOnly
+                ? nhaCungCapRepository.searchActive(q)
+                : nhaCungCapRepository.searchAll(q);
+        return rows.stream().map(NhaCungCapResponse::new).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public NhaCungCapResponse detail(Integer id) {
+        return new NhaCungCapResponse(getOrThrow(id));
     }
 
     @Transactional
@@ -41,10 +47,11 @@ public class NhaCungCapService {
         return new NhaCungCapResponse(nhaCungCapRepository.save(n));
     }
 
+    /** Xóa mềm: lật trang_thai (đang dùng ↔ ngừng dùng). */
     @Transactional
     public void softDelete(Integer id) {
         NhaCungCap n = getOrThrow(id);
-        n.setTrangThai(false);
+        n.setTrangThai(!Boolean.TRUE.equals(n.getTrangThai()));
         nhaCungCapRepository.save(n);
     }
 

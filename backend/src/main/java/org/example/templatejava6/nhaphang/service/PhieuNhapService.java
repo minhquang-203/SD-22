@@ -137,6 +137,9 @@ public class PhieuNhapService {
 
     private void applyHeaderAndLines(PhieuNhap p, PhieuNhapRequest request) {
         LocalDate ngayNhap = request.getNgayNhap() != null ? request.getNgayNhap() : LocalDate.now();
+        if (ngayNhap.isAfter(LocalDate.now())) {
+            throw new ApiException("Ngày nhập không được lớn hơn ngày hiện tại", "VALIDATION_ERROR");
+        }
         LocalTime timePart = p.getNgayTao() != null ? p.getNgayTao().toLocalTime() : LocalTime.now();
         p.setNgayTao(LocalDateTime.of(ngayNhap, timePart));
 

@@ -1,7 +1,15 @@
 import request from './request'
 
-export const getNhaCungCapList = (q) =>
-  request.get('/nha-cung-cap', { params: q ? { q } : {} })
+/** activeOnly=true: chỉ NCC đang dùng (dropdown phiếu). false: cả ngừng dùng (trang quản lý). */
+export const getNhaCungCapList = (q, activeOnly = true) =>
+  request.get('/nha-cung-cap', {
+    params: {
+      ...(q ? { q } : {}),
+      activeOnly,
+    },
+  })
+
+export const getNhaCungCapDetail = (id) => request.get(`/nha-cung-cap/${id}`)
 
 export const createNhaCungCap = (payload) => request.post('/nha-cung-cap', payload)
 

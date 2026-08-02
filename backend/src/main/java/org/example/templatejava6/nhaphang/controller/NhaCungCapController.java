@@ -16,8 +16,15 @@ public class NhaCungCapController {
     @Autowired private NhaCungCapService nhaCungCapService;
 
     @GetMapping
-    public List<NhaCungCapResponse> list(@RequestParam(value = "q", required = false) String q) {
-        return nhaCungCapService.list(q);
+    public List<NhaCungCapResponse> list(
+            @RequestParam(value = "q", required = false) String q,
+            @RequestParam(value = "activeOnly", required = false, defaultValue = "true") boolean activeOnly) {
+        return nhaCungCapService.list(q, activeOnly);
+    }
+
+    @GetMapping("{id}")
+    public NhaCungCapResponse detail(@PathVariable Integer id) {
+        return nhaCungCapService.detail(id);
     }
 
     @PostMapping

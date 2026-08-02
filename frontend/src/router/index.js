@@ -168,6 +168,12 @@ const router = createRouter({
           meta: { title: 'Phiếu nhập', breadcrumb: 'Nhập hàng / Chi tiết', role: ADMIN_ROLES.QUAN_LY },
         },
         {
+          path: 'nha-cung-cap',
+          name: 'AdminNhaCungCap',
+          component: () => import('@/views/admin/nhaphang/NhaCungCapPage.vue'),
+          meta: { title: 'Nhà cung cấp', breadcrumb: 'Nhà cung cấp', role: ADMIN_ROLES.QUAN_LY },
+        },
+        {
           path: 'stats',
           name: 'AdminStats',
           component: () => import('@/views/admin/stats/StatsDashboard.vue'),

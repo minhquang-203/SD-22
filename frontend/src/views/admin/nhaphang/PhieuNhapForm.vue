@@ -29,6 +29,7 @@ const soHoaDonDauVao = ref('')
 const giamGia = ref(0)
 const ghiChu = ref('')
 const ngayNhap = ref(new Date().toISOString().slice(0, 10))
+const maxNgayNhap = new Date().toISOString().slice(0, 10)
 const nccOptions = ref([])
 
 const showSkuModal = ref(false)
@@ -147,7 +148,7 @@ function addVariant(v) {
     tenMauSac: v.tenMauSac,
     dungTichMl: v.dungTichMl,
     soLuong: 1,
-    donGia: Number(v.giaBan || 0),
+    donGia: 0,
     hanSuDung: '',
     soLo: '',
   })
@@ -177,6 +178,10 @@ async function saveNcc() {
 }
 
 function validateBeforeSave(requireHsd) {
+  if (ngayNhap.value && ngayNhap.value > maxNgayNhap) {
+    toast('Ngày nhập không được lớn hơn ngày hiện tại', 'warn')
+    return false
+  }
   if (!lines.value.length) {
     toast('Thêm ít nhất 1 dòng hàng', 'warn')
     return false
@@ -307,7 +312,7 @@ onMounted(async () => {
                 <th>SKU</th>
                 <th>Tên hàng</th>
                 <th>SL</th>
-                <th>Đơn giá</th>
+                <th>Đơn giá nhập</th>
                 <th>HSD</th>
                 <th>Thành tiền</th>
                 <th></th>
@@ -397,7 +402,13 @@ onMounted(async () => {
 
         <label class="pn-field">
           <span>Ngày nhập</span>
-          <input v-model="ngayNhap" type="date" class="admin-input" :disabled="readonly" />
+          <input
+            v-model="ngayNhap"
+            type="date"
+            class="admin-input"
+            :max="maxNgayNhap"
+            :disabled="readonly"
+          />
         </label>
 
         <label class="pn-field">
