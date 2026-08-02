@@ -40,11 +40,34 @@ public class CheckoutPricingService {
     }
 
     /**
-     * Tính tiền giảm từ phiếu theo tổng giá trị đơn hàng (sau giá đợt giảm nếu có).
-     * Không bị giới hạn bởi việc đơn có sản phẩm trong đợt giảm giá.
+     * Overload cho các luồng không phát sinh phí vận chuyển (VD: bán tại quầy).
+     * Mã FREE_SHIP không áp dụng ở đây vì không có phí vận chuyển để miễn.
      */
     public BigDecimal tinhTienGiamPhieu(PhieuGiamGia phieu, BigDecimal tongTien) {
+        if (phieu != null && phieu.getLoai() == LoaiPhieuGiamGia.FREE_SHIP) {
+            throw new ApiException(
+                    "Mã miễn phí vận chuyển chỉ áp dụng cho đơn giao hàng.", "INVALID_VOUCHER");
+        }
+        return tinhTienGiamPhieu(phieu, tongTien, BigDecimal.ZERO);
+    }
+
+    /**
+     * Tính tiền giảm từ phiếu theo tổng giá trị đơn hàng (sau giá đợt giảm nếu có).
+     * Không bị giới hạn bởi việc đơn có sản phẩm trong đợt giảm giá.
+     *
+     * <p>Với FREE_SHIP: số tiền giảm chính là phí vận chuyển (được miễn), giới hạn bởi
+     * {@code giamToiDa} nếu có. Đơn tối thiểu {@code giaTriDonToiThieu} vẫn được áp dụng.
+     */
+    public BigDecimal tinhTienGiamPhieu(PhieuGiamGia phieu, BigDecimal tongTien, BigDecimal phiVanChuyen) {
         validatePhieu(phieu, tongTien);
+
+        if (phieu.getLoai() == LoaiPhieuGiamGia.FREE_SHIP) {
+            BigDecimal giamPhi = phiVanChuyen != null ? phiVanChuyen : BigDecimal.ZERO;
+            if (phieu.getGiamToiDa() != null && giamPhi.compareTo(phieu.getGiamToiDa()) > 0) {
+                giamPhi = phieu.getGiamToiDa();
+            }
+            return giamPhi.max(BigDecimal.ZERO);
+        }
 
         BigDecimal giam;
         if (phieu.getLoai() == LoaiPhieuGiamGia.PHAN_TRAM) {

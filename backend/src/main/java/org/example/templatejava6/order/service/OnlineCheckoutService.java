@@ -144,12 +144,12 @@ public class OnlineCheckoutService {
         BigDecimal tongTien = sumTongTien(lines);
 
         PhieuGiamGia phieu = resolvePhieu(request.getMaPhieuGiamGia());
-        BigDecimal tienGiamGia = BigDecimal.ZERO;
-        if (phieu != null) {
-            tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien);
-        }
         BigDecimal phiVanChuyen = resolvePhiVanChuyen(
                 request.getToDistrictId(), request.getToWardCode(), tongTien);
+        BigDecimal tienGiamGia = BigDecimal.ZERO;
+        if (phieu != null) {
+            tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien, phiVanChuyen);
+        }
         BigDecimal thanhTien = tongTien.subtract(tienGiamGia).add(phiVanChuyen);
         if (thanhTien.compareTo(BigDecimal.ZERO) < 0) {
             thanhTien = BigDecimal.ZERO;
@@ -226,15 +226,15 @@ public class OnlineCheckoutService {
         BigDecimal tongTien = sumTongTien(lines);
 
         PhieuGiamGia phieu = resolvePhieu(request.getMaPhieuGiamGia());
+        BigDecimal phiVanChuyen = resolvePhiVanChuyen(
+                request.getToDistrictId(), request.getToWardCode(), tongTien);
         BigDecimal tienGiamGia = BigDecimal.ZERO;
         String maPhieu = null;
         if (phieu != null) {
-            tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien);
+            tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien, phiVanChuyen);
             maPhieu = phieu.getMa();
         }
 
-        BigDecimal phiVanChuyen = resolvePhiVanChuyen(
-                request.getToDistrictId(), request.getToWardCode(), tongTien);
         BigDecimal thanhTien = tongTien.subtract(tienGiamGia).add(phiVanChuyen);
         if (thanhTien.compareTo(BigDecimal.ZERO) < 0) {
             thanhTien = BigDecimal.ZERO;

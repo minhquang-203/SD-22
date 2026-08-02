@@ -36,6 +36,11 @@ function formatDiscount(voucher) {
     const suffix = voucher.giamToiDa ? ` (tối đa ${formatVND(voucher.giamToiDa)})` : ''
     return `Giảm ${voucher.giaTri}%${suffix}`
   }
+  if (voucher.loai === 'FREE_SHIP') {
+    return voucher.giamToiDa
+      ? `Miễn phí vận chuyển (tối đa ${formatVND(voucher.giamToiDa)})`
+      : 'Miễn phí vận chuyển'
+  }
   return `Giảm ${formatVND(voucher.giaTri)}`
 }
 

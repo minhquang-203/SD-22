@@ -208,7 +208,7 @@
             </div>
             <div class="form-group">
               <label>Ngày kết thúc *</label>
-              <input type="date" v-model="form.end" />
+              <input type="date" v-model="form.end" :min="form.start || undefined" />
             </div>
             <div class="form-group full">
               <label>Ghi chú nội bộ</label>
@@ -590,8 +590,18 @@ function buildPayload() {
     return null
   }
 
-  if (value <= 0 || value > 100) {
+  if (!/^[A-Z0-9_-]{2,30}$/i.test(code)) {
+    toast('Mã chỉ gồm chữ, số, gạch ngang (2–30 ký tự)', 'warn')
+    return null
+  }
+
+  if (!Number.isFinite(value) || value <= 0 || value > 100) {
     toast('Phần trăm giảm phải từ 1 đến 100', 'warn')
+    return null
+  }
+
+  if (form.value.end < form.value.start) {
+    toast('Ngày kết thúc phải sau hoặc bằng ngày bắt đầu', 'warn')
     return null
   }
 

@@ -449,9 +449,9 @@ public class HoaDonService {
 
 
 
-        BigDecimal tienGiamGia = calculateDiscount(tongTien, hd.getIdPhieuGiamGia());
-
         BigDecimal phiVanChuyen = hd.getPhiVanChuyen() != null ? hd.getPhiVanChuyen() : BigDecimal.ZERO;
+
+        BigDecimal tienGiamGia = calculateDiscount(tongTien, phiVanChuyen, hd.getIdPhieuGiamGia());
 
         BigDecimal thanhTien = tongTien.subtract(tienGiamGia).add(phiVanChuyen);
 
@@ -706,11 +706,25 @@ public class HoaDonService {
 
 
 
-    private BigDecimal calculateDiscount(BigDecimal tongTien, PhieuGiamGia phieu) {
+    private BigDecimal calculateDiscount(BigDecimal tongTien, BigDecimal phiVanChuyen, PhieuGiamGia phieu) {
 
         if (phieu == null) {
 
             return BigDecimal.ZERO;
+
+        }
+
+        if (LoaiPhieuGiamGia.FREE_SHIP == phieu.getLoai()) {
+
+            BigDecimal giamPhi = phiVanChuyen != null ? phiVanChuyen : BigDecimal.ZERO;
+
+            if (phieu.getGiamToiDa() != null && giamPhi.compareTo(phieu.getGiamToiDa()) > 0) {
+
+                giamPhi = phieu.getGiamToiDa();
+
+            }
+
+            return giamPhi.max(BigDecimal.ZERO);
 
         }
 
