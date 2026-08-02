@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import OrderCard from '@/components/storefront/OrderCard.vue'
 import ProductReviewModal from '@/components/storefront/ProductReviewModal.vue'
+import ReturnPickShiftModal from '@/components/storefront/ReturnPickShiftModal.vue'
 import ReturnRequestCodModal from '@/components/storefront/ReturnRequestCodModal.vue'
 import ReturnRequestWalletModal from '@/components/storefront/ReturnRequestWalletModal.vue'
 import { confirm } from '@/composables/useConfirm'
@@ -28,6 +29,8 @@ const showReturnModal = ref(false)
 const returnOrder = ref(null)
 const returnActionLoadingId = ref(null)
 const returnNotice = ref('')
+const showPickShiftModal = ref(false)
+const pickShiftOrder = ref(null)
 
 let unsubscribeRealtime = null
 
@@ -185,7 +188,23 @@ async function onReturnSubmitted(result) {
   }
 }
 
-async function handleCreateReturnLabel(order) {
+function openPickShift(order) {
+  if (!order?.idYeuCauTraHang || returnActionLoadingId.value) return
+  if (!getCustomerId()) {
+    toast('Vui lòng đăng nhập để tạo vận đơn hoàn hàng.', 'warn')
+    return
+  }
+  pickShiftOrder.value = order
+  showPickShiftModal.value = true
+}
+
+function closePickShift() {
+  showPickShiftModal.value = false
+  pickShiftOrder.value = null
+}
+
+async function handleCreateReturnLabel(pickShiftId) {
+  const order = pickShiftOrder.value
   if (!order?.idYeuCauTraHang || returnActionLoadingId.value) return
 
   const idKhachHang = getCustomerId()
@@ -194,16 +213,9 @@ async function handleCreateReturnLabel(order) {
     return
   }
 
-  const ok = await confirm({
-    title: 'Tạo vận đơn hoàn hàng',
-    message: `Tạo vận đơn GHN để gửi hàng hoàn cho đơn ${order.maHoaDon}?`,
-    confirmText: 'Tạo vận đơn',
-  })
-  if (!ok) return
-
   returnActionLoadingId.value = order.id
   try {
-    const res = await taoVanDonTra(order.idYeuCauTraHang, idKhachHang)
+    const res = await taoVanDonTra(order.idYeuCauTraHang, idKhachHang, pickShiftId)
     const updated = res.data
     const idx = orders.value.findIndex((item) => item.id === order.id)
     if (idx >= 0 && updated) {
@@ -212,6 +224,7 @@ async function handleCreateReturnLabel(order) {
         trangThaiTraHang: updated.trangThai,
         trangThaiTraHangLabel: updated.trangThaiLabel,
         maVanDonTra: updated.maVanDonTra,
+        pickShiftLabel: updated.pickShiftLabel,
         idYeuCauTraHang: updated.id,
         coTheYeuCauTraHang: false,
       }
@@ -220,6 +233,7 @@ async function handleCreateReturnLabel(order) {
       ? `Đã tạo vận đơn hoàn: ${updated.maVanDonTra}`
       : 'Đã tạo vận đơn hoàn hàng.'
     toast(returnNotice.value, 'info')
+    closePickShift()
   } catch (err) {
     toast(typeof err === 'string' ? err : 'Không tạo được vận đơn hoàn hàng.', 'warn')
   } finally {
@@ -309,7 +323,7 @@ async function handleCancelOrder(order) {
             @review="openReview"
             @cancel-order="handleCancelOrder"
             @request-return="openReturn"
-            @create-return-label="handleCreateReturnLabel"
+            @create-return-label="openPickShift"
           />
         </div>
 
@@ -341,6 +355,14 @@ async function handleCancelOrder(order) {
       :order="returnOrder"
       @close="closeReturn"
       @submitted="onReturnSubmitted"
+    />
+
+    <ReturnPickShiftModal
+      :visible="showPickShiftModal"
+      :order="pickShiftOrder"
+      :submitting="returnActionLoadingId === pickShiftOrder?.id"
+      @close="closePickShift"
+      @confirm="handleCreateReturnLabel"
     />
   </div>
 </template>

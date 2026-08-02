@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import axios from 'axios'
@@ -7,13 +7,95 @@ import ProductCard from '@/components/storefront/ProductCard.vue'
 import HorizontalScroll from '@/components/storefront/HorizontalScroll.vue'
 import { categoryIcon, brandDisplayName } from '@/utils/categoryIcon'
 import { fetchAllProducts, fetchDanhMucList, fetchThuongHieuList } from '@/api/storefrontApi'
+import { fetchActiveBanners } from '@/api/bannerApi'
 import { productImageUrl } from '@/utils/productImage'
+import { rankProductsByQuiz, resolveQuizProfile } from '@/utils/quizRecommend'
 
 const loading = ref(true)
 const featured = ref([])
 const suggestions = ref([])
+const quizSuggestions = ref([])
+const quizSkinName = ref('')
+const homeBanners = ref([])
 const categories = ref([])
 const brands = ref([])
+
+const DEFAULT_QUIZ_BANNER = {
+  id: 'fallback-quiz',
+  tieuDe: 'Trắc nghiệm da',
+  tieuDeChinh: 'Tìm sản phẩm chống nắng phù hợp với bạn',
+  moTa: 'Trả lời vài câu hỏi ngắn — hệ thống SUNOVA sẽ phân tích làn da và gợi ý sản phẩm hoàn hảo dành riêng cho bạn.',
+  nutText: 'Làm Quiz Ngay',
+  linkUrl: '/quiz',
+  anhUrl: null,
+}
+
+function isExternalLink(url) {
+  return /^https?:\/\//i.test(String(url || ''))
+}
+
+function bannerImageUrl(url) {
+  if (!url) return ''
+  return productImageUrl(url)
+}
+
+function bannerBgStyle(banner) {
+  if (!banner?.anhUrl) return undefined
+  return {
+    backgroundImage: `linear-gradient(90deg, rgba(36,26,18,0.92) 0%, rgba(36,26,18,0.72) 55%, rgba(36,26,18,0.45) 100%), url(${bannerImageUrl(banner.anhUrl)})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+  }
+}
+
+// --- Carousel banner ở vùng hero ---
+const BANNER_INTERVAL_MS = 5000
+const currentBannerIndex = ref(0)
+let bannerTimer = null
+
+const activeBanner = computed(() => homeBanners.value[currentBannerIndex.value] || null)
+const hasMultipleBanners = computed(() => homeBanners.value.length > 1)
+
+function goToBanner(index) {
+  const total = homeBanners.value.length
+  if (!total) return
+  currentBannerIndex.value = ((index % total) + total) % total
+  startAutoplay()
+}
+
+function nextBanner() {
+  goToBanner(currentBannerIndex.value + 1)
+}
+
+function prevBanner() {
+  goToBanner(currentBannerIndex.value - 1)
+}
+
+function startAutoplay() {
+  stopAutoplay()
+  if (homeBanners.value.length > 1) {
+    bannerTimer = setInterval(() => {
+      currentBannerIndex.value = (currentBannerIndex.value + 1) % homeBanners.value.length
+    }, BANNER_INTERVAL_MS)
+  }
+}
+
+function stopAutoplay() {
+  if (bannerTimer) {
+    clearInterval(bannerTimer)
+    bannerTimer = null
+  }
+}
+
+watch(
+  () => homeBanners.value.length,
+  () => {
+    currentBannerIndex.value = 0
+    startAutoplay()
+  },
+)
+
+onBeforeUnmount(stopAutoplay)
 
 // --- Thời tiết & UV (cố định Hà Nội) ---
 const weather = ref(null)
@@ -55,14 +137,11 @@ const weatherDesc = computed(() => {
   return 'Se lạnh'
 })
 
-const now = new Date()
-const timeLabel = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-const dateLabel = now.toLocaleDateString('vi-VN', { day: '2-digit', month: 'short', year: 'numeric' })
-
-const sideBanners = [
-  { title: 'Sản phẩm nổi bật', desc: 'Được chọn lọc bởi SUNOVA', to: '/san-pham?noiBat=1' },
-  { title: 'Khuyến mãi', desc: 'Đợt giảm giá đang diễn ra', to: '/san-pham/khuyen-mai' },
-]
+const blogBanner = {
+  title: 'Chưa biết chọn kem chống nắng?',
+  desc: 'Cẩm nang SUNOVA — hiểu SPF, PA và chọn đúng cho da bạn',
+  to: '/blog',
+}
 
 const promises = [
   { icon: 'solar:verified-check-linear', title: 'Chính hãng', desc: 'Nguồn gốc rõ ràng' },
@@ -88,10 +167,12 @@ async function loadWeather() {
 onMounted(async () => {
   loadWeather()
   try {
-    const [prodRes, dmRes, thRes] = await Promise.all([
+    const [prodRes, dmRes, thRes, quizProfile, bannerRes] = await Promise.all([
       fetchAllProducts(),
       fetchDanhMucList(),
       fetchThuongHieuList(),
+      resolveQuizProfile(),
+      fetchActiveBanners().catch(() => ({ data: [] })),
     ])
     const active = (prodRes.data || []).filter((p) => p.trangThai !== false)
     featured.value = active.filter((p) => p.noiBat).slice(0, 8)
@@ -99,6 +180,19 @@ onMounted(async () => {
     suggestions.value = active.slice(0, 8)
     categories.value = (dmRes.data || []).filter((d) => d.trangThai !== false)
     brands.value = (thRes.data || []).filter((b) => b.trangThai !== false).slice(0, 12)
+    const fromApi = Array.isArray(bannerRes.data) ? bannerRes.data : []
+    homeBanners.value = fromApi.length ? fromApi : [DEFAULT_QUIZ_BANNER]
+
+    if (quizProfile) {
+      quizSkinName.value = quizProfile.tenLoaiDa || ''
+      quizSuggestions.value = rankProductsByQuiz(active, {
+        scoreMap: quizProfile.scoreMap,
+        filters: quizProfile.filters,
+      }).slice(0, 8)
+    } else {
+      quizSuggestions.value = []
+      quizSkinName.value = ''
+    }
   } catch (e) {
     console.error(e)
   } finally {
@@ -109,66 +203,131 @@ onMounted(async () => {
 
 <template>
   <div class="sf-home">
-    <!-- Hero carousel + banner phụ -->
+    <!-- Hero: placeholder trái + 2 card phải -->
     <section class="sf-hero-split sf-container">
-      <div class="sf-hero-carousel">
-        <div class="sf-weather-card" v-if="!weatherLoading && weather">
-          <div class="sf-weather-card__sun" aria-hidden="true" />
-
-          <div class="sf-weather-card__top">
-            <span class="sf-weather-card__location">
-              <Icon icon="solar:map-point-linear" width="16" /> Hà Nội
-            </span>
-          </div>
-
-          <div class="sf-weather-card__main">
-            <span class="sf-weather-card__temp">{{ Math.round(weather.temp) }}°</span>
-            <div class="sf-weather-card__main-meta">
-              <span class="sf-weather-card__desc">{{ weatherDesc }}</span>
-              <span class="sf-weather-card__time">{{ timeLabel }}</span>
-              <span class="sf-weather-card__date">{{ dateLabel }}</span>
+      <div
+        v-if="activeBanner"
+        class="sf-hero-banner-wrap"
+        @mouseenter="stopAutoplay"
+        @mouseleave="startAutoplay"
+      >
+        <transition name="sf-banner-fade" mode="out-in">
+          <component
+            :is="isExternalLink(activeBanner.linkUrl) ? 'a' : RouterLink"
+            :key="activeBanner.id"
+            class="sf-hero-banner"
+            :href="isExternalLink(activeBanner.linkUrl) ? activeBanner.linkUrl : undefined"
+            :target="isExternalLink(activeBanner.linkUrl) ? '_blank' : undefined"
+            :rel="isExternalLink(activeBanner.linkUrl) ? 'noopener noreferrer' : undefined"
+            :to="isExternalLink(activeBanner.linkUrl) ? undefined : (activeBanner.linkUrl || '/')"
+            :style="bannerBgStyle(activeBanner)"
+          >
+            <div class="sf-hero-banner__content">
+              <p v-if="activeBanner.tieuDe" class="sf-hero-banner__eyebrow">{{ activeBanner.tieuDe }}</p>
+              <h2 class="sf-hero-banner__title">{{ activeBanner.tieuDeChinh }}</h2>
+              <p v-if="activeBanner.moTa" class="sf-hero-banner__desc">{{ activeBanner.moTa }}</p>
+              <span class="sf-hero-banner__btn">{{ activeBanner.nutText || 'Xem ngay' }}</span>
             </div>
+          </component>
+        </transition>
+
+        <template v-if="hasMultipleBanners">
+          <button
+            type="button"
+            class="sf-hero-nav sf-hero-nav--prev"
+            aria-label="Banner trước"
+            @click="prevBanner"
+          >
+            <Icon icon="solar:alt-arrow-left-linear" width="22" />
+          </button>
+          <button
+            type="button"
+            class="sf-hero-nav sf-hero-nav--next"
+            aria-label="Banner sau"
+            @click="nextBanner"
+          >
+            <Icon icon="solar:alt-arrow-right-linear" width="22" />
+          </button>
+          <div class="sf-hero-dots">
+            <button
+              v-for="(banner, i) in homeBanners"
+              :key="banner.id"
+              type="button"
+              class="sf-hero-dot"
+              :class="{ 'sf-hero-dot--active': i === currentBannerIndex }"
+              :aria-label="`Chuyển tới banner ${i + 1}`"
+              @click="goToBanner(i)"
+            />
           </div>
-
-          <div class="sf-weather-card__stats">
-            <div class="sf-weather-stat">
-              <div class="sf-weather-stat__head">
-                <span>Chỉ số UV</span>
-                <Icon icon="solar:sun-linear" width="18" />
-              </div>
-              <div class="sf-weather-stat__value">{{ weather.uvIndex }}</div>
-              <div class="sf-weather-stat__label">{{ uvInfo?.level }}</div>
-              <div class="sf-weather-stat__bar">
-                <div class="sf-weather-stat__bar-track" />
-                <div class="sf-weather-stat__bar-dot" :style="{ left: uvInfo?.percent + '%' }" />
-              </div>
-            </div>
-
-            <div class="sf-weather-stat">
-              <div class="sf-weather-stat__head">
-                <span>SPF khuyến nghị</span>
-                <Icon icon="solar:shield-check-linear" width="18" />
-              </div>
-              <div class="sf-weather-stat__value sf-weather-stat__value--sm">{{ uvInfo?.spf }}</div>
-              <div class="sf-weather-stat__label">{{ uvInfo?.pa || 'Dùng hàng ngày' }}</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="sf-weather-card sf-weather-card--loading" v-else-if="weatherLoading">
-          <span>Đang tải thời tiết Hà Nội…</span>
-        </div>
+        </template>
       </div>
+      <div v-else class="sf-hero-placeholder" aria-hidden="true" />
+
       <div class="sf-hero-side">
-        <RouterLink
-          v-for="banner in sideBanners"
-          :key="banner.title"
-          :to="banner.to"
-          class="sf-hero-side__card"
-        >
-          <p class="sf-eyebrow sf-eyebrow--light">{{ banner.desc }}</p>
-          <h2>{{ banner.title }}</h2>
+        <RouterLink :to="blogBanner.to" class="sf-hero-side__card sf-hero-side__card--blog">
+          <span class="sf-hero-side__blog-icon" aria-hidden="true">
+            <Icon icon="solar:notebook-bookmark-bold-duotone" width="22" />
+          </span>
+          <p class="sf-hero-side__kicker">{{ blogBanner.desc }}</p>
+          <h2 class="sf-hero-side__title">{{ blogBanner.title }}</h2>
+          <span class="sf-hero-side__cta">
+            Đọc blog <span aria-hidden="true">→</span>
+          </span>
         </RouterLink>
+
+        <div
+          class="sf-hero-side__card sf-hero-side__card--weather"
+          aria-live="polite"
+          :aria-busy="weatherLoading"
+        >
+          <div class="sf-hero-wx">
+            <div class="sf-hero-wx__top">
+              <span class="sf-hero-wx__loc">
+                <Icon icon="solar:map-point-bold" width="14" />
+                Hà Nội
+              </span>
+              <span
+                class="sf-hero-wx__sun"
+                :class="{ 'sf-hero-wx__sun--muted': weatherLoading || !weather }"
+                aria-hidden="true"
+              >
+                <Icon
+                  :icon="!weatherLoading && weather ? 'solar:sun-bold' : 'solar:sun-linear'"
+                  width="28"
+                />
+              </span>
+            </div>
+
+            <!-- Skeleton: khớp vị trí temp / desc / meta -->
+            <div v-if="weatherLoading" class="sf-hero-wx__body sf-hero-wx__body--skel" key="skel">
+              <span class="sf-skel sf-skel--temp" />
+              <span class="sf-skel sf-skel--desc" />
+              <div class="sf-hero-wx__meta sf-hero-wx__meta--skel">
+                <span class="sf-skel sf-skel--chip" />
+                <span class="sf-skel sf-skel--chip sf-skel--chip-sm" />
+              </div>
+            </div>
+
+            <!-- Data -->
+            <div
+              v-else-if="weather && uvInfo"
+              class="sf-hero-wx__body sf-hero-wx__body--fade"
+              key="data"
+            >
+              <div class="sf-hero-wx__temp">{{ Math.round(weather.temp) }}°</div>
+              <p class="sf-hero-wx__desc">{{ weatherDesc }}</p>
+              <div class="sf-hero-wx__meta">
+                <span>UV {{ weather.uvIndex }} · {{ uvInfo.level }}</span>
+                <span v-if="uvInfo.spf">{{ uvInfo.spf }}{{ uvInfo.pa ? ` ${uvInfo.pa}` : '' }}</span>
+              </div>
+            </div>
+
+            <!-- Lỗi / không data -->
+            <div v-else class="sf-hero-wx__body sf-hero-wx__body--error" key="err">
+              <p class="sf-hero-wx__error">Không tải được thời tiết</p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -250,6 +409,24 @@ onMounted(async () => {
       </div>
     </section>
 
+    <!-- Gợi ý theo kết quả quiz (chỉ hiện khi đã làm quiz) -->
+    <section v-if="!loading && quizSuggestions.length" class="sf-section">
+      <div class="sf-container">
+        <div class="sf-section-head sf-section-head--row">
+          <div>
+            <p class="sf-eyebrow">Theo quiz da</p>
+            <h2 class="sf-section-title">
+              Sản phẩm gợi ý{{ quizSkinName ? ` — ${quizSkinName}` : '' }}
+            </h2>
+          </div>
+          <RouterLink to="/san-pham/goi-y" class="sf-link-more">Xem tất cả →</RouterLink>
+        </div>
+        <div class="sf-product-grid">
+          <ProductCard v-for="p in quizSuggestions" :key="`q-${p.id}`" :product="p" />
+        </div>
+      </div>
+    </section>
+
     <!-- Gợi ý (không có API giảm giá công khai) -->
     <section class="sf-section sf-section--muted">
       <div class="sf-container">
@@ -280,186 +457,171 @@ onMounted(async () => {
       </div>
     </section>
 
-    <!-- Quiz CTA -->
-    <section class="sf-section">
-      <div class="sf-container">
-        <div class="sf-quiz-banner sf-quiz-banner--contrast">
-          <div>
-            <p class="sf-quiz-banner__eyebrow">Trắc nghiệm da</p>
-            <h2 class="sf-quiz-banner__title">Tìm sản phẩm chống nắng phù hợp với bạn</h2>
-            <p class="sf-quiz-banner__desc">Trả lời vài câu hỏi ngắn — hệ thống SUNOVA sẽ phân tích làn da và gợi ý sản phẩm hoàn hảo dành riêng cho bạn.</p>
-          </div>
-          <RouterLink to="/quiz" class="sf-quiz-banner__btn">Làm Quiz Ngay</RouterLink>
-        </div>
-      </div>
-    </section>
   </div>
 </template>
 
 <style scoped>
-/* --- Thẻ thời tiết + UV, lấp đầy chiều rộng khối hero --- */
-.sf-hero-carousel {
-  display: flex;
-}
-
-.sf-weather-card {
+/* Carousel banner ở vùng hero (cột trái) — thay cho ô trống cũ */
+.sf-hero-banner-wrap {
   position: relative;
-  overflow: hidden;
-  width: 100%;
-  border-radius: 24px;
-  padding: 28px 28px 24px;
-  background: linear-gradient(135deg, #2b1a12 0%, #3d2417 55%, #5a3520 100%);
-  color: #f4f1ea;
+  min-height: 380px;
+  height: 100%;
+  border-radius: 14px;
 }
 
-.sf-weather-card--loading {
+.sf-banner-fade-enter-active,
+.sf-banner-fade-leave-active {
+  transition: opacity 0.45s ease;
+}
+
+.sf-banner-fade-enter-from,
+.sf-banner-fade-leave-to {
+  opacity: 0;
+}
+
+.sf-hero-banner {
+  position: relative;
   display: flex;
+  align-items: flex-end;
+  min-height: 380px;
+  height: 100%;
+  padding: 2.25rem;
+  border-radius: 14px;
+  overflow: hidden;
+  text-decoration: none;
+  background: linear-gradient(150deg, #241a12 0%, #3a2a1c 55%, #4a3422 100%);
+  background-size: cover;
+  background-position: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sf-hero-banner:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(36, 26, 18, 0.18);
+}
+
+.sf-hero-banner__content {
+  position: relative;
+  max-width: 560px;
+}
+
+.sf-hero-banner__eyebrow {
+  margin: 0 0 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sf-gold, #c9a96e);
+}
+
+.sf-hero-banner__title {
+  margin: 0 0 0.6rem;
+  font-family: var(--sf-font-display, 'Playfair Display', serif);
+  font-size: clamp(1.6rem, 2.6vw, 2.4rem);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--sf-cream, #f9f5f0);
+}
+
+.sf-hero-banner__desc {
+  margin: 0 0 1.4rem;
+  color: rgba(249, 245, 240, 0.8);
+  line-height: 1.7;
+}
+
+.sf-hero-banner__btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 320px;
-  color: rgba(244, 241, 234, 0.75);
-  font-style: italic;
-  background: linear-gradient(135deg, #2b1a12 0%, #4a2c1b 100%);
-}
-
-.sf-weather-card__sun {
-  position: absolute;
-  top: -30px;
-  left: -20px;
-  width: 150px;
-  height: 150px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 40% 40%, #f2b459, #d9822b 70%, rgba(217, 130, 43, 0) 100%);
-  filter: blur(1px);
-  z-index: 0;
-}
-
-.sf-weather-card__top,
-.sf-weather-card__main,
-.sf-weather-card__stats {
-  position: relative;
-  z-index: 1;
-}
-
-.sf-weather-card__top {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  font-size: 14px;
-}
-
-.sf-weather-card__location {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  padding: 0.85rem 1.75rem;
+  border-radius: 8px;
+  background: var(--sf-gold, #c9a96e);
+  color: var(--sf-espresso, #241a12);
+  font-size: 0.85rem;
   font-weight: 600;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
-.sf-weather-card__main {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 14px;
-  margin: 28px 0 30px;
+.sf-hero-banner:hover .sf-hero-banner__btn {
+  background: var(--sf-gold-dark, #9e7340);
+  color: #fff;
 }
 
-.sf-weather-card__temp {
-  font-size: 72px;
-  font-weight: 300;
-  line-height: 1;
-}
-
-.sf-weather-card__main-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  text-align: right;
-}
-
-.sf-weather-card__desc {
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.sf-weather-card__time {
-  font-size: 13px;
-  color: rgba(244, 241, 234, 0.85);
-}
-
-.sf-weather-card__date {
-  font-size: 12px;
-  color: rgba(244, 241, 234, 0.6);
-}
-
-.sf-weather-card__stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.sf-weather-stat {
-  background: rgba(244, 241, 234, 0.94);
-  color: #2b1a12;
-  border-radius: 18px;
-  padding: 16px 18px;
-}
-
-.sf-weather-stat__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 13px;
-  color: #8a7259;
-}
-
-.sf-weather-stat__value {
-  font-size: 28px;
-  font-weight: 700;
-  margin-top: 8px;
-}
-
-.sf-weather-stat__value--sm {
-  font-size: 20px;
-}
-
-.sf-weather-stat__label {
-  font-size: 13px;
-  color: #8a7259;
-  margin-top: 2px;
-}
-
-.sf-weather-stat__bar {
-  position: relative;
-  margin-top: 12px;
-  height: 6px;
-}
-
-.sf-weather-stat__bar-track {
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #22c55e, #eab308, #f97316, #dc2626);
-}
-
-.sf-weather-stat__bar-dot {
+/* Nút điều hướng trái/phải */
+.sf-hero-nav {
   position: absolute;
   top: 50%;
-  width: 14px;
-  height: 14px;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: none;
   border-radius: 50%;
-  background: #f4f1ea;
-  border: 2px solid #2b1a12;
-  transform: translate(-50%, -50%);
+  cursor: pointer;
+  color: var(--sf-espresso, #241a12);
+  background: rgba(249, 245, 240, 0.85);
+  box-shadow: 0 2px 8px rgba(36, 26, 18, 0.18);
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
-@media (max-width: 640px) {
-  .sf-weather-card__temp {
-    font-size: 56px;
-  }
+.sf-hero-nav:hover {
+  background: #fff;
+  transform: translateY(-50%) scale(1.06);
+}
 
-  .sf-weather-card__stats {
-    grid-template-columns: 1fr;
+.sf-hero-nav--prev {
+  left: 0.9rem;
+}
+
+.sf-hero-nav--next {
+  right: 0.9rem;
+}
+
+/* Chấm điều hướng */
+.sf-hero-dots {
+  position: absolute;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.sf-hero-dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  background: rgba(249, 245, 240, 0.5);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.sf-hero-dot:hover {
+  background: rgba(249, 245, 240, 0.8);
+}
+
+.sf-hero-dot--active {
+  background: var(--sf-gold, #c9a96e);
+  transform: scale(1.25);
+}
+
+@media (max-width: 991px) {
+  .sf-hero-banner-wrap {
+    min-height: 220px;
+  }
+  .sf-hero-banner {
+    min-height: 220px;
+    padding: 1.5rem;
+  }
+  .sf-hero-nav {
+    width: 2.1rem;
+    height: 2.1rem;
   }
 }
 </style>

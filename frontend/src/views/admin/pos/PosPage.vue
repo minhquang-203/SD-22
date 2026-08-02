@@ -9,9 +9,11 @@ import {
   timKhachTheoSdt,
   taoKhachNhanh,
   taoDonTaiQuay,
+  buildThanhToanKetHopItem,
   tinhGiaTaiQuay,
   kiemTraThanhToanPos,
   huyThanhToanPos,
+  hoanTatThanhToanPos,
   giuDon,
   dsDonCho,
   layDonCho,
@@ -24,6 +26,10 @@ import { confirm } from '@/composables/useConfirm'
 import { useAdminAuth } from '@/composables/useAdminAuth'
 
 const { hoTen: currentStaffName } = useAdminAuth()
+
+// TODO: điền mã ngân hàng (BIN) và số tài khoản shop để VietQR đúng
+const VIETQR_BANK = '970436' // ví dụ: Vietcombank — thay bằng mã ngân hàng shop
+const VIETQR_ACCOUNT = '0123456789' // TODO: số tài khoản nhận chuyển khoản của shop
 
 const loading = ref(false)
 const paying = ref(false)
@@ -53,6 +59,12 @@ const cashGiven = ref('')
 const transferRef = ref('')
 const ghiChu = ref('')
 
+const isSplitMode = ref(false)
+const splitCashAmount = ref('')
+const splitTransferRef = ref('')
+const splitTransferConfirmed = ref(false)
+const showVietQrModal = ref(false)
+
 const receipt = ref(null)
 const showReceipt = ref(false)
 
@@ -69,6 +81,7 @@ const qrAmount = ref(0)
 const qrTransactionRef = ref('')
 const qrStatus = ref('CHO_THANH_TOAN')
 const qrPolling = ref(false)
+const qrCompleting = ref(false)
 
 let searchTimer = null
 let qrPollTimer = null
@@ -95,11 +108,32 @@ const isManualTransfer = computed(() =>
 
 const isNonCash = computed(() => isManualTransfer.value)
 
+const paymentByMa = computed(() => {
+  const map = {}
+  for (const p of paymentMethods.value) {
+    map[p.ma] = p
+  }
+  return map
+})
+
 const tongTienHang = computed(() =>
   cart.value.reduce((sum, line) => sum + line.giaBan * line.soLuong, 0),
 )
 
 const thanhTien = computed(() => Math.max(0, tongTienHang.value - voucherDiscount.value))
+
+const splitCashNum = computed(() => Number(splitCashAmount.value) || 0)
+const splitTransferNum = computed(() => Math.max(0, thanhTien.value - splitCashNum.value))
+const splitCashValid = computed(() =>
+  splitCashNum.value > 0 && splitCashNum.value < thanhTien.value,
+)
+
+const vietQrImageUrl = computed(() => {
+  const amount = Math.round(splitTransferNum.value)
+  if (amount <= 0) return ''
+  const addInfo = encodeURIComponent(`SUNOVA CK ${amount}`)
+  return `https://img.vietqr.io/image/${VIETQR_BANK}-${VIETQR_ACCOUNT}-compact2.png?amount=${amount}&addInfo=${addInfo}`
+})
 
 const tienThua = computed(() => {
   const cash = Number(cashGiven.value) || 0
@@ -115,7 +149,15 @@ const cashShortage = computed(() => {
 })
 
 const canCheckout = computed(() => {
-  if (cart.value.length === 0 || !selectedPaymentId.value) return false
+  if (cart.value.length === 0) return false
+
+  if (isSplitMode.value) {
+    return splitCashValid.value
+      && splitTransferNum.value > 0
+      && splitTransferConfirmed.value
+  }
+
+  if (!selectedPaymentId.value) return false
   if (isCash.value) {
     const cash = Number(cashGiven.value) || 0
     return cash >= thanhTien.value
@@ -307,6 +349,48 @@ function addDenomination(amount) {
 function clearCash() {
   cashGiven.value = ''
 }
+
+function resetSplitFields() {
+  splitCashAmount.value = ''
+  splitTransferRef.value = ''
+  splitTransferConfirmed.value = false
+  showVietQrModal.value = false
+}
+
+function toggleSplitMode() {
+  isSplitMode.value = !isSplitMode.value
+  resetSplitFields()
+  cashGiven.value = ''
+  transferRef.value = ''
+  const cash = paymentMethods.value.find((p) => p.ma === 'TIEN_MAT')
+  if (cash) selectedPaymentId.value = cash.id
+}
+
+function openVietQrModal() {
+  if (splitTransferNum.value <= 0) {
+    notify('Nhập tiền mặt nhỏ hơn thành tiền để còn phần chuyển khoản', 'error')
+    return
+  }
+  showVietQrModal.value = true
+}
+
+function confirmVietQrReceived() {
+  splitTransferConfirmed.value = true
+  showVietQrModal.value = false
+  notify('Đã ghi nhận nhận chuyển khoản')
+}
+
+function cancelVietQrModal() {
+  showVietQrModal.value = false
+}
+
+watch(splitCashAmount, () => {
+  splitTransferConfirmed.value = false
+})
+
+watch(thanhTien, () => {
+  if (isSplitMode.value) splitTransferConfirmed.value = false
+})
 
 function clearVoucher() {
   voucherCode.value = ''
@@ -523,6 +607,9 @@ async function checkout() {
   if (!ok) return
   paying.value = true
   try {
+    const cashPt = paymentByMa.value.TIEN_MAT
+    const transferPt = paymentByMa.value.CHUYEN_KHOAN
+
     const payload = {
       items: cart.value.map((l) => ({
         idChiTietSanPham: l.idChiTietSanPham,
@@ -530,18 +617,43 @@ async function checkout() {
       })),
       idKhachHang: selectedCustomer.value?.id ?? null,
       maPhieuGiamGia: appliedVoucher.value || null,
-      idPhuongThucThanhToan: selectedPaymentId.value,
-      soTienKhachDua: isCash.value ? Number(cashGiven.value) : null,
-      maGiaoDich: isManualTransfer.value && transferRef.value.trim() ? transferRef.value.trim() : null,
+      idPhuongThucThanhToan: isSplitMode.value
+        ? (splitCashNum.value >= splitTransferNum.value ? cashPt?.id : transferPt?.id) ?? selectedPaymentId.value
+        : selectedPaymentId.value,
+      soTienKhachDua: !isSplitMode.value && isCash.value ? Number(cashGiven.value) : null,
+      maGiaoDich: !isSplitMode.value && isManualTransfer.value && transferRef.value.trim()
+        ? transferRef.value.trim()
+        : null,
       ghiChu: ghiChu.value.trim() || null,
       idHoaDonCho: activeHeldOrderId.value ?? null,
     }
+
+    if (isSplitMode.value) {
+      if (!cashPt?.id || !transferPt?.id) {
+        notify('Thiếu phương thức Tiền mặt hoặc Chuyển khoản', 'error')
+        return
+      }
+      payload.danhSachThanhToan = [
+        buildThanhToanKetHopItem({
+          idPhuongThucThanhToan: cashPt.id,
+          soTien: splitCashNum.value,
+        }),
+        buildThanhToanKetHopItem({
+          idPhuongThucThanhToan: transferPt.id,
+          soTien: splitTransferNum.value,
+          maGiaoDich: splitTransferRef.value.trim() || null,
+        }),
+      ]
+    }
+
     const res = await taoDonTaiQuay(payload)
     if (res.data?.paymentUrl) {
       openQrPayment(res.data)
       activeHeldOrderId.value = null
       clearCustomer()
       cart.value = []
+      isSplitMode.value = false
+      resetSplitFields()
       void loadProducts()
       await loadHeldOrders()
       notify('Đã tạo mã QR — chờ khách thanh toán')
@@ -552,6 +664,8 @@ async function checkout() {
     activeHeldOrderId.value = null
     clearCustomer()
     cart.value = []
+    isSplitMode.value = false
+    resetSplitFields()
     void loadProducts()
     await loadHeldOrders()
     notify('Thanh toán thành công!')
@@ -636,6 +750,35 @@ async function cancelQrPayment() {
   }
 }
 
+/** Hoàn tất thủ công (chưa có IPN VNPAY) — nhân viên xác nhận khách đã thanh toán xong. */
+async function completeQrPayment() {
+  if (!qrOrderId.value || qrCompleting.value) return
+  const ok = await confirm({
+    title: 'Hoàn tất thanh toán',
+    message: 'Xác nhận khách đã thanh toán thành công trên app VNPay / ngân hàng?',
+    confirmText: 'Thanh toán',
+  })
+  if (!ok) return
+  qrCompleting.value = true
+  try {
+    const res = await hoanTatThanhToanPos(qrOrderId.value)
+    stopQrPolling()
+    showQrModal.value = false
+    qrPaymentUrl.value = ''
+    qrOrderId.value = null
+    if (res.data?.hoaDon) {
+      receipt.value = res.data.hoaDon
+      showReceipt.value = true
+    }
+    void loadProducts()
+    notify('Thanh toán QR thành công!')
+  } catch (err) {
+    notify(String(err), 'error')
+  } finally {
+    qrCompleting.value = false
+  }
+}
+
 function closeQrModal() {
   if (qrStatus.value === 'CHO_THANH_TOAN') {
     void cancelQrPayment()
@@ -659,6 +802,8 @@ function resetSale() {
   voucherDiscount.value = 0
   cashGiven.value = ''
   transferRef.value = ''
+  isSplitMode.value = false
+  resetSplitFields()
   ghiChu.value = ''
   receipt.value = null
   showReceipt.value = false
@@ -954,7 +1099,17 @@ onBeforeUnmount(() => {
 
         <!-- Thanh toán -->
         <p class="pos-section-title">Phương thức thanh toán</p>
-        <div class="pos-pay-methods">
+
+        <label class="pos-split-toggle">
+          <input
+            type="checkbox"
+            :checked="isSplitMode"
+            @change="toggleSplitMode"
+          />
+          <span>Thanh toán kết hợp (Tiền mặt + Chuyển khoản)</span>
+        </label>
+
+        <div v-if="!isSplitMode" class="pos-pay-methods">
           <button
             v-for="pt in paymentMethods"
             :key="pt.id"
@@ -967,7 +1122,81 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <div v-if="isCash" class="mb-4">
+        <div v-if="isSplitMode" class="pos-split-panel mb-4">
+          <div>
+            <label class="soleil-label block mb-2">Tiền mặt</label>
+            <input
+              v-model="splitCashAmount"
+              type="number"
+              min="0"
+              class="admin-input w-full text-lg"
+              placeholder="0"
+            />
+            <p v-if="splitCashNum > 0 && splitCashNum >= thanhTien" class="text-sm mt-2 text-[var(--coral)] font-medium">
+              Tiền mặt đã đủ thành tiền — dùng phương thức Tiền mặt thường, hoặc nhập ít hơn để kết hợp.
+            </p>
+          </div>
+
+          <div>
+            <label class="soleil-label block mb-2">Chuyển khoản (tự tính)</label>
+            <div class="pos-split-transfer-row">
+              <input
+                type="text"
+                class="admin-input w-full text-lg"
+                :value="formatCurrency(splitTransferNum)"
+                readonly
+                tabindex="-1"
+              />
+              <button
+                type="button"
+                class="pos-pay-btn pos-split-qr-btn"
+                :disabled="splitTransferNum <= 0"
+                @click="openVietQrModal"
+              >
+                Tạo QR
+              </button>
+            </div>
+            <p
+              v-if="splitTransferConfirmed"
+              class="text-sm mt-2 text-[var(--sage)] font-medium"
+            >
+              Đã xác nhận nhận chuyển khoản
+            </p>
+            <p
+              v-else-if="splitTransferNum > 0"
+              class="text-sm mt-2 text-[var(--admin-muted)]"
+            >
+              Tạo QR → kiểm tra app ngân hàng → bấm “Đã nhận chuyển khoản”
+            </p>
+          </div>
+
+          <div>
+            <label class="soleil-label block mb-2">Mã giao dịch CK (tùy chọn)</label>
+            <input
+              v-model="splitTransferRef"
+              type="text"
+              class="admin-input w-full"
+              placeholder="Mã GD / tham chiếu..."
+            />
+          </div>
+
+          <div class="pos-split-summary text-sm">
+            <div class="flex justify-between">
+              <span>Tiền mặt</span>
+              <strong>{{ formatCurrency(splitCashNum) }}</strong>
+            </div>
+            <div class="flex justify-between">
+              <span>Chuyển khoản</span>
+              <strong>{{ formatCurrency(splitTransferNum) }}</strong>
+            </div>
+            <div class="flex justify-between pos-split-summary__total">
+              <span>Thành tiền</span>
+              <strong>{{ formatCurrency(thanhTien) }}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="!isSplitMode && isCash" class="mb-4">
           <label class="soleil-label block mb-2">Tiền khách đưa</label>
           <input
             v-model="cashGiven"
@@ -995,15 +1224,15 @@ onBeforeUnmount(() => {
           </p>
         </div>
 
-        <div v-else-if="isManualTransfer" class="mb-4">
+        <div v-else-if="!isSplitMode && isManualTransfer" class="mb-4">
           <label class="soleil-label block mb-2">Mã giao dịch (tùy chọn)</label>
           <input v-model="transferRef" type="text" class="admin-input w-full" placeholder="Mã GD / tham chiếu..." />
         </div>
 
-        <div v-else-if="isVnpay" class="mb-4 pos-qr-hint">
+        <!-- <div v-else-if="isVnpay" class="mb-4 pos-qr-hint">
           <Icon icon="solar:qr-code-linear" class="text-xl shrink-0" />
           <p>Khách quét mã QR VNPay trên điện thoại. Hệ thống tự xác nhận khi thanh toán thành công.</p>
-        </div>
+        </div> -->
 
         <div class="pos-checkout-row">
           <button
@@ -1121,7 +1350,18 @@ onBeforeUnmount(() => {
             <div v-if="receipt.tienThua != null" class="flex justify-between">
               <span>Tiền thối</span><span>{{ formatCurrency(receipt.tienThua) }}</span>
             </div>
-            <div class="mt-1">PTTT: {{ receipt.tenPhuongThucThanhToan }}</div>
+            <template v-if="receipt.danhSachThanhToan && receipt.danhSachThanhToan.length > 1">
+              <div class="mt-1">Thanh toán:</div>
+              <div
+                v-for="(tt, ttIdx) in receipt.danhSachThanhToan"
+                :key="ttIdx"
+                class="flex justify-between"
+              >
+                <span>{{ tt.tenPhuongThucThanhToan }}</span>
+                <span>{{ formatCurrency(tt.soTien) }}</span>
+              </div>
+            </template>
+            <div v-else class="mt-1">PTTT: {{ receipt.tenPhuongThucThanhToan }}</div>
           </div>
           <p class="pos-receipt-print__thanks">Cảm ơn quý khách!</p>
         </div>
@@ -1163,7 +1403,8 @@ onBeforeUnmount(() => {
               Mã GD: <strong>{{ qrTransactionRef }}</strong>
             </p>
             <p class="pos-qr-modal__hint">
-              Khách mở app ngân hàng / VNPay và quét mã. Màn hình sẽ tự cập nhật khi thanh toán xong.
+              Khách mở app ngân hàng / VNPay và quét mã. Sau khi khách thanh toán xong, bấm
+              <strong>Thanh toán</strong> để hoàn tất giao dịch.
             </p>
           </div>
 
@@ -1172,17 +1413,70 @@ onBeforeUnmount(() => {
               v-if="qrStatus === 'CHO_THANH_TOAN'"
               type="button"
               class="soleil-btn-outline flex-1"
+              :disabled="qrCompleting"
               @click="cancelQrPayment"
             >
               Hủy thanh toán
             </button>
             <button
+              v-if="qrStatus === 'CHO_THANH_TOAN'"
               type="button"
               class="soleil-btn-primary flex-1"
-              :disabled="qrPolling"
-              @click="pollQrPaymentStatus"
+              :disabled="qrCompleting"
+              @click="completeQrPayment"
             >
-              {{ qrPolling ? 'Đang kiểm tra...' : 'Kiểm tra lại' }}
+              {{ qrCompleting ? 'Đang hoàn tất...' : 'Thanh toán' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Modal VietQR chuyển khoản (thanh toán kết hợp) -->
+    <Teleport to="body">
+      <div v-if="showVietQrModal" class="pos-qr-overlay" @click.self="cancelVietQrModal">
+        <div class="pos-qr-modal">
+          <div class="pos-qr-modal__head">
+            <h2 class="pos-qr-modal__title">QR chuyển khoản (VietQR)</h2>
+            <button type="button" class="admin-icon-btn" title="Đóng" @click="cancelVietQrModal">
+              <Icon icon="mdi:close" width="20" />
+            </button>
+          </div>
+
+          <div class="pos-qr-modal__body">
+            <p class="pos-qr-modal__amount">{{ formatCurrency(splitTransferNum) }}</p>
+            <p class="pos-qr-modal__status">Quét QR — kiểm tra tiền về trên app ngân hàng</p>
+
+            <div v-if="vietQrImageUrl" class="pos-qr-modal__code">
+              <img
+                :src="vietQrImageUrl"
+                alt="VietQR chuyển khoản"
+                class="pos-vietqr-img"
+                width="240"
+                height="240"
+              />
+            </div>
+
+            <p class="pos-qr-modal__hint">
+              Số tiền QR = phần chuyển khoản còn thiếu.
+              Khi đã thấy tiền vào tài khoản, bấm <strong>Đã nhận chuyển khoản</strong>.
+            </p>
+          </div>
+
+          <div class="pos-qr-modal__actions">
+            <button
+              type="button"
+              class="soleil-btn-outline flex-1"
+              @click="cancelVietQrModal"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              class="soleil-btn-primary flex-1"
+              @click="confirmVietQrReceived"
+            >
+              Đã nhận chuyển khoản
             </button>
           </div>
         </div>

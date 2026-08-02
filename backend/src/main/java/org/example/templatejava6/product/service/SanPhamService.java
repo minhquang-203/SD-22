@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -50,6 +51,7 @@ public class SanPhamService {
     @Autowired private DanhGiaRepository danhGiaRepository;
     @Autowired private ProductFileStorageService productFileStorageService;
     @Autowired private LoHangService loHangService;
+    @Autowired private LoHangRepository loHangRepository;
     @Autowired private ChiTietDotGiamGiaRepository chiTietDotGiamGiaRepository;
     @Autowired private DotGiamGiaService dotGiamGiaService;
 
@@ -61,12 +63,13 @@ public class SanPhamService {
     @Transactional(readOnly = true)
     public List<SanPhamResponse> getAll(Boolean excludeKhuyenMai) {
         Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
+        Set<Integer> canHanIds = loadCoLoCanHanProductIds();
         Set<Integer> saleProductIds = Boolean.TRUE.equals(excludeKhuyenMai)
                 ? loadActiveSaleProductIds()
                 : Set.of();
         return sanPhamRepository.findAll().stream()
                 .filter(sp -> !saleProductIds.contains(sp.getId()))
-                .map(sp -> toListResponse(sp, variantAggMap))
+                .map(sp -> toListResponse(sp, variantAggMap, canHanIds))
                 .toList();
     }
 
@@ -74,7 +77,8 @@ public class SanPhamService {
     public Page<SanPhamResponse> phanTrang(Integer pageNo, Integer pageSize) {
         Pageable pageable = PageRequest.of(pageNo, pageSize);
         Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
-        return sanPhamRepository.findAll(pageable).map(sp -> toListResponse(sp, variantAggMap));
+        Set<Integer> canHanIds = loadCoLoCanHanProductIds();
+        return sanPhamRepository.findAll(pageable).map(sp -> toListResponse(sp, variantAggMap, canHanIds));
     }
 
     @Transactional(readOnly = true)
@@ -85,13 +89,14 @@ public class SanPhamService {
     @Transactional(readOnly = true)
     public List<SanPhamResponse> timKiem(String keyword, Boolean excludeKhuyenMai) {
         Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
+        Set<Integer> canHanIds = loadCoLoCanHanProductIds();
         Set<Integer> saleProductIds = Boolean.TRUE.equals(excludeKhuyenMai)
                 ? loadActiveSaleProductIds()
                 : Set.of();
         return sanPhamRepository.findByTenContainingIgnoreCase(keyword)
                 .stream()
                 .filter(sp -> !saleProductIds.contains(sp.getId()))
-                .map(sp -> toListResponse(sp, variantAggMap))
+                .map(sp -> toListResponse(sp, variantAggMap, canHanIds))
                 .toList();
     }
 
@@ -102,18 +107,36 @@ public class SanPhamService {
             return List.of();
         }
         Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
+        Set<Integer> canHanIds = loadCoLoCanHanProductIds();
         Map<Integer, SalePriceAgg> salePriceMap = loadActiveSalePriceMap();
         return sanPhamRepository.findAllById(ids).stream()
                 .filter(sp -> sp.getTrangThai() != Boolean.FALSE)
-                .map(sp -> toSaleListResponse(sp, variantAggMap, salePriceMap.get(sp.getId())))
+                .map(sp -> toSaleListResponse(sp, variantAggMap, canHanIds, salePriceMap.get(sp.getId())))
                 .toList();
     }
 
     public Page<SanPhamResponse> timKiemPhanTrang(String keyword, Integer pageNo, Integer pageSize) {
         Pageable pageable = PageRequest.of(pageNo, pageSize);
         Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
+        Set<Integer> canHanIds = loadCoLoCanHanProductIds();
         return sanPhamRepository.findByTenContainingIgnoreCase(keyword, pageable)
-                .map(sp -> toListResponse(sp, variantAggMap));
+                .map(sp -> toListResponse(sp, variantAggMap, canHanIds));
+    }
+
+    /** Đếm SP sắp hết hàng (tồn ≤ 10) và có lô cận hạn — badge sidebar. */
+    @Transactional(readOnly = true)
+    public SanPhamCanhBaoCountResponse canhBaoCount() {
+        Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
+        Set<Integer> canHanIds = loadCoLoCanHanProductIds();
+        long sapHetHang = 0;
+        for (SanPham sp : sanPhamRepository.findAll()) {
+            VariantAgg agg = variantAggMap.get(sp.getId());
+            long ton = agg != null && agg.getTongTon() != null ? agg.getTongTon() : 0L;
+            if (ton <= 10) {
+                sapHetHang++;
+            }
+        }
+        return new SanPhamCanhBaoCountResponse(sapHetHang, canHanIds.size());
     }
 
     @Transactional(readOnly = true)
@@ -254,8 +277,8 @@ public class SanPhamService {
     }
 
     private SanPhamResponse toSaleListResponse(
-            SanPham sp, Map<Integer, VariantAgg> variantAggMap, SalePriceAgg sale) {
-        SanPhamResponse response = toListResponse(sp, variantAggMap);
+            SanPham sp, Map<Integer, VariantAgg> variantAggMap, Set<Integer> canHanIds, SalePriceAgg sale) {
+        SanPhamResponse response = toListResponse(sp, variantAggMap, canHanIds);
         if (sale == null) {
             return response;
         }
@@ -328,7 +351,17 @@ public class SanPhamService {
         return current == null || value.compareTo(current) > 0 ? value : current;
     }
 
+    private Set<Integer> loadCoLoCanHanProductIds() {
+        LocalDate today = LocalDate.now();
+        return new HashSet<>(loHangRepository.findSanPhamIdsCoLoCanHan(today, today.plusDays(30)));
+    }
+
     private SanPhamResponse toListResponse(SanPham sp, Map<Integer, VariantAgg> variantAggMap) {
+        return toListResponse(sp, variantAggMap, loadCoLoCanHanProductIds());
+    }
+
+    private SanPhamResponse toListResponse(
+            SanPham sp, Map<Integer, VariantAgg> variantAggMap, Set<Integer> canHanIds) {
         SanPhamResponse response = new SanPhamResponse(sp);
         response.setAnhChinhUrl(resolveMainImageUrl(sp.getId()));
         response.setIdLoaiDas(
@@ -347,6 +380,7 @@ public class SanPhamService {
             response.setTongTon(0L);
             response.setSoBienThe(0L);
         }
+        response.setCoLoCanHan(canHanIds != null && canHanIds.contains(sp.getId()));
         return response;
     }
 
@@ -371,6 +405,7 @@ public class SanPhamService {
                 anh.setUrl(url);
                 anh.setLaAnhChinh(anhReq.getLaAnhChinh() != null ? anhReq.getLaAnhChinh() : false);
                 anh.setThuTu(anhReq.getThuTu() != null ? anhReq.getThuTu() : 0);
+                anh.setMauSac(categoryService.getMauSacOrNull(anhReq.getIdMauSac()));
                 anhSanPhamRepository.save(anh);
             }
         }

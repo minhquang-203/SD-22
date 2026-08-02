@@ -6,6 +6,8 @@ import org.example.templatejava6.order.entity.HoanTien;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -27,10 +29,15 @@ public class HoanTienResponse {
     private String chuTaiKhoan;
     private String ghiChu;
     private String tenNhanVien;
+    private List<String> anhUrls = new ArrayList<>();
     private LocalDateTime ngayTao;
     private LocalDateTime ngayHoan;
 
     public HoanTienResponse(HoanTien ht) {
+        this(ht, null);
+    }
+
+    public HoanTienResponse(HoanTien ht, List<String> anhUrls) {
         this.id = ht.getId();
         if (ht.getIdHoaDon() != null) {
             this.idHoaDon = ht.getIdHoaDon().getId();
@@ -53,6 +60,7 @@ public class HoanTienResponse {
         this.chuTaiKhoan = ht.getChuTaiKhoan();
         this.ghiChu = ht.getGhiChu();
         this.tenNhanVien = ht.getIdNhanVien() != null ? ht.getIdNhanVien().getHoTen() : null;
+        this.anhUrls = anhUrls != null ? new ArrayList<>(anhUrls) : new ArrayList<>();
         this.ngayTao = ht.getNgayTao();
         this.ngayHoan = ht.getNgayHoan();
     }

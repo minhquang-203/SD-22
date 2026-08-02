@@ -1,13 +1,16 @@
 package org.example.templatejava6.order.controller;
 
 import jakarta.validation.Valid;
+import org.example.templatejava6.order.model.request.TaoVanDonTraRequest;
 import org.example.templatejava6.order.model.request.TaoYeuCauTraHangRequest;
 import org.example.templatejava6.order.model.response.YeuCauTraHangResponse;
 import org.example.templatejava6.order.service.ReturnRequestService;
+import org.example.templatejava6.shipping.model.response.GhnPickShiftResponse;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -41,10 +44,18 @@ public class TraHangKhachController {
         return returnRequestService.danhSachCuaToi(idKhachHang);
     }
 
+    /** Ca lay hang GHN de khach chon thoi diem shipper den lay hang tra. */
+    @GetMapping("/tra-hang/ca-lay-hang")
+    public List<GhnPickShiftResponse> caLayHang() {
+        return returnRequestService.danhSachCaLayHang();
+    }
+
     @PostMapping("/tra-hang/{id}/tao-van-don")
     public YeuCauTraHangResponse taoVanDonTra(
             @PathVariable Integer id,
-            @RequestParam Integer idKhachHang) {
-        return returnRequestService.taoVanDonTra(idKhachHang, id);
+            @RequestParam Integer idKhachHang,
+            @RequestBody(required = false) TaoVanDonTraRequest request) {
+        return returnRequestService.taoVanDonTra(
+                idKhachHang, id, request != null ? request.getPickShiftId() : null);
     }
 }

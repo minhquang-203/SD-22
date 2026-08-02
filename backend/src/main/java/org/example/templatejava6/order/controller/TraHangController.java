@@ -3,6 +3,8 @@ package org.example.templatejava6.order.controller;
 import org.example.templatejava6.common.enums.TrangThaiTraHang;
 import org.example.templatejava6.order.model.request.DuyetTraHangRequest;
 import org.example.templatejava6.order.model.request.HoaDonTuChoiRequest;
+import org.example.templatejava6.order.model.request.NhanHangTraRequest;
+import org.example.templatejava6.order.model.response.LoHangDonHangResponse;
 import org.example.templatejava6.order.model.response.YeuCauTraHangResponse;
 import org.example.templatejava6.order.service.ReturnRequestService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -55,8 +57,25 @@ public class TraHangController {
     @PostMapping("/{id}/da-nhan-hang")
     public YeuCauTraHangResponse daNhanHang(
             @PathVariable Integer id,
-            @RequestBody(required = false) DuyetTraHangRequest request) {
+            @RequestBody(required = false) NhanHangTraRequest request) {
         return returnRequestService.xacNhanNhanHang(
+                id,
+                request != null ? request.getIdNhanVien() : null,
+                request != null ? request.getChiTietLo() : null);
+    }
+
+    /** Danh sách lô đơn đã lấy — để nhân viên chọn khi nhận hàng trả. */
+    @GetMapping("/{id}/lo-hang")
+    public List<LoHangDonHangResponse> danhSachLo(@PathVariable Integer id) {
+        return returnRequestService.danhSachLoCuaYeuCau(id);
+    }
+
+    /** Dong bo trang thai van don hoan tu GHN; khong tu hoan kho — can nhan vien phan loai TOT/LOI. */
+    @PostMapping("/{id}/dong-bo-ghn")
+    public YeuCauTraHangResponse dongBoGhn(
+            @PathVariable Integer id,
+            @RequestBody(required = false) DuyetTraHangRequest request) {
+        return returnRequestService.dongBoVanDonTra(
                 id,
                 request != null ? request.getIdNhanVien() : null);
     }

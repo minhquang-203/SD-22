@@ -3,6 +3,7 @@ package org.example.templatejava6.product.controller;
 import jakarta.validation.Valid;
 import org.example.templatejava6.common.model.response.MaTiepTheoResponse;
 import org.example.templatejava6.product.model.request.SanPhamRequest;
+import org.example.templatejava6.product.model.response.SanPhamCanhBaoCountResponse;
 import org.example.templatejava6.product.model.response.SanPhamDetailResponse;
 import org.example.templatejava6.product.model.response.SanPhamResponse;
 import org.example.templatejava6.product.service.SanPhamService;
@@ -40,6 +41,12 @@ public class SanPhamController {
     @GetMapping("ma-tiep-theo")
     public MaTiepTheoResponse maTiepTheo() {
         return sanPhamService.previewMaTiepTheo();
+    }
+
+    /** Đếm SP sắp hết hàng (tồn ≤ 10) và cận hạn (lô ≤ 30 ngày) — cho badge sidebar. */
+    @GetMapping("canh-bao-count")
+    public SanPhamCanhBaoCountResponse canhBaoCount() {
+        return sanPhamService.canhBaoCount();
     }
 
     @GetMapping("tim")

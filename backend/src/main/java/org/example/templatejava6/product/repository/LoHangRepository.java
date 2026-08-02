@@ -52,4 +52,21 @@ public interface LoHangRepository extends JpaRepository<LoHang, Integer> {
             WHERE l.chiTietSanPham.id = :idCts AND l.trangThai = true
             """)
     int sumSoLuongCon(@Param("idCts") Integer idChiTietSanPham);
+
+    /**
+     * ID sản phẩm có ít nhất 1 lô active, còn hàng, HSD trong [today, today+30).
+     * Khớp LoHangResponse.isSapHetHan (còn ≥ 0 và &lt; 30 ngày).
+     */
+    @Query("""
+            SELECT DISTINCT cts.sanPham.id FROM LoHang l
+            JOIN l.chiTietSanPham cts
+            WHERE l.trangThai = true
+              AND l.soLuongCon > 0
+              AND l.hanSuDung IS NOT NULL
+              AND l.hanSuDung >= :today
+              AND l.hanSuDung < :limitExclusive
+            """)
+    List<Integer> findSanPhamIdsCoLoCanHan(
+            @Param("today") java.time.LocalDate today,
+            @Param("limitExclusive") java.time.LocalDate limitExclusive);
 }

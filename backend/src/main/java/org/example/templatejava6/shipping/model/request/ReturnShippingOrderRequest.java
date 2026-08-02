@@ -22,5 +22,8 @@ public class ReturnShippingOrderRequest {
     private Long insuranceValue;
     private Integer weight;
 
+    /** Ca lay hang GHN (pick_shift), lay tu API danh sach ca lay. */
+    private Integer pickShiftId;
+
     private List<CreateShippingOrderRequest.Item> items;
 }

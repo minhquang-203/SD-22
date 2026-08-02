@@ -32,11 +32,21 @@ public class BanHangHoaDonResponse {
     private String transactionRef;
     private String trangThaiThanhToan;
     private List<BanHangChiTietResponse> items;
+    /** Các dòng thanh toán thật (1 hoặc nhiều khi kết hợp). */
+    private List<ThanhToanDongResponse> danhSachThanhToan;
 
     public static BanHangHoaDonResponse from(
             HoaDon hd,
             ThanhToanHoaDon tt,
             List<BanHangChiTietResponse> lines) {
+        return from(hd, tt, lines, null);
+    }
+
+    public static BanHangHoaDonResponse from(
+            HoaDon hd,
+            ThanhToanHoaDon tt,
+            List<BanHangChiTietResponse> lines,
+            List<ThanhToanHoaDon> thanhToans) {
         BanHangHoaDonResponse res = new BanHangHoaDonResponse();
         res.setId(hd.getId());
         res.setMaHoaDon(hd.getMaHoaDon());
@@ -56,7 +66,27 @@ public class BanHangHoaDonResponse {
             res.setTienThua(tt.getTienThua());
         }
         res.setItems(lines);
+        if (thanhToans != null && !thanhToans.isEmpty()) {
+            res.setDanhSachThanhToan(thanhToans.stream().map(ThanhToanDongResponse::from).toList());
+        } else if (tt != null) {
+            res.setDanhSachThanhToan(List.of(ThanhToanDongResponse.from(tt)));
+        }
         return res;
+    }
+
+    @Getter
+    @Setter
+    public static class ThanhToanDongResponse {
+        private String tenPhuongThucThanhToan;
+        private BigDecimal soTien;
+
+        public static ThanhToanDongResponse from(ThanhToanHoaDon tt) {
+            ThanhToanDongResponse d = new ThanhToanDongResponse();
+            d.setTenPhuongThucThanhToan(
+                    tt.getIdPhuongThucThanhToan() != null ? tt.getIdPhuongThucThanhToan().getTen() : null);
+            d.setSoTien(tt.getSoTien());
+            return d;
+        }
     }
 
     @Getter

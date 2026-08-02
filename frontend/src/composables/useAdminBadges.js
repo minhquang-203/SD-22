@@ -3,6 +3,7 @@ import { getAllHoaDon } from '@/api/hoaDonApi'
 import { docTatCaThongBao, docThongBao, getThongBao } from '@/api/thongBaoApi'
 import { fetchTraHangList } from '@/api/traHangApi'
 import { fetchHoanTienList } from '@/api/hoanTienApi'
+import { getSanPhamCanhBaoCount } from '@/api/sanPhamApi'
 import { useAdminAuth } from '@/composables/useAdminAuth'
 import { toast } from '@/composables/useToast'
 import {
@@ -22,6 +23,7 @@ const pendingOrderCount = ref(0)
 const pendingReturns = ref([])
 const pendingReturnCount = ref(0)
 const pendingRefundCount = ref(0)
+const productWarnCount = ref(0)
 const otherNotifications = ref([])
 const unreadOtherCount = ref(0)
 
@@ -42,12 +44,13 @@ const sidebarBadgeByPath = computed(() => ({
   '/admin/hoa-don': hoaDonSidebarBadge.value,
   '/admin/tra-hang': pendingReturnCount.value,
   '/admin/hoan-tien': pendingRefundCount.value,
+  '/admin/products': productWarnCount.value,
 }))
 
 /** Dùng buộc NMenu re-render khi số badge đổi */
 const badgeVersion = computed(
   () =>
-    `${pendingOrderCount.value}-${pendingReturnCount.value}-${pendingRefundCount.value}-${unreadOtherCount.value}`,
+    `${pendingOrderCount.value}-${pendingReturnCount.value}-${pendingRefundCount.value}-${productWarnCount.value}-${unreadOtherCount.value}`,
 )
 
 let pollTimer = null
@@ -112,6 +115,19 @@ async function loadPendingRefunds() {
   }
 }
 
+async function loadProductWarnings() {
+  const { isLoggedIn } = useAdminAuth()
+  if (!isLoggedIn.value) return
+  try {
+    const res = await getSanPhamCanhBaoCount()
+    const sapHetHang = Number(res.data?.sapHetHang) || 0
+    const canHan = Number(res.data?.canHan) || 0
+    productWarnCount.value = sapHetHang + canHan
+  } catch {
+    // im lặng
+  }
+}
+
 async function loadOtherNotifications({ updateList = true } = {}) {
   const { isLoggedIn } = useAdminAuth()
   if (!isLoggedIn.value) return
@@ -132,6 +148,7 @@ async function refreshBadges() {
     loadPendingOrders(),
     loadPendingReturns(),
     loadPendingRefunds(),
+    loadProductWarnings(),
     loadOtherNotifications({ updateList: true }),
   ])
 }
@@ -216,6 +233,7 @@ export function useAdminBadges() {
     pendingReturns,
     pendingReturnCount,
     pendingRefundCount,
+    productWarnCount,
     otherNotifications,
     unreadOtherCount,
     notifBadgeCount,

@@ -69,6 +69,8 @@ public class BanHangService {
     private static final String TRANG_THAI_THANH_CONG = "THANH_CONG";
     private static final String MA_TIEN_MAT = "TIEN_MAT";
     private static final String MA_VNPAY = "VNPAY";
+    private static final String MA_CHUYEN_KHOAN = "CHUYEN_KHOAN";
+    private static final Set<String> SPLIT_ALLOWED_METHODS = Set.of(MA_TIEN_MAT, MA_CHUYEN_KHOAN);
     private static final String MA_COD = "COD";
     private static final String TRANG_THAI_CHO_THANH_TOAN = "CHO_THANH_TOAN";
     private static final String TRANG_THAI_THAT_BAI = "THAT_BAI";
@@ -283,6 +285,7 @@ public class BanHangService {
         if (req.getItems() == null || req.getItems().isEmpty()) {
             throw new ApiException("Giỏ hàng trống. Vui lòng thêm sản phẩm.", "EMPTY_CART");
         }
+        boolean isSplitPayment = req.getDanhSachThanhToan() != null && !req.getDanhSachThanhToan().isEmpty();
         if (req.getIdPhuongThucThanhToan() == null) {
             throw new ApiException("Vui lòng chọn phương thức thanh toán.", "MISSING_PAYMENT");
         }
@@ -321,7 +324,7 @@ public class BanHangService {
 
         BigDecimal soTienKhachDua = null;
         BigDecimal tienThua = null;
-        if (MA_TIEN_MAT.equals(pttt.getMa())) {
+        if (!isSplitPayment && MA_TIEN_MAT.equals(pttt.getMa())) {
             if (req.getSoTienKhachDua() == null) {
                 throw new ApiException("Vui lòng nhập tiền khách đưa.", "MISSING_CASH");
             }
@@ -387,6 +390,102 @@ public class BanHangService {
                     "Áp mã giảm giá " + phieu.getMa() + " (−" + tienGiamGia.toPlainString() + "đ)",
                     nhanVien, now);
         }
+        if (isSplitPayment) {
+            if (req.getDanhSachThanhToan().size() < 2) {
+                throw new ApiException(
+                        "Thanh toán kết hợp cần ít nhất 2 phương thức.",
+                        "SPLIT_MIN_METHODS");
+            }
+
+            List<PhuongThucThanhToan> splitPts = new ArrayList<>();
+            BigDecimal tongSplit = BigDecimal.ZERO;
+            for (TaoDonTaiQuayRequest.ThanhToanItemRequest item : req.getDanhSachThanhToan()) {
+                if (item.getIdPhuongThucThanhToan() == null || item.getSoTien() == null) {
+                    throw new ApiException("Thiếu thông tin thanh toán.", "SPLIT_INVALID_ITEM");
+                }
+                if (item.getSoTien().compareTo(BigDecimal.ZERO) <= 0) {
+                    throw new ApiException("Số tiền từng phần phải lớn hơn 0.", "SPLIT_INVALID_AMOUNT");
+                }
+
+                PhuongThucThanhToan ptItem = phuongThucThanhToanRepository
+                        .findById(item.getIdPhuongThucThanhToan())
+                        .orElseThrow(() -> new ApiException(
+                                "Phương thức thanh toán không hợp lệ.", "INVALID_PAYMENT"));
+                if (!Boolean.TRUE.equals(ptItem.getTrangThai())) {
+                    throw new ApiException(
+                            "Phương thức thanh toán không còn hoạt động.", "INACTIVE_PAYMENT");
+                }
+                if (!SPLIT_ALLOWED_METHODS.contains(ptItem.getMa())) {
+                    throw new ApiException(
+                            "Thanh toán kết hợp chỉ hỗ trợ Tiền mặt và Chuyển khoản.",
+                            "SPLIT_UNSUPPORTED_METHOD");
+                }
+                tongSplit = tongSplit.add(item.getSoTien());
+                splitPts.add(ptItem);
+            }
+
+            if (tongSplit.compareTo(thanhTien) != 0) {
+                throw new ApiException(
+                        "Tổng thanh toán (" + tongSplit.toPlainString()
+                                + "đ) không khớp thành tiền (" + thanhTien.toPlainString() + "đ).",
+                        "SPLIT_TOTAL_MISMATCH");
+            }
+
+            PhuongThucThanhToan ptttLonNhat = null;
+            BigDecimal soTienLonNhat = BigDecimal.valueOf(-1);
+            ThanhToanHoaDon ttDaiDien = null;
+            List<ThanhToanHoaDon> cacDongThanhToan = new ArrayList<>();
+
+            for (int i = 0; i < req.getDanhSachThanhToan().size(); i++) {
+                TaoDonTaiQuayRequest.ThanhToanItemRequest item = req.getDanhSachThanhToan().get(i);
+                PhuongThucThanhToan ptItem = splitPts.get(i);
+
+                ThanhToanHoaDon tt = new ThanhToanHoaDon();
+                tt.setIdHoaDon(hoaDon);
+                tt.setIdPhuongThucThanhToan(ptItem);
+                tt.setSoTien(item.getSoTien());
+                // Kết hợp: không tính tiền thối cho phần tiền mặt
+                tt.setSoTienKhachDua(null);
+                tt.setTienThua(null);
+                tt.setMaGiaoDich(item.getMaGiaoDich());
+                tt.setTrangThai(TRANG_THAI_THANH_CONG);
+                tt.setThoiGian(now);
+                tt = thanhToanHoaDonRepository.save(tt);
+                cacDongThanhToan.add(tt);
+
+                if (ttDaiDien == null || item.getSoTien().compareTo(soTienLonNhat) > 0) {
+                    soTienLonNhat = item.getSoTien();
+                    ptttLonNhat = ptItem;
+                    ttDaiDien = tt;
+                }
+
+                ghiNhatKy(hoaDon, "THANH_TOAN",
+                        "Thanh toán " + ptItem.getTen() + " — " + item.getSoTien().toPlainString() + "đ",
+                        nhanVien, now);
+            }
+
+            if (ptttLonNhat != null) {
+                hoaDon.setIdPhuongThucThanhToan(ptttLonNhat);
+            }
+            hoaDon.setTrangThai(TrangThaiDonHang.HOAN_THANH);
+            hoaDon = hoaDonRepository.save(hoaDon);
+
+            ghiNhatKy(hoaDon, "HOAN_THANH", "Hoàn thành đơn", nhanVien, now);
+
+            if (phieu != null) {
+                phieu.setSoLuong(phieu.getSoLuong() - 1);
+                phieuGiamGiaRepository.save(phieu);
+            }
+
+            if (khachHang != null) {
+                int diemThem = thanhTien.divide(BigDecimal.valueOf(1000), 0, RoundingMode.FLOOR).intValue();
+                int diemHien = khachHang.getDiemTichLuy() != null ? khachHang.getDiemTichLuy() : 0;
+                khachHang.setDiemTichLuy(diemHien + diemThem);
+                khachHangRepository.save(khachHang);
+            }
+
+            return BanHangHoaDonResponse.from(hoaDon, ttDaiDien, lineResponses, cacDongThanhToan);
+        }
 
         if (isVnpay) {
             if (phieu != null) {
@@ -451,7 +550,9 @@ public class BanHangService {
             List<BanHangChiTietResponse> lines = hoaDonChiTietRepository.findByIdHoaDon(hoaDon).stream()
                     .map(BanHangChiTietResponse::new)
                     .toList();
-            hoaDonResponse = BanHangHoaDonResponse.from(hoaDon, thanhToan, lines);
+            List<ThanhToanHoaDon> tatCaThanhToan =
+                    thanhToanHoaDonRepository.findByIdHoaDonOrderByThoiGianDesc(hoaDon);
+            hoaDonResponse = BanHangHoaDonResponse.from(hoaDon, thanhToan, lines, tatCaThanhToan);
             hoaDonResponse.setTrangThaiThanhToan(TRANG_THAI_THANH_CONG);
         }
 
@@ -469,6 +570,52 @@ public class BanHangService {
                     thanhToan.setThoiGian(LocalDateTime.now());
                     thanhToanHoaDonRepository.save(thanhToan);
                 });
+    }
+
+    /**
+     * Hoàn tất thanh toán VNPAY tại quầy thủ công (khi chưa có IPN).
+     * Nhân viên xác nhận khách đã quét QR / thanh toán thành công trên app.
+     */
+    @Transactional
+    public PosThanhToanStatusResponse hoanTatThanhToanVnpayTaiQuay(Integer idHoaDon) {
+        HoaDon hoaDon = hoaDonRepository.findById(idHoaDon)
+                .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn.", "NOT_FOUND"));
+        if (!LOAI_TAI_QUAY.equalsIgnoreCase(hoaDon.getLoaiDon())) {
+            throw new ApiException("Không phải hóa đơn tại quầy.", "INVALID_ORDER_TYPE");
+        }
+        if (hoaDon.getTrangThai() == TrangThaiDonHang.HOAN_THANH) {
+            return kiemTraThanhToanTaiQuay(idHoaDon);
+        }
+        if (hoaDon.getTrangThai() == null || hoaDon.getTrangThai().laTrangThaiKetThuc()) {
+            throw new ApiException("Đơn hàng đã kết thúc, không thể hoàn tất thanh toán.", "ORDER_CLOSED");
+        }
+
+        ThanhToanHoaDon thanhToan = thanhToanHoaDonRepository
+                .findLatestByHoaDonAndTrangThai(hoaDon, TRANG_THAI_CHO_THANH_TOAN)
+                .orElseThrow(() -> new ApiException(
+                        "Không có giao dịch VNPAY đang chờ thanh toán.", "PAYMENT_NOT_PENDING"));
+
+        NhanVien nhanVien = currentNhanVien();
+        LocalDateTime now = LocalDateTime.now();
+
+        thanhToan.setTrangThai(TRANG_THAI_THANH_CONG);
+        thanhToan.setThoiGian(now);
+        thanhToanHoaDonRepository.save(thanhToan);
+
+        posOrderLifecycleService.hoanThanhDonVnpay(hoaDon);
+        ghiNhatKy(hoaDon, "THANH_TOAN",
+                "Nhân viên xác nhận thanh toán VNPAY tại quầy (không qua IPN)",
+                nhanVien, now);
+
+        List<BanHangChiTietResponse> lines = hoaDonChiTietRepository.findByIdHoaDon(hoaDon).stream()
+                .map(BanHangChiTietResponse::new)
+                .toList();
+        List<ThanhToanHoaDon> tatCaThanhToan =
+                thanhToanHoaDonRepository.findByIdHoaDonOrderByThoiGianDesc(hoaDon);
+        BanHangHoaDonResponse hoaDonResponse =
+                BanHangHoaDonResponse.from(hoaDon, thanhToan, lines, tatCaThanhToan);
+        hoaDonResponse.setTrangThaiThanhToan(TRANG_THAI_THANH_CONG);
+        return PosThanhToanStatusResponse.of(hoaDon.getId(), hoaDon.getMaHoaDon(), TRANG_THAI_THANH_CONG, hoaDonResponse);
     }
 
     private HoaDon loadDonCho(Integer id) {

@@ -46,6 +46,7 @@ public class SecurityConfig {
                     .requestMatchers("/api/auth/khach/**").permitAll()
                     .requestMatchers("/api/khach/quiz/**").permitAll()
                     .requestMatchers("/api/khach/routines/**").permitAll()
+                    .requestMatchers("/api/khach/banners/**").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/auth/nhan-vien/dang-nhap").permitAll()
 
                     // 2. MỞ CỬA TỰ DO CHO API THỜI TIẾT VÀ CẤU HÌNH UV
@@ -69,6 +70,17 @@ public class SecurityConfig {
                     .requestMatchers("/api/chat/**").permitAll()
                     .requestMatchers("/ws", "/ws/**").permitAll()
                     .requestMatchers("/uploads/**").permitAll()
+                    // Hỗ trợ chat: rule riêng TRƯỚC /api/**
+                    .requestMatchers(HttpMethod.POST, "/api/ho-tro/phien", "/api/ho-tro/tin-nhan")
+                        .hasRole("KHACH_HANG")
+                    .requestMatchers(HttpMethod.GET, "/api/ho-tro/phien/*/tin-nhan")
+                        .hasAnyRole("KHACH_HANG", "NHAN_VIEN", "QUAN_LY", "CHU")
+                    .requestMatchers(HttpMethod.GET, "/api/ho-tro/phien")
+                        .hasAnyRole("NHAN_VIEN", "QUAN_LY", "CHU")
+                    .requestMatchers(HttpMethod.POST, "/api/ho-tro/phien/*/tra-loi")
+                        .hasAnyRole("NHAN_VIEN", "QUAN_LY", "CHU")
+                    .requestMatchers(HttpMethod.PUT, "/api/ho-tro/phien/*/da-doc")
+                        .hasAnyRole("NHAN_VIEN", "QUAN_LY", "CHU")
                     .requestMatchers("/api/khach-hang/toi", "/api/khach-hang/toi/**").hasRole("KHACH_HANG")
                     .requestMatchers("/api/yeu-thich/**").hasRole("KHACH_HANG")
                     .requestMatchers("/api/gio-hang", "/api/gio-hang/**").hasRole("KHACH_HANG")

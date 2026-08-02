@@ -45,6 +45,8 @@ public class PhieuGiamGiaService {
 
     @Transactional
     public void add(PhieuGiamGiaRequest request) {
+        normalizeRequest(request);
+        validateRequest(request);
         if (phieuGiamGiaRepository.existsByMa(request.getMa())) {
             throw new ApiException("Mã phiếu giảm giá đã tồn tại", "DUPLICATE");
         }
@@ -60,12 +62,72 @@ public class PhieuGiamGiaService {
     @Transactional
     public void update(Integer id, PhieuGiamGiaRequest request) {
         PhieuGiamGia pgg = getPhieuGiamGiaOrThrow(id);
+        normalizeRequest(request);
+        validateRequest(request);
         if (phieuGiamGiaRepository.existsByMaAndIdNot(request.getMa(), id)) {
             throw new ApiException("Mã phiếu giảm giá đã tồn tại", "DUPLICATE");
         }
         MapperUtil.mapToExisting(request, pgg);
         pgg.setId(id);
+        if (pgg.getGiaTriDonToiThieu() == null) {
+            pgg.setGiaTriDonToiThieu(java.math.BigDecimal.ZERO);
+        }
         phieuGiamGiaRepository.save(pgg);
+    }
+
+    private void normalizeRequest(PhieuGiamGiaRequest request) {
+        if (request.getMa() != null) {
+            request.setMa(request.getMa().trim().toUpperCase());
+        }
+        if (request.getTen() != null) {
+            request.setTen(request.getTen().trim());
+        }
+    }
+
+    private void validateRequest(PhieuGiamGiaRequest request) {
+        if (request.getLoai() == null) {
+            throw new ApiException("Loại phiếu giảm giá không được để trống", "VALIDATION_ERROR");
+        }
+        if (request.getNgayBatDau() == null || request.getNgayKetThuc() == null) {
+            throw new ApiException("Vui lòng chọn thời gian áp dụng", "VALIDATION_ERROR");
+        }
+        if (request.getNgayKetThuc().isBefore(request.getNgayBatDau())) {
+            throw new ApiException("Ngày kết thúc phải sau hoặc bằng ngày bắt đầu", "VALIDATION_ERROR");
+        }
+        if (request.getSoLuong() == null || request.getSoLuong() < 1) {
+            throw new ApiException("Số lượng phải lớn hơn hoặc bằng 1", "VALIDATION_ERROR");
+        }
+        if (request.getGiaTriDonToiThieu() != null
+                && request.getGiaTriDonToiThieu().signum() < 0) {
+            throw new ApiException("Đơn tối thiểu không hợp lệ", "VALIDATION_ERROR");
+        }
+        java.math.BigDecimal giaTri = request.getGiaTri();
+        java.math.BigDecimal giamToiDa = request.getGiamToiDa();
+        switch (request.getLoai()) {
+            case PHAN_TRAM -> {
+                if (giaTri == null || giaTri.signum() <= 0
+                        || giaTri.compareTo(java.math.BigDecimal.valueOf(100)) > 0) {
+                    throw new ApiException("Phần trăm giảm phải từ 1 đến 100", "VALIDATION_ERROR");
+                }
+                if (giamToiDa != null && giamToiDa.signum() <= 0) {
+                    throw new ApiException("Giảm tối đa phải lớn hơn 0", "VALIDATION_ERROR");
+                }
+            }
+            case TIEN_MAT -> {
+                if (giaTri == null || giaTri.signum() <= 0) {
+                    throw new ApiException("Số tiền giảm phải lớn hơn 0", "VALIDATION_ERROR");
+                }
+            }
+            case FREE_SHIP -> {
+                if (giamToiDa != null && giamToiDa.signum() <= 0) {
+                    throw new ApiException("Miễn phí ship tối đa phải lớn hơn 0", "VALIDATION_ERROR");
+                }
+                // FREE_SHIP không dùng giaTri để tính; đặt giá trị mặc định hợp lệ cho cột NOT NULL.
+                if (giaTri == null || giaTri.signum() <= 0) {
+                    request.setGiaTri(java.math.BigDecimal.ONE);
+                }
+            }
+        }
     }
 
     @Transactional

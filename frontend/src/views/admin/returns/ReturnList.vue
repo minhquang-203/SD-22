@@ -7,7 +7,9 @@ import { confirm } from '@/composables/useConfirm'
 import { useAdminAuth } from '@/composables/useAdminAuth'
 import {
   daNhanHangTraHang,
+  dongBoVanDonTra,
   duyetTraHang,
+  fetchLoHangTraHang,
   fetchTraHangList,
   tuChoiTraHang,
 } from '@/api/traHangApi'
@@ -34,6 +36,7 @@ const tabs = [
   { value: 'CHO_DUYET', label: 'Chờ duyệt' },
   { value: 'DA_DUYET', label: 'Đã duyệt' },
   { value: 'DANG_HOAN_HANG', label: 'Đang hoàn hàng' },
+  { value: 'DA_NHAN_HANG', label: 'Đã nhận hàng' },
   { value: 'HOAN_TAT', label: 'Hoàn tất' },
   { value: 'TU_CHOI', label: 'Từ chối' },
 ]
@@ -44,6 +47,12 @@ const rejectTarget = ref(null)
 const rejectNote = ref('')
 const expandedId = ref(null)
 const previewImageUrl = ref('')
+
+const showReceiveModal = ref(false)
+const receiveTarget = ref(null)
+const receiveLots = ref([])
+const receiveRows = ref([])
+const receiveLoading = ref(false)
 
 function openImagePreview(url) {
   previewImageUrl.value = productImageUrl(url)
@@ -144,12 +153,10 @@ function openOrder(item) {
 }
 
 async function handleDuyet(item) {
-  const isVnpay = String(item.phuongThucThanhToan || '').toUpperCase() === 'VNPAY'
   const ok = await confirm({
     title: 'Duyệt yêu cầu trả hàng',
-    message: isVnpay
-      ? `Duyệt đơn ${item.maHoaDon}? Hệ thống sẽ hoàn tiền VNPAY tự động. Tồn kho được hoàn sau khi xác nhận đã nhận hàng trả.`
-      : `Duyệt yêu cầu trả hàng cho đơn ${item.maHoaDon}?`,
+    message: `Duyệt đơn ${item.maHoaDon}? Khách sẽ được thông báo để tạo vận đơn hoàn hàng.`
+      + ' Hoàn tiền chỉ được xét sau khi cửa hàng nhận lại hàng.',
     confirmText: 'Duyệt',
   })
   if (!ok) return
@@ -157,11 +164,7 @@ async function handleDuyet(item) {
   actionLoading.value = item.id
   try {
     await duyetTraHang(item.id, staffPayload())
-    notify(
-      isVnpay
-        ? `Đã duyệt và hoàn tiền VNPAY cho đơn ${item.maHoaDon}.`
-        : `Đã duyệt yêu cầu trả hàng đơn ${item.maHoaDon}.`,
-    )
+    notify(`Đã duyệt yêu cầu trả hàng đơn ${item.maHoaDon}. Chờ khách tạo vận đơn hoàn hàng.`)
     await loadList()
   } catch (err) {
     notify(String(err), 'error')
@@ -199,17 +202,157 @@ async function confirmReject() {
 }
 
 async function handleDaNhanHang(item) {
+  if (!item?.maVanDonTra) {
+    notify('Khách chưa tạo vận đơn hoàn hàng. Không thể xác nhận đã nhận hàng.', 'error')
+    return
+  }
+  receiveTarget.value = item
+  receiveRows.value = []
+  receiveLots.value = []
+  showReceiveModal.value = true
+  receiveLoading.value = true
+  try {
+    const res = await fetchLoHangTraHang(item.id)
+    const lots = res.data || []
+    receiveLots.value = lots
+    // Mỗi lô: nhập SL tốt + SL lỗi (tổng = đã bán). Lỗi → cột SL lỗi của lô tăng.
+    receiveRows.value = lots.map((lot) => ({
+      idLoHang: lot.idLoHang,
+      soLo: lot.soLo,
+      hanSuDung: lot.hanSuDung,
+      sku: lot.sku,
+      tenSanPham: lot.tenSanPham,
+      soLuongDaBan: Number(lot.soLuongDaBan) || 0,
+      soLuongTot: Number(lot.soLuongDaBan) || 0,
+      soLuongLoi: 0,
+    }))
+  } catch (err) {
+    notify(String(err), 'error')
+    closeReceive()
+  } finally {
+    receiveLoading.value = false
+  }
+}
+
+function closeReceive() {
+  showReceiveModal.value = false
+  receiveTarget.value = null
+  receiveLots.value = []
+  receiveRows.value = []
+}
+
+/** Khi đổi SL lỗi → tự trừ SL tốt (tổng luôn = đã bán). */
+function onLoiChange(row) {
+  const max = Number(row.soLuongDaBan) || 0
+  let loi = Math.max(0, Number(row.soLuongLoi) || 0)
+  if (loi > max) loi = max
+  row.soLuongLoi = loi
+  row.soLuongTot = max - loi
+}
+
+/** Khi đổi SL tốt → tự trừ SL lỗi. */
+function onTotChange(row) {
+  const max = Number(row.soLuongDaBan) || 0
+  let tot = Math.max(0, Number(row.soLuongTot) || 0)
+  if (tot > max) tot = max
+  row.soLuongTot = tot
+  row.soLuongLoi = max - tot
+}
+
+function formatDateShort(value) {
+  if (!value) return '—'
+  return new Date(value).toLocaleDateString('vi-VN')
+}
+
+function buildChiTietLoPayload() {
+  const chiTietLo = []
+  for (const row of receiveRows.value) {
+    const tot = Number(row.soLuongTot) || 0
+    const loi = Number(row.soLuongLoi) || 0
+    if (tot > 0) {
+      chiTietLo.push({ idLoHang: row.idLoHang, soLuong: tot, loaiHang: 'TOT' })
+    }
+    if (loi > 0) {
+      chiTietLo.push({ idLoHang: row.idLoHang, soLuong: loi, loaiHang: 'LOI' })
+    }
+  }
+  return chiTietLo
+}
+
+async function confirmReceive() {
+  const item = receiveTarget.value
+  if (!item) return
+
+  const hasLots = receiveLots.value.length > 0
+  let chiTietLo = []
+  if (hasLots) {
+    for (const row of receiveRows.value) {
+      const max = Number(row.soLuongDaBan) || 0
+      const tot = Number(row.soLuongTot) || 0
+      const loi = Number(row.soLuongLoi) || 0
+      if (tot < 0 || loi < 0 || tot + loi !== max) {
+        notify(
+          `Lô ${row.soLo}: SL tốt (${tot}) + SL lỗi (${loi}) phải = ${max}.`,
+          'error',
+        )
+        return
+      }
+    }
+    chiTietLo = buildChiTietLoPayload()
+    if (!chiTietLo.length) {
+      notify('Vui lòng phân bổ số lượng trả về từng lô.', 'error')
+      return
+    }
+  }
+
+  const loiCount = chiTietLo
+    .filter((r) => r.loaiHang === 'LOI')
+    .reduce((s, r) => s + r.soLuong, 0)
+  const totCount = chiTietLo
+    .filter((r) => r.loaiHang === 'TOT')
+    .reduce((s, r) => s + r.soLuong, 0)
+
   const ok = await confirm({
     title: 'Xác nhận đã nhận hàng',
-    message: `Xác nhận đã nhận hàng hoàn của đơn ${item.maHoaDon}? Hệ thống sẽ hoàn kho và tạo yêu cầu hoàn tiền.`,
+    message: hasLots
+      ? `Đơn ${item.maHoaDon}: ${totCount} tốt (hoàn tồn bán) + ${loiCount} lỗi (cột SL lỗi lô tăng). Tiếp tục?`
+      : `Xác nhận đã nhận hàng hoàn của đơn ${item.maHoaDon}?`,
     confirmText: 'Đã nhận hàng',
   })
   if (!ok) return
 
   actionLoading.value = item.id
   try {
-    await daNhanHangTraHang(item.id, staffPayload())
-    notify(`Đã xác nhận nhận hàng đơn ${item.maHoaDon}.`)
+    await daNhanHangTraHang(item.id, staffPayload({ chiTietLo }))
+    notify(
+      hasLots
+        ? `Đã nhận hàng đơn ${item.maHoaDon}: ${totCount} tốt → hoàn lô, ${loiCount} lỗi → SL lỗi +${loiCount}.`
+        : `Đã xác nhận nhận hàng đơn ${item.maHoaDon}. Vào trang Hoàn tiền để quyết định hoàn tiền.`,
+    )
+    closeReceive()
+    await loadList()
+  } catch (err) {
+    notify(String(err), 'error')
+  } finally {
+    actionLoading.value = null
+  }
+}
+
+async function handleDongBoGhn(item) {
+  actionLoading.value = item.id
+  try {
+    const res = await dongBoVanDonTra(item.id, staffPayload())
+    const updated = res.data
+    const ghn = (updated?.ghnTrangThaiTra || '').toLowerCase()
+    if (ghn === 'delivered' || ghn === 'returned') {
+      notify(
+        `Vận đơn hoàn đơn ${item.maHoaDon} đã về cửa hàng — nhấn "Đã nhận hàng" để phân loại lô TỐT/LỖI.`,
+      )
+    } else {
+      notify(
+        `Vận đơn hoàn đơn ${item.maHoaDon}: ${updated?.ghnTrangThaiTraLabel || 'chưa có cập nhật mới'}.`,
+      )
+    }
     await loadList()
   } catch (err) {
     notify(String(err), 'error')
@@ -322,7 +465,15 @@ onMounted(() => {
                     {{ item.trangThaiLabel || traHangStatusLabel(item.trangThai) }}
                   </span>
                 </td>
-                <td class="soleil-col-text text-sm">{{ item.maVanDonTra || '—' }}</td>
+                <td class="soleil-col-text text-sm">
+                  <template v-if="item.maVanDonTra">
+                    {{ item.maVanDonTra }}
+                    <span v-if="item.ghnTrangThaiTraLabel" class="ghn-status">
+                      {{ item.ghnTrangThaiTraLabel }}
+                    </span>
+                  </template>
+                  <template v-else>—</template>
+                </td>
                 <td class="soleil-col-text text-sm text-[var(--admin-muted)]">
                   {{ formatDateTime(item.ngayTao) }}
                 </td>
@@ -355,13 +506,31 @@ onMounted(() => {
                       </button>
                     </template>
                     <button
-                      v-if="item.trangThai === 'DANG_HOAN_HANG' || item.trangThai === 'DA_DUYET'"
+                      v-if="item.maVanDonTra && item.trangThai === 'DANG_HOAN_HANG'"
+                      type="button"
+                      class="act-btn act-btn--info"
+                      :disabled="actionLoading === item.id"
+                      @click="handleDongBoGhn(item)"
+                    >
+                      Đồng bộ GHN
+                    </button>
+                    <button
+                      v-if="item.trangThai === 'DANG_HOAN_HANG' && item.maVanDonTra"
                       type="button"
                       class="act-btn act-btn--ok"
                       :disabled="actionLoading === item.id"
                       @click="handleDaNhanHang(item)"
                     >
                       Đã nhận hàng
+                    </button>
+                    <button
+                      v-if="item.trangThai === 'DA_NHAN_HANG'"
+                      type="button"
+                      class="act-btn act-btn--info"
+                      title="Quyết định hoàn tiền hay từ chối"
+                      @click="router.push('/admin/hoan-tien')"
+                    >
+                      Xử lý hoàn tiền
                     </button>
                   </div>
                 </td>
@@ -372,6 +541,9 @@ onMounted(() => {
                     <div><strong>Mô tả:</strong> {{ item.moTa || '—' }}</div>
                     <div><strong>Địa chỉ trả:</strong> {{ item.diaChiTra || '—' }}</div>
                     <div><strong>Phương thức TT:</strong> {{ item.phuongThucThanhToan || '—' }}</div>
+                    <div><strong>Ca lấy hàng:</strong> {{ item.pickShiftLabel || '—' }}</div>
+                    <div><strong>Trạng thái vận đơn hoàn:</strong> {{ item.ghnTrangThaiTraLabel || '—' }}</div>
+                    <div><strong>Nhận lại hàng lúc:</strong> {{ formatDateTime(item.ngayNhanHang) }}</div>
                     <div><strong>Ngân hàng:</strong> {{ item.tenNganHang || '—' }}</div>
                     <div><strong>STK:</strong> {{ item.soTaiKhoan || '—' }}</div>
                     <div><strong>Chủ TK:</strong> {{ item.chuTaiKhoan || '—' }}</div>
@@ -434,6 +606,84 @@ onMounted(() => {
             @click="confirmReject"
           >
             Xác nhận từ chối
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showReceiveModal" class="modal-overlay" @click.self="closeReceive">
+      <div class="modal-card receive-modal">
+        <h3>Nhận hàng trả — phân loại lô</h3>
+        <p class="modal-sub">
+          Đơn {{ receiveTarget?.maHoaDon }} — với mỗi lô: nhập bao nhiêu còn tốt / bao nhiêu lỗi.
+          Lỗi sẽ cộng vào cột <strong>SL lỗi</strong> của lô (không bán lại).
+        </p>
+
+        <div v-if="receiveLoading" class="text-sm text-[var(--admin-muted)] py-6 text-center">
+          Đang tải danh sách lô...
+        </div>
+        <template v-else-if="receiveLots.length === 0">
+          <p class="text-sm text-[var(--admin-muted)] mb-4">
+            Đơn cũ chưa ghi nhận phân bổ lô — hệ thống sẽ hoàn tồn mặc định (toàn bộ hàng tốt).
+          </p>
+        </template>
+        <template v-else>
+          <div class="overflow-x-auto mt-1">
+            <table class="soleil-table admin-table--soleil w-full text-sm">
+              <thead>
+                <tr>
+                  <th>Số lô</th>
+                  <th>SKU</th>
+                  <th>HSD</th>
+                  <th>Đã bán</th>
+                  <th>SL tốt</th>
+                  <th>SL lỗi</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in receiveRows" :key="row.idLoHang">
+                  <td class="font-semibold text-[var(--bronze,#a67c3d)]">{{ row.soLo }}</td>
+                  <td class="text-xs">{{ row.sku || '—' }}</td>
+                  <td>{{ formatDateShort(row.hanSuDung) }}</td>
+                  <td>{{ row.soLuongDaBan }}</td>
+                  <td style="width: 96px">
+                    <input
+                      v-model.number="row.soLuongTot"
+                      type="number"
+                      min="0"
+                      :max="row.soLuongDaBan"
+                      class="soleil-toolbar__input"
+                      @input="onTotChange(row)"
+                    />
+                  </td>
+                  <td style="width: 96px">
+                    <input
+                      v-model.number="row.soLuongLoi"
+                      type="number"
+                      min="0"
+                      :max="row.soLuongDaBan"
+                      class="soleil-toolbar__input"
+                      @input="onLoiChange(row)"
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-xs text-[var(--admin-muted)] mt-3 mb-0">
+            Ví dụ: đã bán 3, lỗi 1 → để SL tốt = 2, SL lỗi = 1 → cột SL lỗi của lô +1.
+          </p>
+        </template>
+
+        <div class="modal-actions">
+          <button type="button" class="soleil-btn-outline" @click="closeReceive">Hủy</button>
+          <button
+            type="button"
+            class="act-btn act-btn--ok"
+            :disabled="actionLoading === receiveTarget?.id || receiveLoading"
+            @click="confirmReceive"
+          >
+            Xác nhận đã nhận hàng
           </button>
         </div>
       </div>
@@ -545,6 +795,12 @@ onMounted(() => {
 .act-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .act-btn--ok { background: rgba(72, 140, 82, 0.14); color: #3d7a4a; }
 .act-btn--danger { background: rgba(180, 72, 72, 0.12); color: #a83a3a; }
+.act-btn--info { background: rgba(72, 120, 180, 0.12); color: #3a6ea8; }
+.ghn-status {
+  display: block;
+  font-size: 11px;
+  color: rgba(30, 21, 16, 0.5);
+}
 .link-btn {
   background: none;
   border: none;
@@ -658,6 +914,29 @@ onMounted(() => {
   width: 420px;
   max-width: 100%;
   box-shadow: 0 18px 50px rgba(15, 23, 42, 0.25);
+}
+.receive-modal {
+  width: min(720px, 96vw);
+}
+.receive-lot-hint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.receive-lot-chip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(30, 21, 16, 0.04);
+  font-size: 12px;
+  color: rgba(30, 21, 16, 0.7);
+}
+.receive-lot-chip strong {
+  color: var(--bronze, #a67c3d);
 }
 .modal-card h3 { margin: 0 0 4px; font-size: 16px; }
 .modal-sub { margin: 0 0 14px; font-size: 13px; color: #64748b; }

@@ -134,12 +134,19 @@ export function useReturnRequest({ visible, order, emit, requireBank = false }) 
     if (imageFiles.value.length < MIN_IMAGES) {
       return `Vui lòng tải lên tối thiểu ${MIN_IMAGES} hình ảnh sản phẩm.`
     }
+    if (imageFiles.value.length > MAX_IMAGES) {
+      return `Chỉ được tải tối đa ${MAX_IMAGES} ảnh.`
+    }
     if (requireBank) {
       if (!tenNganHang.value.trim()) {
         return 'Vui lòng nhập tên ngân hàng.'
       }
-      if (!soTaiKhoan.value.trim()) {
+      const stk = soTaiKhoan.value.trim().replace(/\s+/g, '')
+      if (!stk) {
         return 'Vui lòng nhập số tài khoản nhận hoàn tiền.'
+      }
+      if (!/^\d{6,20}$/.test(stk)) {
+        return 'Số tài khoản phải gồm 6–20 chữ số.'
       }
       if (!chuTaiKhoan.value.trim()) {
         return 'Vui lòng nhập tên chủ tài khoản.'
@@ -169,7 +176,7 @@ export function useReturnRequest({ visible, order, emit, requireBank = false }) 
         moTa: moTa.value.trim() || null,
         diaChiTra: currentOrder.diaChiGiao || null,
         tenNganHang: requireBank ? tenNganHang.value.trim() : null,
-        soTaiKhoan: requireBank ? soTaiKhoan.value.trim() : null,
+        soTaiKhoan: requireBank ? soTaiKhoan.value.trim().replace(/\s+/g, '') : null,
         chuTaiKhoan: requireBank ? chuTaiKhoan.value.trim() : null,
       }
 

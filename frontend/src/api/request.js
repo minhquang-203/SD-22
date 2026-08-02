@@ -35,9 +35,18 @@ request.interceptors.request.use((config) => {
   }
 
   const url = String(config.url || '')
+  const isHoTro = url.includes('/ho-tro')
   const isCustomerApi = isCustomerApiUrl(url)
 
-  if (isCustomerApi) {
+  if (isHoTro) {
+    // Admin inbox ưu tiên token nhân viên; storefront dùng token khách
+    const adminToken = getAdminToken()
+    if (adminToken) {
+      attachBearer(config, adminToken)
+    } else {
+      attachBearer(config, getCustomerToken())
+    }
+  } else if (isCustomerApi) {
     attachBearer(config, getCustomerToken())
   } else {
     const adminToken = getAdminToken()

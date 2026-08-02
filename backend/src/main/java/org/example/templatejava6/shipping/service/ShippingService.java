@@ -9,6 +9,7 @@ import org.example.templatejava6.shipping.model.request.ReturnShippingOrderReque
 import org.example.templatejava6.shipping.model.request.ShippingFeeRequest;
 import org.example.templatejava6.shipping.model.response.CreateShippingOrderResponse;
 import org.example.templatejava6.shipping.model.response.GhnDistrictResponse;
+import org.example.templatejava6.shipping.model.response.GhnPickShiftResponse;
 import org.example.templatejava6.shipping.model.response.GhnProvinceResponse;
 import org.example.templatejava6.shipping.model.response.GhnWardResponse;
 import org.example.templatejava6.shipping.model.response.ShippingFeeResponse;
@@ -101,6 +102,32 @@ public class ShippingService {
             }
         }
         result.sort(Comparator.comparing(GhnWardResponse::getWardName, VI_COLLATOR));
+        return result;
+    }
+
+    /**
+     * Danh sach ca lay hang GHN con hieu luc (API /v2/shift/date).
+     * Khach chon mot ca de GHN den lay hang tra, ma ca duoc truyen vao {@code pick_shift} khi tao van don.
+     */
+    public List<GhnPickShiftResponse> getPickShifts() {
+        requireConfigured();
+        JsonNode data = dataOf(call(() -> ghnClient.get("/v2/shift/date"), "ca lấy hàng"));
+        List<GhnPickShiftResponse> result = new ArrayList<>();
+        if (data.isArray()) {
+            for (JsonNode node : data) {
+                Integer id = intOrNull(node, "id");
+                if (id == null) {
+                    continue;
+                }
+                result.add(new GhnPickShiftResponse(
+                        id,
+                        text(node, "title"),
+                        longOrNull(node, "from_time"),
+                        longOrNull(node, "to_time")));
+            }
+        }
+        result.sort(Comparator.comparing(
+                GhnPickShiftResponse::getFromTime, Comparator.nullsLast(Comparator.naturalOrder())));
         return result;
     }
 
@@ -331,6 +358,9 @@ public class ShippingService {
         if (request.getInsuranceValue() != null && request.getInsuranceValue() > 0) {
             body.put("insurance_value", request.getInsuranceValue());
         }
+        if (request.getPickShiftId() != null) {
+            body.put("pick_shift", List.of(request.getPickShiftId()));
+        }
         body.put("items", buildReturnItems(request));
 
         try {
@@ -428,6 +458,11 @@ public class ShippingService {
     private static Integer intOrNull(JsonNode node, String field) {
         JsonNode value = node.path(field);
         return value.isMissingNode() || value.isNull() ? null : value.asInt();
+    }
+
+    private static Long longOrNull(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        return value.isMissingNode() || value.isNull() ? null : value.asLong();
     }
 
     @FunctionalInterface

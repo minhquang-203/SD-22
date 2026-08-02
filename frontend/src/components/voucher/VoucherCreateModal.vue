@@ -188,17 +188,21 @@
             <p v-if="errors.giaTriDonToiThieu" class="voucher-field-error">{{ errors.giaTriDonToiThieu }}</p>
           </div>
 
-          <!-- GIẢM TỐI ĐA (chỉ áp dụng khi giảm theo %) -->
+          <!-- GIẢM TỐI ĐA (áp dụng khi giảm theo % hoặc miễn ship) -->
           <div v-if="showGiamToiDa" class="col-span-6">
             <label class="text-[11px] uppercase text-[rgba(30,21,16,0.5)] block mb-[6px]">
-              Giảm tối đa
+              {{ giamToiDaLabel }}
             </label>
             <input
               v-model.number="form.giamToiDa"
               type="number"
               min="1"
               :class="inputClass('giamToiDa')"
-              placeholder="Không giới hạn nếu để trống"
+              :placeholder="
+                form.loai === 'FREE_SHIP'
+                  ? 'Miễn toàn bộ phí ship nếu để trống'
+                  : 'Không giới hạn nếu để trống'
+              "
               @input="clearError('giamToiDa')"
             />
             <p v-if="errors.giamToiDa" class="voucher-field-error">{{ errors.giamToiDa }}</p>
@@ -233,7 +237,7 @@ const props = defineProps({
 const emit = defineEmits(["update:modelValue", "create", "update"]);
 
 const isEdit = computed(() => !!props.voucher);
-const showGiamToiDa = computed(() => form.loai === "PHAN_TRAM");
+const showGiamToiDa = computed(() => form.loai !== "TIEN_MAT");
 const showGiaTri = computed(() => form.loai !== "FREE_SHIP");
 
 const giaTriLabel = computed(() => {
@@ -241,6 +245,10 @@ const giaTriLabel = computed(() => {
   if (form.loai === "TIEN_MAT") return "Số tiền giảm";
   return "Giá trị";
 });
+
+const giamToiDaLabel = computed(() =>
+  form.loai === "FREE_SHIP" ? "Miễn ship tối đa" : "Giảm tối đa",
+);
 
 const form = reactive({
   ma: "",
@@ -287,8 +295,8 @@ function setType(type) {
   form.loai = type;
 
   if (type === "FREE_SHIP") {
+    // FREE_SHIP không dùng "giá trị giảm", nhưng vẫn có "miễn ship tối đa" (giamToiDa).
     form.giaTri = null;
-    form.giamToiDa = null;
   } else if (type === "TIEN_MAT") {
     form.giamToiDa = null;
   }
@@ -405,7 +413,8 @@ function buildPayload() {
       ? null
       : Number(form.giaTriDonToiThieu),
     giamToiDa:
-      form.loai === "PHAN_TRAM" && !isEmptyNumber(form.giamToiDa)
+      (form.loai === "PHAN_TRAM" || form.loai === "FREE_SHIP") &&
+      !isEmptyNumber(form.giamToiDa)
         ? Number(form.giamToiDa)
         : null,
     soLuong: Number(form.soLuong),

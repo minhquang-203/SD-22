@@ -15,6 +15,14 @@ export const timKhachTheoSdt = (sdt) =>
 export const taoKhachNhanh = (payload) =>
   request.post('/khach-hang/tao-nhanh', payload)
 
+/** Một dòng trong thanh toán kết hợp POS (Tiền mặt + Chuyển khoản). */
+export const buildThanhToanKetHopItem = (item) => ({
+  idPhuongThucThanhToan: item.idPhuongThucThanhToan,
+  soTien: item.soTien,
+  soTienKhachDua: item.soTienKhachDua ?? null,
+  maGiaoDich: item.maGiaoDich ?? null,
+})
+
 export const taoDonTaiQuay = (payload) =>
   request.post('/ban-hang/tai-quay', payload)
 
@@ -26,6 +34,10 @@ export const kiemTraThanhToanPos = (idHoaDon) =>
 
 export const huyThanhToanPos = (idHoaDon) =>
   request.post(`/ban-hang/tai-quay/${idHoaDon}/huy-thanh-toan`)
+
+/** Hoàn tất thủ công khi chưa có IPN VNPAY */
+export const hoanTatThanhToanPos = (idHoaDon) =>
+  request.post(`/ban-hang/tai-quay/${idHoaDon}/hoan-tat-thanh-toan`)
 
 export const giuDon = (payload) => request.post('/ban-hang/cho', payload)
 

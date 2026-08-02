@@ -54,6 +54,7 @@ public class LoHangService {
         lo.setHanSuDung(request.getHanSuDung());
         lo.setSoLuongNhap(request.getSoLuongNhap());
         lo.setSoLuongCon(request.getSoLuongNhap());
+        lo.setSoLuongLoi(0);
         lo.setGhiChu(request.getGhiChu());
         lo.setTrangThai(true);
         lo = loHangRepository.save(lo);
@@ -175,6 +176,47 @@ public class LoHangService {
         }
         syncTonKho(idChiTietSanPham);
         return phanBo;
+    }
+
+    /**
+     * Hoàn tồn về đúng một lô (hàng còn tốt khi trả hàng).
+     */
+    @Transactional
+    public void hoanTonVaoLo(Integer idLoHang, int soLuong) {
+        if (idLoHang == null || soLuong <= 0) {
+            throw new ApiException("Số lượng hoàn về lô không hợp lệ.", "VALIDATION_ERROR");
+        }
+        LoHang lot = loHangRepository.findByIdForUpdate(idLoHang)
+                .orElseThrow(() -> new ApiException("Không tìm thấy lô hàng.", "LOT_NOT_FOUND"));
+        int current = lot.getSoLuongCon() != null ? lot.getSoLuongCon() : 0;
+        lot.setSoLuongCon(current + soLuong);
+        loHangRepository.save(lot);
+        Integer idCts = lot.getChiTietSanPham() != null ? lot.getChiTietSanPham().getId() : null;
+        if (idCts != null) {
+            syncTonKho(idCts);
+        }
+    }
+
+    /**
+     * Ghi nhận hàng lỗi/hỏng khi trả — tăng soLuongLoi, KHÔNG vào tồn bán được.
+     */
+    @Transactional
+    public void ghiNhanHangLoi(Integer idLoHang, int soLuong) {
+        if (idLoHang == null || soLuong <= 0) {
+            throw new ApiException("Số lượng hàng lỗi không hợp lệ.", "VALIDATION_ERROR");
+        }
+        LoHang lot = loHangRepository.findByIdForUpdate(idLoHang)
+                .orElseThrow(() -> new ApiException("Không tìm thấy lô hàng.", "LOT_NOT_FOUND"));
+        int current = lot.getSoLuongLoi() != null ? lot.getSoLuongLoi() : 0;
+        lot.setSoLuongLoi(current + soLuong);
+        loHangRepository.save(lot);
+    }
+
+    /** Tham chiếu lô đã tồn tại (dùng gắn FK chi tiết trả hàng). */
+    @Transactional(readOnly = true)
+    public LoHang getLoHangRef(Integer idLoHang) {
+        return loHangRepository.findById(idLoHang)
+                .orElseThrow(() -> new ApiException("Không tìm thấy lô hàng.", "LOT_NOT_FOUND"));
     }
 
     /**

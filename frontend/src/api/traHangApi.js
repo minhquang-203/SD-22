@@ -21,9 +21,14 @@ export function fetchTraHangCuaToi(idKhachHang) {
   return request.get('/online/tra-hang', { params: { idKhachHang } })
 }
 
-/** Khách: tạo vận đơn GHN hoàn hàng */
-export function taoVanDonTra(id, idKhachHang) {
-  return request.post(`/online/tra-hang/${id}/tao-van-don`, null, {
+/** Khách: danh sách ca lấy hàng GHN để chọn thời điểm shipper đến lấy hàng trả */
+export function fetchCaLayHang() {
+  return request.get('/online/tra-hang/ca-lay-hang')
+}
+
+/** Khách: tạo vận đơn GHN hoàn hàng kèm ca lấy hàng đã chọn */
+export function taoVanDonTra(id, idKhachHang, pickShiftId = null) {
+  return request.post(`/online/tra-hang/${id}/tao-van-don`, { pickShiftId }, {
     params: { idKhachHang },
   })
 }
@@ -45,7 +50,17 @@ export function tuChoiTraHang(id, payload = {}) {
   return request.post(`/tra-hang/${id}/tu-choi`, payload)
 }
 
-/** Admin: xác nhận đã nhận hàng hoàn */
+/** Admin: danh sách lô đơn đã lấy (để chọn khi nhận hàng trả) */
+export function fetchLoHangTraHang(id) {
+  return request.get(`/tra-hang/${id}/lo-hang`)
+}
+
+/** Admin: xác nhận đã nhận hàng hoàn (kèm phân bổ lô TOT/LOI) */
 export function daNhanHangTraHang(id, payload = {}) {
   return request.post(`/tra-hang/${id}/da-nhan-hang`, payload)
+}
+
+/** Admin: đồng bộ trạng thái vận đơn hoàn từ GHN */
+export function dongBoVanDonTra(id, payload = {}) {
+  return request.post(`/tra-hang/${id}/dong-bo-ghn`, payload)
 }

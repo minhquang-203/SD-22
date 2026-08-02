@@ -69,6 +69,12 @@ const router = createRouter({
           meta: { title: 'Khuyến mãi — SUNOVA', khuyenMai: true },
         },
         {
+          path: 'san-pham/goi-y',
+          name: 'SanPhamGoiY',
+          component: () => import('@/views/storefront/ProductList.vue'),
+          meta: { title: 'Sản phẩm gợi ý — SUNOVA', goiY: true },
+        },
+        {
           path: 'san-pham/:id',
           name: 'ProductDetail',
           component: () => import('@/views/storefront/ProductDetail.vue'),
@@ -254,6 +260,12 @@ const router = createRouter({
           meta: { title: 'Routine chống nắng', breadcrumb: 'Gợi ý & Cá nhân hóa / Routine chống nắng', role: ADMIN_ROLES.QUAN_LY },
         },
         {
+          path: 'banners',
+          name: 'AdminBanners',
+          component: () => import('@/views/admin/content/BannerManager.vue'),
+          meta: { title: 'Banner trang chủ', breadcrumb: 'Gợi ý & Cá nhân hóa / Banner trang chủ', role: ADMIN_ROLES.QUAN_LY },
+        },
+        {
           path: 'uv',
           name: 'AdminUv',
           component: () => import('@/views/admin/uv/UVConfig.vue'),
@@ -276,18 +288,6 @@ const router = createRouter({
           name: 'AdminSupport',
           component: () => import('@/views/admin/support/SupportPage.vue'),
           meta: { title: 'Hỗ trợ khách hàng', breadcrumb: 'Hỗ trợ khách hàng' },
-        },
-        {
-          path: 'reports',
-          name: 'AdminReports',
-          component: () => import('@/views/admin/report/ReportPage.vue'),
-          meta: { title: 'Báo cáo', breadcrumb: 'Báo cáo', role: ADMIN_ROLES.QUAN_LY },
-        },
-        {
-          path: 'config',
-          name: 'AdminConfig',
-          component: () => import('@/views/admin/config/SystemConfig.vue'),
-          meta: { title: 'Cấu hình hệ thống', breadcrumb: 'Cấu hình hệ thống', role: ADMIN_ROLES.QUAN_LY },
         },
       ],
     },
