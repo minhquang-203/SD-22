@@ -139,10 +139,24 @@ public class ReturnRequestService {
                 idHoaDon, List.of(TrangThaiTraHang.TU_CHOI))) {
             throw new ApiException("Đơn hàng đã có yêu cầu trả hàng đang xử lý.", "RETURN_ALREADY_EXISTS");
         }
-        if (!laVnpay(hoaDon) && (request.getSoTaiKhoan() == null || request.getSoTaiKhoan().isBlank())) {
-            throw new ApiException(
-                    "Vui lòng cung cấp thông tin tài khoản ngân hàng để nhận tiền hoàn.",
-                    "BANK_INFO_REQUIRED");
+        if (!laVnpay(hoaDon)) {
+            if (!coGiaTri(request.getTenNganHang())) {
+                throw new ApiException("Vui lòng nhập tên ngân hàng.", "BANK_NAME_REQUIRED");
+            }
+            String soTk = coGiaTri(request.getSoTaiKhoan())
+                    ? request.getSoTaiKhoan().trim().replaceAll("\\s+", "") : "";
+            if (soTk.isEmpty()) {
+                throw new ApiException(
+                        "Vui lòng cung cấp thông tin tài khoản ngân hàng để nhận tiền hoàn.",
+                        "BANK_INFO_REQUIRED");
+            }
+            if (!soTk.matches("\\d{6,20}")) {
+                throw new ApiException("Số tài khoản phải gồm 6–20 chữ số.", "BANK_ACCOUNT_INVALID");
+            }
+            if (!coGiaTri(request.getChuTaiKhoan())) {
+                throw new ApiException("Vui lòng nhập tên chủ tài khoản.", "BANK_OWNER_REQUIRED");
+            }
+            request.setSoTaiKhoan(soTk);
         }
 
         List<MultipartFile> validFiles = filterValidFiles(files);
@@ -163,9 +177,10 @@ public class ReturnRequestService {
                 ? request.getGhnWardCode().trim() : hoaDon.getGhnWardCode());
         yc.setDiaChiTra(coGiaTri(request.getDiaChiTra())
                 ? request.getDiaChiTra().trim() : hoaDon.getDiaChiGiao());
-        yc.setTenNganHang(request.getTenNganHang());
-        yc.setSoTaiKhoan(request.getSoTaiKhoan());
-        yc.setChuTaiKhoan(request.getChuTaiKhoan());
+        yc.setTenNganHang(coGiaTri(request.getTenNganHang()) ? request.getTenNganHang().trim() : null);
+        yc.setSoTaiKhoan(coGiaTri(request.getSoTaiKhoan())
+                ? request.getSoTaiKhoan().trim().replaceAll("\\s+", "") : null);
+        yc.setChuTaiKhoan(coGiaTri(request.getChuTaiKhoan()) ? request.getChuTaiKhoan().trim() : null);
         yc.setNgayTao(LocalDateTime.now());
         yc.setNgayCapNhat(LocalDateTime.now());
         YeuCauTraHang saved = yeuCauTraHangRepository.save(yc);
