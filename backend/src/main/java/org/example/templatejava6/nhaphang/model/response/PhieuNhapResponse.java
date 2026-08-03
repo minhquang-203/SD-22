@@ -75,6 +75,7 @@ public class PhieuNhapResponse {
         private LocalDate hanSuDung;
         private String soLo;
         private BigDecimal thanhTien;
+        private BigDecimal giaBan;
         private Integer idLoHang;
 
         public DongResponse(ChiTietPhieuNhap d) {
@@ -83,6 +84,7 @@ public class PhieuNhapResponse {
             if (ct != null) {
                 this.idChiTietSanPham = ct.getId();
                 this.sku = ct.getSku();
+                this.giaBan = ct.getGiaBan();
                 if (ct.getSanPham() != null) {
                     this.tenSanPham = ct.getSanPham().getTen();
                 }

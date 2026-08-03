@@ -1933,6 +1933,62 @@ h2,
   border-bottom: 1px solid var(--admin-border);
 }
 
+.pos-customer-bar--stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.pos-customer-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pos-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--admin-muted);
+}
+
+.pos-quick-customer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 165;
+  background: rgba(30, 21, 16, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.pos-quick-customer-modal {
+  position: relative;
+  z-index: 1;
+  width: min(400px, 100%);
+  background: #fff;
+  border: 1px solid var(--admin-border);
+  border-radius: 14px;
+  padding: 16px 18px;
+  box-shadow: 0 16px 48px rgba(36, 26, 18, 0.22);
+  pointer-events: auto;
+}
+
+.pos-quick-customer-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.pos-quick-customer-modal__head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
 .pos-customer-info {
   flex: 1;
   min-width: 160px;

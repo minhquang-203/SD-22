@@ -8,6 +8,7 @@ import { useAdminBadges } from '@/composables/useAdminBadges'
 import { getRoleLabel } from '@/utils/adminAuth'
 import { formatCurrency } from '@/utils/format'
 import { orderStatusLabel } from '@/utils/orderStatus'
+import { confirm } from '@/composables/useConfirm'
 
 const props = defineProps({
   title: { type: String, default: 'SUNOVA Admin' },
@@ -177,6 +178,13 @@ onBeforeUnmount(() => {
 })
 
 async function handleLogout() {
+  const ok = await confirm({
+    title: 'Đăng xuất',
+    message: 'Bạn có chắc muốn đăng xuất khỏi trang quản trị?',
+    confirmText: 'Đăng xuất',
+    danger: true,
+  })
+  if (!ok) return
   dangXuat()
   await router.push('/admin/dang-nhap')
 }

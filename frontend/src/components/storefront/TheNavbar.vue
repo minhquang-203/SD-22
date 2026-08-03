@@ -6,6 +6,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useAuthModal } from '@/composables/useAuthModal'
 import { useCart } from '@/composables/useCart'
 import { fetchDanhMucList } from '@/api/storefrontApi'
+import { confirm } from '@/composables/useConfirm'
 
 const router = useRouter()
 const route = useRoute()
@@ -116,7 +117,14 @@ function isLinkActive(link) {
   return path === link.to
 }
 
-function handleLogout() {
+async function handleLogout() {
+  const ok = await confirm({
+    title: 'Đăng xuất',
+    message: 'Bạn có chắc muốn đăng xuất?',
+    confirmText: 'Đăng xuất',
+    danger: true,
+  })
+  if (!ok) return
   dangXuat()
   userOpen.value = false
   router.push('/')

@@ -7,6 +7,7 @@ import {
   huyPhieuNhap,
 } from '@/api/nhapHangApi'
 import { toast } from '@/composables/useToast'
+import { confirm } from '@/composables/useConfirm'
 import { formatApiError } from '@/utils/apiError'
 
 const router = useRouter()
@@ -81,7 +82,13 @@ function openDetail(row) {
 
 async function onHuy(row) {
   if (row.trangThai !== 'PHIEU_TAM') return
-  if (!confirm(`Hủy phiếu ${row.maPhieuNhap}?`)) return
+  const ok = await confirm({
+    title: 'Hủy phiếu nhập',
+    message: `Hủy phiếu ${row.maPhieuNhap}?`,
+    confirmText: 'Hủy phiếu',
+    danger: true,
+  })
+  if (!ok) return
   try {
     await huyPhieuNhap(row.id)
     toast('Đã hủy phiếu', 'success')

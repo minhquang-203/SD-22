@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,7 +34,11 @@ public class KhachHangService {
     @Autowired
     private VaiTroRepository vaiTroRepository;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     private static final String MA_VAI_TRO_KHACH = "KHACH_HANG";
+    /** Mật khẩu mặc định khi tạo khách nhanh tại POS — lưu BCrypt (cùng cơ chế đăng ký). */
     private static final String MAT_KHAU_MAC_DINH = "pos@sunova";
 
     @Transactional(readOnly = true)
@@ -104,8 +109,11 @@ public class KhachHangService {
         kh.setMaKhachHang(sinhMaKhachHang());
         kh.setHoTen(hoTen);
         kh.setSoDienThoai(sdt);
-        kh.setEmail(sdt + "@pos.sunova.local");
-        kh.setMatKhau(MAT_KHAU_MAC_DINH);
+        String email = req.getEmail() != null && !req.getEmail().isBlank()
+                ? req.getEmail().trim()
+                : sdt + "@pos.sunova.local";
+        kh.setEmail(email);
+        kh.setMatKhau(passwordEncoder.encode(MAT_KHAU_MAC_DINH));
         kh.setGioiTinh("Khac");
         kh.setDiemTichLuy(0);
         kh.setTrangThai(true);

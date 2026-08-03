@@ -244,7 +244,14 @@ watch(selectedId, () => {
             >
               <div class="support-msg__bubble">
                 <p>{{ m.noiDung }}</p>
-                <span>{{ formatTime(m.thoiGian) }} · {{ m.nguoiGui === 'NHAN_VIEN' ? 'NV' : 'KH' }}</span>
+                <span>
+                  {{ formatTime(m.thoiGian) }} ·
+                  {{
+                    m.nguoiGui === 'NHAN_VIEN'
+                      ? (m.tenNguoiGui ? `NV ${m.tenNguoiGui}` : 'NV')
+                      : 'KH'
+                  }}
+                </span>
               </div>
             </div>
           </div>

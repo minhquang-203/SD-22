@@ -17,7 +17,7 @@ public class HoTroRealtimeService {
         this.eventPublisher = eventPublisher;
     }
 
-    public void publishTinNhanMoi(PhienHoTro phien, TinNhanHoTro tin) {
+    public void publishTinNhanMoi(PhienHoTro phien, TinNhanHoTro tin, TinNhanHoTroResponse tinRes) {
         if (phien == null || phien.getId() == null || tin == null) {
             return;
         }
@@ -33,13 +33,18 @@ public class HoTroRealtimeService {
         if (noiDung.length() > 80) {
             noiDung = noiDung.substring(0, 80) + "…";
         }
+        TinNhanHoTroResponse payloadTin = tinRes != null ? tinRes : TinNhanHoTroResponse.from(tin);
         HoTroRealtimeEvent payload = HoTroRealtimeEvent.builder()
                 .type(HoTroRealtimeEvent.TYPE_TIN_NHAN_MOI)
                 .idPhien(phien.getId())
                 .tenKhachHang(tenKhach)
                 .noiDungTomTat(noiDung)
-                .tinNhan(TinNhanHoTroResponse.from(tin))
+                .tinNhan(payloadTin)
                 .build();
         eventPublisher.publishEvent(new HoTroRealtimeAppEvent(this, payload));
+    }
+
+    public void publishTinNhanMoi(PhienHoTro phien, TinNhanHoTro tin) {
+        publishTinNhanMoi(phien, tin, null);
     }
 }

@@ -67,6 +67,8 @@ import java.util.concurrent.ThreadLocalRandom;
 public class BanHangService {
 
     private static final String LOAI_TAI_QUAY = "TAI_QUAY";
+    private static final String GUEST_PREFIX = "__POS_GUEST__|";
+    private static final int MAX_HELD_ORDERS = 15;
     private static final String TRANG_THAI_THANH_CONG = "THANH_CONG";
     private static final String MA_TIEN_MAT = "TIEN_MAT";
     private static final String MA_VNPAY = "VNPAY";
@@ -204,6 +206,11 @@ public class BanHangService {
             throw new ApiException("Giỏ hàng trống. Không thể giữ đơn.", "EMPTY_CART");
         }
 
+        long soDonCho = hoaDonRepository.countByTrangThaiAndLoaiDon(TrangThaiDonHang.CHO, LOAI_TAI_QUAY);
+        if (soDonCho >= MAX_HELD_ORDERS) {
+            throw new ApiException("Đã đạt tối đa 15 hóa đơn chờ", "MAX_HELD_ORDERS");
+        }
+
         Map<Integer, Integer> qtyByVariant = mergeItems(req.getItems());
         Map<Integer, VariantSaleInfo> saleMap = checkoutPricingService.loadActiveSales();
         // Giữ đơn phải kiểm tra và trừ tồn theo lô (FEFO), giống checkout.
@@ -224,7 +231,7 @@ public class BanHangService {
         hoaDon.setTienGiamGia(BigDecimal.ZERO);
         hoaDon.setPhiVanChuyen(BigDecimal.ZERO);
         hoaDon.setThanhTien(tongTien);
-        hoaDon.setGhiChu(req.getGhiChu());
+        hoaDon.setGhiChu(buildGhiChuChoDon(khachHang, req));
         hoaDon.setNgayTao(now);
         hoaDon = hoaDonRepository.save(hoaDon);
 
@@ -239,7 +246,7 @@ public class BanHangService {
                 .stream()
                 .map(hd -> {
                     int soMatHang = hoaDonChiTietRepository.findByIdHoaDon(hd).stream()
-                            .mapToInt(HoaDonChiTiet::getSoLuong)
+                            .mapToInt(line -> line.getSoLuong() != null ? line.getSoLuong() : 0)
                             .sum();
                     return new DonChoListItemResponse(hd, soMatHang);
                 })
@@ -255,10 +262,20 @@ public class BanHangService {
             res.setIdKhachHang(hd.getIdKhachHang().getId());
             res.setHoTenKhachHang(hd.getIdKhachHang().getHoTen());
             res.setSoDienThoai(hd.getIdKhachHang().getSoDienThoai());
+        } else {
+            String[] guest = parseGuestGhiChu(hd.getGhiChu());
+            if (guest != null) {
+                res.setHoTenKhachHang(guest[0]);
+                res.setSoDienThoai(guest[1]);
+            }
         }
         List<DonChoDetailResponse.DonChoLineResponse> items = new ArrayList<>();
         for (HoaDonChiTiet line : hoaDonChiTietRepository.findByIdHoaDon(hd)) {
             ChiTietSanPham cts = line.getIdChiTietSanPham();
+            if (cts == null) {
+                // Dòng thiếu biến thể — bỏ qua, không để NPE sập POS
+                continue;
+            }
             DonChoDetailResponse.DonChoLineResponse item = new DonChoDetailResponse.DonChoLineResponse();
             item.setIdChiTietSanPham(cts.getId());
             item.setSku(cts.getSku());
@@ -266,8 +283,8 @@ public class BanHangService {
             item.setDungTichMl(cts.getDungTichMl());
             item.setTenMauSac(cts.getMauSac() != null ? cts.getMauSac().getTen() : null);
             item.setDonGia(line.getDonGia());
-            item.setSoLuong(line.getSoLuong());
-            item.setSoLuongTon(cts.getSoLuongTon());
+            item.setSoLuong(line.getSoLuong() != null ? line.getSoLuong() : 0);
+            item.setSoLuongTon(cts.getSoLuongTon() != null ? cts.getSoLuongTon() : 0);
             items.add(item);
         }
         res.setItems(items);
@@ -626,6 +643,43 @@ public class BanHangService {
         return hoaDonRepository
                 .findByIdAndTrangThaiAndLoaiDon(id, TrangThaiDonHang.CHO, LOAI_TAI_QUAY)
                 .orElseThrow(() -> new ApiException("Đơn chờ không tồn tại hoặc đã được xử lý.", "NOT_FOUND"));
+    }
+
+    private String buildGhiChuChoDon(KhachHang khachHang, GiuDonChoRequest req) {
+        if (khachHang != null) {
+            return blankToNull(req.getGhiChu());
+        }
+        String ten = blankToNull(req.getTenKhachHang());
+        String sdt = blankToNull(req.getSoDienThoai());
+        if (ten == null && sdt == null) {
+            return blankToNull(req.getGhiChu());
+        }
+        String note = blankToNull(req.getGhiChu());
+        return GUEST_PREFIX
+                + (ten != null ? ten : "")
+                + "|"
+                + (sdt != null ? sdt : "")
+                + (note != null ? "|" + note : "");
+    }
+
+    /** @return [ten, sdt] hoặc null */
+    public static String[] parseGuestGhiChu(String ghiChu) {
+        if (ghiChu == null || !ghiChu.startsWith(GUEST_PREFIX)) {
+            return null;
+        }
+        String rest = ghiChu.substring(GUEST_PREFIX.length());
+        String[] parts = rest.split("\\|", 3);
+        String ten = parts.length > 0 && !parts[0].isBlank() ? parts[0].trim() : null;
+        String sdt = parts.length > 1 && !parts[1].isBlank() ? parts[1].trim() : null;
+        if (ten == null && sdt == null) {
+            return null;
+        }
+        return new String[]{ten, sdt};
+    }
+
+    private static String blankToNull(String s) {
+        if (s == null || s.isBlank()) return null;
+        return s.trim();
     }
 
     private KhachHang resolveKhachHang(Integer idKhachHang) {

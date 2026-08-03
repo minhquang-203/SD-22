@@ -11,6 +11,7 @@ import {
   fetchMyQuizResult,
 } from '@/api/khachHangApi'
 import { useAuth } from '@/composables/useAuth'
+import { confirm } from '@/composables/useConfirm'
 import CheckoutRecipientModal from '@/components/storefront/CheckoutRecipientModal.vue'
 import { getProducts } from '@/api/sanPhamApi'
 import { getRoutinesByLoaiDa } from '@/api/routineApi'
@@ -293,7 +294,14 @@ function selectSection(id) {
   }
 }
 
-function handleLogout() {
+async function handleLogout() {
+  const ok = await confirm({
+    title: 'Đăng xuất',
+    message: 'Bạn có chắc muốn đăng xuất?',
+    confirmText: 'Đăng xuất',
+    danger: true,
+  })
+  if (!ok) return
   dangXuat()
   router.push('/')
 }

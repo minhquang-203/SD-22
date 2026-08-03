@@ -18,6 +18,8 @@ import {
 } from '@/api/sanPhamApi'
 import { formToFormData } from '@/utils/productForm'
 import { confirm } from '@/composables/useConfirm'
+import { useAdminAuth } from '@/composables/useAdminAuth'
+import { isManagerOrOwner } from '@/utils/adminAuth'
 import {
   getCongDungList,
   getDanhMucList,
@@ -28,6 +30,9 @@ import {
 } from '@/api/danhMucApi'
 
 const router = useRouter()
+const { vaiTro } = useAdminAuth()
+/** Chỉ CHU / QUAN_LY được thêm·sửa·đổi trạng thái sản phẩm */
+const canWriteProduct = computed(() => isManagerOrOwner(vaiTro.value))
 
 const loading = ref(false)
 const saving = ref(false)
@@ -328,7 +333,7 @@ onMounted(async () => {
       title="Quản lý sản phẩm"
       :description="`SUNOVA — sản phẩm chống nắng (${filteredProducts.length} sản phẩm)`"
     >
-      <template #actions>
+      <template v-if="canWriteProduct" #actions>
         <button type="button" class="soleil-btn-primary" @click="openCreateModal">
           <Icon icon="icon-park-outline:plus" />
           Thêm sản phẩm
@@ -423,6 +428,7 @@ onMounted(async () => {
         :loading="loading"
         :page="page"
         :page-size="pageSize"
+        :can-write="canWriteProduct"
         @edit="openEditModal"
         @toggle-status="handleToggleStatus"
         @toggle-noi-bat="handleToggleNoiBat"

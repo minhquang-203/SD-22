@@ -9,4 +9,5 @@ public class TaoKhachNhanhRequest {
 
     private String hoTen;
     private String soDienThoai;
+    private String email;
 }

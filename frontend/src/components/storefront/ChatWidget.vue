@@ -93,6 +93,7 @@ function upsertTinHoTro(tin) {
   messages.value.push({
     id: tin.id,
     nguoiGui: tin.nguoiGui,
+    tenNguoiGui: tin.tenNguoiGui || null,
     noiDung: tin.noiDung,
     thoiGian: tin.thoiGian,
   })
@@ -128,6 +129,7 @@ async function switchToStaff() {
     messages.value = (hist.data || []).map((t) => ({
       id: t.id,
       nguoiGui: t.nguoiGui,
+      tenNguoiGui: t.tenNguoiGui || null,
       noiDung: t.noiDung,
       thoiGian: t.thoiGian,
     }))
@@ -366,7 +368,12 @@ watch(isOpen, (open) => {
               </div>
             </div>
 
-            <span class="msg-time">{{ formatTime(msg.thoiGian) }}</span>
+            <span class="msg-time">
+              <template v-if="msg.nguoiGui === 'NHAN_VIEN'">
+                Nhân viên {{ msg.tenNguoiGui || 'CSKH' }} ·
+              </template>
+              {{ formatTime(msg.thoiGian) }}
+            </span>
           </div>
         </div>
 

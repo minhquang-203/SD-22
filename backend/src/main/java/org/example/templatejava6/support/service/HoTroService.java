@@ -88,7 +88,7 @@ public class HoTroService {
         PhienHoTro phien = loadPhien(idPhien);
         assertKhachSoHuu(phien, khach.getId());
         return tinNhanHoTroRepository.findByIdPhien_IdOrderByThoiGianAsc(idPhien).stream()
-                .map(TinNhanHoTroResponse::from)
+                .map(this::toTinResponse)
                 .toList();
     }
 
@@ -118,7 +118,7 @@ public class HoTroService {
     public List<TinNhanHoTroResponse> lichSuTinNhanChoNhanVien(Integer idPhien) {
         loadPhien(idPhien);
         return tinNhanHoTroRepository.findByIdPhien_IdOrderByThoiGianAsc(idPhien).stream()
-                .map(TinNhanHoTroResponse::from)
+                .map(this::toTinResponse)
                 .toList();
     }
 
@@ -155,8 +155,19 @@ public class HoTroService {
         if (phien.getIdKhachHang() != null) {
             phien.getIdKhachHang().getHoTen();
         }
-        hoTroRealtimeService.publishTinNhanMoi(phien, tin);
-        return TinNhanHoTroResponse.from(tin);
+        TinNhanHoTroResponse res = toTinResponse(tin);
+        hoTroRealtimeService.publishTinNhanMoi(phien, tin, res);
+        return res;
+    }
+
+    private TinNhanHoTroResponse toTinResponse(TinNhanHoTro tin) {
+        TinNhanHoTroResponse res = TinNhanHoTroResponse.from(tin);
+        if (NGUOI_NHAN_VIEN.equalsIgnoreCase(tin.getNguoiGui()) && tin.getIdNguoiGui() != null) {
+            nhanVienRepository.findById(tin.getIdNguoiGui()).ifPresent(nv -> res.setTenNguoiGui(nv.getHoTen()));
+        } else if (NGUOI_KHACH.equalsIgnoreCase(tin.getNguoiGui()) && tin.getIdNguoiGui() != null) {
+            khachHangRepository.findById(tin.getIdNguoiGui()).ifPresent(kh -> res.setTenNguoiGui(kh.getHoTen()));
+        }
+        return res;
     }
 
     private PhienHoTro resolvePhienChoKhach(Integer idPhien, KhachHang khach) {

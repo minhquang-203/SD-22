@@ -6,6 +6,7 @@ defineProps({
   loading: { type: Boolean, default: false },
   variant: { type: Object, default: null },
   lots: { type: Array, default: () => [] },
+  canWrite: { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['close', 'edit'])
@@ -18,7 +19,12 @@ const emit = defineEmits(['close', 'edit'])
         <div>
           <h2 class="text-lg font-semibold">Lô hàng — {{ variant?.sku }}</h2>
           <p class="text-sm text-[var(--admin-muted)]">
-            Lô chỉ tạo qua phiếu nhập. Tại đây xem tồn và sửa nhẹ HSD / ghi chú.
+            <template v-if="canWrite">
+              Lô chỉ tạo qua phiếu nhập. Tại đây xem tồn và sửa nhẹ HSD / ghi chú.
+            </template>
+            <template v-else>
+              Lô chỉ tạo qua phiếu nhập. Tại đây xem tồn kho theo lô.
+            </template>
           </p>
         </div>
         <button type="button" class="admin-btn admin-btn-default !px-2" @click="emit('close')">✕</button>
@@ -34,15 +40,15 @@ const emit = defineEmits(['close', 'edit'])
               <th>SL nhập</th>
               <th>Còn lại</th>
               <th>SL lỗi</th>
-              <th class="text-right">Thao tác</th>
+              <th v-if="canWrite" class="text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="loading">
-              <td colspan="7" class="text-center py-8 text-[var(--admin-muted)]">Đang tải...</td>
+              <td :colspan="canWrite ? 7 : 6" class="text-center py-8 text-[var(--admin-muted)]">Đang tải...</td>
             </tr>
             <tr v-else-if="lots.length === 0">
-              <td colspan="7" class="text-center py-8 text-[var(--admin-muted)]">
+              <td :colspan="canWrite ? 7 : 6" class="text-center py-8 text-[var(--admin-muted)]">
                 Chưa có lô. Vào menu <strong>Nhập hàng</strong> để lập phiếu và nhập kho.
               </td>
             </tr>
@@ -73,7 +79,7 @@ const emit = defineEmits(['close', 'edit'])
                 </span>
                 <span v-else class="text-[var(--admin-muted)]">0</span>
               </td>
-              <td class="text-right whitespace-nowrap">
+              <td v-if="canWrite" class="text-right whitespace-nowrap">
                 <button
                   type="button"
                   class="admin-btn admin-btn-default !px-2 !py-1 text-xs"

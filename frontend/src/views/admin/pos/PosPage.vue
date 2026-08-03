@@ -24,12 +24,22 @@ import { formatDiscountPercent } from '@/utils/formatVND'
 import { productImageUrl } from '@/utils/productImage'
 import { confirm } from '@/composables/useConfirm'
 import { useAdminAuth } from '@/composables/useAdminAuth'
+import { getPhoneValidationError, normalizePhoneDigits } from '@/utils/phone'
 
 const { hoTen: currentStaffName } = useAdminAuth()
 
-// TODO: điền mã ngân hàng (BIN) và số tài khoản shop để VietQR đúng
-const VIETQR_BANK = '970436' // ví dụ: Vietcombank — thay bằng mã ngân hàng shop
-const VIETQR_ACCOUNT = '0123456789' // TODO: số tài khoản nhận chuyển khoản của shop
+/**
+ * Cấu hình VietQR nhận chuyển khoản tại quầy (1 chỗ sửa).
+ * TODO: thay bằng thông tin tài khoản thật của cửa hàng trước khi demo/nộp.
+ * - bankBin: mã BIN ngân hàng (VD Vietcombank = 970436)
+ * - accountNo: số tài khoản nhận tiền
+ * - accountName: tên chủ TK (hiển thị trên ảnh QR)
+ */
+const VIETQR_CONFIG = {
+  bankBin: '970436',
+  accountNo: '0123456789',
+  accountName: 'SUNOVA STORE',
+}
 
 const loading = ref(false)
 const paying = ref(false)
@@ -44,9 +54,13 @@ const searchInput = ref(null)
 const cart = ref([])
 
 const customerSdt = ref('')
+const customerName = ref('')
 const selectedCustomer = ref(null)
 const showQuickCreate = ref(false)
 const quickName = ref('')
+const quickSdt = ref('')
+const quickEmail = ref('')
+const showCreateCustomerModal = ref(false)
 
 const voucherCode = ref('')
 const appliedVoucher = ref('')
@@ -67,6 +81,8 @@ const showVietQrModal = ref(false)
 
 const receipt = ref(null)
 const showReceipt = ref(false)
+
+const MAX_HELD_ORDERS = 15
 
 const heldOrders = ref([])
 const showHeldDrawer = ref(false)
@@ -132,7 +148,8 @@ const vietQrImageUrl = computed(() => {
   const amount = Math.round(splitTransferNum.value)
   if (amount <= 0) return ''
   const addInfo = encodeURIComponent(`SUNOVA CK ${amount}`)
-  return `https://img.vietqr.io/image/${VIETQR_BANK}-${VIETQR_ACCOUNT}-compact2.png?amount=${amount}&addInfo=${addInfo}`
+  const accName = encodeURIComponent(VIETQR_CONFIG.accountName || 'SUNOVA')
+  return `https://img.vietqr.io/image/${VIETQR_CONFIG.bankBin}-${VIETQR_CONFIG.accountNo}-compact2.png?amount=${amount}&addInfo=${addInfo}&accountName=${accName}`
 })
 
 const tienThua = computed(() => {
@@ -301,41 +318,108 @@ async function loadMeta() {
 }
 
 async function findCustomer() {
-  const sdt = customerSdt.value.trim()
-  if (!sdt) return
+  const sdt = normalizePhoneDigits(customerSdt.value)
+  customerSdt.value = sdt
+  const phoneErr = getPhoneValidationError(sdt)
+  if (phoneErr) {
+    notify(phoneErr, 'error')
+    return
+  }
   showQuickCreate.value = false
   try {
     const res = await timKhachTheoSdt(sdt)
     selectedCustomer.value = res.data
+    customerName.value = res.data.hoTen || ''
     notify(`Đã tìm thấy: ${res.data.hoTen}`)
   } catch {
     selectedCustomer.value = null
     showQuickCreate.value = true
+    quickSdt.value = sdt
+    quickName.value = customerName.value
     notify('Không tìm thấy khách — có thể tạo nhanh', 'error')
   }
 }
 
+function validateGuestFields({ requireBoth = false } = {}) {
+  const name = customerName.value.trim()
+  const sdtRaw = customerSdt.value.trim()
+  const sdt = normalizePhoneDigits(sdtRaw)
+  if (sdtRaw) customerSdt.value = sdt
+
+  if (requireBoth || name || sdt) {
+    if (!name || name.length < 2) {
+      return 'Nhập tên khách (ít nhất 2 ký tự) để gắn vào hóa đơn chờ'
+    }
+    if (/^\d+$/.test(name)) {
+      return 'Tên khách không được chỉ gồm số'
+    }
+    const phoneErr = getPhoneValidationError(sdt)
+    if (phoneErr) return phoneErr
+  }
+  return ''
+}
+
 async function createQuickCustomer() {
-  const sdt = customerSdt.value.trim()
-  if (!sdt) {
-    notify('Vui lòng nhập SĐT', 'error')
+  const name = (quickName.value || customerName.value).trim()
+  const sdt = normalizePhoneDigits(quickSdt.value || customerSdt.value)
+  quickSdt.value = sdt
+  if (!name || name.length < 2) {
+    notify('Vui lòng nhập tên khách (ít nhất 2 ký tự)', 'error')
+    return
+  }
+  if (/^\d+$/.test(name)) {
+    notify('Tên khách không được chỉ gồm số', 'error')
+    return
+  }
+  const phoneErr = getPhoneValidationError(sdt)
+  if (phoneErr) {
+    notify(phoneErr, 'error')
     return
   }
   try {
-    const res = await taoKhachNhanh({ hoTen: quickName.value.trim() || undefined, soDienThoai: sdt })
+    const payload = {
+      hoTen: name,
+      soDienThoai: sdt,
+    }
+    if (quickEmail.value.trim()) {
+      const email = quickEmail.value.trim()
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        notify('Email không hợp lệ', 'error')
+        return
+      }
+      payload.email = email
+    }
+    const res = await taoKhachNhanh(payload)
     selectedCustomer.value = res.data
+    customerSdt.value = res.data.soDienThoai || sdt
+    customerName.value = res.data.hoTen || name
     showQuickCreate.value = false
+    showCreateCustomerModal.value = false
+    quickName.value = ''
+    quickSdt.value = ''
+    quickEmail.value = ''
     notify(`Đã tạo khách: ${res.data.hoTen}`)
   } catch (err) {
     notify(String(err), 'error')
   }
 }
 
+function openCreateCustomerModal() {
+  quickSdt.value = customerSdt.value.trim()
+  quickName.value = customerName.value.trim()
+  quickEmail.value = ''
+  showCreateCustomerModal.value = true
+}
+
 function clearCustomer() {
   selectedCustomer.value = null
   customerSdt.value = ''
+  customerName.value = ''
   quickName.value = ''
+  quickSdt.value = ''
+  quickEmail.value = ''
   showQuickCreate.value = false
+  showCreateCustomerModal.value = false
 }
 
 function fillExactCash() {
@@ -461,8 +545,19 @@ function applyVoucher() {
 async function loadHeldOrders() {
   try {
     const res = await dsDonCho()
-    heldOrders.value = res.data || []
+    const rows = Array.isArray(res.data) ? res.data : []
+    // Phòng thủ: bỏ bản ghi thiếu id / dữ liệu hỏng, soLuong/soMatHang null → 0
+    heldOrders.value = rows
+      .filter((o) => o && o.id != null)
+      .map((o) => ({
+        ...o,
+        soMatHang: Number(o.soMatHang) || 0,
+        thanhTien: Number(o.thanhTien) || 0,
+        tenKhachHang: o.tenKhachHang || 'Khách lẻ',
+        soDienThoai: o.soDienThoai || '',
+      }))
   } catch (err) {
+    heldOrders.value = []
     notify(String(err), 'error')
   }
 }
@@ -495,6 +590,24 @@ function clearCartOnly() {
 
 async function holdCurrentOrder() {
   if (cart.value.length === 0) return
+
+  if (!selectedCustomer.value) {
+    const guestErr = validateGuestFields({ requireBoth: true })
+    if (guestErr) {
+      notify(guestErr, 'error')
+      return
+    }
+  }
+
+  // Làm mới danh sách trước khi chặn — tránh lệch số khi nhiều máy/quầy
+  await loadHeldOrders()
+  const replacingId = activeHeldOrderId.value
+  // Khi đang tiếp tục 1 đơn chờ rồi giữ lại: xóa cũ trước rồi tạo mới → không tăng tổng
+  if (!replacingId && heldOrders.value.length >= MAX_HELD_ORDERS) {
+    notify('Đã đạt tối đa 15 hóa đơn chờ', 'error')
+    return
+  }
+
   const ok = await confirm({
     title: 'Giữ đơn',
     message: 'Lưu giỏ hàng hiện tại thành đơn chờ?',
@@ -503,21 +616,25 @@ async function holdCurrentOrder() {
   if (!ok) return
   holding.value = true
   try {
+    if (replacingId) {
+      try {
+        await huyDonCho(replacingId)
+      } catch {
+        /* đơn cũ có thể đã xử lý */
+      }
+      activeHeldOrderId.value = null
+    }
     await giuDon({
       items: cart.value.map((l) => ({
         idChiTietSanPham: l.idChiTietSanPham,
         soLuong: l.soLuong,
       })),
       idKhachHang: selectedCustomer.value?.id ?? null,
+      tenKhachHang: selectedCustomer.value?.hoTen || customerName.value.trim() || null,
+      soDienThoai: selectedCustomer.value?.soDienThoai
+        || normalizePhoneDigits(customerSdt.value)
+        || null,
     })
-    if (activeHeldOrderId.value) {
-      try {
-        await huyDonCho(activeHeldOrderId.value)
-      } catch {
-        /* đơn cũ có thể đã xử lý */
-      }
-      activeHeldOrderId.value = null
-    }
     clearCartOnly()
     clearCustomer()
     await loadHeldOrders()
@@ -531,15 +648,19 @@ async function holdCurrentOrder() {
 }
 
 function loadCartFromDetail(detail) {
-  cart.value = (detail.items || []).map((item) => ({
-    idChiTietSanPham: item.idChiTietSanPham,
-    sku: item.sku,
-    tenSanPham: item.tenSanPham,
-    bienThe: formatVariant(item),
-    giaBan: Number(item.donGia),
-    soLuongTon: item.soLuongTon ?? 0,
-    soLuong: item.soLuong,
-  }))
+  const items = Array.isArray(detail?.items) ? detail.items : []
+  cart.value = items
+    .filter((item) => item && item.idChiTietSanPham != null)
+    .map((item) => ({
+      idChiTietSanPham: item.idChiTietSanPham,
+      sku: item.sku || '—',
+      tenSanPham: item.tenSanPham || 'Sản phẩm',
+      bienThe: formatVariant(item),
+      giaBan: Number(item.donGia) || 0,
+      soLuongTon: Number(item.soLuongTon) || 0,
+      soLuong: Math.max(0, Number(item.soLuong) || 0),
+    }))
+    .filter((line) => line.soLuong > 0)
 }
 
 async function resumeHeldOrder(order) {
@@ -552,8 +673,12 @@ async function resumeHeldOrder(order) {
     if (!ok) return
   }
   try {
-    const res = await layDonCho(order.id)
-    const detail = res.data
+    const res = await layDonCho(order?.id)
+    const detail = res?.data
+    if (!detail) {
+      notify('Không tải được đơn chờ', 'error')
+      return
+    }
     loadCartFromDetail(detail)
     if (detail.idKhachHang) {
       selectedCustomer.value = {
@@ -562,9 +687,13 @@ async function resumeHeldOrder(order) {
         soDienThoai: detail.soDienThoai,
       }
       customerSdt.value = detail.soDienThoai || ''
+      customerName.value = detail.hoTenKhachHang || ''
       showQuickCreate.value = false
     } else {
-      clearCustomer()
+      selectedCustomer.value = null
+      customerSdt.value = detail.soDienThoai || ''
+      customerName.value = detail.hoTenKhachHang || ''
+      showQuickCreate.value = false
     }
     activeHeldOrderId.value = order.id
     closeHeldDrawer()
@@ -961,7 +1090,7 @@ onBeforeUnmount(() => {
         <p class="soleil-eyebrow mb-3">Hóa đơn</p>
 
         <!-- Khách hàng -->
-        <div class="pos-customer-bar">
+        <div class="pos-customer-bar pos-customer-bar--stack">
           <template v-if="selectedCustomer">
             <div class="pos-customer-info">
               <strong>{{ selectedCustomer.hoTen }}</strong>
@@ -975,26 +1104,49 @@ onBeforeUnmount(() => {
             </button>
           </template>
           <template v-else>
-            <span class="text-sm text-[var(--admin-muted)]">Khách lẻ</span>
+            <div class="pos-customer-row">
+              <input
+                v-model="customerSdt"
+                type="text"
+                class="admin-input flex-1 min-w-[120px]"
+                placeholder="Số điện thoại"
+                inputmode="numeric"
+                maxlength="10"
+                @input="customerSdt = normalizePhoneDigits(customerSdt)"
+                @keyup.enter="findCustomer"
+              />
+              <button type="button" class="admin-btn admin-btn-default" @click="findCustomer">
+                Tìm
+              </button>
+              <button
+                type="button"
+                class="admin-btn admin-btn-primary"
+                title="Thêm nhanh khách hàng"
+                @click="openCreateCustomerModal"
+              >
+                ＋
+              </button>
+            </div>
             <input
-              v-model="customerSdt"
+              v-model="customerName"
               type="text"
-              class="admin-input flex-1 min-w-[140px]"
-              placeholder="Số điện thoại"
+              class="admin-input w-full"
+              placeholder="Tên khách * (bắt buộc khi giữ đơn)"
+              maxlength="100"
             />
-            <button type="button" class="admin-btn admin-btn-default" @click="findCustomer">
-              Tìm
-            </button>
+            <p class="text-xs text-[var(--admin-muted)]">
+              Giữ đơn cần tên + SĐT hợp lệ (10 số, đầu 03/05/07/08/09) — hoặc chọn khách thành viên.
+            </p>
           </template>
         </div>
 
         <div v-if="showQuickCreate && !selectedCustomer" class="mb-4 p-3 rounded-lg bg-[var(--cream)] border border-[var(--admin-border)]">
-          <p class="text-sm mb-2 text-[var(--admin-muted)]">Chưa có khách với SĐT này</p>
+          <p class="text-sm mb-2 text-[var(--admin-muted)]">Chưa có khách với SĐT này — tạo nhanh?</p>
           <input
             v-model="quickName"
             type="text"
             class="admin-input w-full mb-2"
-            placeholder="Họ tên (tùy chọn)"
+            placeholder="Họ tên *"
           />
           <button type="button" class="admin-btn admin-btn-primary w-full" @click="createQuickCustomer">
             Tạo nhanh
@@ -1297,6 +1449,51 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </aside>
+
+    <!-- Modal tạo nhanh khách (Teleport + z-index cao hơn overlay) -->
+    <Teleport to="body">
+      <div
+        v-if="showCreateCustomerModal"
+        class="pos-quick-customer-overlay"
+        @click.self="showCreateCustomerModal = false"
+      >
+        <div class="pos-quick-customer-modal" role="dialog" aria-modal="true" @click.stop>
+          <div class="pos-quick-customer-modal__head">
+            <h3>Thêm nhanh khách hàng</h3>
+            <button type="button" class="admin-icon-btn" @click="showCreateCustomerModal = false">
+              <Icon icon="mdi:close" width="20" />
+            </button>
+          </div>
+          <label class="pos-field">
+            <span>Tên *</span>
+            <input
+              v-model="quickName"
+              class="admin-input"
+              placeholder="Họ tên khách"
+              autofocus
+            />
+          </label>
+          <label class="pos-field">
+            <span>SĐT *</span>
+            <input
+              v-model="quickSdt"
+              class="admin-input"
+              placeholder="VD: 0912345678"
+              inputmode="numeric"
+              maxlength="10"
+              @input="quickSdt = normalizePhoneDigits(quickSdt)"
+            />
+          </label>
+          <label class="pos-field">
+            <span>Email (tuỳ chọn)</span>
+            <input v-model="quickEmail" class="admin-input" type="email" placeholder="email@..." />
+          </label>
+          <button type="button" class="admin-btn admin-btn-primary w-full" @click="createQuickCustomer">
+            Lưu &amp; gán vào hóa đơn
+          </button>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- Modal biên lai (Teleport ra body để in đúng) -->
     <Teleport to="body">

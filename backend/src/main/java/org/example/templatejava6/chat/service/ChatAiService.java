@@ -52,11 +52,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.example.templatejava6.chat.event.CatalogCacheInvalidateEvent;
+import org.springframework.context.event.EventListener;
+
 @Service
 public class ChatAiService {
 
     private static final int HISTORY_LIMIT = 10;
-    private static final long CATALOG_TTL_MS = 5 * 60 * 1000L;
+    private static final long CATALOG_TTL_MS = 60 * 1000L;
     private static final Pattern PRODUCT_ID_PATTERN = Pattern.compile("\\[PRODUCT_ID:\\s*(\\d+)\\]");
     private static final NumberFormat VND = NumberFormat.getInstance(new Locale("vi", "VN"));
 
@@ -83,6 +86,16 @@ public class ChatAiService {
     private final AtomicReference<CachedCatalog> catalogCache = new AtomicReference<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ChatAiService.class);
+
+    /** Xóa cache catalog để lần chat kế nạp giá mới ngay. */
+    public void invalidateCatalog() {
+        catalogCache.set(null);
+    }
+
+    @EventListener
+    public void onCatalogCacheInvalidate(CatalogCacheInvalidateEvent event) {
+        invalidateCatalog();
+    }
 
     public ChatAiService(org.springframework.boot.web.client.RestTemplateBuilder builder) {
         // Cùng mẫu GhnClient: build 1 lần, có timeout để lỗi mạng không treo request chat

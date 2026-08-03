@@ -1,5 +1,6 @@
 package org.example.templatejava6.voucher.service;
 
+import org.example.templatejava6.chat.event.CatalogCacheInvalidateEvent;
 import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
 import org.example.templatejava6.product.repository.ChiTietSanPhamRepository;
@@ -9,6 +10,7 @@ import org.example.templatejava6.voucher.model.request.ChiTietDotGiamGiaRequest;
 import org.example.templatejava6.voucher.model.response.ChiTietDotGiamGiaResponse;
 import org.example.templatejava6.voucher.repository.ChiTietDotGiamGiaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +26,12 @@ public class ChiTietDotGiamGiaService {
     private DotGiamGiaService dotGiamGiaService;
     @Autowired
     private ChiTietSanPhamRepository chiTietSanPhamRepository;
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
+
+    private void invalidateChatCatalog() {
+        eventPublisher.publishEvent(new CatalogCacheInvalidateEvent());
+    }
 
     @Transactional(readOnly = true)
     public List<ChiTietDotGiamGiaResponse> getByDotGiamGia(Integer idDotGiamGia) {
@@ -63,6 +71,7 @@ public class ChiTietDotGiamGiaService {
         ChiTietDotGiamGia existing = getChiTietOrThrow(id);
         validateBelongsToDotGiamGia(existing, idDotGiamGia);
         chiTietDotGiamGiaRepository.delete(existing);
+        invalidateChatCatalog();
     }
 
     @Transactional
@@ -78,6 +87,7 @@ public class ChiTietDotGiamGiaService {
         ct.setIdChiTietSanPham(ctsp);
         ct.setGiaSauGiam(resolveGiaSauGiam(request, dgg, ctsp));
         chiTietDotGiamGiaRepository.save(ct);
+        invalidateChatCatalog();
     }
 
     @Transactional
@@ -94,12 +104,14 @@ public class ChiTietDotGiamGiaService {
         ct.setGiaSauGiam(resolveGiaSauGiam(request, dgg, ctsp));
         ct.setId(id);
         chiTietDotGiamGiaRepository.save(ct);
+        invalidateChatCatalog();
     }
 
     @Transactional
     public void delete(Integer id) {
         ChiTietDotGiamGia ct = getChiTietOrThrow(id);
         chiTietDotGiamGiaRepository.delete(ct);
+        invalidateChatCatalog();
     }
 
     private ChiTietDotGiamGia getChiTietOrThrow(Integer id) {
