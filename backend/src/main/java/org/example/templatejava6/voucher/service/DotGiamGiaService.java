@@ -49,7 +49,7 @@ public class DotGiamGiaService {
     @Transactional
     public void add(DotGiamGiaRequest request) {
         normalizeRequest(request);
-        validateRequest(request);
+        validateRequest(request, true);
         if (dotGiamGiaRepository.existsByMa(request.getMa())) {
             throw new ApiException("Mã đợt giảm giá đã tồn tại", "DUPLICATE");
         }
@@ -63,7 +63,7 @@ public class DotGiamGiaService {
     public void update(Integer id, DotGiamGiaRequest request) {
         DotGiamGia dgg = getDotGiamGiaOrThrow(id);
         normalizeRequest(request);
-        validateRequest(request);
+        validateRequest(request, false);
         if (dotGiamGiaRepository.existsByMaAndIdNot(request.getMa(), id)) {
             throw new ApiException("Mã đợt giảm giá đã tồn tại", "DUPLICATE");
         }
@@ -161,7 +161,8 @@ public class DotGiamGiaService {
         if (giaSauGiam == null && giaGoc != null && phanTramGiam != null) {
             giaSauGiam = calculateGiaSauGiam(giaGoc, phanTramGiam);
         }
-        if (giaGoc == null || giaSauGiam == null || giaSauGiam.compareTo(giaGoc) >= 0) {
+        if (giaGoc == null || giaSauGiam == null || giaSauGiam.compareTo(BigDecimal.ZERO) < 0
+                || giaSauGiam.compareTo(giaGoc) >= 0) {
             return null;
         }
         return new VariantSaleInfo(giaGoc, giaSauGiam, phanTramGiam);
@@ -186,10 +187,11 @@ public class DotGiamGiaService {
         }
     }
 
-    private void validateRequest(DotGiamGiaRequest request) {
+    private void validateRequest(DotGiamGiaRequest request, boolean isCreate) {
         if (request.getPhanTramGiam() != null
-                && request.getPhanTramGiam().compareTo(BigDecimal.valueOf(100)) > 0) {
-            throw new ApiException("Phần trăm giảm không được vượt quá 100", "VALIDATION_ERROR");
+                && (request.getPhanTramGiam().signum() <= 0
+                || request.getPhanTramGiam().compareTo(BigDecimal.valueOf(100)) > 0)) {
+            throw new ApiException("Phần trăm giảm phải từ 1 đến 100", "VALIDATION_ERROR");
         }
         if (request.getNgayBatDau() == null) {
             throw new ApiException("Ngày bắt đầu không được để trống", "VALIDATION_ERROR");
@@ -197,8 +199,15 @@ public class DotGiamGiaService {
         if (request.getNgayKetThuc() == null) {
             throw new ApiException("Ngày kết thúc không được để trống", "VALIDATION_ERROR");
         }
-        if (!request.getNgayKetThuc().isAfter(request.getNgayBatDau())) {
-            throw new ApiException("Ngày kết thúc phải sau ngày bắt đầu", "VALIDATION_ERROR");
+        if (request.getNgayKetThuc().isBefore(request.getNgayBatDau())) {
+            throw new ApiException("Ngày kết thúc phải sau hoặc bằng ngày bắt đầu", "VALIDATION_ERROR");
+        }
+        java.time.LocalDate today = java.time.LocalDate.now();
+        if (isCreate && request.getNgayBatDau().toLocalDate().isBefore(today)) {
+            throw new ApiException("Ngày bắt đầu không được nhỏ hơn ngày hiện tại", "VALIDATION_ERROR");
+        }
+        if (request.getNgayKetThuc().toLocalDate().isBefore(today)) {
+            throw new ApiException("Ngày kết thúc không được nhỏ hơn ngày hiện tại", "VALIDATION_ERROR");
         }
     }
 

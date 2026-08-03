@@ -156,9 +156,22 @@ public class ChiTietDotGiamGiaService {
         if (!Boolean.TRUE.equals(dgg.getIsActive())) {
             throw new ApiException("Đợt giảm giá đã ngừng áp dụng", "VALIDATION_ERROR");
         }
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        if (dgg.getNgayBatDau() == null || dgg.getNgayKetThuc() == null) {
+            throw new ApiException("Đợt giảm giá chưa được cấu hình thời gian áp dụng", "VALIDATION_ERROR");
+        }
+        if (now.isBefore(dgg.getNgayBatDau())) {
+            throw new ApiException("Đợt giảm giá chưa đến ngày bắt đầu, không thể thêm/sửa sản phẩm", "VALIDATION_ERROR");
+        }
+        if (now.isAfter(dgg.getNgayKetThuc())) {
+            throw new ApiException("Đợt giảm giá đã hết hạn, không thể thêm/sửa sản phẩm", "VALIDATION_ERROR");
+        }
     }
 
     private void validateGiaSauGiam(BigDecimal giaSauGiam, BigDecimal giaBan) {
+        if (giaSauGiam == null || giaSauGiam.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ApiException("Giá sau giảm không hợp lệ", "VALIDATION_ERROR");
+        }
         if (giaBan != null && giaSauGiam.compareTo(giaBan) >= 0) {
             throw new ApiException("Giá sau giảm phải nhỏ hơn giá bán", "VALIDATION_ERROR");
         }

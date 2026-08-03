@@ -134,6 +134,7 @@
             <input
               v-model="form.ngayBatDau"
               type="date"
+              :min="minDate"
               :class="inputClass('ngayBatDau')"
               @change="clearError('ngayBatDau')"
             />
@@ -148,7 +149,7 @@
             <input
               v-model="form.ngayKetThuc"
               type="date"
-              :min="form.ngayBatDau || undefined"
+              :min="form.ngayBatDau || minDate"
               :class="inputClass('ngayKetThuc')"
               @change="clearError('ngayKetThuc')"
             />
@@ -309,9 +310,24 @@ function close() {
   emit("update:modelValue", false);
 };
 
-const formatDate = (d) => {
+const todayISO = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+const minDate = todayISO();
+
+const formatStartDate = (d) => {
   if (!d) return null;
   return `${d}T00:00:00`;
+};
+
+const formatEndDate = (d) => {
+  if (!d) return null;
+  return `${d}T23:59:59`;
 };
 
 function isEmptyNumber(value) {
@@ -321,6 +337,7 @@ function isEmptyNumber(value) {
 function validateForm() {
   resetErrors();
   const next = {};
+  const today = todayISO();
 
   if (!isEdit.value) {
     const ma = form.ma?.trim();
@@ -360,10 +377,14 @@ function validateForm() {
 
   if (!form.ngayBatDau) {
     next.ngayBatDau = "Chọn ngày bắt đầu";
+  } else if (!isEdit.value && form.ngayBatDau < today) {
+    next.ngayBatDau = "Ngày bắt đầu không được nhỏ hơn ngày hiện tại";
   }
 
   if (!form.ngayKetThuc) {
     next.ngayKetThuc = "Chọn ngày kết thúc";
+  } else if (form.ngayKetThuc < today) {
+    next.ngayKetThuc = "Ngày kết thúc không được nhỏ hơn ngày hiện tại";
   } else if (form.ngayBatDau && form.ngayKetThuc < form.ngayBatDau) {
     next.ngayKetThuc = "Ngày kết thúc phải sau hoặc bằng ngày bắt đầu";
   }
@@ -418,8 +439,8 @@ function buildPayload() {
         ? Number(form.giamToiDa)
         : null,
     soLuong: Number(form.soLuong),
-    ngayBatDau: formatDate(form.ngayBatDau),
-    ngayKetThuc: formatDate(form.ngayKetThuc),
+    ngayBatDau: formatStartDate(form.ngayBatDau),
+    ngayKetThuc: formatEndDate(form.ngayKetThuc),
   };
 }
 
@@ -430,8 +451,6 @@ const submit = () => {
 
   if (isEdit.value) emit("update", payload);
   else emit("create", payload);
-
-  close();
 };
 
 watch(

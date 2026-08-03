@@ -87,6 +87,8 @@ public class SecurityConfig {
                     .requestMatchers("/api/online", "/api/online/**").hasRole("KHACH_HANG")
                     .requestMatchers("/api/hoa-don/cua-toi", "/api/hoa-don/cua-toi/**").hasRole("KHACH_HANG")
                     .requestMatchers("/api/nhan-vien", "/api/nhan-vien/**").hasAnyRole("QUAN_LY", "CHU")
+                    .requestMatchers("/api/nhap-hang", "/api/nhap-hang/**").hasAnyRole("QUAN_LY", "CHU")
+                    .requestMatchers("/api/nha-cung-cap", "/api/nha-cung-cap/**").hasAnyRole("QUAN_LY", "CHU")
                     .requestMatchers("/api/**").hasAnyRole("NHAN_VIEN", "QUAN_LY", "CHU")
                     .anyRequest().permitAll()
             );

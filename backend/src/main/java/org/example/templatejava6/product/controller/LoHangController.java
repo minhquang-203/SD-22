@@ -1,6 +1,7 @@
 package org.example.templatejava6.product.controller;
 
 import jakarta.validation.Valid;
+import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.product.model.request.LoHangRequest;
 import org.example.templatejava6.product.model.response.LoHangResponse;
 import org.example.templatejava6.product.service.LoHangService;
@@ -23,7 +24,9 @@ public class LoHangController {
 
     @PostMapping
     public LoHangResponse nhapLo(@Valid @RequestBody LoHangRequest request) {
-        return loHangService.nhapLo(request);
+        throw new ApiException(
+                "Lô chỉ được tạo qua phiếu nhập hàng. Vào menu Nhập hàng để lập phiếu.",
+                "FORBIDDEN");
     }
 
     @PutMapping("{id}")

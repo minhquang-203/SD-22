@@ -23,7 +23,7 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false,
-        timeout: 60000,
+        timeout: 180000,
       },
       '/ws': {
         target: 'http://localhost:8080',
@@ -35,7 +35,7 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false,
-        timeout: 60000,
+        timeout: 180000,
       },
     },
   },

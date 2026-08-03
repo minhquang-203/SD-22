@@ -257,7 +257,8 @@ const handleUpdate = async (payload) => {
   });
   if (!ok) return;
   try {
-    await updateVoucher(payload.id, payload);
+    const id = payload.id ?? editingVoucher.value?.id;
+    await updateVoucher(id, payload);
     showModal.value = false;
     editingVoucher.value = null;
     toast("Cập nhật phiếu giảm giá thành công", "info");

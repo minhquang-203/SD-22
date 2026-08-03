@@ -204,11 +204,11 @@
             </div>
             <div class="form-group">
               <label>Ngày bắt đầu *</label>
-              <input type="date" v-model="form.start" />
+              <input type="date" v-model="form.start" :min="minDate" />
             </div>
             <div class="form-group">
               <label>Ngày kết thúc *</label>
-              <input type="date" v-model="form.end" :min="form.start || undefined" />
+              <input type="date" v-model="form.end" :min="form.start || minDate" />
             </div>
             <div class="form-group full">
               <label>Ghi chú nội bộ</label>
@@ -555,9 +555,28 @@ function closeModal() {
   modalOpen.value = false
 }
 
+function todayISO() {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+const minDate = todayISO()
+
 async function handleSubmit() {
   const payload = buildPayload()
   if (!payload) return
+
+  const ok = await confirm({
+    title: editingId.value ? 'Cập nhật đợt giảm giá' : 'Tạo đợt giảm giá',
+    message: editingId.value
+      ? 'Cập nhật đợt giảm giá này?'
+      : 'Lưu đợt giảm giá mới?',
+    confirmText: editingId.value ? 'Cập nhật' : 'Tạo',
+  })
+  if (!ok) return
 
   saving.value = true
   try {
@@ -584,6 +603,7 @@ function buildPayload() {
   const code = form.value.code?.trim()
   const name = form.value.name?.trim()
   const value = Number(form.value.value)
+  const today = todayISO()
 
   if (!code || !name || !form.value.start || !form.value.end || !value) {
     toast('Vui lòng nhập đầy đủ thông tin bắt buộc', 'warn')
@@ -597,6 +617,16 @@ function buildPayload() {
 
   if (!Number.isFinite(value) || value <= 0 || value > 100) {
     toast('Phần trăm giảm phải từ 1 đến 100', 'warn')
+    return null
+  }
+
+  if (!editingId.value && form.value.start < today) {
+    toast('Ngày bắt đầu không được nhỏ hơn ngày hiện tại', 'warn')
+    return null
+  }
+
+  if (form.value.end < today) {
+    toast('Ngày kết thúc không được nhỏ hơn ngày hiện tại', 'warn')
     return null
   }
 

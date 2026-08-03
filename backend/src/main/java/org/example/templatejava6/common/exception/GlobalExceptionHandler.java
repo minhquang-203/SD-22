@@ -7,6 +7,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -68,6 +70,15 @@ public class GlobalExceptionHandler {
         res.put("code", "DUPLICATE");
         res.put("message", toFriendlyDbMessage(ex));
         return new ResponseEntity<>(res, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler({MaxUploadSizeExceededException.class, MultipartException.class})
+    public ResponseEntity<?> handleUploadTooLarge(Exception ex) {
+        Map<String, Object> res = new HashMap<>();
+        res.put("status", "FAILED");
+        res.put("code", "UPLOAD_TOO_LARGE");
+        res.put("message", "Ảnh quá lớn. Mỗi ảnh tối đa 10MB, tổng request tối đa 30MB (JPG/PNG/WEBP/GIF).");
+        return new ResponseEntity<>(res, HttpStatus.PAYLOAD_TOO_LARGE);
     }
 
     @ExceptionHandler(Exception.class)

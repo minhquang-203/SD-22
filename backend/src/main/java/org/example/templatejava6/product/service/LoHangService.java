@@ -18,7 +18,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
 
 @Service
 public class LoHangService {
@@ -89,57 +88,35 @@ public class LoHangService {
         }
     }
 
+    /**
+     * Sửa nhẹ thông tin lô (HSD + ghi chú). Không đổi số lượng / số lô / ngày nhập.
+     * Lô chỉ được tạo qua phiếu nhập.
+     */
     @Transactional
-    public LoHangResponse capNhatLo(Integer id, LoHangRequest request) {
+    public LoHangResponse capNhatThongTinNhe(Integer id, LocalDate hanSuDung, String ghiChu) {
         LoHang lo = getLoOrThrow(id);
         if (!Boolean.TRUE.equals(lo.getTrangThai())) {
             throw new ApiException("Lô hàng không còn hoạt động", "NOT_FOUND");
         }
-        validateSoLuongVaHsd(request);
-
-        int soLuongNhapCu = lo.getSoLuongNhap() != null ? lo.getSoLuongNhap() : 0;
-        int soLuongCon = lo.getSoLuongCon() != null ? lo.getSoLuongCon() : 0;
-        boolean daBan = soLuongCon < soLuongNhapCu;
-
-        lo.setSoLo(request.getSoLo().trim());
-        lo.setNgayNhap(request.getNgayNhap());
-        lo.setHanSuDung(request.getHanSuDung());
-
-        if (daBan) {
-            if (!Objects.equals(request.getSoLuongNhap(), soLuongNhapCu)) {
-                throw new ApiException(
-                        "Lô đã phát sinh bán, không thể sửa số lượng nhập",
-                        "LOT_ALREADY_SOLD");
-            }
-            // Đã bán: không đụng soLuongNhap / soLuongCon / ghiChu
-        } else {
-            lo.setSoLuongNhap(request.getSoLuongNhap());
-            lo.setSoLuongCon(request.getSoLuongNhap());
-            lo.setGhiChu(request.getGhiChu());
+        if (hanSuDung != null && lo.getNgayNhap() != null && !hanSuDung.isAfter(lo.getNgayNhap())) {
+            throw new ApiException("Hạn sử dụng phải sau ngày nhập", "VALIDATION_ERROR");
         }
+        lo.setHanSuDung(hanSuDung);
+        lo.setGhiChu(ghiChu != null && !ghiChu.isBlank() ? ghiChu.trim() : null);
+        return new LoHangResponse(loHangRepository.save(lo));
+    }
 
-        lo = loHangRepository.save(lo);
-        syncTonKho(lo.getChiTietSanPham().getId());
-        return new LoHangResponse(lo);
+    @Transactional
+    public LoHangResponse capNhatLo(Integer id, LoHangRequest request) {
+        // Giữ tương thích: chỉ cập nhật HSD + ghi chú (hướng A — không sửa SL qua màn lô)
+        return capNhatThongTinNhe(id, request.getHanSuDung(), request.getGhiChu());
     }
 
     @Transactional
     public void xoaLo(Integer id) {
-        LoHang lo = getLoOrThrow(id);
-        if (!Boolean.TRUE.equals(lo.getTrangThai())) {
-            return;
-        }
-        int soLuongNhap = lo.getSoLuongNhap() != null ? lo.getSoLuongNhap() : 0;
-        int soLuongCon = lo.getSoLuongCon() != null ? lo.getSoLuongCon() : 0;
-        if (soLuongCon < soLuongNhap) {
-            throw new ApiException(
-                    "Lô đã phát sinh bán, không thể xóa",
-                    "LOT_ALREADY_SOLD");
-        }
-        Integer idCts = lo.getChiTietSanPham().getId();
-        lo.setTrangThai(false);
-        loHangRepository.save(lo);
-        syncTonKho(idCts);
+        throw new ApiException(
+                "Không xóa lô trực tiếp. Lô được quản lý qua phiếu nhập.",
+                "FORBIDDEN");
     }
 
     /**

@@ -241,8 +241,24 @@ function closeReceive() {
   receiveRows.value = []
 }
 
-/** Khi đổi SL lỗi → tự trừ SL tốt (tổng luôn = đã bán). */
+function isEmptyInput(value) {
+  return value === '' || value === null || value === undefined
+}
+
+/** Khi đang gõ SL lỗi → chỉ tính lại SL tốt khi đã có số hợp lệ (cho phép để trống lúc gõ dở). */
 function onLoiChange(row) {
+  const max = Number(row.soLuongDaBan) || 0
+  if (isEmptyInput(row.soLuongLoi)) return
+  let loi = Math.max(0, Number(row.soLuongLoi) || 0)
+  if (loi > max) {
+    loi = max
+    row.soLuongLoi = loi
+  }
+  row.soLuongTot = max - loi
+}
+
+/** Rời ô SL lỗi → chuẩn hóa: trống = 0, kẹp trong [0, đã bán], SL tốt bù phần còn lại. */
+function onLoiBlur(row) {
   const max = Number(row.soLuongDaBan) || 0
   let loi = Math.max(0, Number(row.soLuongLoi) || 0)
   if (loi > max) loi = max
@@ -250,13 +266,22 @@ function onLoiChange(row) {
   row.soLuongTot = max - loi
 }
 
-/** Khi đổi SL tốt → tự trừ SL lỗi. */
-function onTotChange(row) {
+/** Đặt SL lỗi (kẹp 0..đã bán), SL tốt tự bù — dùng cho nút +/-. */
+function setLoi(row, value) {
   const max = Number(row.soLuongDaBan) || 0
-  let tot = Math.max(0, Number(row.soLuongTot) || 0)
-  if (tot > max) tot = max
-  row.soLuongTot = tot
-  row.soLuongLoi = max - tot
+  let loi = Math.floor(Number(value) || 0)
+  if (loi < 0) loi = 0
+  if (loi > max) loi = max
+  row.soLuongLoi = loi
+  row.soLuongTot = max - loi
+}
+
+function incLoi(row) {
+  setLoi(row, (Number(row.soLuongLoi) || 0) + 1)
+}
+
+function decLoi(row) {
+  setLoi(row, (Number(row.soLuongLoi) || 0) - 1)
 }
 
 function formatDateShort(value) {
@@ -646,32 +671,45 @@ onMounted(() => {
                   <td class="text-xs">{{ row.sku || '—' }}</td>
                   <td>{{ formatDateShort(row.hanSuDung) }}</td>
                   <td>{{ row.soLuongDaBan }}</td>
-                  <td style="width: 96px">
-                    <input
-                      v-model.number="row.soLuongTot"
-                      type="number"
-                      min="0"
-                      :max="row.soLuongDaBan"
-                      class="soleil-toolbar__input"
-                      @input="onTotChange(row)"
-                    />
+                  <td class="font-semibold text-[#3d7a4a]" style="width: 80px">
+                    {{ row.soLuongTot }}
                   </td>
-                  <td style="width: 96px">
-                    <input
-                      v-model.number="row.soLuongLoi"
-                      type="number"
-                      min="0"
-                      :max="row.soLuongDaBan"
-                      class="soleil-toolbar__input"
-                      @input="onLoiChange(row)"
-                    />
+                  <td style="width: 150px">
+                    <div class="qty-stepper">
+                      <button
+                        type="button"
+                        class="qty-stepper__btn"
+                        :disabled="(Number(row.soLuongLoi) || 0) <= 0"
+                        @click="decLoi(row)"
+                      >
+                        −
+                      </button>
+                      <input
+                        v-model.number="row.soLuongLoi"
+                        type="number"
+                        min="0"
+                        :max="row.soLuongDaBan"
+                        class="qty-stepper__input"
+                        @input="onLoiChange(row)"
+                        @blur="onLoiBlur(row)"
+                      />
+                      <button
+                        type="button"
+                        class="qty-stepper__btn"
+                        :disabled="(Number(row.soLuongLoi) || 0) >= (Number(row.soLuongDaBan) || 0)"
+                        @click="incLoi(row)"
+                      >
+                        +
+                      </button>
+                    </div>
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
           <p class="text-xs text-[var(--admin-muted)] mt-3 mb-0">
-            Ví dụ: đã bán 3, lỗi 1 → để SL tốt = 2, SL lỗi = 1 → cột SL lỗi của lô +1.
+            Nhập <strong>SL lỗi</strong> (bấm +/− hoặc gõ số) — <strong>SL tốt</strong> tự tính phần còn lại.
+            VD: đã bán 3, lỗi 1 → SL tốt = 2 → cột SL lỗi của lô +1.
           </p>
         </template>
 
@@ -917,6 +955,57 @@ onMounted(() => {
 }
 .receive-modal {
   width: min(720px, 96vw);
+}
+.qty-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.qty-stepper__btn {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border: 1px solid rgba(30, 21, 16, 0.18);
+  border-radius: 6px;
+  background: #fff;
+  color: rgba(30, 21, 16, 0.75);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.qty-stepper__btn:hover:not(:disabled) {
+  border-color: var(--bronze, #a67c3d);
+  color: var(--bronze, #a67c3d);
+}
+.qty-stepper__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.qty-stepper__input {
+  width: 56px;
+  height: 28px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 4px;
+  border: 1px solid rgba(30, 21, 16, 0.18);
+  border-radius: 6px;
+  background: #fff;
+  color: rgba(30, 21, 16, 0.9);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.qty-stepper__input:focus {
+  border-color: var(--bronze, #a67c3d);
+}
+.qty-stepper__input::-webkit-outer-spin-button,
+.qty-stepper__input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 .receive-lot-hint {
   display: flex;
