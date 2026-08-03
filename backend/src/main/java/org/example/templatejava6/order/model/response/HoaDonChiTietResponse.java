@@ -5,6 +5,8 @@ import lombok.Setter;
 import org.example.templatejava6.order.entity.HoaDonChiTiet;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -20,6 +22,8 @@ public class HoaDonChiTietResponse {
     private Integer soLuong;
     private BigDecimal donGia;
     private BigDecimal thanhTien;
+    /** Phân bổ lô FEFO đã trừ khi bán (có thể rỗng với đơn cũ). */
+    private List<LoHangDonHangResponse> loHangs = new ArrayList<>();
 
     public HoaDonChiTietResponse(HoaDonChiTiet ct) {
         this.id = ct.getId();

@@ -308,6 +308,11 @@ function formatDateTime(value) {
   return new Date(value).toLocaleString('vi-VN')
 }
 
+function formatDate(value) {
+  if (!value) return '—'
+  return new Date(value).toLocaleDateString('vi-VN')
+}
+
 function actionIcon(ma) {
   const map = {
     TAO_DON: 'icon-park-outline:bill',
@@ -678,17 +683,35 @@ onUnmounted(() => {
                 <tr v-if="!detail.chiTiets?.length">
                   <td colspan="4" class="text-center py-8 text-[var(--admin-muted)]">Không có dòng hàng</td>
                 </tr>
-                <tr v-for="line in detail.chiTiets || []" :key="line.id">
-                  <td>
-                    <div class="font-medium">{{ line.tenSanPham }}</div>
-                    <div v-if="line.bienThe || line.sku" class="text-xs text-[var(--admin-muted)]">
-                      {{ line.bienThe || line.sku }}
-                    </div>
-                  </td>
-                  <td class="text-center">{{ line.soLuong }}</td>
-                  <td class="text-right">{{ formatCurrency(line.donGia) }}</td>
-                  <td class="text-right font-medium">{{ formatCurrency(line.thanhTien) }}</td>
-                </tr>
+                <template v-for="line in detail.chiTiets || []" :key="line.id">
+                  <tr>
+                    <td>
+                      <div class="font-medium">{{ line.tenSanPham }}</div>
+                      <div v-if="line.bienThe || line.sku" class="text-xs text-[var(--admin-muted)]">
+                        {{ line.bienThe || line.sku }}
+                      </div>
+                    </td>
+                    <td class="text-center">{{ line.soLuong }}</td>
+                    <td class="text-right">{{ formatCurrency(line.donGia) }}</td>
+                    <td class="text-right font-medium">{{ formatCurrency(line.thanhTien) }}</td>
+                  </tr>
+                  <tr v-if="line.loHangs?.length" class="hoa-don-lot-row">
+                    <td colspan="4">
+                      <div class="hoa-don-lots">
+                        <span class="hoa-don-lots__label">Lô:</span>
+                        <span
+                          v-for="lo in line.loHangs"
+                          :key="lo.idLoHang"
+                          class="hoa-don-lots__chip"
+                        >
+                          {{ lo.soLo || `#${lo.idLoHang}` }}
+                          · SL {{ lo.soLuongDaBan }}
+                          <template v-if="lo.hanSuDung"> · HSD {{ formatDate(lo.hanSuDung) }}</template>
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
               </tbody>
             </table>
           </div>
@@ -1024,6 +1047,34 @@ onUnmounted(() => {
   color: var(--ink);
 }
 
+.hoa-don-lot-row td {
+  padding-top: 0 !important;
+  border-top: none !important;
+}
+.hoa-don-lots {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0 0.35rem;
+  font-size: 0.78rem;
+  color: var(--admin-muted);
+}
+.hoa-don-lots__label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.68rem;
+}
+.hoa-don-lots__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.35rem;
+  background: rgba(166, 124, 61, 0.1);
+  color: var(--ink, #1e1510);
+  border: 1px solid rgba(166, 124, 61, 0.22);
+}
 .hoa-don-totals {
   margin-top: 1rem;
   padding-top: 1rem;

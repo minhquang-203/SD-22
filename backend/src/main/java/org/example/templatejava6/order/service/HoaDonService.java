@@ -27,11 +27,15 @@ import org.example.templatejava6.order.model.response.HoaDonDetailResponse;
 
 import org.example.templatejava6.order.model.response.HoaDonResponse;
 
+import org.example.templatejava6.order.model.response.LoHangDonHangResponse;
+
 import org.example.templatejava6.customer.repository.KhachHangRepository;
 import org.example.templatejava6.order.repository.*;
 import org.example.templatejava6.voucher.repository.PhieuGiamGiaRepository;
 
 import org.example.templatejava6.product.entity.ChiTietSanPham;
+
+import org.example.templatejava6.product.entity.LoHang;
 
 import org.example.templatejava6.product.repository.ChiTietSanPhamRepository;
 
@@ -59,7 +63,13 @@ import java.math.RoundingMode;
 
 import java.time.LocalDateTime;
 
+import java.util.ArrayList;
+
+import java.util.LinkedHashMap;
+
 import java.util.List;
+
+import java.util.Map;
 
 
 
@@ -72,6 +82,8 @@ public class HoaDonService {
     @Autowired private HoaDonRepository hoaDonRepository;
 
     @Autowired private HoaDonChiTietRepository hoaDonChiTietRepository;
+
+    @Autowired private HoaDonChiTietLoRepository hoaDonChiTietLoRepository;
 
     @Autowired private LichSuDonHangRepository lichSuDonHangRepository;
 
@@ -529,9 +541,13 @@ public class HoaDonService {
 
         HoaDonDetailResponse response = new HoaDonDetailResponse(hd);
 
-        response.setChiTiets(hoaDonChiTietRepository.findByIdHoaDon(hd)
-
-                .stream().map(HoaDonChiTietResponse::new).toList());
+        List<HoaDonChiTietResponse> chiTiets = hoaDonChiTietRepository.findByIdHoaDon(hd)
+                .stream().map(HoaDonChiTietResponse::new).toList();
+        Map<Integer, List<LoHangDonHangResponse>> loTheoDong = mapLoHangTheoDong(hd);
+        for (HoaDonChiTietResponse ct : chiTiets) {
+            ct.setLoHangs(loTheoDong.getOrDefault(ct.getId(), List.of()));
+        }
+        response.setChiTiets(chiTiets);
 
         thanhToanHoaDonRepository.findLatestByHoaDon(hd).ifPresent(tt -> {
             response.setSoTienKhachDua(tt.getSoTienKhachDua());
@@ -552,6 +568,44 @@ public class HoaDonService {
 
         return response;
 
+    }
+
+    /** Gom phân bổ lô theo từng dòng hóa đơn chi tiết. */
+    private Map<Integer, List<LoHangDonHangResponse>> mapLoHangTheoDong(HoaDon hd) {
+        Map<Integer, List<LoHangDonHangResponse>> byLine = new LinkedHashMap<>();
+        for (HoaDonChiTietLo row : hoaDonChiTietLoRepository.findByHoaDonFetchLo(hd)) {
+            HoaDonChiTiet ct = row.getHoaDonChiTiet();
+            LoHang lo = row.getLoHang();
+            if (ct == null || ct.getId() == null || lo == null || lo.getId() == null) {
+                continue;
+            }
+            List<LoHangDonHangResponse> list = byLine.computeIfAbsent(ct.getId(), k -> new ArrayList<>());
+            LoHangDonHangResponse existing = null;
+            for (LoHangDonHangResponse item : list) {
+                if (lo.getId().equals(item.getIdLoHang())) {
+                    existing = item;
+                    break;
+                }
+            }
+            int add = row.getSoLuong() != null ? row.getSoLuong() : 0;
+            if (existing == null) {
+                LoHangDonHangResponse item = new LoHangDonHangResponse();
+                item.setIdLoHang(lo.getId());
+                item.setSoLo(lo.getSoLo());
+                item.setHanSuDung(lo.getHanSuDung());
+                item.setNgayNhap(lo.getNgayNhap());
+                item.setSoLuongDaBan(add);
+                item.setIdChiTietSanPham(ct.getIdChiTietSanPham() != null ? ct.getIdChiTietSanPham().getId() : null);
+                item.setSku(ct.getIdChiTietSanPham() != null ? ct.getIdChiTietSanPham().getSku() : null);
+                if (ct.getIdChiTietSanPham() != null && ct.getIdChiTietSanPham().getSanPham() != null) {
+                    item.setTenSanPham(ct.getIdChiTietSanPham().getSanPham().getTen());
+                }
+                list.add(item);
+            } else {
+                existing.setSoLuongDaBan(existing.getSoLuongDaBan() + add);
+            }
+        }
+        return byLine;
     }
 
 
