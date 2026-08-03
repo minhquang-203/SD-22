@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -70,7 +71,7 @@ public class ChiTietDotGiamGiaService {
     public void deleteInDotGiamGia(Integer idDotGiamGia, Integer id) {
         ChiTietDotGiamGia existing = getChiTietOrThrow(id);
         validateBelongsToDotGiamGia(existing, idDotGiamGia);
-        chiTietDotGiamGiaRepository.delete(existing);
+        delete(id);
         invalidateChatCatalog();
     }
 
@@ -110,6 +111,18 @@ public class ChiTietDotGiamGiaService {
     @Transactional
     public void delete(Integer id) {
         ChiTietDotGiamGia ct = getChiTietOrThrow(id);
+        DotGiamGia dgg = ct.getIdDotGiamGia();
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime ngayBatDau = dgg.getNgayBatDau();
+        LocalDateTime ngayKetThuc = dgg.getNgayKetThuc();
+        if(ngayBatDau != null && ngayKetThuc != null &&
+                !now.isAfter(ngayKetThuc) && !now.isBefore(ngayBatDau)){
+            throw new ApiException("Không thể sửa đợt giảm giá đang hoạt động", "IS_ACTIVE");
+        }
+        if(ngayKetThuc != null && ngayKetThuc.isBefore(now)){
+            throw new ApiException("Không thể chỉnh sửa đợt giảm giá đã kết thúc", "SALE_IS_OVER");
+        }
+
         chiTietDotGiamGiaRepository.delete(ct);
         invalidateChatCatalog();
     }

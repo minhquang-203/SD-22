@@ -7,7 +7,6 @@ import { confirm } from '@/composables/useConfirm'
 import { useAdminAuth } from '@/composables/useAdminAuth'
 import {
   daNhanHangTraHang,
-  dongBoVanDonTra,
   duyetTraHang,
   fetchLoHangTraHang,
   fetchTraHangList,
@@ -363,29 +362,6 @@ async function confirmReceive() {
   }
 }
 
-async function handleDongBoGhn(item) {
-  actionLoading.value = item.id
-  try {
-    const res = await dongBoVanDonTra(item.id, staffPayload())
-    const updated = res.data
-    const ghn = (updated?.ghnTrangThaiTra || '').toLowerCase()
-    if (ghn === 'delivered' || ghn === 'returned') {
-      notify(
-        `Vận đơn hoàn đơn ${item.maHoaDon} đã về cửa hàng — nhấn "Đã nhận hàng" để phân loại lô TỐT/LỖI.`,
-      )
-    } else {
-      notify(
-        `Vận đơn hoàn đơn ${item.maHoaDon}: ${updated?.ghnTrangThaiTraLabel || 'chưa có cập nhật mới'}.`,
-      )
-    }
-    await loadList()
-  } catch (err) {
-    notify(String(err), 'error')
-  } finally {
-    actionLoading.value = null
-  }
-}
-
 watch([keyword, currentTab], () => { page.value = 1 })
 watch(filteredItems, () => {
   if (page.value > totalPages.value) page.value = totalPages.value
@@ -530,15 +506,6 @@ onMounted(() => {
                         Từ chối
                       </button>
                     </template>
-                    <button
-                      v-if="item.maVanDonTra && item.trangThai === 'DANG_HOAN_HANG'"
-                      type="button"
-                      class="act-btn act-btn--info"
-                      :disabled="actionLoading === item.id"
-                      @click="handleDongBoGhn(item)"
-                    >
-                      Đồng bộ GHN
-                    </button>
                     <button
                       v-if="item.trangThai === 'DANG_HOAN_HANG' && item.maVanDonTra"
                       type="button"

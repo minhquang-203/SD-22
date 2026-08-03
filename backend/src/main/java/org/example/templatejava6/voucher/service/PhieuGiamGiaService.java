@@ -62,6 +62,17 @@ public class PhieuGiamGiaService {
     @Transactional
     public void update(Integer id, PhieuGiamGiaRequest request) {
         PhieuGiamGia pgg = getPhieuGiamGiaOrThrow(id);
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime ngayBatDau  =pgg.getNgayBatDau();
+        LocalDateTime ngayKetThuc =pgg.getNgayKetThuc();
+
+        if(ngayBatDau != null && ngayKetThuc != null &&
+                !now.isBefore(ngayBatDau) && !now.isAfter(ngayKetThuc)){
+            throw new ApiException("Không thể cập nhật phiếu giảm giá đang trong thời gian hoạt động", "PROMOTION_ISACTIVE");
+        }
+        if(ngayKetThuc != null && ngayKetThuc.isBefore(now)){
+            throw new ApiException("Không thể cập nhật phiếu giảm giá đã kết thúc", "PROMOTION_IS_OVER");
+        }
         normalizeRequest(request);
         validateRequest(request, false);
         if (phieuGiamGiaRepository.existsByMaAndIdNot(request.getMa(), id)) {
@@ -233,6 +244,17 @@ public class PhieuGiamGiaService {
         String normalizedKeyword = keyword == null ? null : keyword.trim();
         return phieuGiamGiaRepository.findAvailableForCustomer(normalizedKeyword, pageable)
                 .map(PhieuGiamGiaResponse::new);
+    }
+
+    /** Danh sách mã giảm giá khả dụng tại quầy (loại trừ FREE_SHIP trên service). */
+    public Page<PhieuGiamGiaResponse> listAvailableForPos(String keyword, Pageable pageable) {
+        String normalizedKeyword = keyword == null ? null : keyword.trim();
+        Page<PhieuGiamGia> page = phieuGiamGiaRepository.findAvailableForCustomer(normalizedKeyword, pageable);
+        var content = page.getContent().stream()
+                .filter(v -> v.getLoai() != LoaiPhieuGiamGia.FREE_SHIP)
+                .map(PhieuGiamGiaResponse::new)
+                .toList();
+        return new org.springframework.data.domain.PageImpl<>(content, pageable, page.getTotalElements());
     }
 
 //    public Page<PhieuGiamGiaResponse> paginition(return null)

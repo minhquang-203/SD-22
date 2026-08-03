@@ -19,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +72,16 @@ public class DotGiamGiaService {
     @Transactional
     public void update(Integer id, DotGiamGiaRequest request) {
         DotGiamGia dgg = getDotGiamGiaOrThrow(id);
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime ngayKetThuc = dgg.getNgayKetThuc();
+        LocalDateTime ngayBatDau = dgg.getNgayBatDau();
+        if (ngayKetThuc != null && ngayKetThuc.isBefore(now)) {
+            throw new ApiException("Không thể chỉnh sửa đợt giảm giá đã kết thúc", "SALE_IS_OVER");
+        }
+        if (ngayBatDau != null && ngayKetThuc != null
+                && !ngayBatDau.isAfter(now) && !now.isAfter(ngayKetThuc)) {
+            throw new ApiException("Không thể chỉnh sửa đợt giảm giá đang trong thời gian hoạt động", "SALE_IS_ACTIVE");
+        }
         normalizeRequest(request);
         validateRequest(request, false);
         if (dotGiamGiaRepository.existsByMaAndIdNot(request.getMa(), id)) {

@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
-import { getAllHoaDon } from '@/api/hoaDonApi'
+import { getHoaDonAdminCounts, searchHoaDon } from '@/api/hoaDonApi'
 import { useAdminBadges } from '@/composables/useAdminBadges'
 import { subscribeAdminOrders } from '@/composables/useRealtime'
 import { formatCurrency } from '@/utils/format'
@@ -16,8 +16,9 @@ const message = ref('')
 const messageType = ref('success')
 
 let unsubscribeOrders = null
+let searchTimer = null
 
-const allOrders = ref([])
+const orders = ref([])
 const keyword = ref('')
 const filterLoaiDon = ref('')
 const filterTrangThai = ref('')
@@ -26,6 +27,9 @@ const dateTo = ref('')
 
 const page = ref(1)
 const pageSize = ref(12)
+const totalElements = ref(0)
+const totalPages = ref(1)
+const tabCounts = ref({ ALL: 0, CHO_XAC_NHAN: 0 })
 
 const TAB_ALL = 'ALL'
 const TAB_PENDING = 'CHO_XAC_NHAN'
@@ -81,23 +85,6 @@ function loaiDonLabel(loai) {
   return loai || '—'
 }
 
-function onOrderRealtime(event) {
-  if (!event?.idHoaDon) return
-  const idx = allOrders.value.findIndex((o) => Number(o.id) === Number(event.idHoaDon))
-  if (idx >= 0) {
-    allOrders.value[idx] = {
-      ...allOrders.value[idx],
-      trangThai: event.trangThai ?? allOrders.value[idx].trangThai,
-    }
-  } else if (event.type === 'ORDER_CREATED') {
-    loadOrders({ silent: true })
-  }
-}
-
-function onOrderRealtimeWindow(e) {
-  onOrderRealtime(e?.detail)
-}
-
 function loaiDonTone(loai) {
   return loai === 'TAI_QUAY' ? 'gold' : 'teal'
 }
@@ -107,39 +94,10 @@ function formatDateTime(value) {
   return new Date(value).toLocaleString('vi-VN')
 }
 
-function matchesDate(ngayTao) {
-  if (!ngayTao) return true
-  const d = new Date(ngayTao)
-  if (dateFrom.value) {
-    const from = new Date(dateFrom.value)
-    from.setHours(0, 0, 0, 0)
-    if (d < from) return false
-  }
-  if (dateTo.value) {
-    const to = new Date(dateTo.value)
-    to.setHours(23, 59, 59, 999)
-    if (d > to) return false
-  }
-  return true
+function resolveTrangThaiFilter() {
+  if (currentTab.value === TAB_PENDING) return 'CHO_XAC_NHAN'
+  return filterTrangThai.value || undefined
 }
-
-function matchesTab(trangThai) {
-  if (currentTab.value === TAB_PENDING) {
-    return trangThai === 'CHO_XAC_NHAN'
-  }
-  return true
-}
-
-function matchesTrangThai(trangThai) {
-  if (currentTab.value === TAB_PENDING) return true
-  if (!filterTrangThai.value) return true
-  return trangThai === filterTrangThai.value
-}
-
-const tabCounts = computed(() => ({
-  [TAB_ALL]: allOrders.value.length,
-  [TAB_PENDING]: allOrders.value.filter((o) => o.trangThai === 'CHO_XAC_NHAN').length,
-}))
 
 const pageTitle = computed(() =>
   currentTab.value === TAB_PENDING ? 'Đơn hàng chờ xác nhận' : 'Hóa đơn',
@@ -150,7 +108,7 @@ const listLabel = computed(() =>
 )
 
 const pageDescription = computed(() =>
-  `SUNOVA — ${filteredOrders.value.length} ${listLabel.value}`,
+  `SUNOVA — ${totalElements.value} ${listLabel.value}`,
 )
 
 const tableTitle = computed(() =>
@@ -163,48 +121,73 @@ const emptyMessage = computed(() =>
     : 'Không có hóa đơn phù hợp',
 )
 
-const filteredOrders = computed(() => {
-  const kw = keyword.value.trim().toLowerCase()
-  return allOrders.value.filter((o) => {
-    if (!matchesTab(o.trangThai)) return false
-    if (filterLoaiDon.value && o.loaiDon !== filterLoaiDon.value) return false
-    if (!matchesTrangThai(o.trangThai)) return false
-    if (!matchesDate(o.ngayTao)) return false
-    if (!kw) return true
-    const haystack = [
-      o.maHoaDon,
-      o.tenKhachHang,
-      o.tenNhanVien,
-      o.tenPhuongThucThanhToan,
-    ]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase()
-    return haystack.includes(kw)
-  })
+/** Dãy trang: 1 … 4 5 6 … 20 */
+const pageItems = computed(() => {
+  const total = totalPages.value
+  const current = page.value
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1)
+  }
+
+  const set = new Set([1, total, current, current - 1, current + 1, current - 2, current + 2])
+  const nums = [...set].filter((n) => n >= 1 && n <= total).sort((a, b) => a - b)
+
+  const items = []
+  for (let i = 0; i < nums.length; i++) {
+    if (i > 0 && nums[i] - nums[i - 1] > 1) {
+      items.push('…')
+    }
+    items.push(nums[i])
+  }
+  return items
 })
 
-const totalPages = computed(() =>
-  Math.max(1, Math.ceil(filteredOrders.value.length / pageSize.value)),
-)
+async function loadTabCounts() {
+  try {
+    const res = await getHoaDonAdminCounts()
+    tabCounts.value = {
+      ALL: Number(res.data?.all) || 0,
+      CHO_XAC_NHAN: Number(res.data?.choXacNhan) || 0,
+    }
+  } catch {
+    // im lặng — không chặn list
+  }
+}
 
-const pagedOrders = computed(() => {
-  const start = (page.value - 1) * pageSize.value
-  return filteredOrders.value.slice(start, start + pageSize.value)
-})
-
-async function loadOrders({ silent = false } = {}) {
+async function loadOrders({ silent = false, resetPage = false } = {}) {
+  if (resetPage) page.value = 1
   if (!silent) loading.value = true
   try {
-    const res = await getAllHoaDon()
-    allOrders.value = res.data || []
-    if (!silent) page.value = 1
-    await refreshBadges()
+    const res = await searchHoaDon({
+      keyword: keyword.value.trim() || undefined,
+      loaiDon: filterLoaiDon.value || undefined,
+      trangThai: resolveTrangThaiFilter(),
+      from: dateFrom.value || undefined,
+      to: dateTo.value || undefined,
+      page: page.value,
+      size: pageSize.value,
+    })
+    const data = res.data || {}
+    orders.value = data.content || []
+    totalElements.value = Number(data.totalElements) || 0
+    totalPages.value = Math.max(1, Number(data.totalPages) || 1)
+    if (page.value > totalPages.value) {
+      page.value = totalPages.value
+    }
+    await Promise.all([loadTabCounts(), refreshBadges()])
   } catch (err) {
     if (!silent) notify(String(err), 'error')
   } finally {
     if (!silent) loading.value = false
   }
+}
+
+function onOrderRealtime() {
+  loadOrders({ silent: true })
+}
+
+function onOrderRealtimeWindow() {
+  loadOrders({ silent: true })
 }
 
 function openDetail(order) {
@@ -222,14 +205,17 @@ function switchTab(tab) {
   }
 }
 
-watch([keyword, filterLoaiDon, filterTrangThai, dateFrom, dateTo, currentTab], () => {
-  page.value = 1
-})
+function changePage(next) {
+  if (next < 1 || next > totalPages.value || next === page.value) return
+  page.value = next
+  loadOrders()
+}
 
-watch(filteredOrders, () => {
-  if (page.value > totalPages.value) {
-    page.value = totalPages.value
-  }
+watch([keyword, filterLoaiDon, filterTrangThai, dateFrom, dateTo, currentTab], () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    loadOrders({ resetPage: true })
+  }, 300)
 })
 
 onMounted(() => {
@@ -239,6 +225,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  clearTimeout(searchTimer)
   unsubscribeOrders?.()
   unsubscribeOrders = null
   window.removeEventListener('sunova-admin-order-realtime', onOrderRealtimeWindow)
@@ -311,7 +298,7 @@ onUnmounted(() => {
         <label class="soleil-toolbar__label">Đến ngày</label>
         <input v-model="dateTo" type="date" class="soleil-toolbar__input" />
       </div>
-      <button type="button" class="soleil-btn-outline" style="align-self: flex-end" @click="loadOrders">
+      <button type="button" class="soleil-btn-outline" style="align-self: flex-end" @click="loadOrders()">
         <Icon icon="icon-park-outline:refresh" />
         Tải lại
       </button>
@@ -343,12 +330,12 @@ onUnmounted(() => {
                 Đang tải dữ liệu...
               </td>
             </tr>
-            <tr v-else-if="pagedOrders.length === 0">
+            <tr v-else-if="orders.length === 0">
               <td colspan="8" class="text-center py-10 text-[var(--admin-muted)]">
                 {{ emptyMessage }}
               </td>
             </tr>
-            <tr v-for="item in pagedOrders" :key="item.id">
+            <tr v-for="item in orders" :key="item.id">
               <td class="soleil-col-text">
                 <span class="soleil-sp-code">{{ item.maHoaDon }}</span>
               </td>
@@ -391,19 +378,39 @@ onUnmounted(() => {
 
       <div class="soleil-pagination">
         <span class="soleil-pagination__info">
-          Hiển thị {{ pagedOrders.length }} / {{ filteredOrders.length }} {{ listLabel }}
+          Hiển thị {{ orders.length }} / {{ totalElements }} {{ listLabel }}
         </span>
         <div class="soleil-pagination__btns">
-          <button type="button" class="soleil-page-btn" :disabled="page <= 1" @click="page--">
-            Trước
-          </button>
           <button
             type="button"
             class="soleil-page-btn"
-            :disabled="page >= totalPages"
-            @click="page++"
+            title="Trang trước"
+            :disabled="page <= 1 || loading"
+            @click="changePage(page - 1)"
           >
-            Sau
+            <Icon icon="icon-park-outline:left" width="14" />
+          </button>
+          <template v-for="(item, idx) in pageItems" :key="`${item}-${idx}`">
+            <span v-if="item === '…'" class="soleil-page-ellipsis">…</span>
+            <button
+              v-else
+              type="button"
+              class="soleil-page-btn"
+              :class="{ 'soleil-page-btn--active': item === page }"
+              :disabled="loading"
+              @click="changePage(item)"
+            >
+              {{ item }}
+            </button>
+          </template>
+          <button
+            type="button"
+            class="soleil-page-btn"
+            title="Trang sau"
+            :disabled="page >= totalPages || loading"
+            @click="changePage(page + 1)"
+          >
+            <Icon icon="icon-park-outline:right" width="14" />
           </button>
         </div>
       </div>
@@ -502,5 +509,16 @@ onUnmounted(() => {
 .order-badge--neutral {
   background: rgba(30, 21, 16, 0.06);
   color: rgba(30, 21, 16, 0.55);
+}
+
+.soleil-page-ellipsis {
+  min-width: 24px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(30, 21, 16, 0.4);
+  font-size: 13px;
+  user-select: none;
 }
 </style>

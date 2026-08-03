@@ -16,9 +16,14 @@ import org.example.templatejava6.order.service.GhnTrackingService;
 import org.example.templatejava6.order.service.HoaDonService;
 import org.example.templatejava6.order.service.HoaDonStorefrontService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/hoa-don")
@@ -68,16 +73,29 @@ public class HoaDonController {
         return hoaDonService.phanTrang(pageNo, pageSize).getContent();
     }
 
+    /** Admin: phân trang + lọc keyword/loại/trạng thái/ngày. */
+    @GetMapping("/search")
+    public ResponseEntity<Page<HoaDonResponse>> search(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String loaiDon,
+            @RequestParam(required = false) String trangThai,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "12") int size
+    ) {
+        return ResponseEntity.ok(hoaDonService.searchAdmin(keyword, loaiDon, trangThai, from, to, page, size));
+    }
+
+    /** Admin: số lượng tab Tất cả / Chờ xác nhận (đơn visible). */
+    @GetMapping("/admin-counts")
+    public Map<String, Long> adminCounts() {
+        return hoaDonService.adminTabCounts();
+    }
+
     @GetMapping("/{id}")
     public HoaDonDetailResponse detail(@PathVariable Integer id) {
         return hoaDonService.detail(id);
-    }
-
-    @GetMapping("/search")
-    public List<HoaDonResponse> search(
-            @RequestParam("keyword") String keyword
-    ) {
-        return hoaDonService.timKiem(keyword);
     }
 
     @PostMapping

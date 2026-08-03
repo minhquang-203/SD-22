@@ -20,21 +20,6 @@ const error = ref('')
 const orderCode = computed(() => props.order?.maHoaDon || '')
 const pickupAddress = computed(() => props.order?.diaChiGiao || '')
 
-function formatShiftTime(shift) {
-  const range = [shift.fromTime, shift.toTime]
-    .filter((t) => Number.isFinite(t))
-    .map((t) => {
-      const date = new Date(t * 1000)
-      return date.toLocaleString('vi-VN', {
-        day: '2-digit',
-        month: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    })
-  return range.length === 2 ? `${range[0]} — ${range[1]}` : ''
-}
-
 async function loadShifts() {
   loading.value = true
   error.value = ''
@@ -136,9 +121,6 @@ function handleConfirm() {
                 />
                 <span class="sf-shift-option__body">
                   <span class="sf-shift-option__title">{{ shift.title || `Ca ${shift.id}` }}</span>
-                  <span v-if="formatShiftTime(shift)" class="sf-shift-option__time">
-                    {{ formatShiftTime(shift) }}
-                  </span>
                 </span>
               </label>
             </div>
@@ -174,16 +156,17 @@ function handleConfirm() {
 .sf-shift-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
 }
 
 .sf-shift-option {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 12px;
+  padding: 14px 16px;
+  min-height: 52px;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
   font-weight: 400;
   margin: 0;
@@ -214,10 +197,5 @@ function handleConfirm() {
 .sf-shift-option__title {
   font-size: 14px;
   color: #1e1510;
-}
-
-.sf-shift-option__time {
-  font-size: 12px;
-  color: #64748b;
 }
 </style>

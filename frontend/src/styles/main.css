@@ -1923,6 +1923,43 @@ h2,
   margin: 0 0 12px;
 }
 
+.pos-voucher-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+  color: rgba(30, 21, 16, 0.7);
+}
+
+.pos-voucher-trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pos-voucher-trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pos-voucher-clear {
+  margin-left: 8px;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: inherit;
+  color: #a83a3a;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.pos-voucher-clear:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .pos-customer-bar {
   display: flex;
   flex-wrap: wrap;

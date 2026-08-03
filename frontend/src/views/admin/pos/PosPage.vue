@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { NQrCode } from 'naive-ui'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import PosVoucherModal from '@/components/admin/PosVoucherModal.vue'
 import {
   getSanPhamBan,
   getPhuongThuc,
@@ -66,6 +67,7 @@ const voucherCode = ref('')
 const appliedVoucher = ref('')
 const voucherDiscount = ref(0)
 const voucherLoading = ref(false)
+const showVoucherModal = ref(false)
 
 const paymentMethods = ref([])
 const selectedPaymentId = ref(null)
@@ -505,8 +507,27 @@ async function recalculateVoucher() {
   }
 }
 
-function applyVoucher() {
-  const code = voucherCode.value.trim()
+function openVoucherModal() {
+  if (cart.value.length === 0) {
+    notify('Thêm sản phẩm trước khi chọn mã giảm giá', 'error')
+    return
+  }
+  showVoucherModal.value = true
+}
+
+function onVoucherModalSelect(code) {
+  const next = String(code || '').trim()
+  if (!next) {
+    clearVoucher()
+    notify('Đã bỏ mã giảm giá')
+    return
+  }
+  voucherCode.value = next
+  void applyVoucher(next, { skipConfirm: true })
+}
+
+async function applyVoucher(codeOverride, { skipConfirm = false } = {}) {
+  const code = String(codeOverride ?? voucherCode.value).trim()
   if (!code) {
     clearVoucher()
     return
@@ -515,31 +536,33 @@ function applyVoucher() {
     notify('Thêm sản phẩm trước khi áp mã giảm giá', 'error')
     return
   }
-  confirm({
-    title: 'Áp mã giảm giá',
-    message: `Áp dụng mã "${code}" cho đơn này?`,
-    confirmText: 'Áp mã',
-  }).then(async (ok) => {
+  if (!skipConfirm) {
+    const ok = await confirm({
+      title: 'Áp mã giảm giá',
+      message: `Áp dụng mã "${code}" cho đơn này?`,
+      confirmText: 'Áp mã',
+    })
     if (!ok) return
-    voucherLoading.value = true
-    try {
-      const res = await tinhGiaTaiQuay({
-        items: cart.value.map((l) => ({
-          idChiTietSanPham: l.idChiTietSanPham,
-          soLuong: l.soLuong,
-        })),
-        maPhieuGiamGia: code,
-      })
-      appliedVoucher.value = code
-      voucherDiscount.value = Number(res.data?.tienGiamGia) || 0
-      notify(`Đã áp mã "${code}" — giảm ${formatCurrency(voucherDiscount.value)}`)
-    } catch (err) {
-      clearVoucher()
-      notify(String(err), 'error')
-    } finally {
-      voucherLoading.value = false
-    }
-  })
+  }
+  voucherLoading.value = true
+  try {
+    const res = await tinhGiaTaiQuay({
+      items: cart.value.map((l) => ({
+        idChiTietSanPham: l.idChiTietSanPham,
+        soLuong: l.soLuong,
+      })),
+      maPhieuGiamGia: code,
+    })
+    voucherCode.value = code
+    appliedVoucher.value = code
+    voucherDiscount.value = Number(res.data?.tienGiamGia) || 0
+    notify(`Đã áp mã "${code}" — giảm ${formatCurrency(voucherDiscount.value)}`)
+  } catch (err) {
+    clearVoucher()
+    notify(String(err), 'error')
+  } finally {
+    voucherLoading.value = false
+  }
 }
 
 async function loadHeldOrders() {
@@ -1212,24 +1235,35 @@ onBeforeUnmount(() => {
         <div class="mb-4">
           <p class="pos-section-title">Mã giảm giá</p>
           <div class="flex gap-2">
-            <input
-              v-model="voucherCode"
-              type="text"
-              class="admin-input flex-1"
-              placeholder="Nhập mã (tùy chọn)"
-            />
+            <button
+              type="button"
+              class="admin-input flex-1 pos-voucher-trigger"
+              :disabled="voucherLoading || cart.length === 0"
+              @click="openVoucherModal"
+            >
+              <Icon icon="icon-park-outline:ticket" width="16" />
+              <span>{{ appliedVoucher || 'Chọn / tìm mã giảm giá...' }}</span>
+            </button>
             <button
               type="button"
               class="admin-btn admin-btn-default"
               :disabled="voucherLoading || cart.length === 0"
-              @click="applyVoucher"
+              @click="openVoucherModal"
             >
-              {{ voucherLoading ? 'Đang kiểm tra...' : 'Áp dụng' }}
+              {{ voucherLoading ? 'Đang kiểm tra...' : 'Chọn mã' }}
             </button>
           </div>
           <p v-if="appliedVoucher" class="text-xs text-[var(--admin-muted)] mt-1">
             Mã đã áp dụng: <strong>{{ appliedVoucher }}</strong>
             — giảm <strong class="text-[var(--sage)]">{{ formatCurrency(voucherDiscount) }}</strong>
+            <button
+              type="button"
+              class="pos-voucher-clear"
+              :disabled="voucherLoading"
+              @click="clearVoucher"
+            >
+              Bỏ mã
+            </button>
           </p>
         </div>
 
@@ -1628,6 +1662,13 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </Teleport>
+
+    <PosVoucherModal
+      v-model:visible="showVoucherModal"
+      :selected-code="appliedVoucher"
+      :subtotal="tongTienHang"
+      @select="onVoucherModalSelect"
+    />
 
     <!-- Modal VietQR chuyển khoản (thanh toán kết hợp) -->
     <Teleport to="body">

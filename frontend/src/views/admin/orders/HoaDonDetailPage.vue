@@ -215,18 +215,18 @@ async function handleCapNhatWebhook() {
     if (payload?.daCapNhat) {
       notifyWebhook(
         payload.thongDiep ||
-          `Đã cập nhật đơn theo webhook GHN "${statusLabelText}"`,
+          `Đã cập nhật trạng thái đơn thành "${statusLabelText}"`,
         'success',
       )
     } else {
       notifyWebhook(
-        payload?.thongDiep || `Webhook GHN "${statusLabelText}" không đổi trạng thái đơn.`,
+        payload?.thongDiep || `Trạng thái "${statusLabelText}" không làm thay đổi đơn.`,
         'error',
       )
     }
     await loadDetail()
   } catch (err) {
-    notifyWebhook(typeof err === 'string' ? err : 'Không gửi được webhook GHN giả lập', 'error')
+    notifyWebhook(typeof err === 'string' ? err : 'Không cập nhật được trạng thái đơn', 'error')
   } finally {
     webhookLoading.value = false
   }
@@ -548,15 +548,9 @@ onUnmounted(() => {
           <div class="hoa-don-webhook__head">
             <h2 class="hoa-don-section-title" style="margin: 0">
               <Icon icon="mdi:webhook" width="18" class="hoa-don-webhook__title-icon" />
-              Giả lập webhook cập nhật trạng thái
+              Cập nhật trạng thái đơn hàng
             </h2>
           </div>
-
-          <p class="hoa-don-webhook__hint">
-            Mô phỏng webhook GHN gửi về hệ thống: chọn <strong>trạng thái vận đơn GHN</strong>,
-            hệ thống sẽ ánh xạ sang trạng thái đơn nội bộ (giống webhook thật).
-            Chỉ dùng khi đơn đã có mã vận đơn GHN.
-          </p>
 
           <div class="hoa-don-webhook__form">
             <div class="hoa-don-webhook__field">
@@ -567,7 +561,7 @@ onUnmounted(() => {
             </div>
 
             <div class="hoa-don-webhook__field">
-              <label class="hoa-don-webhook__label" for="webhook-ghn-status">Trạng thái GHN (webhook)</label>
+              <label class="hoa-don-webhook__label" for="webhook-ghn-status">Trạng thái GHN</label>
               <select
                 id="webhook-ghn-status"
                 v-model="selectedGhnStatus"
@@ -590,7 +584,7 @@ onUnmounted(() => {
                 v-model="webhookGhiChu"
                 type="text"
                 class="hoa-don-webhook__input"
-                placeholder="Ví dụ: Webhook test từ GHN"
+                placeholder="Ví dụ: Đơn đang giao, khách hẹn nhận chiều"
               />
             </div>
 
@@ -601,7 +595,7 @@ onUnmounted(() => {
               @click="handleCapNhatWebhook"
             >
               <Icon icon="icon-park-outline:refresh" />
-              {{ webhookLoading ? 'Đang gửi webhook...' : 'Gửi webhook GHN giả lập' }}
+              {{ webhookLoading ? 'Đang cập nhật...' : 'Cập nhật trạng thái' }}
             </button>
           </div>
 
@@ -700,10 +694,11 @@ onUnmounted(() => {
                       <div class="hoa-don-lots">
                         <span class="hoa-don-lots__label">Lô:</span>
                         <span
-                          v-for="lo in line.loHangs"
+                          v-for="(lo, idx) in line.loHangs"
                           :key="lo.idLoHang"
-                          class="hoa-don-lots__chip"
+                          class="hoa-don-lots__item"
                         >
+                          <template v-if="idx > 0">; </template>
                           {{ lo.soLo || `#${lo.idLoHang}` }}
                           · SL {{ lo.soLuongDaBan }}
                           <template v-if="lo.hanSuDung"> · HSD {{ formatDate(lo.hanSuDung) }}</template>
@@ -1052,28 +1047,18 @@ onUnmounted(() => {
   border-top: none !important;
 }
 .hoa-don-lots {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
   padding: 0.15rem 0 0.35rem;
   font-size: 0.78rem;
   color: var(--admin-muted);
+  line-height: 1.45;
 }
 .hoa-don-lots__label {
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-size: 0.68rem;
+  margin-right: 0.35rem;
+  font-weight: 500;
+  color: var(--admin-muted);
 }
-.hoa-don-lots__chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.15rem 0.5rem;
-  border-radius: 0.35rem;
-  background: rgba(166, 124, 61, 0.1);
+.hoa-don-lots__item {
   color: var(--ink, #1e1510);
-  border: 1px solid rgba(166, 124, 61, 0.22);
 }
 .hoa-don-totals {
   margin-top: 1rem;

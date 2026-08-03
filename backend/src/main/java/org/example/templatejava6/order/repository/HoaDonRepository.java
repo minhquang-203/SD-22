@@ -71,6 +71,76 @@ public interface HoaDonRepository extends JpaRepository<HoaDon, Integer> {
             """)
     List<HoaDon> findVisibleForAdminByMaHoaDonContaining(@Param("keyword") String keyword);
 
+    /**
+     * Admin list: ẩn VNPAY chưa thanh toán + lọc keyword/loại/trạng thái/ngày + phân trang.
+     */
+    @Query(
+            value = """
+                    SELECT h FROM HoaDon h
+                    LEFT JOIN h.idKhachHang kh
+                    LEFT JOIN h.idNhanVien nv
+                    LEFT JOIN h.idPhuongThucThanhToan pttt
+                    WHERE NOT (
+                        UPPER(pttt.ma) = 'VNPAY'
+                        AND NOT EXISTS (
+                            SELECT 1 FROM ThanhToanHoaDon t
+                            WHERE t.idHoaDon = h AND t.trangThai = 'THANH_CONG'
+                        )
+                    )
+                      AND (:keyword IS NULL OR :keyword = ''
+                           OR LOWER(h.maHoaDon) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                           OR LOWER(kh.hoTen) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                           OR LOWER(nv.hoTen) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                           OR LOWER(pttt.ten) LIKE LOWER(CONCAT('%', :keyword, '%')))
+                      AND (:loaiDon IS NULL OR :loaiDon = '' OR UPPER(h.loaiDon) = UPPER(:loaiDon))
+                      AND (:trangThai IS NULL OR h.trangThai = :trangThai)
+                      AND (:from IS NULL OR h.ngayTao >= :from)
+                      AND (:to IS NULL OR h.ngayTao <= :to)
+                    """,
+            countQuery = """
+                    SELECT COUNT(h) FROM HoaDon h
+                    LEFT JOIN h.idKhachHang kh
+                    LEFT JOIN h.idNhanVien nv
+                    LEFT JOIN h.idPhuongThucThanhToan pttt
+                    WHERE NOT (
+                        UPPER(pttt.ma) = 'VNPAY'
+                        AND NOT EXISTS (
+                            SELECT 1 FROM ThanhToanHoaDon t
+                            WHERE t.idHoaDon = h AND t.trangThai = 'THANH_CONG'
+                        )
+                    )
+                      AND (:keyword IS NULL OR :keyword = ''
+                           OR LOWER(h.maHoaDon) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                           OR LOWER(kh.hoTen) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                           OR LOWER(nv.hoTen) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                           OR LOWER(pttt.ten) LIKE LOWER(CONCAT('%', :keyword, '%')))
+                      AND (:loaiDon IS NULL OR :loaiDon = '' OR UPPER(h.loaiDon) = UPPER(:loaiDon))
+                      AND (:trangThai IS NULL OR h.trangThai = :trangThai)
+                      AND (:from IS NULL OR h.ngayTao >= :from)
+                      AND (:to IS NULL OR h.ngayTao <= :to)
+                    """)
+    Page<HoaDon> searchVisibleForAdmin(
+            @Param("keyword") String keyword,
+            @Param("loaiDon") String loaiDon,
+            @Param("trangThai") TrangThaiDonHang trangThai,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            Pageable pageable);
+
+    @Query("""
+            SELECT COUNT(h) FROM HoaDon h
+            LEFT JOIN h.idPhuongThucThanhToan pttt
+            WHERE NOT (
+                UPPER(pttt.ma) = 'VNPAY'
+                AND NOT EXISTS (
+                    SELECT 1 FROM ThanhToanHoaDon t
+                    WHERE t.idHoaDon = h AND t.trangThai = 'THANH_CONG'
+                )
+            )
+              AND (:trangThai IS NULL OR h.trangThai = :trangThai)
+            """)
+    long countVisibleForAdmin(@Param("trangThai") TrangThaiDonHang trangThai);
+
     List<HoaDon> findByTrangThaiAndLoaiDonOrderByNgayTaoDesc(TrangThaiDonHang trangThai, String loaiDon);
 
     long countByTrangThaiAndLoaiDon(TrangThaiDonHang trangThai, String loaiDon);
