@@ -89,6 +89,22 @@ public class SecurityConfig {
                     .requestMatchers("/api/nhan-vien", "/api/nhan-vien/**").hasAnyRole("QUAN_LY", "CHU")
                     .requestMatchers("/api/nhap-hang", "/api/nhap-hang/**").hasAnyRole("QUAN_LY", "CHU")
                     .requestMatchers("/api/nha-cung-cap", "/api/nha-cung-cap/**").hasAnyRole("QUAN_LY", "CHU")
+                    // Quản lý sản phẩm: GHI chỉ CHU/QUAN_LY; GET vẫn cho NV (và permitAll ở trên)
+                    .requestMatchers(HttpMethod.POST,
+                            "/api/san-pham/**",
+                            "/api/chi-tiet-san-pham/**",
+                            "/api/lo-hang/**"
+                    ).hasAnyRole("QUAN_LY", "CHU")
+                    .requestMatchers(HttpMethod.PUT,
+                            "/api/san-pham/**",
+                            "/api/chi-tiet-san-pham/**",
+                            "/api/lo-hang/**"
+                    ).hasAnyRole("QUAN_LY", "CHU")
+                    .requestMatchers(HttpMethod.DELETE,
+                            "/api/san-pham/**",
+                            "/api/chi-tiet-san-pham/**",
+                            "/api/lo-hang/**"
+                    ).hasAnyRole("QUAN_LY", "CHU")
                     .requestMatchers("/api/**").hasAnyRole("NHAN_VIEN", "QUAN_LY", "CHU")
                     .anyRequest().permitAll()
             );

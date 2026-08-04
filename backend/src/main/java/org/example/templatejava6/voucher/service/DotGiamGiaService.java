@@ -1,5 +1,6 @@
 package org.example.templatejava6.voucher.service;
 
+import org.example.templatejava6.chat.event.CatalogCacheInvalidateEvent;
 import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.common.util.MapperUtil;
 import org.example.templatejava6.voucher.entity.DotGiamGia;
@@ -10,6 +11,7 @@ import org.example.templatejava6.voucher.repository.ChiTietDotGiamGiaRepository;
 import org.example.templatejava6.voucher.repository.DotGiamGiaRepository;
 import org.example.templatejava6.voucher.repository.VariantSalePriceRow;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +30,11 @@ public class DotGiamGiaService {
 
     @Autowired private DotGiamGiaRepository dotGiamGiaRepository;
     @Autowired private ChiTietDotGiamGiaRepository chiTietDotGiamGiaRepository;
+    @Autowired private ApplicationEventPublisher eventPublisher;
+
+    private void invalidateChatCatalog() {
+        eventPublisher.publishEvent(new CatalogCacheInvalidateEvent());
+    }
 
     @Transactional(readOnly = true)
     public List<DotGiamGiaResponse> getAll() {
@@ -57,11 +66,22 @@ public class DotGiamGiaService {
         dgg.setTrangThai(true);
         dgg.setIsActive(true);
         dotGiamGiaRepository.save(dgg);
+        invalidateChatCatalog();
     }
 
     @Transactional
     public void update(Integer id, DotGiamGiaRequest request) {
         DotGiamGia dgg = getDotGiamGiaOrThrow(id);
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime ngayKetThuc = dgg.getNgayKetThuc();
+        LocalDateTime ngayBatDau = dgg.getNgayBatDau();
+        if (ngayKetThuc != null && ngayKetThuc.isBefore(now)) {
+            throw new ApiException("Không thể chỉnh sửa đợt giảm giá đã kết thúc", "SALE_IS_OVER");
+        }
+        if (ngayBatDau != null && ngayKetThuc != null
+                && !ngayBatDau.isAfter(now) && !now.isAfter(ngayKetThuc)) {
+            throw new ApiException("Không thể chỉnh sửa đợt giảm giá đang trong thời gian hoạt động", "SALE_IS_ACTIVE");
+        }
         normalizeRequest(request);
         validateRequest(request, false);
         if (dotGiamGiaRepository.existsByMaAndIdNot(request.getMa(), id)) {
@@ -76,6 +96,7 @@ public class DotGiamGiaService {
                 && request.getPhanTramGiam().compareTo(oldPhanTram) != 0) {
             recalculateChiTietGiaSauGiam(dgg);
         }
+        invalidateChatCatalog();
     }
 
     @Transactional
@@ -83,6 +104,7 @@ public class DotGiamGiaService {
         DotGiamGia dgg = getDotGiamGiaOrThrow(id);
         dgg.setTrangThai(false);
         dotGiamGiaRepository.save(dgg);
+        invalidateChatCatalog();
     }
 
     @Transactional
@@ -96,6 +118,7 @@ public class DotGiamGiaService {
         }
         dgg.setIsActive(false);
         dotGiamGiaRepository.save(dgg);
+        invalidateChatCatalog();
     }
 
     @Transactional
@@ -109,6 +132,7 @@ public class DotGiamGiaService {
         }
         dgg.setIsActive(true);
         dotGiamGiaRepository.save(dgg);
+        invalidateChatCatalog();
     }
 
     @Transactional(readOnly = true)

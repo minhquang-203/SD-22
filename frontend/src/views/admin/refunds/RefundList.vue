@@ -453,6 +453,24 @@ onUnmounted(clearProofImages)
         </p>
 
         <template v-if="completeTarget?.phuongThuc !== 'VNPAY'">
+          <label class="soleil-toolbar__label">Số tiền cần chuyển</label>
+          <div class="refund-amount-box" aria-live="polite">
+            <span class="refund-amount-box__value">
+              {{ formatCurrency(completeTarget?.soTien) }}
+            </span>
+            <span class="refund-amount-box__hint">
+              Nhân viên chuyển đúng số tiền này về tài khoản khách
+            </span>
+            <div
+              v-if="completeTarget?.soTaiKhoan || completeTarget?.tenNganHang || completeTarget?.chuTaiKhoan"
+              class="refund-amount-box__bank"
+            >
+              <span v-if="completeTarget?.tenNganHang">{{ completeTarget.tenNganHang }}</span>
+              <span v-if="completeTarget?.soTaiKhoan">STK {{ completeTarget.soTaiKhoan }}</span>
+              <span v-if="completeTarget?.chuTaiKhoan">{{ completeTarget.chuTaiKhoan }}</span>
+            </div>
+          </div>
+
           <label class="soleil-toolbar__label">
             Mã giao dịch hoàn <span class="req-mark">*</span>
           </label>
@@ -682,6 +700,37 @@ onUnmounted(clearProofImages)
 .modal-card h3 { margin: 0 0 4px; font-size: 16px; }
 .modal-sub { margin: 0 0 14px; font-size: 13px; color: #64748b; }
 .req-mark { color: #dc2626; }
+.refund-amount-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(196, 149, 84, 0.35);
+  border-radius: 10px;
+  background: rgba(196, 149, 84, 0.08);
+}
+.refund-amount-box__value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #8a6428;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+.refund-amount-box__hint {
+  font-size: 12px;
+  color: #64748b;
+}
+.refund-amount-box__bank {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(166, 124, 61, 0.35);
+  font-size: 13px;
+  color: rgba(30, 21, 16, 0.8);
+}
 .modal-input { width: 100%; margin: 6px 0 12px; }
 .modal-textarea { width: 100%; min-height: 72px; resize: vertical; margin: 6px 0 12px; }
 .proof-box {

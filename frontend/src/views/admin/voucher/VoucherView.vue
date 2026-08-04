@@ -98,6 +98,10 @@ function capNhatPhieuLocal(id, isActive) {
   );
 }
 
+function normalizeError(error) {
+  return typeof error === "string" ? error : error?.message;
+}
+
 /* ================= LOAD DATA ================= */
 const loadData = async (page = 1, { silent = false } = {}) => {
   if (!silent && danhSach.value.length === 0) {
@@ -125,10 +129,11 @@ const loadData = async (page = 1, { silent = false } = {}) => {
     trangHienTai.value = page;
   } catch (e) {
     console.error(e);
+    const msg = normalizeError(e) || "Không thể tải dữ liệu";
     if (danhSach.value.length === 0) {
-      loi.value = "Không thể tải dữ liệu";
+      loi.value = msg;
     } else {
-      toast("Không thể tải dữ liệu", "warn");
+      toast(msg, "warn");
     }
   } finally {
     taiLanDau.value = false;
@@ -169,8 +174,8 @@ const xacNhanDung = async (phieu) => {
     refreshStats();
     toast(`Đã dừng phiếu "${phieu.ma}"`, "info");
   } catch (e) {
-    toast("Dừng chương trình thất bại", "warn");
     console.error(e);
+    toast(normalizeError(e) || "Dừng chương trình thất bại", "warn");
   } finally {
     dangXuLyId.value = null;
   }
@@ -191,8 +196,8 @@ const xacNhanKichHoat = async (phieu) => {
     refreshStats();
     toast(`Đã kích hoạt phiếu "${phieu.ma}"`, "info");
   } catch (e) {
-    toast("Kích hoạt thất bại", "warn");
     console.error(e);
+    toast(normalizeError(e) || "Kích hoạt thất bại", "warn");
   } finally {
     dangXuLyId.value = null;
   }
@@ -220,8 +225,8 @@ const xacNhanXoa = async (phieu) => {
     refreshStats();
     toast(`Đã xóa phiếu "${phieu.ma}"`, "info");
   } catch (e) {
-    toast("Xóa thất bại", "warn");
     console.error(e);
+    toast(normalizeError(e) || "Xóa thất bại", "warn");
   } finally {
     dangXuLyId.value = null;
   }
@@ -244,7 +249,7 @@ const handleCreate = async (payload) => {
     refreshStats();
   } catch (e) {
     console.error(e);
-    toast("Tạo thất bại", "warn");
+    toast(normalizeError(e) || "Tạo thất bại", "warn");
   }
 };
 
@@ -266,7 +271,7 @@ const handleUpdate = async (payload) => {
     refreshStats();
   } catch (e) {
     console.error(e);
-    toast("Cập nhật thất bại", "warn");
+    toast(normalizeError(e) || "Cập nhật thất bại", "warn");
   }
 };
 

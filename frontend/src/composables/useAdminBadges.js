@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import { getAllHoaDon } from '@/api/hoaDonApi'
+import { searchHoaDon } from '@/api/hoaDonApi'
 import { docTatCaThongBao, docThongBao, getThongBao } from '@/api/thongBaoApi'
 import { fetchTraHangList } from '@/api/traHangApi'
 import { fetchHoanTienList } from '@/api/hoanTienApi'
@@ -81,11 +81,15 @@ async function loadPendingOrders() {
   const { isLoggedIn } = useAdminAuth()
   if (!isLoggedIn.value) return
   try {
-    const res = await getAllHoaDon()
-    const all = asArray(res.data)
-    const choXacNhan = all.filter((o) => o.trangThai === 'CHO_XAC_NHAN')
-    pendingOrderCount.value = choXacNhan.length
-    pendingOrders.value = sortByNewest(choXacNhan).slice(0, MAX_PENDING_ORDERS)
+    const res = await searchHoaDon({
+      trangThai: 'CHO_XAC_NHAN',
+      page: 1,
+      size: MAX_PENDING_ORDERS,
+    })
+    const data = res.data || {}
+    const list = asArray(data.content)
+    pendingOrderCount.value = Number(data.totalElements) || list.length
+    pendingOrders.value = sortByNewest(list).slice(0, MAX_PENDING_ORDERS)
   } catch {
     // im lặng khi polling lỗi tạm thời
   }

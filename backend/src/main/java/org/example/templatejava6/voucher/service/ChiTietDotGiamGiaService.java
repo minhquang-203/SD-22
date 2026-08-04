@@ -1,5 +1,6 @@
 package org.example.templatejava6.voucher.service;
 
+import org.example.templatejava6.chat.event.CatalogCacheInvalidateEvent;
 import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
 import org.example.templatejava6.product.repository.ChiTietSanPhamRepository;
@@ -9,10 +10,12 @@ import org.example.templatejava6.voucher.model.request.ChiTietDotGiamGiaRequest;
 import org.example.templatejava6.voucher.model.response.ChiTietDotGiamGiaResponse;
 import org.example.templatejava6.voucher.repository.ChiTietDotGiamGiaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -24,6 +27,12 @@ public class ChiTietDotGiamGiaService {
     private DotGiamGiaService dotGiamGiaService;
     @Autowired
     private ChiTietSanPhamRepository chiTietSanPhamRepository;
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
+
+    private void invalidateChatCatalog() {
+        eventPublisher.publishEvent(new CatalogCacheInvalidateEvent());
+    }
 
     @Transactional(readOnly = true)
     public List<ChiTietDotGiamGiaResponse> getByDotGiamGia(Integer idDotGiamGia) {
@@ -62,7 +71,8 @@ public class ChiTietDotGiamGiaService {
     public void deleteInDotGiamGia(Integer idDotGiamGia, Integer id) {
         ChiTietDotGiamGia existing = getChiTietOrThrow(id);
         validateBelongsToDotGiamGia(existing, idDotGiamGia);
-        chiTietDotGiamGiaRepository.delete(existing);
+        delete(id);
+        invalidateChatCatalog();
     }
 
     @Transactional
@@ -78,6 +88,7 @@ public class ChiTietDotGiamGiaService {
         ct.setIdChiTietSanPham(ctsp);
         ct.setGiaSauGiam(resolveGiaSauGiam(request, dgg, ctsp));
         chiTietDotGiamGiaRepository.save(ct);
+        invalidateChatCatalog();
     }
 
     @Transactional
@@ -94,12 +105,26 @@ public class ChiTietDotGiamGiaService {
         ct.setGiaSauGiam(resolveGiaSauGiam(request, dgg, ctsp));
         ct.setId(id);
         chiTietDotGiamGiaRepository.save(ct);
+        invalidateChatCatalog();
     }
 
     @Transactional
     public void delete(Integer id) {
         ChiTietDotGiamGia ct = getChiTietOrThrow(id);
+        DotGiamGia dgg = ct.getIdDotGiamGia();
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime ngayBatDau = dgg.getNgayBatDau();
+        LocalDateTime ngayKetThuc = dgg.getNgayKetThuc();
+        if(ngayBatDau != null && ngayKetThuc != null &&
+                !now.isAfter(ngayKetThuc) && !now.isBefore(ngayBatDau)){
+            throw new ApiException("Không thể sửa đợt giảm giá đang hoạt động", "IS_ACTIVE");
+        }
+        if(ngayKetThuc != null && ngayKetThuc.isBefore(now)){
+            throw new ApiException("Không thể chỉnh sửa đợt giảm giá đã kết thúc", "SALE_IS_OVER");
+        }
+
         chiTietDotGiamGiaRepository.delete(ct);
+        invalidateChatCatalog();
     }
 
     private ChiTietDotGiamGia getChiTietOrThrow(Integer id) {

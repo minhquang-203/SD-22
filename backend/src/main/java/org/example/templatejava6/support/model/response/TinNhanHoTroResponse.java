@@ -14,6 +14,8 @@ public class TinNhanHoTroResponse {
     private Integer idPhien;
     private String nguoiGui;
     private Integer idNguoiGui;
+    /** Tên nhân viên / khách gửi — dùng truy trách nhiệm phía staff */
+    private String tenNguoiGui;
     private String noiDung;
     private Boolean daDoc;
     private LocalDateTime thoiGian;

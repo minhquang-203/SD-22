@@ -7,6 +7,7 @@ import {
   updateNhaCungCap,
 } from '@/api/nhapHangApi'
 import { toast } from '@/composables/useToast'
+import { confirm } from '@/composables/useConfirm'
 import { formatApiError } from '@/utils/apiError'
 
 const loading = ref(false)
@@ -93,7 +94,13 @@ async function saveForm() {
 
 async function onDelete(row) {
   if (!row.trangThai) return
-  if (!confirm(`Ngừng dùng nhà cung cấp ${row.ma} — ${row.ten}?`)) return
+  const ok = await confirm({
+    title: 'Ngừng dùng nhà cung cấp',
+    message: `Ngừng dùng nhà cung cấp ${row.ma} — ${row.ten}?`,
+    confirmText: 'Ngừng dùng',
+    danger: true,
+  })
+  if (!ok) return
   try {
     await deleteNhaCungCap(row.id)
     toast('Đã ngừng dùng nhà cung cấp', 'success')

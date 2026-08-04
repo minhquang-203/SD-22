@@ -215,18 +215,18 @@ async function handleCapNhatWebhook() {
     if (payload?.daCapNhat) {
       notifyWebhook(
         payload.thongDiep ||
-          `Đã cập nhật đơn theo webhook GHN "${statusLabelText}"`,
+          `Đã cập nhật trạng thái đơn thành "${statusLabelText}"`,
         'success',
       )
     } else {
       notifyWebhook(
-        payload?.thongDiep || `Webhook GHN "${statusLabelText}" không đổi trạng thái đơn.`,
+        payload?.thongDiep || `Trạng thái "${statusLabelText}" không làm thay đổi đơn.`,
         'error',
       )
     }
     await loadDetail()
   } catch (err) {
-    notifyWebhook(typeof err === 'string' ? err : 'Không gửi được webhook GHN giả lập', 'error')
+    notifyWebhook(typeof err === 'string' ? err : 'Không cập nhật được trạng thái đơn', 'error')
   } finally {
     webhookLoading.value = false
   }
@@ -306,6 +306,11 @@ function loaiDonTone(loai) {
 function formatDateTime(value) {
   if (!value) return '—'
   return new Date(value).toLocaleString('vi-VN')
+}
+
+function formatDate(value) {
+  if (!value) return '—'
+  return new Date(value).toLocaleDateString('vi-VN')
 }
 
 function actionIcon(ma) {
@@ -543,15 +548,9 @@ onUnmounted(() => {
           <div class="hoa-don-webhook__head">
             <h2 class="hoa-don-section-title" style="margin: 0">
               <Icon icon="mdi:webhook" width="18" class="hoa-don-webhook__title-icon" />
-              Giả lập webhook cập nhật trạng thái
+              Cập nhật trạng thái đơn hàng
             </h2>
           </div>
-
-          <p class="hoa-don-webhook__hint">
-            Mô phỏng webhook GHN gửi về hệ thống: chọn <strong>trạng thái vận đơn GHN</strong>,
-            hệ thống sẽ ánh xạ sang trạng thái đơn nội bộ (giống webhook thật).
-            Chỉ dùng khi đơn đã có mã vận đơn GHN.
-          </p>
 
           <div class="hoa-don-webhook__form">
             <div class="hoa-don-webhook__field">
@@ -562,7 +561,7 @@ onUnmounted(() => {
             </div>
 
             <div class="hoa-don-webhook__field">
-              <label class="hoa-don-webhook__label" for="webhook-ghn-status">Trạng thái GHN (webhook)</label>
+              <label class="hoa-don-webhook__label" for="webhook-ghn-status">Trạng thái GHN</label>
               <select
                 id="webhook-ghn-status"
                 v-model="selectedGhnStatus"
@@ -585,7 +584,7 @@ onUnmounted(() => {
                 v-model="webhookGhiChu"
                 type="text"
                 class="hoa-don-webhook__input"
-                placeholder="Ví dụ: Webhook test từ GHN"
+                placeholder="Ví dụ: Đơn đang giao, khách hẹn nhận chiều"
               />
             </div>
 
@@ -596,7 +595,7 @@ onUnmounted(() => {
               @click="handleCapNhatWebhook"
             >
               <Icon icon="icon-park-outline:refresh" />
-              {{ webhookLoading ? 'Đang gửi webhook...' : 'Gửi webhook GHN giả lập' }}
+              {{ webhookLoading ? 'Đang cập nhật...' : 'Cập nhật trạng thái' }}
             </button>
           </div>
 
@@ -678,17 +677,36 @@ onUnmounted(() => {
                 <tr v-if="!detail.chiTiets?.length">
                   <td colspan="4" class="text-center py-8 text-[var(--admin-muted)]">Không có dòng hàng</td>
                 </tr>
-                <tr v-for="line in detail.chiTiets || []" :key="line.id">
-                  <td>
-                    <div class="font-medium">{{ line.tenSanPham }}</div>
-                    <div v-if="line.bienThe || line.sku" class="text-xs text-[var(--admin-muted)]">
-                      {{ line.bienThe || line.sku }}
-                    </div>
-                  </td>
-                  <td class="text-center">{{ line.soLuong }}</td>
-                  <td class="text-right">{{ formatCurrency(line.donGia) }}</td>
-                  <td class="text-right font-medium">{{ formatCurrency(line.thanhTien) }}</td>
-                </tr>
+                <template v-for="line in detail.chiTiets || []" :key="line.id">
+                  <tr>
+                    <td>
+                      <div class="font-medium">{{ line.tenSanPham }}</div>
+                      <div v-if="line.bienThe || line.sku" class="text-xs text-[var(--admin-muted)]">
+                        {{ line.bienThe || line.sku }}
+                      </div>
+                    </td>
+                    <td class="text-center">{{ line.soLuong }}</td>
+                    <td class="text-right">{{ formatCurrency(line.donGia) }}</td>
+                    <td class="text-right font-medium">{{ formatCurrency(line.thanhTien) }}</td>
+                  </tr>
+                  <tr v-if="line.loHangs?.length" class="hoa-don-lot-row">
+                    <td colspan="4">
+                      <div class="hoa-don-lots">
+                        <span class="hoa-don-lots__label">Lô:</span>
+                        <span
+                          v-for="(lo, idx) in line.loHangs"
+                          :key="lo.idLoHang"
+                          class="hoa-don-lots__item"
+                        >
+                          <template v-if="idx > 0">; </template>
+                          {{ lo.soLo || `#${lo.idLoHang}` }}
+                          · SL {{ lo.soLuongDaBan }}
+                          <template v-if="lo.hanSuDung"> · HSD {{ formatDate(lo.hanSuDung) }}</template>
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
               </tbody>
             </table>
           </div>
@@ -1024,6 +1042,24 @@ onUnmounted(() => {
   color: var(--ink);
 }
 
+.hoa-don-lot-row td {
+  padding-top: 0 !important;
+  border-top: none !important;
+}
+.hoa-don-lots {
+  padding: 0.15rem 0 0.35rem;
+  font-size: 0.78rem;
+  color: var(--admin-muted);
+  line-height: 1.45;
+}
+.hoa-don-lots__label {
+  margin-right: 0.35rem;
+  font-weight: 500;
+  color: var(--admin-muted);
+}
+.hoa-don-lots__item {
+  color: var(--ink, #1e1510);
+}
 .hoa-don-totals {
   margin-top: 1rem;
   padding-top: 1rem;

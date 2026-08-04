@@ -59,6 +59,17 @@ public interface ChiTietSanPhamRepository extends JpaRepository<ChiTietSanPham, 
             + "GROUP BY c.sanPham.id")
     List<DungTichAgg> aggregateDungTich();
 
+    interface VariantPriceRow {
+        Integer getSpId();
+        BigDecimal getDungTich();
+        BigDecimal getGiaBan();
+    }
+
+    @Query("SELECT c.sanPham.id AS spId, c.dungTichMl AS dungTich, c.giaBan AS giaBan "
+            + "FROM ChiTietSanPham c WHERE c.trangThai = true AND c.giaBan IS NOT NULL "
+            + "ORDER BY c.sanPham.id ASC, c.dungTichMl ASC")
+    List<VariantPriceRow> listActiveVariantPrices();
+
     @Query("SELECT c FROM ChiTietSanPham c JOIN FETCH c.sanPham sp LEFT JOIN FETCH c.mauSac ms "
             + "WHERE c.trangThai = true AND sp.trangThai = true AND ("
             + "LOWER(c.sku) LIKE LOWER(CONCAT('%', :keyword, '%')) OR "

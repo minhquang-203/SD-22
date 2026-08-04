@@ -8,6 +8,7 @@ import { calcShippingFee, fetchDistricts, fetchProvinces, fetchWards } from '@/a
 import { useAuth } from '@/composables/useAuth'
 import { useCart, variantLabel } from '@/composables/useCart'
 import { toast } from '@/composables/useToast'
+import { confirm } from '@/composables/useConfirm'
 import { formatVND } from '@/utils/formatVND'
 import { orderStatusLabel } from '@/utils/orderStatus'
 import { getPhoneValidationError, normalizePhoneDigits } from '@/utils/phone'
@@ -481,6 +482,15 @@ async function submitCheckout() {
     toast(message)
     return
   }
+
+  const ok = await confirm({
+    title: 'Xác nhận đặt hàng',
+    message: selectedPayment.value === 'VNPAY'
+      ? 'Bạn sẽ được chuyển sang VNPay để thanh toán. Tiếp tục?'
+      : 'Xác nhận đặt đơn hàng này?',
+    confirmText: selectedPayment.value === 'VNPAY' ? 'Thanh toán VNPay' : 'Đặt hàng',
+  })
+  if (!ok) return
 
   submitting.value = true
   orderResult.value = null

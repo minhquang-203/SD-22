@@ -11,9 +11,13 @@ import { addChiTiet, hideChiTiet, updateChiTiet } from '@/api/sanPhamApi'
 import { getLoHangByChiTiet, capNhatLoHang } from '@/api/loHangApi'
 import { formatCurrency, formatDate } from '@/utils/format'
 import { confirm } from '@/composables/useConfirm'
+import { useAdminAuth } from '@/composables/useAdminAuth'
+import { isManagerOrOwner } from '@/utils/adminAuth'
 
 const route = useRoute()
 const router = useRouter()
+const { vaiTro } = useAdminAuth()
+const canWriteProduct = computed(() => isManagerOrOwner(vaiTro.value))
 
 const loading = ref(false)
 const saving = ref(false)
@@ -330,7 +334,12 @@ onMounted(async () => {
           </p>
         </div>
         <div class="flex gap-2 shrink-0">
-          <button type="button" class="admin-fab-btn admin-fab-btn--primary group" @click="openAdd">
+          <button
+            v-if="canWriteProduct"
+            type="button"
+            class="admin-fab-btn admin-fab-btn--primary group"
+            @click="openAdd"
+          >
             <span>＋</span>
             <span class="admin-fab-btn__label">Thêm biến thể</span>
           </button>
@@ -362,7 +371,12 @@ onMounted(async () => {
             </tr>
             <tr v-else-if="pagedVariants.length === 0">
               <td colspan="9" class="text-center py-10 text-[var(--admin-muted)] px-6">
-                Sản phẩm này chưa có biến thể. Nhấn <strong>+ Thêm biến thể</strong> để tạo.
+                <template v-if="canWriteProduct">
+                  Sản phẩm này chưa có biến thể. Nhấn <strong>+ Thêm biến thể</strong> để tạo.
+                </template>
+                <template v-else>
+                  Sản phẩm này chưa có biến thể.
+                </template>
               </td>
             </tr>
             <tr v-for="(row, index) in pagedVariants" :key="row.id">
@@ -392,7 +406,11 @@ onMounted(async () => {
               </td>
               <td class="text-center">
                 <div class="flex flex-col items-center gap-1">
-                  <AdminSwitch :model-value="row.trangThai !== false" @update:model-value="handleToggleStatus(row)" />
+                  <AdminSwitch
+                    v-if="canWriteProduct"
+                    :model-value="row.trangThai !== false"
+                    @update:model-value="handleToggleStatus(row)"
+                  />
                   <span
                     class="text-xs"
                     :class="row.trangThai !== false ? 'text-[var(--admin-primary)]' : 'text-gray-400'"
@@ -406,7 +424,14 @@ onMounted(async () => {
                   <button type="button" class="admin-btn admin-btn-default text-xs !px-2" @click="openLots(row)">
                     Lô hàng
                   </button>
-                  <button type="button" class="admin-icon-btn admin-icon-btn--warning" @click="openEdit(row)">✏️</button>
+                  <button
+                    v-if="canWriteProduct"
+                    type="button"
+                    class="admin-icon-btn admin-icon-btn--warning"
+                    @click="openEdit(row)"
+                  >
+                    ✏️
+                  </button>
                 </div>
               </td>
             </tr>
@@ -438,6 +463,7 @@ onMounted(async () => {
       :loading="lotLoading"
       :variant="activeVariant"
       :lots="activeLots"
+      :can-write="canWriteProduct"
       @close="lotListOpen = false"
       @edit="openEditLot"
     />

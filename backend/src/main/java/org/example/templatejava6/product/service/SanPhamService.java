@@ -24,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -54,6 +55,11 @@ public class SanPhamService {
     @Autowired private LoHangRepository loHangRepository;
     @Autowired private ChiTietDotGiamGiaRepository chiTietDotGiamGiaRepository;
     @Autowired private DotGiamGiaService dotGiamGiaService;
+    @Autowired private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
+    /** Mới nhất lên đầu — dùng cho list/phân trang admin. */
+    private static final Sort SP_NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "ngayTao")
+            .and(Sort.by(Sort.Direction.DESC, "id"));
 
     @Transactional(readOnly = true)
     public List<SanPhamResponse> getAll() {
@@ -67,7 +73,7 @@ public class SanPhamService {
         Set<Integer> saleProductIds = Boolean.TRUE.equals(excludeKhuyenMai)
                 ? loadActiveSaleProductIds()
                 : Set.of();
-        return sanPhamRepository.findAll().stream()
+        return sanPhamRepository.findAll(SP_NEWEST_FIRST).stream()
                 .filter(sp -> !saleProductIds.contains(sp.getId()))
                 .map(sp -> toListResponse(sp, variantAggMap, canHanIds))
                 .toList();
@@ -75,7 +81,7 @@ public class SanPhamService {
 
     @Transactional(readOnly = true)
     public Page<SanPhamResponse> phanTrang(Integer pageNo, Integer pageSize) {
-        Pageable pageable = PageRequest.of(pageNo, pageSize);
+        Pageable pageable = PageRequest.of(pageNo, pageSize, SP_NEWEST_FIRST);
         Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
         Set<Integer> canHanIds = loadCoLoCanHanProductIds();
         return sanPhamRepository.findAll(pageable).map(sp -> toListResponse(sp, variantAggMap, canHanIds));
@@ -93,7 +99,7 @@ public class SanPhamService {
         Set<Integer> saleProductIds = Boolean.TRUE.equals(excludeKhuyenMai)
                 ? loadActiveSaleProductIds()
                 : Set.of();
-        return sanPhamRepository.findByTenContainingIgnoreCase(keyword)
+        return sanPhamRepository.findByTenContainingIgnoreCase(keyword, SP_NEWEST_FIRST)
                 .stream()
                 .filter(sp -> !saleProductIds.contains(sp.getId()))
                 .map(sp -> toListResponse(sp, variantAggMap, canHanIds))
@@ -116,7 +122,7 @@ public class SanPhamService {
     }
 
     public Page<SanPhamResponse> timKiemPhanTrang(String keyword, Integer pageNo, Integer pageSize) {
-        Pageable pageable = PageRequest.of(pageNo, pageSize);
+        Pageable pageable = PageRequest.of(pageNo, pageSize, SP_NEWEST_FIRST);
         Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
         Set<Integer> canHanIds = loadCoLoCanHanProductIds();
         return sanPhamRepository.findByTenContainingIgnoreCase(keyword, pageable)
@@ -172,6 +178,7 @@ public class SanPhamService {
         sp = sanPhamRepository.save(sp);
 
         saveRelations(sp, request, files, false);
+        eventPublisher.publishEvent(new org.example.templatejava6.chat.event.CatalogCacheInvalidateEvent());
     }
 
     @Transactional
@@ -204,6 +211,7 @@ public class SanPhamService {
         sanPhamThanhPhanRepository.flush();
 
         saveRelations(sp, request, files, true);
+        eventPublisher.publishEvent(new org.example.templatejava6.chat.event.CatalogCacheInvalidateEvent());
     }
 
     public void delete(Integer id) {
@@ -445,26 +453,47 @@ public class SanPhamService {
             return;
         }
 
+        Map<Integer, ChiTietSanPham> existingById = new HashMap<>();
         Map<String, ChiTietSanPham> existingBySku = new HashMap<>();
         if (isUpdate) {
-            chiTietSanPhamRepository.findBySanPham(sp).forEach(ct -> existingBySku.put(ct.getSku(), ct));
+            for (ChiTietSanPham ct : chiTietSanPhamRepository.findBySanPham(sp)) {
+                if (ct.getId() != null) {
+                    existingById.put(ct.getId(), ct);
+                }
+                if (ct.getSku() != null) {
+                    existingBySku.put(ct.getSku(), ct);
+                }
+            }
         }
 
         for (ChiTietSanPhamRequest ctReq : chiTiets) {
-            ChiTietSanPham ct = isUpdate ? existingBySku.get(ctReq.getSku()) : null;
-            if (ct == null) {
+            ChiTietSanPham ct = null;
+            if (isUpdate) {
+                // Ưu tiên khớp theo ID (ổn định); SKU chỉ fallback
+                if (ctReq.getId() != null) {
+                    ct = existingById.get(ctReq.getId());
+                }
+                if (ct == null && ctReq.getSku() != null) {
+                    ct = existingBySku.get(ctReq.getSku());
+                }
+            }
+            boolean isNew = ct == null;
+            if (isNew) {
                 ct = new ChiTietSanPham();
                 ct.setSanPham(sp);
-                ct.setSku(ctReq.getSku());
+                ct.setSoLuongTon(0);
             }
+            ct.setSku(ctReq.getSku());
             ct.setMauSac(categoryService.getMauSacOrNull(ctReq.getIdMauSac()));
             ct.setDungTichMl(ctReq.getDungTichMl());
             ct.setGiaBan(ctReq.getGiaBan());
-            if (ct.getId() == null) {
-                ct.setSoLuongTon(0);
-            }
+            // Biến thể đã có: tuyệt đối không ghi đè tồn từ form
             ct.setTrangThai(true);
-            chiTietSanPhamRepository.save(ct);
+            ct = chiTietSanPhamRepository.save(ct);
+            // Cache tồn = tổng lô (sửa giá/tên không được để tồn về 0)
+            if (!isNew && ct.getId() != null) {
+                loHangService.syncTonKho(ct.getId());
+            }
         }
     }
 

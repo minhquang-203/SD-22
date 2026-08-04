@@ -26,7 +26,13 @@ public class DonChoListItemResponse {
             this.tenKhachHang = hd.getIdKhachHang().getHoTen();
             this.soDienThoai = hd.getIdKhachHang().getSoDienThoai();
         } else {
-            this.tenKhachHang = "Khách lẻ";
+            String[] guest = org.example.templatejava6.order.service.BanHangService.parseGuestGhiChu(hd.getGhiChu());
+            if (guest != null) {
+                this.tenKhachHang = guest[0] != null ? guest[0] : "Khách lẻ";
+                this.soDienThoai = guest[1];
+            } else {
+                this.tenKhachHang = "Khách lẻ";
+            }
         }
         this.soMatHang = soMatHang;
         this.thanhTien = hd.getThanhTien();

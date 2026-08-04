@@ -10,6 +10,8 @@ defineProps({
   loading: { type: Boolean, default: false },
   page: { type: Number, default: 1 },
   pageSize: { type: Number, default: 10 },
+  /** false = nhân viên chỉ xem (ẩn Sửa / khóa đổi trạng thái) */
+  canWrite: { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['edit', 'toggle-status', 'toggle-noi-bat', 'manage'])
@@ -116,6 +118,7 @@ function formatLoaiChongNang(value) {
           <td class="text-xs text-[rgba(30,21,16,0.55)]">{{ formatDate(item.ngayTao) }}</td>
           <td @click.stop>
             <button
+              v-if="canWrite"
               type="button"
               class="soleil-status-toggle"
               :title="item.trangThai !== false ? 'Nhấn để ngưng hoạt động' : 'Nhấn để kích hoạt'"
@@ -126,9 +129,15 @@ function formatLoaiChongNang(value) {
                 :label="item.trangThai !== false ? 'Đang hoạt động' : 'Ngưng hoạt động'"
               />
             </button>
+            <StatusDot
+              v-else
+              :status="item.trangThai !== false ? 'active' : 'expired'"
+              :label="item.trangThai !== false ? 'Đang hoạt động' : 'Ngưng hoạt động'"
+            />
           </td>
           <td @click.stop>
             <button
+              v-if="canWrite"
               type="button"
               class="soleil-status-toggle"
               :title="item.noiBat ? 'Nhấn để bỏ nổi bật' : 'Nhấn để đánh dấu nổi bật'"
@@ -139,6 +148,11 @@ function formatLoaiChongNang(value) {
                 :label="item.noiBat ? 'Nổi bật' : 'Thường'"
               />
             </button>
+            <StatusDot
+              v-else
+              :status="item.noiBat ? 'upcoming' : 'paused'"
+              :label="item.noiBat ? 'Nổi bật' : 'Thường'"
+            />
           </td>
           <td @click.stop>
             <div class="soleil-actions-cell">
@@ -151,6 +165,7 @@ function formatLoaiChongNang(value) {
                 <Icon icon="icon-park-outline:box" />
               </button>
               <button
+                v-if="canWrite"
                 type="button"
                 class="soleil-act-btn-round"
                 title="Sửa"

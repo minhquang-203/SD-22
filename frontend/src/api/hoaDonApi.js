@@ -5,8 +5,29 @@ export const getAllHoaDon = () => request.get('/hoa-don')
 export const getHoaDonPaging = (pageNo, pageSize) =>
   request.get('/hoa-don/paging', { params: { pageNo, pageSize } })
 
-export const searchHoaDon = (keyword) =>
-  request.get('/hoa-don/search', { params: { keyword } })
+/** Admin: phân trang + lọc (keyword, loaiDon, trangThai, from, to). page 1-based. */
+export const searchHoaDon = ({
+  keyword,
+  loaiDon,
+  trangThai,
+  from,
+  to,
+  page = 1,
+  size = 12,
+} = {}) =>
+  request.get('/hoa-don/search', {
+    params: {
+      keyword: keyword || undefined,
+      loaiDon: loaiDon || undefined,
+      trangThai: trangThai || undefined,
+      from: from || undefined,
+      to: to || undefined,
+      page,
+      size,
+    },
+  })
+
+export const getHoaDonAdminCounts = () => request.get('/hoa-don/admin-counts')
 
 export const getHoaDonDetail = (id) => request.get(`/hoa-don/${id}`)
 

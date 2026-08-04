@@ -1,5 +1,6 @@
 package org.example.templatejava6.product.service;
 
+import org.example.templatejava6.chat.event.CatalogCacheInvalidateEvent;
 import org.example.templatejava6.category.service.CategoryService;
 import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.common.util.MapperUtil;
@@ -8,6 +9,7 @@ import org.example.templatejava6.product.model.request.ChiTietSanPhamRequest;
 import org.example.templatejava6.product.model.response.ChiTietSanPhamResponse;
 import org.example.templatejava6.product.repository.ChiTietSanPhamRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +22,7 @@ public class ChiTietSanPhamService {
     @Autowired private SanPhamService sanPhamService;
     @Autowired private CategoryService categoryService;
     @Autowired private LoHangService loHangService;
+    @Autowired private ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void add(ChiTietSanPhamRequest request) {
@@ -34,6 +37,7 @@ public class ChiTietSanPhamService {
         ct.setTrangThai(true);
         ct.setSoLuongTon(0);
         chiTietSanPhamRepository.save(ct);
+        eventPublisher.publishEvent(new CatalogCacheInvalidateEvent());
     }
 
     @Transactional
@@ -42,6 +46,8 @@ public class ChiTietSanPhamService {
                 .orElseThrow(() -> new ApiException("Không tìm thấy biến thể sản phẩm", "NOT_FOUND"));
         validateGia(request.getGiaBan());
         validateSku(request.getSku(), id);
+        // Giữ tồn — MapperUtil sẽ ghi đè soLuongTon=null từ request thiếu field
+        Integer soLuongTon = ct.getSoLuongTon();
         Boolean trangThai = ct.getTrangThai();
         MapperUtil.mapToExisting(request, ct);
         if (request.getIdSanPham() != null) {
@@ -49,8 +55,11 @@ public class ChiTietSanPhamService {
         }
         ct.setMauSac(categoryService.getMauSacOrNull(request.getIdMauSac()));
         ct.setTrangThai(request.getTrangThai() != null ? request.getTrangThai() : trangThai);
+        ct.setSoLuongTon(soLuongTon);
         ct.setId(id);
         chiTietSanPhamRepository.save(ct);
+        loHangService.syncTonKho(id);
+        eventPublisher.publishEvent(new CatalogCacheInvalidateEvent());
     }
 
     public void delete(Integer id) {

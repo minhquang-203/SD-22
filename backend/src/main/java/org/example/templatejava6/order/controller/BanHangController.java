@@ -1,6 +1,7 @@
 package org.example.templatejava6.order.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.example.templatejava6.common.util.PaginationUtil;
 import org.example.templatejava6.order.model.request.GiuDonChoRequest;
 import org.example.templatejava6.order.model.request.PosTinhGiaRequest;
 import org.example.templatejava6.order.model.request.TaoDonTaiQuayRequest;
@@ -12,7 +13,12 @@ import org.example.templatejava6.order.model.response.PosTinhGiaResponse;
 import org.example.templatejava6.order.model.response.BanHangHoaDonResponse;
 import org.example.templatejava6.order.model.response.PosThanhToanStatusResponse;
 import org.example.templatejava6.order.service.BanHangService;
+import org.example.templatejava6.voucher.model.response.PhieuGiamGiaResponse;
+import org.example.templatejava6.voucher.service.PhieuGiamGiaService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,6 +29,9 @@ public class BanHangController {
 
     @Autowired
     private BanHangService banHangService;
+
+    @Autowired
+    private PhieuGiamGiaService phieuGiamGiaService;
 
     @GetMapping("san-pham")
     public List<BienTheBanResponse> danhSachSanPham(
@@ -39,6 +48,16 @@ public class BanHangController {
     @PostMapping("tinh-gia")
     public PosTinhGiaResponse tinhGia(@RequestBody PosTinhGiaRequest request) {
         return banHangService.tinhGiaTaiQuay(request);
+    }
+
+    /** Mã giảm giá khả dụng tại quầy (không gồm FREE_SHIP). */
+    @GetMapping("vouchers")
+    public ResponseEntity<Page<PhieuGiamGiaResponse>> vouchers(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Pageable pageable = PaginationUtil.create(page, size);
+        return ResponseEntity.ok(phieuGiamGiaService.listAvailableForPos(keyword, pageable));
     }
 
     @PostMapping("tai-quay")

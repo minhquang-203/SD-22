@@ -11,6 +11,7 @@ import {
   updatePhieuNhap,
 } from '@/api/nhapHangApi'
 import { toast } from '@/composables/useToast'
+import { confirm } from '@/composables/useConfirm'
 import { formatApiError } from '@/utils/apiError'
 
 const route = useRoute()
@@ -107,6 +108,7 @@ async function loadDetail(id) {
       dungTichMl: d.dungTichMl,
       soLuong: d.soLuong,
       donGia: Number(d.donGia || 0),
+      giaBan: Number(d.giaBan || 0),
       hanSuDung: d.hanSuDung || '',
       soLo: d.soLo || '',
     }))
@@ -158,6 +160,7 @@ function addVariant(v) {
     dungTichMl: v.dungTichMl,
     soLuong: 1,
     donGia: 0,
+    giaBan: Number(v.giaBan || 0),
     hanSuDung: '',
     soLo: '',
   })
@@ -238,7 +241,12 @@ async function onLuuTam() {
 async function onHoanThanh() {
   if (readonly.value) return
   if (!validateBeforeSave(true)) return
-  if (!confirm('Hoàn thành phiếu sẽ sinh lô và cộng tồn. Tiếp tục?')) return
+  const ok = await confirm({
+    title: 'Hoàn thành phiếu nhập',
+    message: 'Hoàn thành phiếu sẽ sinh lô và cộng tồn. Không hoàn tác được. Tiếp tục?',
+    confirmText: 'Hoàn thành',
+  })
+  if (!ok) return
   saving.value = true
   try {
     const payload = buildPayload()
@@ -325,7 +333,8 @@ onMounted(async () => {
                 <th>SKU</th>
                 <th>Tên hàng</th>
                 <th>SL</th>
-                <th>Đơn giá</th>
+                <th>Đơn giá nhập</th>
+                <th>Giá bán</th>
                 <th>HSD</th>
                 <th>Thành tiền</th>
                 <th></th>
@@ -333,7 +342,7 @@ onMounted(async () => {
             </thead>
             <tbody>
               <tr v-if="!lines.length">
-                <td colspan="8" class="pn-empty-cell">Chưa có dòng hàng — tìm và thêm SKU.</td>
+                <td colspan="9" class="pn-empty-cell">Chưa có dòng hàng — tìm và thêm SKU.</td>
               </tr>
               <tr v-for="(row, idx) in lines" :key="row.idChiTietSanPham">
                 <td>{{ idx + 1 }}</td>
@@ -361,7 +370,11 @@ onMounted(async () => {
                     min="0"
                     class="admin-input pn-input-sm"
                     :disabled="readonly"
+                    placeholder="Giá nhập"
                   />
+                </td>
+                <td class="pn-money pn-ref-price" :title="'Giá bán hiện tại — chỉ tham khảo'">
+                  {{ formatMoney(row.giaBan) }}
                 </td>
                 <td>
                   <input
@@ -636,6 +649,12 @@ onMounted(async () => {
 .pn-money {
   font-weight: 600;
   white-space: nowrap;
+}
+
+.pn-ref-price {
+  color: var(--admin-muted, #8a7b6a);
+  font-weight: 500;
+  font-size: 0.8rem;
 }
 
 .pn-empty-cell {
