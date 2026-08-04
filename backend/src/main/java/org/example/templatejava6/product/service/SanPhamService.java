@@ -453,26 +453,47 @@ public class SanPhamService {
             return;
         }
 
+        Map<Integer, ChiTietSanPham> existingById = new HashMap<>();
         Map<String, ChiTietSanPham> existingBySku = new HashMap<>();
         if (isUpdate) {
-            chiTietSanPhamRepository.findBySanPham(sp).forEach(ct -> existingBySku.put(ct.getSku(), ct));
+            for (ChiTietSanPham ct : chiTietSanPhamRepository.findBySanPham(sp)) {
+                if (ct.getId() != null) {
+                    existingById.put(ct.getId(), ct);
+                }
+                if (ct.getSku() != null) {
+                    existingBySku.put(ct.getSku(), ct);
+                }
+            }
         }
 
         for (ChiTietSanPhamRequest ctReq : chiTiets) {
-            ChiTietSanPham ct = isUpdate ? existingBySku.get(ctReq.getSku()) : null;
-            if (ct == null) {
+            ChiTietSanPham ct = null;
+            if (isUpdate) {
+                // Ưu tiên khớp theo ID (ổn định); SKU chỉ fallback
+                if (ctReq.getId() != null) {
+                    ct = existingById.get(ctReq.getId());
+                }
+                if (ct == null && ctReq.getSku() != null) {
+                    ct = existingBySku.get(ctReq.getSku());
+                }
+            }
+            boolean isNew = ct == null;
+            if (isNew) {
                 ct = new ChiTietSanPham();
                 ct.setSanPham(sp);
-                ct.setSku(ctReq.getSku());
+                ct.setSoLuongTon(0);
             }
+            ct.setSku(ctReq.getSku());
             ct.setMauSac(categoryService.getMauSacOrNull(ctReq.getIdMauSac()));
             ct.setDungTichMl(ctReq.getDungTichMl());
             ct.setGiaBan(ctReq.getGiaBan());
-            if (ct.getId() == null) {
-                ct.setSoLuongTon(0);
-            }
+            // Biến thể đã có: tuyệt đối không ghi đè tồn từ form
             ct.setTrangThai(true);
-            chiTietSanPhamRepository.save(ct);
+            ct = chiTietSanPhamRepository.save(ct);
+            // Cache tồn = tổng lô (sửa giá/tên không được để tồn về 0)
+            if (!isNew && ct.getId() != null) {
+                loHangService.syncTonKho(ct.getId());
+            }
         }
     }
 

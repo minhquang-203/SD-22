@@ -18,12 +18,15 @@ const router = useRouter()
 const { isLoggedIn } = useAuth()
 const { openAuthModal } = useAuthModal()
 
+const CHAT_AI_PHIEN_KEY = 'sunova_chat_ai_phien'
+
 const isOpen = ref(false)
 const isTyping = ref(false)
 const inputMessage = ref('')
 const messages = ref([])
 const sessionId = ref(null)
 const messagesContainer = ref(null)
+const restoringAi = ref(false)
 
 /** 'AI' | 'NGUOI' */
 const chatMode = ref('AI')
@@ -33,10 +36,63 @@ const sendingStaff = ref(false)
 const showMenu = ref(false)
 let unsubscribeHoTro = null
 
+function readStoredAiPhien() {
+  const raw = localStorage.getItem(CHAT_AI_PHIEN_KEY)
+  const id = Number(raw)
+  return Number.isFinite(id) && id > 0 ? id : null
+}
+
+function saveAiPhien(id) {
+  if (id == null) return
+  localStorage.setItem(CHAT_AI_PHIEN_KEY, String(id))
+}
+
+function clearAiPhien() {
+  localStorage.removeItem(CHAT_AI_PHIEN_KEY)
+}
+
 const scrollToBottom = async () => {
   await nextTick()
   if (messagesContainer.value) {
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+  }
+}
+
+function pushAiWelcome(text) {
+  messages.value = [
+    {
+      nguoiGui: 'AI',
+      noiDung: text || 'Chào bạn! Tôi là Trợ lý AI của SUNOVA. Bạn cần tư vấn kem chống nắng cho loại da nào?',
+      thoiGian: new Date(),
+    },
+  ]
+}
+
+/** Khôi phục hội thoại AI từ localStorage id phiên. */
+async function restoreAiSession() {
+  const id = readStoredAiPhien()
+  if (!id) return false
+  restoringAi.value = true
+  try {
+    const res = await request.get(`/chat/tin-nhan/${id}`)
+    const list = Array.isArray(res.data) ? res.data : []
+    sessionId.value = id
+    messages.value = list.map((t) => ({
+      id: t.idTinNhan || t.id,
+      idPhien: t.idPhien,
+      nguoiGui: t.nguoiGui,
+      noiDung: t.noiDung,
+      thoiGian: t.thoiGian,
+      danhSachSanPhamGoiY: t.danhSachSanPhamGoiY,
+      sanPhamGoiY: t.sanPhamGoiY,
+    }))
+    return true
+  } catch {
+    clearAiPhien()
+    sessionId.value = null
+    return false
+  } finally {
+    restoringAi.value = false
   }
 }
 
@@ -49,21 +105,30 @@ async function openChat(mode) {
     return
   }
 
-  if(chatMode.value === 'NGUOI') {
+  if (chatMode.value === 'NGUOI') {
     cleanupHoTroSub()
     hoTroPhienId.value = null
+    messages.value = []
+    sessionId.value = null
   }
 
   chatMode.value = 'AI'
   isOpen.value = true
 
   if (messages.value.length === 0) {
-    messages.value.push({
-      nguoiGui: 'AI',
-      noiDung: 'Chào bạn! Tôi là Trợ lý AI của SUNOVA. Bạn cần tư vấn kem chống nắng cho loại da nào?',
-      thoiGian: new Date(),
-    })
+    const ok = await restoreAiSession()
+    if (!ok || messages.value.length === 0) {
+      pushAiWelcome()
+    }
+    scrollToBottom()
   }
+}
+
+function startNewAiChat() {
+  clearAiPhien()
+  sessionId.value = null
+  pushAiWelcome('Đã bắt đầu hội thoại mới. Bạn cần tư vấn gì?')
+  scrollToBottom()
 }
 
  const toggleChat = () => {
@@ -158,13 +223,14 @@ function switchToAi() {
   cleanupHoTroSub()
   chatMode.value = 'AI'
   hoTroPhienId.value = null
-  messages.value = [
-    {
-      nguoiGui: 'AI',
-      noiDung: 'Đã quay lại chat AI. Bạn cần tư vấn gì tiếp theo?',
-      thoiGian: new Date(),
-    },
-  ]
+  messages.value = []
+  sessionId.value = null
+  restoreAiSession().then((ok) => {
+    if (!ok || messages.value.length === 0) {
+      pushAiWelcome('Đã quay lại chat AI. Bạn cần tư vấn gì tiếp theo?')
+    }
+    scrollToBottom()
+  })
 }
 
 const sendMessage = async () => {
@@ -210,6 +276,7 @@ const sendMessage = async () => {
     const res = await request.post('/chat/tin-nhan', payload)
     if (res.data) {
       if (!sessionId.value) sessionId.value = res.data.idPhien
+      if (sessionId.value) saveAiPhien(sessionId.value)
       messages.value.push(res.data)
     }
   } catch (err) {
@@ -337,6 +404,15 @@ watch(isOpen, (open) => {
           @click="switchToAi"
         >
           Quay lại chat AI
+        </button>
+        <button
+          v-if="chatMode === 'AI'"
+          type="button"
+          class="chat-mode-btn chat-mode-btn--ghost"
+          :disabled="restoringAi || isTyping"
+          @click="startNewAiChat"
+        >
+          Chat mới
         </button>
       </div>
 

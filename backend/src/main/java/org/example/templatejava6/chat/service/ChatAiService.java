@@ -11,6 +11,7 @@ import org.example.templatejava6.chat.entity.TinNhanChatAi;
 import org.example.templatejava6.chat.repository.PhienChatAiRepository;
 import org.example.templatejava6.chat.repository.TinNhanChatAiRepository;
 import org.example.templatejava6.common.entity.KhachHang;
+import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.customer.repository.KhachHangRepository;
 import org.example.templatejava6.product.entity.SanPham;
 import org.example.templatejava6.product.entity.SanPhamCongDung;
@@ -123,6 +124,9 @@ public class ChatAiService {
     }
 
     public List<ChatResponseDto> getLichSuTinNhan(Integer idPhien) {
+        if (idPhien == null || !phienChatAiRepository.existsById(idPhien)) {
+            throw new ApiException("Không tìm thấy phiên chat", "NOT_FOUND");
+        }
         Map<Integer, SanPhamResponse> byId = catalogById();
         return tinNhanChatAiRepository.findByPhienChatAiIdOrderByThoiGianAsc(idPhien)
                 .stream()
@@ -639,6 +643,8 @@ public class ChatAiService {
             dungTichMap.put(agg.getSpId(), formatDungTich(agg.getDungTichMin(), agg.getDungTichMax()));
         }
 
+        Map<Integer, String> giaBienTheMap = buildGiaBienTheMap();
+
         List<ProductCatalogItem> items = new ArrayList<>();
         for (SanPhamResponse sp : all) {
             items.add(new ProductCatalogItem(
@@ -655,7 +661,7 @@ public class ChatAiService {
                     joinNames(loaiDaMap.get(sp.getId())),
                     joinNames(thanhPhanMap.get(sp.getId())),
                     dungTichMap.getOrDefault(sp.getId(), "—"),
-                    formatGia(sp.getGiaMin())
+                    giaBienTheMap.getOrDefault(sp.getId(), formatGiaKhoang(sp.getGiaMin(), sp.getGiaMax()))
             ));
         }
 
@@ -699,6 +705,58 @@ public class ChatAiService {
     private String strip(BigDecimal v) {
         if (v == null) return "?";
         return v.stripTrailingZeros().toPlainString();
+    }
+
+    private Map<Integer, String> buildGiaBienTheMap() {
+        Map<Integer, List<ChiTietSanPhamRepository.VariantPriceRow>> bySp = new HashMap<>();
+        for (ChiTietSanPhamRepository.VariantPriceRow row : chiTietSanPhamRepository.listActiveVariantPrices()) {
+            if (row.getSpId() == null || row.getGiaBan() == null) continue;
+            bySp.computeIfAbsent(row.getSpId(), k -> new ArrayList<>()).add(row);
+        }
+        Map<Integer, String> result = new HashMap<>();
+        for (Map.Entry<Integer, List<ChiTietSanPhamRepository.VariantPriceRow>> e : bySp.entrySet()) {
+            result.put(e.getKey(), formatGiaBienTheRows(e.getValue()));
+        }
+        return result;
+    }
+
+    /** Một giá, hoặc liệt kê dung tích+giá, hoặc khoảng min–max. */
+    private String formatGiaBienTheRows(List<ChiTietSanPhamRepository.VariantPriceRow> rows) {
+        if (rows == null || rows.isEmpty()) return "—";
+        if (rows.size() == 1) {
+            ChiTietSanPhamRepository.VariantPriceRow only = rows.get(0);
+            if (only.getDungTich() != null) {
+                return strip(only.getDungTich()) + "ml: " + formatGia(only.getGiaBan());
+            }
+            return formatGia(only.getGiaBan());
+        }
+        boolean hasVolume = rows.stream().anyMatch(v -> v.getDungTich() != null);
+        if (hasVolume) {
+            List<String> parts = new ArrayList<>();
+            for (ChiTietSanPhamRepository.VariantPriceRow v : rows) {
+                String vol = v.getDungTich() != null ? strip(v.getDungTich()) + "ml" : "khác";
+                parts.add(vol + ": " + formatGia(v.getGiaBan()));
+            }
+            return String.join(" · ", parts);
+        }
+        BigDecimal min = null;
+        BigDecimal max = null;
+        for (ChiTietSanPhamRepository.VariantPriceRow v : rows) {
+            BigDecimal g = v.getGiaBan();
+            if (g == null) continue;
+            if (min == null || g.compareTo(min) < 0) min = g;
+            if (max == null || g.compareTo(max) > 0) max = g;
+        }
+        return formatGiaKhoang(min, max);
+    }
+
+    private String formatGiaKhoang(BigDecimal min, BigDecimal max) {
+        if (min == null && max == null) return "—";
+        if (min != null && (max == null || min.compareTo(max) == 0)) {
+            return formatGia(min);
+        }
+        if (min == null) return formatGia(max);
+        return "giá từ " + formatGia(min) + " đến " + formatGia(max);
     }
 
     private String formatGia(BigDecimal gia) {

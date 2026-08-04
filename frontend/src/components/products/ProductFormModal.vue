@@ -8,6 +8,8 @@ import { LOAI_DA_OPTIONS } from '@/constants/loaiDa'
 import {
   createEmptyProductForm,
   detailToForm,
+  PA_OPTIONS,
+  sanitizeSpfSuffix,
   validateProductForm,
 } from '@/utils/productForm'
 import { getMaTiepTheo } from '@/api/sanPhamApi'
@@ -91,7 +93,12 @@ async function loadPreviewMaSanPham() {
   }
 }
 
+function onSpfInput(event) {
+  form.value.chiSoSpf = sanitizeSpfSuffix(event.target.value)
+}
+
 function handleSubmit() {
+  form.value.chiSoSpf = sanitizeSpfSuffix(form.value.chiSoSpf)
   const validationError = validateProductForm(form.value)
   if (validationError) {
     error.value = validationError
@@ -189,11 +196,24 @@ function handleSubmit() {
           </div>
           <div>
             <label class="admin-label">Chỉ số SPF</label>
-            <input v-model="form.chiSoSpf" class="admin-input" placeholder="VD: SPF50+" />
+            <div class="spf-input-group">
+              <span class="spf-input-group__prefix" aria-hidden="true">SPF</span>
+              <input
+                :value="form.chiSoSpf"
+                class="admin-input spf-input-group__field"
+                placeholder="VD: 50+ hoặc 30"
+                inputmode="text"
+                autocomplete="off"
+                @input="onSpfInput"
+              />
+            </div>
           </div>
           <div>
             <label class="admin-label">Chỉ số PA</label>
-            <input v-model="form.chiSoPa" class="admin-input" placeholder="VD: PA++++" />
+            <select v-model="form.chiSoPa" class="admin-select">
+              <option value="">— Chọn PA —</option>
+              <option v-for="opt in PA_OPTIONS" :key="opt" :value="opt">{{ opt }}</option>
+            </select>
           </div>
           <div class="md:col-span-2">
             <label class="flex items-center gap-2 text-sm">
@@ -258,3 +278,40 @@ function handleSubmit() {
     </div>
   </div>
 </template>
+
+<style scoped>
+.spf-input-group {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.spf-input-group:focus-within {
+  border-color: var(--admin-primary);
+  box-shadow: 0 0 0 2px rgba(201, 169, 110, 0.12);
+}
+.spf-input-group__prefix {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  background: rgba(201, 169, 110, 0.12);
+  color: var(--ink, #1e1510);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  border-right: 1px solid var(--admin-border);
+  user-select: none;
+  flex-shrink: 0;
+}
+.spf-input-group__field {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  flex: 1;
+  min-width: 0;
+}
+</style>
