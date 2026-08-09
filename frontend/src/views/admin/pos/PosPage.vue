@@ -20,12 +20,13 @@ import {
   layDonCho,
   huyDonCho,
 } from '@/api/banHangApi'
-import { formatCurrency, formatMonthYear } from '@/utils/format'
+import { formatCurrency, formatDate, formatMonthYear } from '@/utils/format'
 import { formatDiscountPercent } from '@/utils/formatVND'
 import { productImageUrl } from '@/utils/productImage'
 import { confirm } from '@/composables/useConfirm'
 import { useAdminAuth } from '@/composables/useAdminAuth'
 import { getPhoneValidationError, normalizePhoneDigits } from '@/utils/phone'
+import { getLoHangConHangTheoBienThe } from '@/api/loHangApi'
 
 const { hoTen: currentStaffName } = useAdminAuth()
 
@@ -53,6 +54,12 @@ const productsLoaded = ref(false)
 const searchInput = ref(null)
 
 const cart = ref([])
+const lotModalOpen = ref(false)
+const lotModalLine = ref(null)
+const lotOptions = ref([])
+const lotLoading = ref(false)
+/** draft SL theo id lô khi mở popup chọn lô */
+const lotQtyDraft = ref({})
 
 const customerSdt = ref('')
 const customerName = ref('')
@@ -208,8 +215,37 @@ function formatVariant(item) {
   return parts.join(' / ') || '—'
 }
 
-function cartKey(id) {
-  return id
+function cartKey(line) {
+  if (line.phanBoLos?.length) {
+    const sig = [...line.phanBoLos]
+      .map((p) => `${p.idLoHang}:${p.soLuong}`)
+      .sort()
+      .join(',')
+    return `${line.idChiTietSanPham}-m-${sig}`
+  }
+  return `${line.idChiTietSanPham}-${line.idLoHang ?? 'fefo'}`
+}
+
+function mapCartItems() {
+  return cart.value.map((l) => {
+    const base = {
+      idChiTietSanPham: l.idChiTietSanPham,
+      soLuong: l.soLuong,
+    }
+    if (l.phanBoLos?.length) {
+      return {
+        ...base,
+        phanBoLos: l.phanBoLos.map((p) => ({
+          idLoHang: p.idLoHang,
+          soLuong: p.soLuong,
+        })),
+      }
+    }
+    if (l.idLoHang != null) {
+      return { ...base, idLoHang: l.idLoHang }
+    }
+    return base
+  })
 }
 
 function isOutOfStock(product) {
@@ -233,7 +269,12 @@ function saleLabel(product) {
 
 function addToCart(product) {
   if (isOutOfStock(product)) return
-  const existing = cart.value.find((l) => l.idChiTietSanPham === product.idChiTietSanPham)
+  const existing = cart.value.find(
+    (l) =>
+      l.idChiTietSanPham === product.idChiTietSanPham &&
+      l.idLoHang == null &&
+      !l.phanBoLos?.length,
+  )
   if (existing) {
     if (existing.soLuong >= product.soLuongTon) {
       notify(`Đã đạt tồn tối đa cho ${product.sku}`, 'error')
@@ -253,11 +294,26 @@ function addToCart(product) {
       dangGiamGia: Boolean(product.dangGiamGia),
       soLuongTon: product.soLuongTon,
       soLuong: 1,
+      idLoHang: null,
+      soLo: null,
+      hanSuDungLo: null,
+      phanBoLos: null,
+      /** HSD lô FEFO gần nhất (từ API bán) — hiện khi chưa chọn lô tay */
+      hanSuDungGanNhat: product.hanSuDungGanNhat || null,
+      soNgayConLai: product.soNgayConLai != null ? Number(product.soNgayConLai) : null,
     })
   }
   if (appliedVoucher.value) {
     void recalculateVoucher()
   }
+}
+
+function clearManualLot(line) {
+  if (!line) return
+  line.phanBoLos = null
+  line.idLoHang = null
+  line.soLo = null
+  line.hanSuDungLo = null
 }
 
 function changeQty(line, delta) {
@@ -270,14 +326,19 @@ function changeQty(line, delta) {
     notify(`Tồn kho còn ${line.soLuongTon}`, 'error')
     return
   }
+  const hadManual = Boolean(line.phanBoLos?.length || line.idLoHang != null)
   line.soLuong = next
+  if (hadManual) {
+    clearManualLot(line)
+    notify('Đã đổi số lượng — chọn lại lô hoặc giữ FEFO tự động', 'success')
+  }
   if (appliedVoucher.value) {
     void recalculateVoucher()
   }
 }
 
 function removeLine(line) {
-  cart.value = cart.value.filter((l) => l.idChiTietSanPham !== line.idChiTietSanPham)
+  cart.value = cart.value.filter((l) => cartKey(l) !== cartKey(line))
   if (appliedVoucher.value) {
     if (cart.value.length === 0) {
       clearVoucher()
@@ -285,6 +346,169 @@ function removeLine(line) {
       void recalculateVoucher()
     }
   }
+}
+
+async function openLotPicker(line) {
+  lotModalLine.value = line
+  lotModalOpen.value = true
+  lotOptions.value = []
+  lotQtyDraft.value = {}
+  lotLoading.value = true
+  try {
+    const res = await getLoHangConHangTheoBienThe(line.idChiTietSanPham)
+    lotOptions.value = res.data || []
+    const draft = {}
+    lotOptions.value.forEach((l) => {
+      draft[l.id] = 0
+    })
+    if (line.phanBoLos?.length) {
+      line.phanBoLos.forEach((p) => {
+        if (p.idLoHang != null) draft[p.idLoHang] = Number(p.soLuong) || 0
+      })
+    } else if (line.idLoHang != null) {
+      draft[line.idLoHang] = Number(line.soLuong) || 0
+    }
+    lotQtyDraft.value = draft
+  } catch (err) {
+    notify(String(err), 'error')
+    lotModalOpen.value = false
+  } finally {
+    lotLoading.value = false
+  }
+}
+
+function closeLotPicker() {
+  lotModalOpen.value = false
+  lotModalLine.value = null
+  lotOptions.value = []
+  lotQtyDraft.value = {}
+}
+
+const lotDraftTotal = computed(() =>
+  Object.values(lotQtyDraft.value).reduce((sum, n) => sum + (Number(n) || 0), 0),
+)
+
+/** Cho phép xác nhận khi tổng > 0 (số lượng dòng sẽ tự = tổng). */
+const lotDraftCanConfirm = computed(() => lotDraftTotal.value > 0)
+
+function setLotDraftQty(lotId, raw) {
+  const max = Number(lotOptions.value.find((l) => l.id === lotId)?.soLuongCon) || 0
+  let n = Number(raw)
+  if (!Number.isFinite(n) || n < 0) n = 0
+  if (n > max) n = max
+  lotQtyDraft.value = { ...lotQtyDraft.value, [lotId]: Math.floor(n) }
+}
+
+async function confirmLotSelection() {
+  const line = lotModalLine.value
+  if (!line) return
+
+  const selected = lotOptions.value
+    .map((lot) => ({
+      lot,
+      soLuong: Number(lotQtyDraft.value[lot.id]) || 0,
+    }))
+    .filter((x) => x.soLuong > 0)
+
+  const tong = selected.reduce((s, x) => s + x.soLuong, 0)
+  if (tong <= 0) {
+    notify('Nhập số lượng lấy từ ít nhất 1 lô.', 'error')
+    return
+  }
+  if (tong > Number(line.soLuongTon)) {
+    notify(`Tổng chọn (${tong}) vượt tồn SKU (còn ${line.soLuongTon}).`, 'error')
+    return
+  }
+
+  for (const { lot, soLuong } of selected) {
+    if (soLuong > Number(lot.soLuongCon)) {
+      notify(`Lô [${lot.soLo}] không đủ hàng (còn ${lot.soLuongCon}).`, 'error')
+      return
+    }
+  }
+
+  // Cảnh báo nếu bỏ qua lô cận hạn có HSD sớm hơn lô đang lấy
+  const skippedNear = lotOptions.value.find((l) => {
+    if (!l.sapHetHan) return false
+    const take = Number(lotQtyDraft.value[l.id]) || 0
+    if (take > 0) return false
+    return selected.some(
+      (s) =>
+        s.lot.hanSuDung &&
+        l.hanSuDung &&
+        new Date(l.hanSuDung) < new Date(s.lot.hanSuDung),
+    )
+  })
+  if (skippedNear) {
+    const ok = await confirm({
+      title: 'Bỏ qua lô cận hạn?',
+      message: `Bạn đang bỏ qua lô [${skippedNear.soLo}] sắp hết hạn (${formatDate(skippedNear.hanSuDung)}) — vẫn tiếp tục?`,
+      confirmText: 'Vẫn tiếp tục',
+    })
+    if (!ok) return
+  }
+
+  // Số lượng dòng = tổng các lô đã chọn
+  line.soLuong = tong
+
+  if (selected.length === 1) {
+    const { lot } = selected[0]
+    line.phanBoLos = null
+    line.idLoHang = lot.id
+    line.soLo = lot.soLo
+    line.hanSuDungLo = lot.hanSuDung
+  } else {
+    line.idLoHang = null
+    line.soLo = null
+    line.hanSuDungLo = selected
+      .map((s) => s.lot.hanSuDung)
+      .filter(Boolean)
+      .sort((a, b) => new Date(a) - new Date(b))[0] || null
+    line.phanBoLos = selected.map(({ lot, soLuong }) => ({
+      idLoHang: lot.id,
+      soLo: lot.soLo,
+      soLuong,
+      hanSuDung: lot.hanSuDung,
+    }))
+  }
+
+  if (appliedVoucher.value) {
+    void recalculateVoucher()
+  }
+  closeLotPicker()
+}
+
+function clearLotSelection() {
+  const line = lotModalLine.value
+  if (!line) return
+  const dup = cart.value.find(
+    (l) => l !== line && l.idChiTietSanPham === line.idChiTietSanPham && !l.phanBoLos?.length && l.idLoHang == null,
+  )
+  if (dup) {
+    const total = dup.soLuong + line.soLuong
+    if (total > line.soLuongTon) {
+      notify(`Gộp dòng vượt tồn SKU (còn ${line.soLuongTon}).`, 'error')
+      return
+    }
+    dup.soLuong = total
+    removeLine(line)
+  } else {
+    clearManualLot(line)
+  }
+  closeLotPicker()
+}
+
+function lineLotLabel(line) {
+  if (line.phanBoLos?.length) {
+    return `Chọn lô thủ công · ${line.soLuong} sp (${line.phanBoLos.length} lô)`
+  }
+  if (line.soLo) return `Lô: ${line.soLo} · ${line.soLuong} sp`
+  return 'Tự động (FEFO) · Chọn lô'
+}
+
+function lineLotHint(line) {
+  if (!line.phanBoLos?.length) return null
+  return line.phanBoLos.map((p) => `${p.soLo || '#' + p.idLoHang}×${p.soLuong}`).join(', ')
 }
 
 async function loadProducts() {
@@ -298,6 +522,24 @@ async function loadProducts() {
   } finally {
     loading.value = false
   }
+}
+
+function expiryTone(line) {
+  const hsd = lineDisplayHsd(line)
+  if (!hsd) return null
+  const days =
+    (line.phanBoLos?.length || line.idLoHang != null) && line.hanSuDungLo
+      ? Math.ceil((new Date(line.hanSuDungLo) - new Date()) / (1000 * 60 * 60 * 24))
+      : line.soNgayConLai
+  if (days == null || Number.isNaN(days)) return null
+  if (days <= 0) return 'expired'
+  if (days < 30) return 'warning'
+  return null
+}
+
+function lineDisplayHsd(line) {
+  if (line.hanSuDungLo) return line.hanSuDungLo
+  return line.hanSuDungGanNhat || null
 }
 
 function onSearchEnter() {
@@ -492,10 +734,7 @@ async function recalculateVoucher() {
   voucherLoading.value = true
   try {
     const res = await tinhGiaTaiQuay({
-      items: cart.value.map((l) => ({
-        idChiTietSanPham: l.idChiTietSanPham,
-        soLuong: l.soLuong,
-      })),
+      items: mapCartItems(),
       maPhieuGiamGia: appliedVoucher.value,
     })
     voucherDiscount.value = Number(res.data?.tienGiamGia) || 0
@@ -547,10 +786,7 @@ async function applyVoucher(codeOverride, { skipConfirm = false } = {}) {
   voucherLoading.value = true
   try {
     const res = await tinhGiaTaiQuay({
-      items: cart.value.map((l) => ({
-        idChiTietSanPham: l.idChiTietSanPham,
-        soLuong: l.soLuong,
-      })),
+      items: mapCartItems(),
       maPhieuGiamGia: code,
     })
     voucherCode.value = code
@@ -648,10 +884,7 @@ async function holdCurrentOrder() {
       activeHeldOrderId.value = null
     }
     await giuDon({
-      items: cart.value.map((l) => ({
-        idChiTietSanPham: l.idChiTietSanPham,
-        soLuong: l.soLuong,
-      })),
+      items: mapCartItems(),
       idKhachHang: selectedCustomer.value?.id ?? null,
       tenKhachHang: selectedCustomer.value?.hoTen || customerName.value.trim() || null,
       soDienThoai: selectedCustomer.value?.soDienThoai
@@ -682,6 +915,22 @@ function loadCartFromDetail(detail) {
       giaBan: Number(item.donGia) || 0,
       soLuongTon: Number(item.soLuongTon) || 0,
       soLuong: Math.max(0, Number(item.soLuong) || 0),
+      idLoHang: item.idLoHang ?? null,
+      soLo: item.soLo || null,
+      hanSuDungLo: item.phanBoLos?.length
+        ? [...item.phanBoLos]
+            .map((p) => p.hanSuDung)
+            .filter(Boolean)
+            .sort((a, b) => new Date(a) - new Date(b))[0] || null
+        : null,
+      phanBoLos: item.phanBoLos?.length
+        ? item.phanBoLos.map((p) => ({
+            idLoHang: p.idLoHang,
+            soLo: p.soLo,
+            soLuong: Number(p.soLuong) || 0,
+            hanSuDung: p.hanSuDung || null,
+          }))
+        : null,
     }))
     .filter((line) => line.soLuong > 0)
 }
@@ -763,10 +1012,7 @@ async function checkout() {
     const transferPt = paymentByMa.value.CHUYEN_KHOAN
 
     const payload = {
-      items: cart.value.map((l) => ({
-        idChiTietSanPham: l.idChiTietSanPham,
-        soLuong: l.soLuong,
-      })),
+      items: mapCartItems(),
       idKhachHang: selectedCustomer.value?.id ?? null,
       maPhieuGiamGia: appliedVoucher.value || null,
       idPhuongThucThanhToan: isSplitMode.value
@@ -1181,7 +1427,7 @@ onBeforeUnmount(() => {
           Chưa có sản phẩm trong đơn
         </div>
         <div v-else class="pos-cart-lines">
-          <div v-for="line in cart" :key="cartKey(line.idChiTietSanPham)" class="pos-cart-line">
+          <div v-for="line in cart" :key="cartKey(line)" class="pos-cart-line">
             <div class="pos-cart-line__thumb">
               <img
                 :src="productImageUrl(line.anhUrl)"
@@ -1192,6 +1438,26 @@ onBeforeUnmount(() => {
             <div class="pos-cart-line__info">
               <div class="pos-cart-line__name">{{ line.tenSanPham }}</div>
               <div class="pos-cart-line__variant">{{ line.bienThe }}</div>
+              <div
+                v-if="lineDisplayHsd(line)"
+                class="pos-cart-line__hsd"
+                :class="{
+                  'pos-cart-line__hsd--warn': expiryTone(line) === 'warning',
+                  'pos-cart-line__hsd--expired': expiryTone(line) === 'expired',
+                }"
+              >
+                HSD: {{ formatDate(lineDisplayHsd(line)) }}
+                <span v-if="line.phanBoLos?.length" class="pos-cart-line__hsd-note">
+                  (thủ công)
+                </span>
+                <span v-else-if="line.idLoHang && line.soLo" class="pos-cart-line__hsd-note">
+                  (lô {{ line.soLo }})
+                </span>
+                <span v-else class="pos-cart-line__hsd-note">(FEFO)</span>
+              </div>
+              <p v-if="lineLotHint(line)" class="pos-cart-line__lot-hint">
+                {{ lineLotHint(line) }}
+              </p>
               <div v-if="line.dangGiamGia" class="pos-cart-line__prices">
                 <span class="pos-cart-line__price pos-cart-line__price--sale">
                   {{ formatCurrency(line.giaBan) }} / sp
@@ -1201,6 +1467,13 @@ onBeforeUnmount(() => {
                 </span>
               </div>
               <div v-else class="pos-cart-line__price">{{ formatCurrency(line.giaBan) }} / sp</div>
+              <button
+                type="button"
+                class="pos-lot-btn"
+                @click="openLotPicker(line)"
+              >
+                {{ lineLotLabel(line) }}
+              </button>
             </div>
             <button
               type="button"
@@ -1669,6 +1942,95 @@ onBeforeUnmount(() => {
       :subtotal="tongTienHang"
       @select="onVoucherModalSelect"
     />
+
+    <Teleport to="body">
+      <div v-if="lotModalOpen" class="modal-overlay" @click.self="closeLotPicker">
+        <div class="modal-panel" style="max-width: 640px">
+          <div class="px-5 py-4 border-b flex justify-between items-center" style="border-color: var(--admin-border)">
+            <div>
+              <h2 class="text-lg font-semibold m-0">Chọn lô</h2>
+              <p class="text-sm text-[var(--admin-muted)] m-0 mt-1">
+                {{ lotModalLine?.sku }} — gõ số lượng lấy từ từng lô; số lượng dòng sẽ tự cập nhật theo tổng
+              </p>
+            </div>
+            <button type="button" class="admin-btn admin-btn-default !px-2" @click="closeLotPicker">✕</button>
+          </div>
+          <div class="p-5">
+            <button
+              type="button"
+              class="admin-btn admin-btn-default w-full mb-3"
+              @click="clearLotSelection"
+            >
+              Dùng FEFO (tự động)
+            </button>
+            <div
+              class="mb-3 rounded-lg px-3 py-2 text-sm"
+              :style="{
+                background: lotDraftCanConfirm ? 'rgba(122, 140, 110, 0.12)' : 'rgba(201, 169, 110, 0.12)',
+                color: lotDraftCanConfirm ? '#5a6b52' : '#8c6b4a',
+              }"
+            >
+              Tổng: <strong>{{ lotDraftTotal }}</strong> sản phẩm
+              <span class="opacity-80"> — sẽ gán vào số lượng dòng khi xác nhận</span>
+            </div>
+            <div v-if="lotLoading" class="text-center py-8 text-[var(--admin-muted)]">Đang tải lô...</div>
+            <div v-else-if="lotOptions.length === 0" class="text-center py-8 text-[var(--admin-muted)]">
+              Không có lô còn hàng
+            </div>
+            <div v-else class="overflow-x-auto">
+              <table class="admin-table admin-table--striped w-full">
+                <thead>
+                  <tr>
+                    <th>Số lô</th>
+                    <th>Ngày nhập</th>
+                    <th>HSD</th>
+                    <th>Còn</th>
+                    <th>Lấy</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="lot in lotOptions" :key="lot.id">
+                    <td class="font-medium">
+                      {{ lot.soLo }}
+                      <span
+                        v-if="lot.sapHetHan"
+                        class="ml-1 inline-block text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800"
+                      >Cận hạn</span>
+                    </td>
+                    <td>{{ formatDate(lot.ngayNhap) }}</td>
+                    <td>{{ lot.hanSuDung ? formatDate(lot.hanSuDung) : '—' }}</td>
+                    <td>{{ lot.soLuongCon }}</td>
+                    <td style="min-width: 96px">
+                      <input
+                        type="number"
+                        class="admin-input !py-1"
+                        min="0"
+                        :max="lot.soLuongCon"
+                        :value="lotQtyDraft[lot.id] ?? 0"
+                        @input="setLotDraftQty(lot.id, $event.target.value)"
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="flex justify-end gap-2 mt-4">
+              <button type="button" class="admin-btn admin-btn-default" @click="closeLotPicker">
+                Hủy
+              </button>
+              <button
+                type="button"
+                class="admin-btn admin-btn-primary"
+                :disabled="!lotDraftCanConfirm || lotLoading"
+                @click="confirmLotSelection"
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- Modal VietQR chuyển khoản (thanh toán kết hợp) -->
     <Teleport to="body">

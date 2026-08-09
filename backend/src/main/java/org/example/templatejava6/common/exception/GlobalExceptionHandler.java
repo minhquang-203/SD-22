@@ -77,7 +77,7 @@ public class GlobalExceptionHandler {
         Map<String, Object> res = new HashMap<>();
         res.put("status", "FAILED");
         res.put("code", "UPLOAD_TOO_LARGE");
-        res.put("message", "Ảnh quá lớn. Mỗi ảnh tối đa 10MB, tổng request tối đa 30MB (JPG/PNG/WEBP/GIF).");
+        res.put("message", "Ảnh quá lớn. Mỗi ảnh tối đa 5MB, tổng request tối đa 30MB (JPG/PNG/WEBP).");
         return new ResponseEntity<>(res, HttpStatus.PAYLOAD_TOO_LARGE);
     }
 

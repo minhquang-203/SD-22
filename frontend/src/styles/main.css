@@ -2095,6 +2095,23 @@ h2,
   color: var(--admin-muted);
 }
 
+.pos-cart-line__hsd {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #5a7a52;
+}
+.pos-cart-line__hsd-note {
+  font-weight: 500;
+  opacity: 0.85;
+}
+.pos-cart-line__hsd--warn {
+  color: #c47a2a;
+}
+.pos-cart-line__hsd--expired {
+  color: #a83a3a;
+}
+
 .pos-cart-line__price {
   font-size: 12px;
   color: rgba(30, 21, 16, 0.55);
@@ -2118,6 +2135,30 @@ h2,
   font-size: 11px;
   color: var(--admin-muted);
   text-decoration: line-through;
+}
+
+.pos-lot-btn {
+  display: inline-flex;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border: 1px dashed rgba(140, 107, 74, 0.45);
+  border-radius: 6px;
+  background: rgba(201, 169, 110, 0.08);
+  color: #8c6b4a;
+  font-size: 11px;
+  cursor: pointer;
+  max-width: 100%;
+  text-align: left;
+}
+.pos-lot-btn:hover {
+  border-style: solid;
+  background: rgba(201, 169, 110, 0.16);
+}
+.pos-cart-line__lot-hint {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: #8c6b4a;
+  line-height: 1.35;
 }
 
 .pos-qty-control {

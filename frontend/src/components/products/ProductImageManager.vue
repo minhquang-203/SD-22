@@ -7,10 +7,17 @@ const images = defineModel({ type: Array, required: true })
 const props = defineProps({
   /** Danh sách màu có thể gán ảnh — thường lấy từ biến thể đang có */
   mauOptions: { type: Array, default: () => [] },
+  error: { type: String, default: '' },
 })
+
+const emit = defineEmits(['clear-error'])
 
 const fileInputRef = ref(null)
 const dragOver = ref(false)
+const localReject = ref('')
+
+const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+const MAX_BYTES = 5 * 1024 * 1024
 
 const colorSelectOptions = computed(() => {
   const map = new Map()
@@ -21,6 +28,8 @@ const colorSelectOptions = computed(() => {
   })
   return [...map.values()]
 })
+
+const displayError = computed(() => props.error || localReject.value)
 
 function previewSrc(img) {
   if (img.previewUrl) return img.previewUrl
@@ -40,9 +49,29 @@ function syncThuTu() {
   }
 }
 
+function isAllowedImage(file) {
+  const type = (file?.type || '').toLowerCase()
+  return ALLOWED_TYPES.includes(type)
+}
+
 function addFiles(fileList) {
-  const selected = Array.from(fileList || []).filter((f) => f?.type?.startsWith('image/'))
-  selected.forEach((file) => {
+  localReject.value = ''
+  emit('clear-error')
+  const selected = Array.from(fileList || [])
+  const accepted = []
+  for (const file of selected) {
+    if (!file) continue
+    if (!isAllowedImage(file)) {
+      localReject.value = `Bỏ qua "${file.name}": chỉ chấp nhận JPG, PNG hoặc WEBP`
+      continue
+    }
+    if (file.size > MAX_BYTES) {
+      localReject.value = `Bỏ qua "${file.name}": ảnh vượt quá 5MB`
+      continue
+    }
+    accepted.push(file)
+  }
+  accepted.forEach((file) => {
     images.value.push({
       url: '',
       file,
@@ -111,7 +140,7 @@ function onColorChange(img, event) {
     <input
       ref="fileInputRef"
       type="file"
-      accept="image/jpeg,image/png,image/webp,image/gif"
+      accept="image/jpeg,image/png,image/webp"
       multiple
       class="hidden"
       @change="onFilesSelected"
@@ -125,6 +154,13 @@ function onColorChange(img, event) {
     </div>
 
     <div
+      v-if="displayError"
+      class="admin-alert admin-alert-error rounded-lg px-4 py-2 text-sm mb-3"
+    >
+      {{ displayError }}
+    </div>
+
+    <div
       class="pim__drop"
       :class="{ 'pim__drop--active': dragOver }"
       @dragover.prevent="dragOver = true"
@@ -135,7 +171,7 @@ function onColorChange(img, event) {
       <p>
         Kéo thả ảnh vào đây hoặc <strong>bấm để chọn</strong>
       </p>
-      <span>JPG, PNG, WEBP, GIF — có thể chọn nhiều ảnh</span>
+      <span>JPG, PNG, WEBP — tối đa 5MB mỗi ảnh</span>
     </div>
 
     <div v-if="images.length === 0" class="pim__empty">

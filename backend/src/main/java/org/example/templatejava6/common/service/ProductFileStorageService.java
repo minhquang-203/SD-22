@@ -18,8 +18,7 @@ public class ProductFileStorageService {
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
             "image/jpeg",
             "image/png",
-            "image/webp",
-            "image/gif"
+            "image/webp"
     );
 
     @Value("${app.upload.products-dir:uploads/products}")
@@ -32,7 +31,10 @@ public class ProductFileStorageService {
 
         String contentType = file.getContentType();
         if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase())) {
-            throw new ApiException("Chỉ chấp nhận ảnh JPG, PNG, WEBP hoặc GIF", "VALIDATION_ERROR");
+            throw new ApiException("Chỉ chấp nhận ảnh JPG, PNG hoặc WEBP", "VALIDATION_ERROR");
+        }
+        if (file.getSize() > 5L * 1024 * 1024) {
+            throw new ApiException("Ảnh vượt quá 5MB", "VALIDATION_ERROR");
         }
 
         try {

@@ -452,6 +452,7 @@ onMounted(async () => {
       :loading="saving"
       :product-id="productId"
       :ma-san-pham="productInfo.maSanPham"
+      :ten-san-pham="productInfo.ten || ''"
       :initial="editingVariant"
       :mau-sac-options="mauSacOptions"
       @close="modalOpen = false"

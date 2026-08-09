@@ -10,6 +10,7 @@ import org.example.templatejava6.common.security.SecurityUtils;
 import org.example.templatejava6.customer.repository.KhachHangRepository;
 import org.example.templatejava6.order.entity.HoaDon;
 import org.example.templatejava6.order.entity.HoaDonChiTiet;
+import org.example.templatejava6.order.entity.HoaDonChiTietLo;
 import org.example.templatejava6.order.entity.LichSuDonHang;
 import org.example.templatejava6.order.entity.ThanhToanHoaDon;
 import org.example.templatejava6.order.model.request.GiuDonChoRequest;
@@ -23,6 +24,7 @@ import org.example.templatejava6.order.model.response.DonChoListItemResponse;
 import org.example.templatejava6.order.model.response.GiuDonChoResponse;
 import org.example.templatejava6.order.model.response.PosTinhGiaResponse;
 import org.example.templatejava6.order.model.response.PosThanhToanStatusResponse;
+import org.example.templatejava6.order.repository.HoaDonChiTietLoRepository;
 import org.example.templatejava6.order.repository.HoaDonChiTietRepository;
 import org.example.templatejava6.order.repository.HoaDonRepository;
 import org.example.templatejava6.order.repository.LichSuDonHangRepository;
@@ -83,6 +85,7 @@ public class BanHangService {
     @Autowired private AnhSanPhamRepository anhSanPhamRepository;
     @Autowired private HoaDonRepository hoaDonRepository;
     @Autowired private HoaDonChiTietRepository hoaDonChiTietRepository;
+    @Autowired private HoaDonChiTietLoRepository hoaDonChiTietLoRepository;
     @Autowired private ThanhToanHoaDonRepository thanhToanHoaDonRepository;
     @Autowired private LichSuDonHangRepository lichSuDonHangRepository;
     @Autowired private PhuongThucThanhToanRepository phuongThucThanhToanRepository;
@@ -211,10 +214,9 @@ public class BanHangService {
             throw new ApiException("Đã đạt tối đa 15 hóa đơn chờ", "MAX_HELD_ORDERS");
         }
 
-        Map<Integer, Integer> qtyByVariant = mergeItems(req.getItems());
         Map<Integer, VariantSaleInfo> saleMap = checkoutPricingService.loadActiveSales();
-        // Giữ đơn phải kiểm tra và trừ tồn theo lô (FEFO), giống checkout.
-        List<LineCalc> lines = buildLines(qtyByVariant, true, saleMap);
+        // Giữ đơn phải kiểm tra và trừ tồn theo lô (FEFO hoặc lô chọn), giống checkout.
+        List<LineCalc> lines = buildLinesWithLots(req.getItems(), true, saleMap);
         BigDecimal tongTien = sumTongTien(lines);
 
         KhachHang khachHang = resolveKhachHang(req.getIdKhachHang());
@@ -285,6 +287,28 @@ public class BanHangService {
             item.setDonGia(line.getDonGia());
             item.setSoLuong(line.getSoLuong() != null ? line.getSoLuong() : 0);
             item.setSoLuongTon(cts.getSoLuongTon() != null ? cts.getSoLuongTon() : 0);
+            List<HoaDonChiTietLo> lotRows = hoaDonChiTietLoRepository.findByHoaDonChiTiet(line);
+            if (lotRows != null && !lotRows.isEmpty()) {
+                List<DonChoDetailResponse.PhanBoLoItem> phanBo = new ArrayList<>();
+                for (HoaDonChiTietLo row : lotRows) {
+                    if (row.getLoHang() == null) {
+                        continue;
+                    }
+                    DonChoDetailResponse.PhanBoLoItem pb = new DonChoDetailResponse.PhanBoLoItem();
+                    pb.setIdLoHang(row.getLoHang().getId());
+                    pb.setSoLo(row.getLoHang().getSoLo());
+                    pb.setSoLuong(row.getSoLuong());
+                    pb.setHanSuDung(row.getLoHang().getHanSuDung());
+                    phanBo.add(pb);
+                }
+                if (!phanBo.isEmpty()) {
+                    item.setPhanBoLos(phanBo);
+                    if (phanBo.size() == 1) {
+                        item.setIdLoHang(phanBo.get(0).getIdLoHang());
+                        item.setSoLo(phanBo.get(0).getSoLo());
+                    }
+                }
+            }
             items.add(item);
         }
         res.setItems(items);
@@ -320,9 +344,8 @@ public class BanHangService {
                     "UNSUPPORTED_PAYMENT_METHOD");
         }
 
-        Map<Integer, Integer> qtyByVariant = mergeItems(req.getItems());
         Map<Integer, VariantSaleInfo> saleMap = checkoutPricingService.loadActiveSales();
-        List<LineCalc> lines = buildLines(qtyByVariant, true, saleMap);
+        List<LineCalc> lines = buildLinesWithLots(req.getItems(), true, saleMap);
         BigDecimal tongTien = sumTongTien(lines);
 
         PhieuGiamGia phieu = null;
@@ -401,7 +424,7 @@ public class BanHangService {
             hdct.setThanhTien(line.thanhTien);
             hdct = hoaDonChiTietRepository.save(hdct);
 
-            loHangService.truTonVaGhiNhan(hdct, line.soLuong);
+            loHangService.truTonVaGhiNhan(hdct, line.soLuong, line.idLoHang, line.phanBoLos);
 
             lineResponses.add(new BanHangChiTietResponse(hdct));
             ghiNhatKy(hoaDon, "THEM_HANG",
@@ -706,29 +729,146 @@ public class BanHangService {
             Map<Integer, VariantSaleInfo> saleMap) {
         List<LineCalc> lines = new ArrayList<>();
         for (Map.Entry<Integer, Integer> entry : qtyByVariant.entrySet()) {
-            ChiTietSanPham cts = chiTietSanPhamRepository.findById(entry.getKey())
-                    .orElseThrow(() -> new ApiException(
-                            "Biến thể sản phẩm không tồn tại (id=" + entry.getKey() + ").", "NOT_FOUND"));
-            if (!Boolean.TRUE.equals(cts.getTrangThai())) {
-                throw new ApiException("SKU " + cts.getSku() + " không còn bán.", "INACTIVE_SKU");
+            lines.add(buildOneLine(entry.getKey(), entry.getValue(), null, checkStock, saleMap));
+        }
+        return lines;
+    }
+
+    /** Giữ/thanh toán POS: gộp theo (biến thể + lô chọn); null lô = FEFO; nhiều lô = 1 dòng riêng. */
+    private List<LineCalc> buildLinesWithLots(
+            List<TaoDonTaiQuayRequest.ItemRequest> items,
+            boolean checkStock,
+            Map<Integer, VariantSaleInfo> saleMap) {
+        Map<String, MergedLotLine> merged = new LinkedHashMap<>();
+        int multiSeq = 0;
+        for (TaoDonTaiQuayRequest.ItemRequest item : items) {
+            if (item.getIdChiTietSanPham() == null || item.getSoLuong() == null || item.getSoLuong() <= 0) {
+                throw new ApiException("Số lượng sản phẩm không hợp lệ.", "INVALID_QTY");
             }
-            int soLuong = entry.getValue();
-            if (checkStock) {
+            List<LoHangService.PhanBoLo> phanBo = normalizePhanBoLos(item);
+            String key;
+            if (phanBo != null && phanBo.size() > 1) {
+                key = item.getIdChiTietSanPham() + "|m|" + (multiSeq++);
+            } else if (phanBo != null && phanBo.size() == 1) {
+                key = item.getIdChiTietSanPham() + "|" + phanBo.get(0).idLoHang();
+            } else {
+                key = item.getIdChiTietSanPham() + "|_";
+            }
+            MergedLotLine existing = merged.get(key);
+            if (existing == null) {
+                Integer idLo = (phanBo != null && phanBo.size() == 1) ? phanBo.get(0).idLoHang() : null;
+                List<LoHangService.PhanBoLo> multi =
+                        (phanBo != null && phanBo.size() > 1) ? phanBo : null;
+                merged.put(key, new MergedLotLine(
+                        item.getIdChiTietSanPham(), idLo, item.getSoLuong(), multi));
+            } else if (existing.phanBoLos != null) {
+                throw new ApiException("Không gộp được dòng chọn nhiều lô.", "VALIDATION_ERROR");
+            } else {
+                existing.soLuong += item.getSoLuong();
+            }
+        }
+        if (checkStock) {
+            Map<Integer, Integer> totalByVariant = new HashMap<>();
+            for (MergedLotLine m : merged.values()) {
+                totalByVariant.merge(m.idChiTietSanPham, m.soLuong, Integer::sum);
+            }
+            for (Map.Entry<Integer, Integer> e : totalByVariant.entrySet()) {
+                ChiTietSanPham cts = chiTietSanPhamRepository.findById(e.getKey())
+                        .orElseThrow(() -> new ApiException(
+                                "Biến thể sản phẩm không tồn tại (id=" + e.getKey() + ").", "NOT_FOUND"));
                 int ton = cts.getSoLuongTon() != null ? cts.getSoLuongTon() : 0;
-                if (ton < soLuong) {
+                if (ton < e.getValue()) {
                     throw new ApiException(
                             "Không đủ tồn cho SKU " + cts.getSku() + " (còn " + ton + ").",
                             "OUT_OF_STOCK");
                 }
             }
-            BigDecimal donGia = checkoutPricingService.resolveDonGia(cts, saleMap);
-            if (donGia == null || donGia.compareTo(BigDecimal.ZERO) < 0) {
-                throw new ApiException("Giá bán SKU " + cts.getSku() + " không hợp lệ.", "INVALID_PRICE");
-            }
-            BigDecimal thanhTienDong = donGia.multiply(BigDecimal.valueOf(soLuong));
-            lines.add(new LineCalc(cts, soLuong, donGia, thanhTienDong));
+        }
+        List<LineCalc> lines = new ArrayList<>();
+        for (MergedLotLine m : merged.values()) {
+            lines.add(buildOneLine(
+                    m.idChiTietSanPham, m.soLuong, m.idLoHang, m.phanBoLos, false, saleMap));
         }
         return lines;
+    }
+
+    /**
+     * Chuẩn hóa phân bổ lô từ request.
+     * @return null = FEFO; list size 1 = 1 lô; size &gt; 1 = nhiều lô
+     */
+    private List<LoHangService.PhanBoLo> normalizePhanBoLos(TaoDonTaiQuayRequest.ItemRequest item) {
+        if (item.getPhanBoLos() != null && !item.getPhanBoLos().isEmpty()) {
+            Map<Integer, Integer> qtyByLot = new LinkedHashMap<>();
+            for (TaoDonTaiQuayRequest.PhanBoLoItem pb : item.getPhanBoLos()) {
+                if (pb == null || pb.getIdLoHang() == null) {
+                    throw new ApiException("Thiếu id lô trong phân bổ.", "VALIDATION_ERROR");
+                }
+                if (pb.getSoLuong() == null || pb.getSoLuong() <= 0) {
+                    throw new ApiException("Số lượng lấy từ mỗi lô phải lớn hơn 0.", "VALIDATION_ERROR");
+                }
+                qtyByLot.merge(pb.getIdLoHang(), pb.getSoLuong(), Integer::sum);
+            }
+            int tong = qtyByLot.values().stream().mapToInt(Integer::intValue).sum();
+            if (tong != item.getSoLuong()) {
+                throw new ApiException(
+                        "Tổng số lượng chọn không khớp (đã chọn " + tong
+                                + ", cần bán " + item.getSoLuong() + ").",
+                        "VALIDATION_ERROR");
+            }
+            List<LoHangService.PhanBoLo> list = new ArrayList<>();
+            for (Map.Entry<Integer, Integer> e : qtyByLot.entrySet()) {
+                list.add(new LoHangService.PhanBoLo(e.getKey(), e.getValue()));
+            }
+            return list;
+        }
+        if (item.getIdLoHang() != null) {
+            return List.of(new LoHangService.PhanBoLo(item.getIdLoHang(), item.getSoLuong()));
+        }
+        return null;
+    }
+
+    private LineCalc buildOneLine(
+            Integer idCts,
+            int soLuong,
+            Integer idLoHang,
+            List<LoHangService.PhanBoLo> phanBoLos,
+            boolean checkStock,
+            Map<Integer, VariantSaleInfo> saleMap) {
+        ChiTietSanPham cts = chiTietSanPhamRepository.findById(idCts)
+                .orElseThrow(() -> new ApiException(
+                        "Biến thể sản phẩm không tồn tại (id=" + idCts + ").", "NOT_FOUND"));
+        if (!Boolean.TRUE.equals(cts.getTrangThai())) {
+            throw new ApiException("SKU " + cts.getSku() + " không còn bán.", "INACTIVE_SKU");
+        }
+        if (checkStock) {
+            int ton = cts.getSoLuongTon() != null ? cts.getSoLuongTon() : 0;
+            if (ton < soLuong) {
+                throw new ApiException(
+                        "Không đủ tồn cho SKU " + cts.getSku() + " (còn " + ton + ").",
+                        "OUT_OF_STOCK");
+            }
+        }
+        BigDecimal donGia = checkoutPricingService.resolveDonGia(cts, saleMap);
+        if (donGia == null || donGia.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ApiException("Giá bán SKU " + cts.getSku() + " không hợp lệ.", "INVALID_PRICE");
+        }
+        BigDecimal thanhTienDong = donGia.multiply(BigDecimal.valueOf(soLuong));
+        Integer singleLot = idLoHang;
+        List<LoHangService.PhanBoLo> multi = phanBoLos;
+        if (multi != null && multi.size() == 1) {
+            singleLot = multi.get(0).idLoHang();
+            multi = null;
+        }
+        return new LineCalc(cts, soLuong, donGia, thanhTienDong, singleLot, multi);
+    }
+
+    private LineCalc buildOneLine(
+            Integer idCts,
+            int soLuong,
+            Integer idLoHang,
+            boolean checkStock,
+            Map<Integer, VariantSaleInfo> saleMap) {
+        return buildOneLine(idCts, soLuong, idLoHang, null, checkStock, saleMap);
     }
 
     private BigDecimal sumTongTien(List<LineCalc> lines) {
@@ -749,7 +889,7 @@ public class BanHangService {
             hdct.setThanhTien(line.thanhTien);
             hoaDonChiTietRepository.save(hdct);
 
-            loHangService.truTonVaGhiNhan(hdct, line.soLuong);
+            loHangService.truTonVaGhiNhan(hdct, line.soLuong, line.idLoHang, line.phanBoLos);
         }
     }
 
@@ -813,5 +953,29 @@ public class BanHangService {
         return ms != null ? ms : "";
     }
 
-    private record LineCalc(ChiTietSanPham cts, int soLuong, BigDecimal donGia, BigDecimal thanhTien) {}
+    private record LineCalc(
+            ChiTietSanPham cts,
+            int soLuong,
+            BigDecimal donGia,
+            BigDecimal thanhTien,
+            Integer idLoHang,
+            List<LoHangService.PhanBoLo> phanBoLos) {}
+
+    private static final class MergedLotLine {
+        final Integer idChiTietSanPham;
+        final Integer idLoHang;
+        final List<LoHangService.PhanBoLo> phanBoLos;
+        int soLuong;
+
+        MergedLotLine(
+                Integer idChiTietSanPham,
+                Integer idLoHang,
+                int soLuong,
+                List<LoHangService.PhanBoLo> phanBoLos) {
+            this.idChiTietSanPham = idChiTietSanPham;
+            this.idLoHang = idLoHang;
+            this.soLuong = soLuong;
+            this.phanBoLos = phanBoLos;
+        }
+    }
 }
