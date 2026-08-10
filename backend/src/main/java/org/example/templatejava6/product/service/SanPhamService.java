@@ -160,6 +160,7 @@ public class SanPhamService {
 
     @Transactional
     public void add(SanPhamRequest request, List<MultipartFile> files) {
+        validateSanPhamFields(request);
         validateChiTiets(request.getChiTiets(), null);
 
         SanPham sp = MapperUtil.map(request, SanPham.class);
@@ -187,6 +188,7 @@ public class SanPhamService {
                 .orElseThrow(() -> new ApiException("Không tìm thấy sản phẩm", "NOT_FOUND"));
 
         validateMaSanPham(request.getMaSanPham(), id);
+        validateSanPhamFields(request);
         validateChiTiets(request.getChiTiets(), id);
 
         Boolean trangThai = sp.getTrangThai();
@@ -512,11 +514,66 @@ public class SanPhamService {
     }
 
     private void validateMaSanPham(String maSanPham, Integer excludeId) {
+        if (maSanPham == null || maSanPham.isBlank()) {
+            throw new ApiException("Mã sản phẩm không được để trống", "VALIDATION_ERROR");
+        }
+        String ma = maSanPham.trim();
         boolean exists = excludeId == null
-                ? sanPhamRepository.existsByMaSanPham(maSanPham)
-                : sanPhamRepository.existsByMaSanPhamAndIdNot(maSanPham, excludeId);
+                ? sanPhamRepository.existsByMaSanPham(ma)
+                : sanPhamRepository.existsByMaSanPhamAndIdNot(ma, excludeId);
         if (exists) {
             throw new ApiException("Mã sản phẩm đã tồn tại", "DUPLICATE");
+        }
+    }
+
+    private void validateSanPhamFields(SanPhamRequest request) {
+        if (request.getTen() != null) {
+            request.setTen(request.getTen().trim());
+        }
+        if (request.getChiSoSpf() != null) {
+            request.setChiSoSpf(request.getChiSoSpf().trim());
+        }
+        if (request.getChiSoPa() != null) {
+            request.setChiSoPa(request.getChiSoPa().trim());
+        }
+        if (request.getLoaiChongNang() != null) {
+            request.setLoaiChongNang(request.getLoaiChongNang().trim());
+        }
+        if (request.getMoTa() != null) {
+            request.setMoTa(request.getMoTa().trim());
+        }
+        if (request.getTen() == null || request.getTen().length() < 2 || request.getTen().length() > 200) {
+            throw new ApiException("Tên sản phẩm phải từ 2 đến 200 ký tự", "VALIDATION_ERROR");
+        }
+        if (request.getChiSoSpf() == null || request.getChiSoSpf().isBlank()) {
+            throw new ApiException("Chỉ số SPF không được để trống", "VALIDATION_ERROR");
+        }
+        String spf = request.getChiSoSpf().toUpperCase();
+        if (!spf.matches("^SPF[0-9]+\\+?$") && !spf.matches("^[0-9]+\\+?$")) {
+            throw new ApiException("Chỉ số SPF không hợp lệ (VD: SPF50+ hoặc 50+)", "VALIDATION_ERROR");
+        }
+        // Chuẩn hóa lưu dạng SPF...
+        if (!spf.startsWith("SPF")) {
+            request.setChiSoSpf("SPF" + spf);
+        } else {
+            request.setChiSoSpf(spf);
+        }
+        if (request.getChiSoPa() == null || request.getChiSoPa().isBlank()) {
+            throw new ApiException("Chỉ số PA không được để trống", "VALIDATION_ERROR");
+        }
+        Set<String> paOk = Set.of("PA+", "PA++", "PA+++", "PA++++");
+        if (!paOk.contains(request.getChiSoPa())) {
+            throw new ApiException("Chỉ số PA phải là PA+, PA++, PA+++ hoặc PA++++", "VALIDATION_ERROR");
+        }
+        if (request.getLoaiChongNang() == null || request.getLoaiChongNang().isBlank()) {
+            throw new ApiException("Loại chống nắng không được để trống", "VALIDATION_ERROR");
+        }
+        Set<String> loaiOk = Set.of("VAT_LY", "HOA_HOC", "LAI");
+        if (!loaiOk.contains(request.getLoaiChongNang())) {
+            throw new ApiException("Loại chống nắng không hợp lệ", "VALIDATION_ERROR");
+        }
+        if (request.getKhangNuoc() == null) {
+            request.setKhangNuoc(false);
         }
     }
 
@@ -526,18 +583,32 @@ public class SanPhamService {
         }
         Set<String> skus = new HashSet<>();
         for (ChiTietSanPhamRequest ct : chiTiets) {
-            if (!skus.add(ct.getSku())) {
+            if (ct.getSku() != null) {
+                ct.setSku(ct.getSku().trim());
+            }
+            if (ct.getSku() == null || ct.getSku().isBlank()) {
+                throw new ApiException("SKU không được để trống", "VALIDATION_ERROR");
+            }
+            String skuKey = ct.getSku().toUpperCase();
+            if (!skus.add(skuKey)) {
                 throw new ApiException("SKU trùng trong cùng sản phẩm: " + ct.getSku(), "DUPLICATE");
+            }
+            if (ct.getDungTichMl() == null || ct.getDungTichMl().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new ApiException("Dung tích phải lớn hơn 0", "VALIDATION_ERROR");
             }
             if (ct.getGiaBan() == null || ct.getGiaBan().compareTo(BigDecimal.ZERO) <= 0) {
                 throw new ApiException("Giá bán phải lớn hơn 0", "VALIDATION_ERROR");
             }
-            chiTietSanPhamRepository.findBySku(ct.getSku()).ifPresent(existing -> {
-                if (excludeProductId == null
-                        || existing.getSanPham() == null
-                        || !existing.getSanPham().getId().equals(excludeProductId)) {
-                    throw new ApiException("SKU đã tồn tại: " + ct.getSku(), "DUPLICATE");
+            if (ct.getIdMauSac() != null) {
+                categoryService.getMauSacOrNull(ct.getIdMauSac());
+            }
+            final String skuCheck = ct.getSku();
+            final Integer ctId = ct.getId();
+            chiTietSanPhamRepository.findBySku(skuCheck).ifPresent(existing -> {
+                if (ctId != null && existing.getId().equals(ctId)) {
+                    return;
                 }
+                throw new ApiException("SKU [" + skuCheck + "] đã tồn tại", "DUPLICATE");
             });
         }
     }

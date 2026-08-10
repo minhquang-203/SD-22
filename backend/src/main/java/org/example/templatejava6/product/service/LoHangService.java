@@ -17,7 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class LoHangService {
@@ -34,6 +36,24 @@ public class LoHangService {
         return loHangRepository.findByChiTietSanPham_IdOrderByNgayNhapDescHanSuDungAsc(idChiTietSanPham)
                 .stream()
                 .filter(l -> Boolean.TRUE.equals(l.getTrangThai()))
+                .map(LoHangResponse::new)
+                .toList();
+    }
+
+    /**
+     * Lô còn hàng của biến thể — dùng POS chọn lô. Sort HSD tăng dần (FEFO).
+     */
+    @Transactional(readOnly = true)
+    public List<LoHangResponse> listConHangTheoBienThe(Integer idChiTietSanPham) {
+        getChiTietOrThrow(idChiTietSanPham);
+        return loHangRepository.findByChiTietSanPham_IdOrderByNgayNhapDescHanSuDungAsc(idChiTietSanPham)
+                .stream()
+                .filter(l -> Boolean.TRUE.equals(l.getTrangThai()))
+                .filter(l -> l.getSoLuongCon() != null && l.getSoLuongCon() > 0)
+                .sorted(Comparator
+                        .comparing((LoHang l) -> l.getHanSuDung() == null)
+                        .thenComparing(LoHang::getHanSuDung, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(LoHang::getId, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(LoHangResponse::new)
                 .toList();
     }
@@ -67,6 +87,26 @@ public class LoHangService {
      */
     @Transactional
     public void truTonVaGhiNhan(HoaDonChiTiet hoaDonChiTiet, int soLuong) {
+        truTonVaGhiNhan(hoaDonChiTiet, soLuong, null);
+    }
+
+    /**
+     * Trừ tồn: {@code idLoHangTuyChon == null} → FEFO; có id → trừ đúng lô đó (POS chọn 1 lô).
+     */
+    @Transactional
+    public void truTonVaGhiNhan(HoaDonChiTiet hoaDonChiTiet, int soLuong, Integer idLoHangTuyChon) {
+        truTonVaGhiNhan(hoaDonChiTiet, soLuong, idLoHangTuyChon, null);
+    }
+
+    /**
+     * Trừ tồn POS: ưu tiên {@code phanBoChiDinh} (nhiều lô) → 1 lô → FEFO.
+     */
+    @Transactional
+    public void truTonVaGhiNhan(
+            HoaDonChiTiet hoaDonChiTiet,
+            int soLuong,
+            Integer idLoHangTuyChon,
+            List<PhanBoLo> phanBoChiDinh) {
         if (hoaDonChiTiet == null || hoaDonChiTiet.getId() == null) {
             throw new ApiException("Thiếu dòng hóa đơn để ghi nhận xuất lô.", "VALIDATION_ERROR");
         }
@@ -76,7 +116,14 @@ public class LoHangService {
             throw new ApiException("Thiếu biến thể sản phẩm trên dòng hóa đơn.", "VALIDATION_ERROR");
         }
 
-        List<PhanBoLo> phanBo = truTonTheoFefo(idCts, soLuong);
+        List<PhanBoLo> phanBo;
+        if (phanBoChiDinh != null && !phanBoChiDinh.isEmpty()) {
+            phanBo = truTonTheoNhieuLo(idCts, soLuong, phanBoChiDinh);
+        } else if (idLoHangTuyChon == null) {
+            phanBo = truTonTheoFefo(idCts, soLuong);
+        } else {
+            phanBo = truTonTheoLoChiDinh(idCts, idLoHangTuyChon, soLuong);
+        }
         for (PhanBoLo item : phanBo) {
             LoHang lot = loHangRepository.findById(item.idLoHang())
                     .orElseThrow(() -> new ApiException("Không tìm thấy lô hàng.", "LOT_NOT_FOUND"));
@@ -86,6 +133,105 @@ public class LoHangService {
             row.setSoLuong(item.soLuong());
             hoaDonChiTietLoRepository.save(row);
         }
+    }
+
+    /**
+     * Trừ đúng danh sách lô POS chọn tay. Khóa từng lô (PESSIMISTIC_WRITE), sort id để tránh deadlock.
+     */
+    @Transactional
+    public List<PhanBoLo> truTonTheoNhieuLo(Integer idChiTietSanPham, int soLuongDong, List<PhanBoLo> phanBoInput) {
+        if (soLuongDong <= 0) {
+            return List.of();
+        }
+        if (phanBoInput == null || phanBoInput.isEmpty()) {
+            throw new ApiException("Danh sách lô chọn không được để trống.", "VALIDATION_ERROR");
+        }
+
+        Map<Integer, Integer> qtyByLot = new LinkedHashMap<>();
+        for (PhanBoLo item : phanBoInput) {
+            if (item == null || item.idLoHang() == null) {
+                throw new ApiException("Thiếu id lô trong phân bổ.", "VALIDATION_ERROR");
+            }
+            if (item.soLuong() <= 0) {
+                throw new ApiException(
+                        "Số lượng lấy từ mỗi lô phải lớn hơn 0.",
+                        "VALIDATION_ERROR");
+            }
+            qtyByLot.merge(item.idLoHang(), item.soLuong(), Integer::sum);
+        }
+
+        int tongChon = qtyByLot.values().stream().mapToInt(Integer::intValue).sum();
+        if (tongChon != soLuongDong) {
+            throw new ApiException(
+                    "Tổng số lượng chọn không khớp (đã chọn " + tongChon + ", cần bán " + soLuongDong + ").",
+                    "VALIDATION_ERROR");
+        }
+
+        List<Integer> lotIds = new ArrayList<>(qtyByLot.keySet());
+        lotIds.sort(Comparator.naturalOrder());
+
+        List<PhanBoLo> ketQua = new ArrayList<>();
+        for (Integer idLo : lotIds) {
+            int canLay = qtyByLot.get(idLo);
+            LoHang lot = loHangRepository.findByIdForUpdate(idLo)
+                    .orElseThrow(() -> new ApiException("Không tìm thấy lô hàng.", "LOT_NOT_FOUND"));
+            if (!Boolean.TRUE.equals(lot.getTrangThai())) {
+                throw new ApiException(
+                        "Lô [" + lot.getSoLo() + "] không còn hoạt động.",
+                        "INACTIVE_LOT");
+            }
+            Integer lotCtsId = lot.getChiTietSanPham() != null ? lot.getChiTietSanPham().getId() : null;
+            if (lotCtsId == null || !lotCtsId.equals(idChiTietSanPham)) {
+                throw new ApiException(
+                        "Lô [" + lot.getSoLo() + "] không thuộc biến thể đang bán.",
+                        "LOT_MISMATCH");
+            }
+            int available = lot.getSoLuongCon() != null ? lot.getSoLuongCon() : 0;
+            if (available < canLay) {
+                throw new ApiException(
+                        "Lô [" + lot.getSoLo() + "] không đủ hàng (còn " + available + ", cần " + canLay + ").",
+                        "OUT_OF_STOCK");
+            }
+            lot.setSoLuongCon(available - canLay);
+            loHangRepository.save(lot);
+            ketQua.add(new PhanBoLo(lot.getId(), canLay));
+        }
+        syncTonKho(idChiTietSanPham);
+        return ketQua;
+    }
+
+    /**
+     * Trừ đúng một lô được chọn (POS). Không âm kho.
+     */
+    @Transactional
+    public List<PhanBoLo> truTonTheoLoChiDinh(Integer idChiTietSanPham, Integer idLoHang, int soLuong) {
+        if (soLuong <= 0) {
+            return List.of();
+        }
+        if (idLoHang == null) {
+            throw new ApiException("Thiếu lô hàng được chọn.", "VALIDATION_ERROR");
+        }
+        LoHang lot = loHangRepository.findByIdForUpdate(idLoHang)
+                .orElseThrow(() -> new ApiException("Không tìm thấy lô hàng.", "LOT_NOT_FOUND"));
+        if (!Boolean.TRUE.equals(lot.getTrangThai())) {
+            throw new ApiException("Lô hàng không còn hoạt động.", "INACTIVE_LOT");
+        }
+        Integer lotCtsId = lot.getChiTietSanPham() != null ? lot.getChiTietSanPham().getId() : null;
+        if (lotCtsId == null || !lotCtsId.equals(idChiTietSanPham)) {
+            throw new ApiException("Lô không thuộc biến thể đang bán.", "LOT_MISMATCH");
+        }
+        int available = lot.getSoLuongCon() != null ? lot.getSoLuongCon() : 0;
+        if (available < soLuong) {
+            ChiTietSanPham ct = getChiTietOrThrow(idChiTietSanPham);
+            throw new ApiException(
+                    "Lô " + lot.getSoLo() + " không đủ tồn cho SKU " + ct.getSku()
+                            + " (còn " + available + ", cần " + soLuong + ").",
+                    "OUT_OF_STOCK");
+        }
+        lot.setSoLuongCon(available - soLuong);
+        loHangRepository.save(lot);
+        syncTonKho(idChiTietSanPham);
+        return List.of(new PhanBoLo(lot.getId(), soLuong));
     }
 
     /**
@@ -322,6 +468,9 @@ public class LoHangService {
     private void validateSoLuongVaHsd(LoHangRequest request) {
         if (request.getSoLuongNhap() == null || request.getSoLuongNhap() <= 0) {
             throw new ApiException("Số lượng nhập phải lớn hơn 0", "VALIDATION_ERROR");
+        }
+        if (request.getNgayNhap() != null && request.getNgayNhap().isAfter(LocalDate.now())) {
+            throw new ApiException("Ngày nhập không được ở tương lai", "VALIDATION_ERROR");
         }
         if (request.getHanSuDung() != null && request.getNgayNhap() != null
                 && !request.getHanSuDung().isAfter(request.getNgayNhap())) {

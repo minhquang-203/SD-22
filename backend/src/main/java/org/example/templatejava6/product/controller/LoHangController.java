@@ -22,6 +22,12 @@ public class LoHangController {
         return loHangService.listByChiTiet(idCts);
     }
 
+    /** POS: lô còn hàng của biến thể, sort HSD tăng dần. */
+    @GetMapping("theo-bien-the/{idCts}")
+    public List<LoHangResponse> listConHangTheoBienThe(@PathVariable("idCts") Integer idCts) {
+        return loHangService.listConHangTheoBienThe(idCts);
+    }
+
     @PostMapping
     public LoHangResponse nhapLo(@Valid @RequestBody LoHangRequest request) {
         throw new ApiException(

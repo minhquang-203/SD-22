@@ -1,11 +1,76 @@
-/** Gợi ý SKU: {MÃ_SP}-{DUNG_TÍCH} — chỉ điền khi ô SKU đang trống */
-export function suggestSku(maSanPham, dungTichMl) {
-  const ma = String(maSanPham || '').trim()
+/**
+ * Chuẩn hóa phần SKU: bỏ dấu, viết hoa, khoảng trắng → "-", chỉ giữ A-Z 0-9 và "-".
+ */
+export function slugSkuPart(text) {
+  return String(text ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+/**
+ * Phần màu trong SKU: viết liền, không dấu, không khoảng trắng.
+ * VD: "Hồng nhạt" → HONGNHAT
+ */
+export function slugSkuColor(text) {
+  return slugSkuPart(text).replace(/-/g, '')
+}
+
+/**
+ * Base SKU theo quy chuẩn: [MÃ_SP]-[DUNG_TÍCH]ML(-[MÀU]).
+ * VD: SP006-60ML, SP008-50ML-HONG
+ */
+export function buildSkuBase(maSanPham, dungTichMl, tenMauSac) {
+  const ma = slugSkuPart(maSanPham)
   if (!ma || dungTichMl == null || dungTichMl === '') return ''
   const vol = Number(dungTichMl)
-  if (Number.isNaN(vol)) return ''
-  const volText = Number.isInteger(vol) ? String(vol) : String(vol)
-  return `${ma}-${volText}`
+  if (Number.isNaN(vol) || vol <= 0) return ''
+  const volText = Number.isInteger(vol) ? String(vol) : String(vol).replace(/\.0$/, '')
+  let sku = `${ma}-${volText}ML`
+  const mau = slugSkuColor(tenMauSac)
+  if (mau) sku += `-${mau}`
+  return sku
+}
+
+/**
+ * Gợi ý SKU; nếu trùng trong danh sách existingSkus thì thêm hậu tố -2, -3, ...
+ * @param {string[]} [existingSkus]
+ */
+export function suggestSku(maSanPham, dungTichMl, tenMauSac, existingSkus = []) {
+  const base = buildSkuBase(maSanPham, dungTichMl, tenMauSac)
+  if (!base) return ''
+  const taken = new Set(
+    (existingSkus || [])
+      .map((s) => String(s || '').trim().toUpperCase())
+      .filter(Boolean),
+  )
+  let candidate = base
+  let n = 2
+  while (taken.has(candidate)) {
+    candidate = `${base}-${n}`
+    n += 1
+  }
+  return candidate
+}
+
+/**
+ * Nhãn gợi ý hiển thị (không lưu DB): [Tên SP] - [dung tích]ml(- [màu]).
+ * VD: "Anessa Perfect UV Gel - 50ml - Hồng"
+ */
+export function suggestVariantLabel(tenSanPham, dungTichMl, tenMauSac) {
+  const ten = String(tenSanPham || '').trim()
+  if (!ten || dungTichMl == null || dungTichMl === '') return ''
+  const vol = Number(dungTichMl)
+  if (Number.isNaN(vol) || vol <= 0) return ''
+  const volText = Number.isInteger(vol) ? String(vol) : String(vol).replace(/\.0$/, '')
+  let label = `${ten} - ${volText}ml`
+  const mau = String(tenMauSac || '').trim()
+  if (mau) label += ` - ${mau}`
+  return label
 }
 
 /** 4 mức PA cố định trên form */
@@ -137,24 +202,117 @@ export function formToPayload(form) {
   return buildProductData(form)
 }
 
+/**
+ * Validate form SP. Trả về null nếu OK, hoặc object lỗi:
+ * { message, fields: { ten, ... }, chiTiets: { [index]: { sku, dungTichMl, giaBan } }, images, warning }
+ */
 export function validateProductForm(form) {
-  if (!form.ten?.trim()) return 'Tên sản phẩm không được để trống'
-  if (!form.idThuongHieu) return 'Vui lòng chọn thương hiệu'
-  if (!form.idDanhMuc) return 'Vui lòng chọn danh mục'
-  if (!form.idDangSanPham) return 'Vui lòng chọn dạng sản phẩm'
-  const spfRaw = String(form.chiSoSpf ?? '')
-  if (spfRaw && /[^0-9+]/.test(spfRaw)) {
-    return 'Chỉ số SPF chỉ gồm số và dấu + (VD: 50+ hoặc 30)'
+  const fields = {}
+  const chiTiets = {}
+  let images = ''
+  let warning = ''
+
+  const ten = String(form.ten ?? '').trim()
+  if (!ten) fields.ten = 'Tên sản phẩm không được để trống'
+  else if (ten.length < 2 || ten.length > 200) fields.ten = 'Tên sản phẩm phải từ 2 đến 200 ký tự'
+
+  if (!form.idThuongHieu) fields.idThuongHieu = 'Vui lòng chọn thương hiệu'
+  if (!form.idDanhMuc) fields.idDanhMuc = 'Vui lòng chọn danh mục'
+  if (!form.idDangSanPham) fields.idDangSanPham = 'Vui lòng chọn dạng sản phẩm'
+
+  const spfRaw = sanitizeSpfSuffix(form.chiSoSpf)
+  if (!spfRaw) fields.chiSoSpf = 'Chỉ số SPF không được để trống'
+  else if (/[^0-9+]/.test(spfRaw)) fields.chiSoSpf = 'Chỉ số SPF chỉ gồm số và dấu + (VD: 50+ hoặc 30)'
+
+  if (!form.chiSoPa) fields.chiSoPa = 'Vui lòng chọn chỉ số PA'
+  else if (!PA_OPTIONS.includes(form.chiSoPa)) fields.chiSoPa = 'Vui lòng chọn chỉ số PA hợp lệ'
+
+  if (!form.loaiChongNang) fields.loaiChongNang = 'Vui lòng chọn loại chống nắng'
+  else if (!['VAT_LY', 'HOA_HOC', 'LAI'].includes(form.loaiChongNang)) {
+    fields.loaiChongNang = 'Loại chống nắng không hợp lệ'
   }
-  if (form.chiSoPa && !PA_OPTIONS.includes(form.chiSoPa)) {
-    return 'Vui lòng chọn chỉ số PA hợp lệ'
+
+  if (!form.idLoaiDas?.length) {
+    warning = 'Nên chọn ít nhất 1 loại da để gợi ý cá nhân hóa tốt hơn'
   }
-  if (!form.chiTiets?.length) return 'Sản phẩm phải có ít nhất 1 biến thể (SKU)'
-  for (const ct of form.chiTiets) {
-    if (!ct.sku?.trim()) return 'SKU không được để trống'
-    if (!ct.giaBan || Number(ct.giaBan) <= 0) return 'Giá bán phải lớn hơn 0'
+
+  if (!form.chiTiets?.length) {
+    fields.chiTiets = 'Sản phẩm phải có ít nhất 1 biến thể'
+  } else {
+    const seenSku = new Set()
+    form.chiTiets.forEach((ct, index) => {
+      const row = {}
+      const sku = String(ct.sku ?? '').trim()
+      if (!sku) row.sku = 'SKU không được để trống'
+      else {
+        const key = sku.toUpperCase()
+        if (seenSku.has(key)) row.sku = `SKU [${sku}] bị trùng trong danh sách`
+        else seenSku.add(key)
+      }
+      const vol = Number(ct.dungTichMl)
+      if (ct.dungTichMl == null || ct.dungTichMl === '' || Number.isNaN(vol) || vol <= 0) {
+        row.dungTichMl = 'Dung tích phải là số lớn hơn 0'
+      }
+      const gia = Number(ct.giaBan)
+      if (!ct.giaBan || Number.isNaN(gia) || gia <= 0) {
+        row.giaBan = 'Giá bán phải lớn hơn 0'
+      }
+      if (Object.keys(row).length) chiTiets[index] = row
+    })
   }
-  return null
+
+  const ALLOWED = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+  const MAX = 5 * 1024 * 1024
+  for (const img of form.anhs || []) {
+    if (img.file) {
+      const type = (img.file.type || '').toLowerCase()
+      if (!ALLOWED.includes(type) && !type.startsWith('image/jpeg')) {
+        images = 'Chỉ chấp nhận ảnh JPG, PNG hoặc WEBP'
+        break
+      }
+      if (img.file.size > MAX) {
+        images = 'Ảnh vượt quá 5MB'
+        break
+      }
+    }
+  }
+  if (!images && !(form.anhs || []).length) {
+    warning = warning
+      ? warning + '. Nên thêm ít nhất 1 ảnh sản phẩm'
+      : 'Nên thêm ít nhất 1 ảnh sản phẩm (khuyến nghị)'
+  } else if (!images && (form.anhs || []).length && !(form.anhs || []).some((a) => a.laAnhChinh)) {
+    warning = warning
+      ? warning + '. Nên chọn 1 ảnh chính'
+      : 'Nên chọn 1 ảnh chính'
+  }
+
+  const hasField = Object.keys(fields).length > 0
+  const hasCt = Object.keys(chiTiets).length > 0
+  if (!hasField && !hasCt && !images) {
+    return warning ? { ok: true, warning } : null
+  }
+
+  const firstMsg =
+    fields.ten ||
+    fields.idThuongHieu ||
+    fields.idDanhMuc ||
+    fields.idDangSanPham ||
+    fields.chiSoSpf ||
+    fields.chiSoPa ||
+    fields.loaiChongNang ||
+    fields.chiTiets ||
+    (hasCt ? 'Vui lòng kiểm tra thông tin biến thể' : null) ||
+    images ||
+    'Vui lòng kiểm tra lại thông tin'
+
+  return { ok: false, message: firstMsg, fields, chiTiets, images, warning }
+}
+
+/** @deprecated dùng validateProductForm (trả object). Giữ tương thích nếu chỗ nào còn expect string. */
+export function validateProductFormMessage(form) {
+  const r = validateProductForm(form)
+  if (!r || r.ok) return null
+  return r.message
 }
 
 function buildAnhPayload(anhs) {

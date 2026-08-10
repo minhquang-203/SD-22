@@ -27,5 +27,19 @@ public class DonChoDetailResponse {
         private BigDecimal donGia;
         private Integer soLuong;
         private Integer soLuongTon;
+        /** Lô đã chọn khi giữ đơn (1 lô / dòng); null = FEFO hoặc xem {@link #phanBoLos}. */
+        private Integer idLoHang;
+        private String soLo;
+        /** Phân bổ nhiều lô trên 1 dòng (giữ đơn / nạp lại POS). */
+        private List<PhanBoLoItem> phanBoLos;
+    }
+
+    @Getter
+    @Setter
+    public static class PhanBoLoItem {
+        private Integer idLoHang;
+        private String soLo;
+        private Integer soLuong;
+        private java.time.LocalDate hanSuDung;
     }
 }
