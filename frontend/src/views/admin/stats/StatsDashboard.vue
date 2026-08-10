@@ -448,9 +448,11 @@ const fetchRealData = async () => {
         // Ánh xạ Tên Trạng Thái và Màu Sắc chuẩn
         const statusMap = {
             'CHO_XAC_NHAN': { label: 'Chờ xác nhận', color: '#f59e0b' }, 
-            'DA_XAC_NHAN': { label: 'Đã đóng gói', color: '#3b82f6' }, 
+            'DA_XAC_NHAN': { label: 'Đã xác nhận', color: '#3b82f6' }, 
+            'DANG_CHUAN_BI': { label: 'Đang chuẩn bị hàng', color: '#8b5cf6' }, 
             'DANG_GIAO': { label: 'Đang giao hàng', color: '#f97316' }, 
             'HOAN_THANH': { label: 'Giao Thành Công', color: '#10b981' }, 
+            'TRA_HANG': { label: 'Trả Hàng', color: '#ec4899' }, 
             'DA_HUY': { label: 'Đã Hủy (Boom hàng)', color: '#ef4444' } 
         };
 

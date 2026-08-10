@@ -17,22 +17,22 @@ public interface StatisticRepository extends JpaRepository<HoaDon, Integer> {
     @Query(value = """
         SELECT 
             -- Index 0: Tổng doanh thu (Tất cả đơn không bị hủy)
-            ISNULL(SUM(CASE WHEN trang_thai IN ('HOAN_THANH', 'CHO_XAC_NHAN', 'DANG_GIAO') THEN thanh_tien ELSE 0 END), 0) AS totalRevenue,
+            ISNULL(SUM(CASE WHEN trang_thai IN ('HOAN_THANH', 'CHO_XAC_NHAN', 'DA_XAC_NHAN', 'DANG_CHUAN_BI', 'DANG_GIAO') THEN thanh_tien ELSE 0 END), 0) AS totalRevenue,
             
             -- Index 1: Doanh thu thực tế (Chỉ tính đơn đã HOAN_THANH)
             ISNULL(SUM(CASE WHEN trang_thai = 'HOAN_THANH' THEN thanh_tien ELSE 0 END), 0) AS actualRevenue,
             
-            -- Index 2: Doanh thu dự kiến (Đơn CHO_XAC_NHAN, DANG_GIAO)
-            ISNULL(SUM(CASE WHEN trang_thai IN ('CHO_XAC_NHAN', 'DANG_GIAO') THEN thanh_tien ELSE 0 END), 0) AS expectedRevenue,
+            -- Index 2: Doanh thu dự kiến (Đơn CHO_XAC_NHAN, DA_XAC_NHAN, DANG_CHUAN_BI, DANG_GIAO)
+            ISNULL(SUM(CASE WHEN trang_thai IN ('CHO_XAC_NHAN', 'DA_XAC_NHAN', 'DANG_CHUAN_BI', 'DANG_GIAO') THEN thanh_tien ELSE 0 END), 0) AS expectedRevenue,
             
             -- Index 3: Số đơn hàng (Không đếm đơn Hủy)
-            SUM(CASE WHEN trang_thai IN ('HOAN_THANH', 'CHO_XAC_NHAN', 'DANG_GIAO') THEN 1 ELSE 0 END) AS totalOrders,
+            SUM(CASE WHEN trang_thai IN ('HOAN_THANH', 'CHO_XAC_NHAN', 'DA_XAC_NHAN', 'DANG_CHUAN_BI', 'DANG_GIAO') THEN 1 ELSE 0 END) AS totalOrders,
             
             -- Index 4: Đơn Online
-            SUM(CASE WHEN loai_don = 'ONLINE' AND trang_thai IN ('HOAN_THANH', 'CHO_XAC_NHAN', 'DANG_GIAO') THEN 1 ELSE 0 END) AS webOrders,
+            SUM(CASE WHEN loai_don = 'ONLINE' AND trang_thai IN ('HOAN_THANH', 'CHO_XAC_NHAN', 'DA_XAC_NHAN', 'DANG_CHUAN_BI', 'DANG_GIAO') THEN 1 ELSE 0 END) AS webOrders,
             
             -- Index 5: Đơn Tại Quầy
-            SUM(CASE WHEN loai_don = 'TAI_QUAY' AND trang_thai IN ('HOAN_THANH', 'CHO_XAC_NHAN', 'DANG_GIAO') THEN 1 ELSE 0 END) AS posOrders
+            SUM(CASE WHEN loai_don = 'TAI_QUAY' AND trang_thai IN ('HOAN_THANH', 'CHO_XAC_NHAN', 'DA_XAC_NHAN', 'DANG_CHUAN_BI', 'DANG_GIAO') THEN 1 ELSE 0 END) AS posOrders
             
         FROM hoa_don
         WHERE ngay_tao >= :fromDate AND ngay_tao <= :toDate
