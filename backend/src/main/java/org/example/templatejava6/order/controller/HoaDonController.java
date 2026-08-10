@@ -5,7 +5,9 @@ import org.example.templatejava6.order.model.request.HoaDonChuyenTrangThaiReques
 import org.example.templatejava6.order.model.request.HoaDonGhnWebhookRequest;
 import org.example.templatejava6.order.model.request.HoaDonRequest;
 import org.example.templatejava6.order.model.request.HoaDonTuChoiRequest;
+import org.example.templatejava6.order.model.request.XacNhanDonGanLoRequest;
 import org.example.templatejava6.order.model.response.GhnTrangThaiOptionResponse;
+import org.example.templatejava6.order.model.response.GoiYGanLoResponse;
 import org.example.templatejava6.order.model.response.HoaDonDetailResponse;
 import org.example.templatejava6.order.model.response.HoaDonResponse;
 import org.example.templatejava6.order.model.response.StorefrontOrderDetailResponse;
@@ -126,6 +128,21 @@ public class HoaDonController {
         );
     }
 
+    /** Admin: dữ liệu fill modal gán lô khi xác nhận đơn. */
+    @GetMapping("/{id}/goi-y-gan-lo")
+    public GoiYGanLoResponse goiYGanLo(@PathVariable Integer id) {
+        return hoaDonService.goiYGanLo(id);
+    }
+
+    /** Admin: xác nhận đơn kèm phân bổ lô thủ công → DA_XAC_NHAN. */
+    @PostMapping("/{id}/xac-nhan-gan-lo")
+    public void xacNhanGanLo(
+            @PathVariable Integer id,
+            @Valid @RequestBody XacNhanDonGanLoRequest request
+    ) {
+        hoaDonService.xacNhanGanLo(id, request);
+    }
+
     @PostMapping("/{id}/tu-choi")
     public void tuChoiDon(
             @PathVariable Integer id,
@@ -158,6 +175,7 @@ public class HoaDonController {
                 request.getStatus(),
                 request.getGhiChu());
     }
+
 
     @PostMapping("/{id}/tao-van-don-ghn")
     public GhnOrderCreationService.KetQua taoVanDonGhn(@PathVariable Integer id) {

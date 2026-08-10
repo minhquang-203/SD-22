@@ -35,19 +35,22 @@ public class GhnOrderSyncService {
     private final GhnTrackingService ghnTrackingService;
     private final LoHangService loHangService;
     private final OrderRealtimeService orderRealtimeService;
+    private final HoaDonService hoaDonService;
 
     public GhnOrderSyncService(HoaDonRepository hoaDonRepository,
                                HoaDonChiTietRepository hoaDonChiTietRepository,
                                LichSuDonHangRepository lichSuDonHangRepository,
                                GhnTrackingService ghnTrackingService,
                                LoHangService loHangService,
-                               OrderRealtimeService orderRealtimeService) {
+                               OrderRealtimeService orderRealtimeService,
+                               HoaDonService hoaDonService) {
         this.hoaDonRepository = hoaDonRepository;
         this.hoaDonChiTietRepository = hoaDonChiTietRepository;
         this.lichSuDonHangRepository = lichSuDonHangRepository;
         this.ghnTrackingService = ghnTrackingService;
         this.loHangService = loHangService;
         this.orderRealtimeService = orderRealtimeService;
+        this.hoaDonService = hoaDonService;
     }
 
     /**
@@ -141,6 +144,9 @@ public class GhnOrderSyncService {
 
         hoaDon.setTrangThai(trangThaiMoi);
         hoaDonRepository.save(hoaDon);
+        if (trangThaiMoi == TrangThaiDonHang.HOAN_THANH) {
+            hoaDonService.danhDauCodDaThanhToanNeuCan(hoaDon);
+        }
         ghiLichSu(hoaDon, trangThaiMoi, ghiChu != null ? ghiChu : moTa);
         // Load id khách trước khi publish (tránh thiếu topic khách)
         if (hoaDon.getIdKhachHang() != null) {

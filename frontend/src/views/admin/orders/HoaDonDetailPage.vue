@@ -3,7 +3,8 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
-import { getHoaDonDetail, getLichSu, taoVanDonGhn, dongBoGhn, giaLapWebhookGhn, capNhatTrangThai, tuChoiDon } from '@/api/hoaDonApi'
+import GanLoDonHangModal from '@/components/admin/orders/GanLoDonHangModal.vue'
+import { getHoaDonDetail, getLichSu, taoVanDonGhn, dongBoGhn, giaLapWebhookGhn, tuChoiDon } from '@/api/hoaDonApi'
 import { confirm } from '@/composables/useConfirm'
 import { subscribeAdminOrders } from '@/composables/useRealtime'
 import { GHN_STATUS_OPTIONS } from '@/constants/ghnStatuses'
@@ -25,6 +26,7 @@ const ghnMessageType = ref('success')
 const actionLoading = ref(false)
 const actionMessage = ref('')
 const actionMessageType = ref('success')
+const showGanLoModal = ref(false)
 
 const webhookLoading = ref(false)
 const webhookMessage = ref('')
@@ -95,32 +97,21 @@ function ghnStatusLabel(status) {
 
 async function handleXacNhanDon() {
   if (!orderId.value || !coTheXacNhanDon.value || actionLoading.value) return
+  showGanLoModal.value = true
+}
 
-  const ok = await confirm({
-    title: 'Xác nhận đơn hàng',
-    message: `Xác nhận đơn ${detail.value.maHoaDon}? Hệ thống sẽ thử tạo vận đơn GHN.`,
-    confirmText: 'Xác nhận',
-  })
-  if (!ok) return
-
-  actionLoading.value = true
-  try {
-    await capNhatTrangThai(orderId.value, {
-      trangThai: 'DA_XAC_NHAN',
-      ghiChu: 'Admin xác nhận đơn hàng',
-    })
-    notifyAction('Đã xác nhận đơn hàng', 'success')
-    await loadDetail()
-    const ghnOk = await tryTaoVanDonSauXacNhan()
-    await loadDetail()
-    if (!ghnOk && !detail.value?.maVanDonGhn) {
-      notifyAction('Đơn đã xác nhận nhưng chưa tạo được vận đơn GHN. Xem thông báo bên phần GHN.', 'error')
-    }
-  } catch (err) {
-    notifyAction(typeof err === 'string' ? err : 'Không xác nhận được đơn hàng', 'error')
-  } finally {
-    actionLoading.value = false
+async function onGanLoSuccess() {
+  notifyAction('Đã xác nhận đơn và cập nhật phân bổ lô', 'success')
+  await loadDetail()
+  const ghnOk = await tryTaoVanDonSauXacNhan()
+  await loadDetail()
+  if (!ghnOk && !detail.value?.maVanDonGhn) {
+    notifyAction('Đơn đã xác nhận nhưng chưa tạo được vận đơn GHN. Xem thông báo bên phần GHN.', 'error')
   }
+}
+
+function onGanLoError(message) {
+  notifyAction(message || 'Không xác nhận / gán lô được', 'error')
 }
 
 async function handleTuChoiDon() {
@@ -493,7 +484,8 @@ onUnmounted(() => {
 
           <p class="hoa-don-actions__hint">
             <template v-if="coTheXacNhanDon">
-              Đơn đang chờ xác nhận. Xác nhận để chuyển sang <strong>Đã xác nhận</strong> và tự thử tạo vận đơn GHN.
+              Đơn đang chờ xác nhận. Xác nhận sẽ mở phân bổ lô (FEFO / chỉnh tay), rồi chuyển sang
+              <strong>Đã xác nhận</strong> và tự thử tạo vận đơn GHN.
             </template>
             <template v-else-if="coTheHuyDonDaXacNhan">
               Đơn online chưa chuyển sang đang giao — có thể hủy và hoàn hàng về kho.
@@ -782,6 +774,16 @@ onUnmounted(() => {
         </div>
       </div>
     </template>
+
+    <GanLoDonHangModal
+      v-model:visible="showGanLoModal"
+      :order-id="orderId"
+      :ma-hoa-don="detail?.maHoaDon || ''"
+      :ten-khach-hang="detail?.tenKhachHang || ''"
+      :ngay-tao="detail?.ngayTao || null"
+      @success="onGanLoSuccess"
+      @error="onGanLoError"
+    />
   </div>
 </template>
 

@@ -31,6 +31,11 @@ export const getHoaDonAdminCounts = () => request.get('/hoa-don/admin-counts')
 
 export const getHoaDonDetail = (id) => request.get(`/hoa-don/${id}`)
 
+export const fetchGoiYGanLo = (id) => request.get(`/hoa-don/${id}/goi-y-gan-lo`)
+
+export const xacNhanGanLo = (id, payload) =>
+  request.post(`/hoa-don/${id}/xac-nhan-gan-lo`, payload)
+
 export const capNhatTrangThai = (id, payload) =>
   request.patch(`/hoa-don/${id}/status`, payload)
 
