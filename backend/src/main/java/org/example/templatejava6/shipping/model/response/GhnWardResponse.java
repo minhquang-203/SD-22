@@ -8,7 +8,9 @@ import lombok.Setter;
 @Setter
 @AllArgsConstructor
 public class GhnWardResponse {
+    /** Với địa chỉ mới: String.valueOf(_id) từ GHN v3. */
     private String wardCode;
     private String wardName;
-    private Integer districtId;
+    /** Province _id (GHN v3 parent_id). */
+    private Integer provinceId;
 }

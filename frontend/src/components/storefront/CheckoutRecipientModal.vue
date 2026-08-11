@@ -2,7 +2,7 @@
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { createDiaChiToi, fetchDiaChiToi, updateDiaChiToi } from '@/api/khachHangApi'
-import { fetchDistricts, fetchProvinces, fetchWards } from '@/api/shipping'
+import { fetchProvinces, fetchWards, isNewWardCode } from '@/api/shipping'
 import { getPhoneValidationError, normalizePhoneDigits } from '@/utils/phone'
 
 const props = defineProps({
@@ -22,24 +22,21 @@ const loadError = ref('')
 const addresses = ref([])
 
 const provinces = ref([])
-const districts = ref([])
 const wards = ref([])
-const addressLoading = reactive({ provinces: false, districts: false, wards: false })
+const addressLoading = reactive({ provinces: false, wards: false })
 
 const form = reactive({
   hoTenNguoiNhan: '',
   soDienThoai: '',
   provinceId: null,
-  districtId: null,
   wardCode: '',
   tinhThanh: '',
-  quanHuyen: '',
   phuongXa: '',
   diaChiChiTiet: '',
   macDinh: false,
 })
 
-const fieldErrors = reactive({ soDienThoai: '' })
+const fieldErrors = reactive({ soDienThoai: '', diaChiChiTiet: '' })
 const editingId = ref(null)
 
 const hasAddresses = computed(() => addresses.value.length > 0)
@@ -51,10 +48,14 @@ const modalTitle = computed(() => {
 })
 
 function formatAddressLine(address) {
-  return [address.diaChiChiTiet, address.phuongXa, address.quanHuyen, address.tinhThanh]
+  return [address.diaChiChiTiet, address.phuongXa, address.tinhThanh]
     .map((part) => String(part || '').trim())
     .filter(Boolean)
     .join(', ')
+}
+
+function isUsableAddress(address) {
+  return Boolean(address?.provinceId && isNewWardCode(address?.wardCode))
 }
 
 function closeModal() {
@@ -71,16 +72,14 @@ function resetForm() {
   form.hoTenNguoiNhan = ''
   form.soDienThoai = ''
   form.provinceId = null
-  form.districtId = null
   form.wardCode = ''
   form.tinhThanh = ''
-  form.quanHuyen = ''
   form.phuongXa = ''
   form.diaChiChiTiet = ''
   form.macDinh = false
   fieldErrors.soDienThoai = ''
+  fieldErrors.diaChiChiTiet = ''
   editingId.value = null
-  districts.value = []
   wards.value = []
 }
 
@@ -92,11 +91,9 @@ function fillFormFromAddress(address) {
   editingId.value = address.id ?? null
   form.hoTenNguoiNhan = address.hoTenNguoiNhan || ''
   form.soDienThoai = address.soDienThoai || ''
-  form.provinceId = address.provinceId ?? null
-  form.districtId = address.districtId ?? null
-  form.wardCode = address.wardCode || ''
+  form.provinceId = isUsableAddress(address) ? (address.provinceId ?? null) : null
+  form.wardCode = isUsableAddress(address) ? (address.wardCode || '') : ''
   form.tinhThanh = address.tinhThanh || ''
-  form.quanHuyen = address.quanHuyen || ''
   form.phuongXa = address.phuongXa || ''
   form.diaChiChiTiet = address.diaChiChiTiet || ''
   form.macDinh = Boolean(address.macDinh)
@@ -113,28 +110,14 @@ async function loadProvinces() {
   }
 }
 
-async function loadDistrictsForProvince(provinceId) {
+async function loadWardsForProvince(provinceId) {
   if (!provinceId) {
-    districts.value = []
-    return
-  }
-  addressLoading.districts = true
-  try {
-    const res = await fetchDistricts(provinceId)
-    districts.value = res.data || []
-  } finally {
-    addressLoading.districts = false
-  }
-}
-
-async function loadWardsForDistrict(districtId) {
-  if (!districtId) {
     wards.value = []
     return
   }
   addressLoading.wards = true
   try {
-    const res = await fetchWards(districtId)
+    const res = await fetchWards(provinceId)
     wards.value = res.data || []
   } finally {
     addressLoading.wards = false
@@ -142,22 +125,12 @@ async function loadWardsForDistrict(districtId) {
 }
 
 async function onProvinceChange() {
-  form.districtId = null
   form.wardCode = ''
   wards.value = []
   const selected = provinces.value.find((p) => p.provinceId === form.provinceId)
   form.tinhThanh = selected?.provinceName || ''
-  form.quanHuyen = ''
   form.phuongXa = ''
-  await loadDistrictsForProvince(form.provinceId)
-}
-
-async function onDistrictChange() {
-  form.wardCode = ''
-  const selected = districts.value.find((d) => d.districtId === form.districtId)
-  form.quanHuyen = selected?.districtName || ''
-  form.phuongXa = ''
-  await loadWardsForDistrict(form.districtId)
+  await loadWardsForProvince(form.provinceId)
 }
 
 function onWardChange() {
@@ -178,9 +151,11 @@ function validateForm() {
     return phoneError
   }
   if (!form.provinceId) return 'Vui lòng chọn tỉnh / thành phố'
-  if (!form.districtId) return 'Vui lòng chọn quận / huyện'
   if (!form.wardCode) return 'Vui lòng chọn phường / xã'
-  if (!form.diaChiChiTiet.trim()) return 'Vui lòng nhập địa chỉ cụ thể'
+  if (!form.diaChiChiTiet.trim()) {
+    fieldErrors.diaChiChiTiet = 'Vui lòng nhập địa chỉ cụ thể'
+    return fieldErrors.diaChiChiTiet
+  }
   return ''
 }
 
@@ -208,13 +183,14 @@ function openForm(address = null) {
     if (!form.soDienThoai.trim()) {
       form.soDienThoai = props.defaultContact.soDienThoai || ''
     }
+  } else if (!isUsableAddress(address)) {
+    loadError.value = 'Địa chỉ cũ (3 cấp) cần chọn lại Tỉnh/Thành và Phường/Xã theo đơn vị hành chính mới.'
+    form.provinceId = null
+    form.wardCode = ''
   }
   void loadProvinces().then(async () => {
     if (form.provinceId) {
-      await loadDistrictsForProvince(form.provinceId)
-    }
-    if (form.districtId) {
-      await loadWardsForDistrict(form.districtId)
+      await loadWardsForProvince(form.provinceId)
     }
   })
 }
@@ -225,8 +201,8 @@ function openPick() {
 }
 
 function selectAddress(address) {
-  if (!address.districtId || !address.wardCode) {
-    loadError.value = 'Địa chỉ này cần cập nhật tỉnh/quận/phường để tính phí giao hàng.'
+  if (!isUsableAddress(address)) {
+    loadError.value = 'Địa chỉ này cần cập nhật theo đơn vị hành chính 2 cấp (Tỉnh → Phường/Xã).'
     openForm(address)
     return
   }
@@ -247,10 +223,10 @@ async function saveAddress() {
     hoTenNguoiNhan: form.hoTenNguoiNhan.trim(),
     soDienThoai: form.soDienThoai.trim(),
     provinceId: form.provinceId,
-    districtId: form.districtId,
+    districtId: null,
     wardCode: form.wardCode,
     tinhThanh: form.tinhThanh.trim(),
-    quanHuyen: form.quanHuyen.trim(),
+    quanHuyen: '',
     phuongXa: form.phuongXa.trim(),
     diaChiChiTiet: form.diaChiChiTiet.trim(),
     macDinh: form.macDinh,
@@ -355,6 +331,9 @@ onUnmounted(() => {
                       <span v-if="address.macDinh" class="sf-recipient-card__badge">Mặc định</span>
                     </div>
                     <p class="sf-recipient-card__address">{{ formatAddressLine(address) }}</p>
+                    <p v-if="!isUsableAddress(address)" class="sf-recipient-card__hint">
+                      Cần cập nhật địa chỉ 2 cấp
+                    </p>
                   </button>
                 </li>
               </ul>
@@ -411,30 +390,11 @@ onUnmounted(() => {
                 </select>
               </div>
               <div class="sf-recipient-form__field">
-                <label for="recipient-district">Quận / Huyện</label>
-                <select
-                  id="recipient-district"
-                  v-model="form.districtId"
-                  :disabled="!form.provinceId || addressLoading.districts"
-                  @change="onDistrictChange"
-                >
-                  <option :value="null">
-                    {{ addressLoading.districts ? 'Đang tải...' : 'Chọn quận / huyện' }}
-                  </option>
-                  <option v-for="d in districts" :key="d.districtId" :value="d.districtId">
-                    {{ d.districtName }}
-                  </option>
-                </select>
-              </div>
-            </div>
-
-            <div class="sf-recipient-form__row">
-              <div class="sf-recipient-form__field">
                 <label for="recipient-ward">Phường / Xã</label>
                 <select
                   id="recipient-ward"
                   v-model="form.wardCode"
-                  :disabled="!form.districtId || addressLoading.wards"
+                  :disabled="!form.provinceId || addressLoading.wards"
                   @change="onWardChange"
                 >
                   <option value="">
@@ -445,14 +405,21 @@ onUnmounted(() => {
                   </option>
                 </select>
               </div>
-              <div class="sf-recipient-form__field">
-                <label for="recipient-detail">Địa chỉ cụ thể</label>
+            </div>
+
+            <div class="sf-recipient-form__row">
+              <div class="sf-recipient-form__field sf-recipient-form__field--full">
+                <label for="recipient-detail">Địa chỉ cụ thể <span class="sf-required">*</span></label>
                 <input
                   id="recipient-detail"
                   v-model="form.diaChiChiTiet"
                   type="text"
                   placeholder="Số nhà, tên đường..."
+                  :class="{ 'is-invalid': fieldErrors.diaChiChiTiet }"
+                  @input="fieldErrors.diaChiChiTiet = ''"
+                  @blur="form.diaChiChiTiet.trim() || (fieldErrors.diaChiChiTiet = 'Vui lòng nhập địa chỉ cụ thể')"
                 />
+                <span v-if="fieldErrors.diaChiChiTiet" class="sf-recipient-form__error">{{ fieldErrors.diaChiChiTiet }}</span>
               </div>
             </div>
 

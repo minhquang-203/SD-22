@@ -135,9 +135,10 @@ public class ReturnRequestService {
             throw new ApiException(
                     "Chỉ có thể yêu cầu trả hàng cho đơn đã giao thành công.", "ORDER_NOT_DELIVERED");
         }
-        if (yeuCauTraHangRepository.existsByIdHoaDon_IdAndTrangThaiNotIn(
-                idHoaDon, List.of(TrangThaiTraHang.TU_CHOI))) {
-            throw new ApiException("Đơn hàng đã có yêu cầu trả hàng đang xử lý.", "RETURN_ALREADY_EXISTS");
+        if (yeuCauTraHangRepository.existsByIdHoaDon_Id(idHoaDon)) {
+            throw new ApiException(
+                    "Đơn hàng đã có yêu cầu trả hàng. Không thể gửi yêu cầu mới.",
+                    "RETURN_ALREADY_EXISTS");
         }
         if (!laVnpay(hoaDon)) {
             if (!coGiaTri(request.getTenNganHang())) {
@@ -283,7 +284,12 @@ public class ReturnRequestService {
             throw new ApiException(
                     "Yêu cầu trả hàng chưa được duyệt hoặc đã tạo vận đơn.", "INVALID_RETURN_STATUS");
         }
-        if (yc.getGhnDistrictId() == null || yc.getGhnWardCode() == null || yc.getGhnWardCode().isBlank()) {
+        if (yc.getGhnWardCode() == null || yc.getGhnWardCode().isBlank()) {
+            throw new ApiException(
+                    "Thiếu địa chỉ phường/xã để lấy hàng trả.", "GHN_MISSING_ADDRESS");
+        }
+        boolean newAddress = ShippingService.looksLikeNewWardCode(yc.getGhnWardCode());
+        if (!newAddress && yc.getGhnDistrictId() == null) {
             throw new ApiException(
                     "Thiếu địa chỉ (quận/huyện, phường/xã) để lấy hàng trả.", "GHN_MISSING_ADDRESS");
         }
@@ -297,6 +303,17 @@ public class ReturnRequestService {
         req.setFromAddress(orElse(yc.getDiaChiTra(), hoaDon.getDiaChiGiao()));
         req.setFromDistrictId(yc.getGhnDistrictId());
         req.setFromWardCode(yc.getGhnWardCode());
+        if (newAddress) {
+            // Tách tên tỉnh / phường từ địa chỉ trả hoặc địa chỉ giao đơn.
+            String source = orElse(yc.getDiaChiTra(), hoaDon.getDiaChiGiao());
+            String[] parts = source != null ? source.split(",") : new String[0];
+            if (parts.length >= 1) {
+                req.setFromProvinceName(parts[parts.length - 1].trim());
+            }
+            if (parts.length >= 2) {
+                req.setFromWardName(parts[parts.length - 2].trim());
+            }
+        }
         req.setItems(buildItems(hoaDon));
         if (caLayHang != null) {
             req.setPickShiftId(caLayHang.getId());

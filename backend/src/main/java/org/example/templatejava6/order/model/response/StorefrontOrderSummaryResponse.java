@@ -16,4 +16,10 @@ public class StorefrontOrderSummaryResponse {
     private String trangThai;
     private String trangThaiLabel;
     private BigDecimal thanhTien;
+
+    /** Preview sản phẩm đầu tiên — dùng cho thẻ danh sách phía khách. */
+    private String anhUrl;
+    private String tenSanPham;
+    private Integer soLuong;
+    private Integer soDongHang;
 }

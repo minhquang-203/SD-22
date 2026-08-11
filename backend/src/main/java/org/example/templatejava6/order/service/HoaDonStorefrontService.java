@@ -111,6 +111,21 @@ public class HoaDonStorefrontService {
         r.setTrangThai(hd.getTrangThai() != null ? hd.getTrangThai().name() : null);
         r.setTrangThaiLabel(mapStatusLabel(hd.getTrangThai()));
         r.setThanhTien(hd.getThanhTien());
+
+        List<HoaDonChiTiet> lines = hoaDonChiTietRepository.findByIdHoaDon(hd);
+        r.setSoDongHang(lines.size());
+        if (!lines.isEmpty()) {
+            HoaDonChiTiet first = lines.get(0);
+            r.setSoLuong(first.getSoLuong());
+            ChiTietSanPham cts = first.getIdChiTietSanPham();
+            if (cts != null) {
+                SanPham sp = cts.getSanPham();
+                if (sp != null) {
+                    r.setTenSanPham(sp.getTen());
+                    r.setAnhUrl(resolveAnhUrl(sp.getId()));
+                }
+            }
+        }
         return r;
     }
 
@@ -151,14 +166,16 @@ public class HoaDonStorefrontService {
     private void applyTraHangVaHoanTien(StorefrontOrderDetailResponse r, HoaDon hd) {
         List<YeuCauTraHang> yeuCaus = yeuCauTraHangRepository.findByIdHoaDonOrderByNgayTaoDesc(hd);
         YeuCauTraHang moiNhat = yeuCaus.isEmpty() ? null : yeuCaus.get(0);
-        boolean coYeuCauDangXuLy = yeuCaus.stream()
-                .anyMatch(yc -> yc.getTrangThai() != TrangThaiTraHang.TU_CHOI);
-        r.setCoTheYeuCauTraHang(hd.getTrangThai() == TrangThaiDonHang.HOAN_THANH && !coYeuCauDangXuLy);
+        // Đã từng gửi yêu cầu (kể cả bị từ chối) thì không cho gửi lại.
+        r.setCoTheYeuCauTraHang(hd.getTrangThai() == TrangThaiDonHang.HOAN_THANH && yeuCaus.isEmpty());
         if (moiNhat != null) {
             r.setIdYeuCauTraHang(moiNhat.getId());
             if (moiNhat.getTrangThai() != null) {
                 r.setTrangThaiTraHang(moiNhat.getTrangThai().name());
                 r.setTrangThaiTraHangLabel(moiNhat.getTrangThai().getLabel());
+            }
+            if (moiNhat.getTrangThai() == TrangThaiTraHang.TU_CHOI) {
+                r.setLyDoTuChoiTraHang(moiNhat.getGhiChuAdmin());
             }
             r.setMaVanDonTra(moiNhat.getMaVanDonTra());
             r.setPickShiftLabel(moiNhat.getPickShiftLabel());

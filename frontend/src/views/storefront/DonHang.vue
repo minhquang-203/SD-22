@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import OrderCard from '@/components/storefront/OrderCard.vue'
@@ -14,7 +14,24 @@ import { subscribeCustomerOrders } from '@/composables/useRealtime'
 import { fetchChiTietDonCuaToi, fetchDonCuaToi, huyDonCuaToi } from '@/api/donHangApi'
 import { taoVanDonTra } from '@/api/traHangApi'
 import { formatVND } from '@/utils/formatVND'
-import { formatOrderDate, orderStatusClass, orderStatusLabel } from '@/utils/orderStatus'
+import { productImageUrl } from '@/utils/productImage'
+import { orderStatusLabel } from '@/utils/orderStatus'
+
+function orderPreview(item) {
+  const soDong = Number(item?.soDongHang || 0)
+  const parts = []
+  if (item?.soLuong) parts.push(`x${item.soLuong}`)
+  if (soDong > 1) parts.push(`+${soDong - 1} sản phẩm`)
+  return {
+    anhUrl: item?.anhUrl,
+    tenSanPham: item?.tenSanPham || 'Đơn hàng SUNOVA',
+    meta: parts.join(' · '),
+  }
+}
+
+const orderRows = computed(() =>
+  orders.value.map((item) => ({ item, preview: orderPreview(item) })),
+)
 
 const loading = ref(true)
 const orders = ref([])
@@ -270,24 +287,26 @@ async function handleCancelOrder(order) {
       <div v-else class="sf-order-history">
         <div class="sf-order-list">
           <button
-            v-for="item in orders"
+            v-for="{ item, preview } in orderRows"
             :key="item.id"
             type="button"
             class="sf-order-list__item"
             :class="{ active: selectedId === item.id }"
             @click="openDetail(item.id)"
           >
+            <img
+              :src="productImageUrl(preview.anhUrl)"
+              :alt="preview.tenSanPham"
+              class="sf-order-list__thumb"
+            />
             <div class="sf-order-list__main">
-              <strong>{{ item.maHoaDon }}</strong>
-              <span>{{ formatOrderDate(item.ngayTao) }}</span>
+              <strong>{{ preview.tenSanPham }}</strong>
+              <span>{{ preview.meta }}</span>
             </div>
-            <span
-              class="sf-order-badge"
-              :class="orderStatusClass(item.trangThai)"
-            >
-              {{ orderStatusLabel(item.trangThai) }}
-            </span>
-            <strong class="sf-order-list__price">{{ formatVND(item.thanhTien) }}</strong>
+            <div class="sf-order-list__side">
+              <strong class="sf-order-list__price">{{ formatVND(item.thanhTien) }}</strong>
+              <span class="sf-order-list__status">{{ orderStatusLabel(item.trangThai) }}</span>
+            </div>
           </button>
         </div>
 

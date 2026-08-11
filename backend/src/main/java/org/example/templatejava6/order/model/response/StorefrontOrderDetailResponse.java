@@ -38,6 +38,8 @@ public class StorefrontOrderDetailResponse {
     private Integer idYeuCauTraHang;
     private String trangThaiTraHang;
     private String trangThaiTraHangLabel;
+    /** Lý do admin từ chối yêu cầu trả hàng (ghiChuAdmin). */
+    private String lyDoTuChoiTraHang;
     private String maVanDonTra;
     private String pickShiftLabel;
     private String ghnTrangThaiTraLabel;

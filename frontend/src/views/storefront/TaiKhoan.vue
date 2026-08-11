@@ -8,6 +8,7 @@ import {
   doiMatKhauToi,
   fetchDiaChiToi,
   updateDiaChiToi,
+  deleteDiaChiToi,
   fetchMyQuizResult,
 } from '@/api/khachHangApi'
 import { useAuth } from '@/composables/useAuth'
@@ -39,6 +40,7 @@ const showRecipientModal = ref(false)
 const recipientModalMode = ref('pick')
 const editingAddress = ref(null)
 const settingDefaultId = ref(null)
+const deletingId = ref(null)
 
 const profileForm = reactive({
   hoTen: '',
@@ -84,7 +86,7 @@ const selectedRecipientSummary = computed(() => {
 })
 
 function formatAddressLine(address) {
-  return [address.diaChiChiTiet, address.phuongXa, address.quanHuyen, address.tinhThanh]
+  return [address.diaChiChiTiet, address.phuongXa, address.tinhThanh]
     .map((part) => String(part || '').trim())
     .filter(Boolean)
     .join(', ')
@@ -264,6 +266,33 @@ async function setDefaultAddress(address) {
     addressError.value = typeof e === 'string' ? e : 'Không đặt được địa chỉ mặc định'
   } finally {
     settingDefaultId.value = null
+  }
+}
+
+async function deleteAddress(address) {
+  if (!address?.id) return
+  const ok = await confirm({
+    title: 'Xóa địa chỉ',
+    message: `Bạn có chắc muốn xóa địa chỉ "${formatAddressLine(address)}"?`,
+    confirmText: 'Xóa',
+    danger: true,
+  })
+  if (!ok) return
+
+  deletingId.value = address.id
+  addressMsg.value = ''
+  addressError.value = ''
+  try {
+    await deleteDiaChiToi(address.id)
+    if (selectedAddressId.value === address.id) {
+      selectedAddressId.value = null
+    }
+    await loadAddresses()
+    addressMsg.value = 'Đã xóa địa chỉ.'
+  } catch (e) {
+    addressError.value = typeof e === 'string' ? e : 'Không xóa được địa chỉ'
+  } finally {
+    deletingId.value = null
   }
 }
 
@@ -461,6 +490,14 @@ onMounted(loadProfile)
                         @click="openRecipientModal('form', address)"
                       >
                         Sửa
+                      </button>
+                      <button
+                        type="button"
+                        class="sf-account-address-card__btn sf-account-address-card__btn--danger"
+                        :disabled="deletingId === address.id"
+                        @click="deleteAddress(address)"
+                      >
+                        {{ deletingId === address.id ? 'Đang xóa...' : 'Xóa' }}
                       </button>
                     </div>
                   </li>

@@ -65,7 +65,7 @@ public class SecurityConfig {
                             "/api/phuong-thuc-thanh-toan/**"
                     ).permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/payments/vnpay/callback", "/api/payments/vnpay/ipn").permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/shipping/provinces", "/api/shipping/districts", "/api/shipping/wards").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/shipping/provinces", "/api/shipping/wards").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/shipping/fee").permitAll()
                     .requestMatchers("/api/chat/**").permitAll()
                     .requestMatchers("/ws", "/ws/**").permitAll()

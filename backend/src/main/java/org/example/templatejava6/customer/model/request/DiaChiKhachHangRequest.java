@@ -21,7 +21,7 @@ public class DiaChiKhachHangRequest {
     @NotNull(message = "Vui lòng chọn tỉnh / thành phố")
     private Integer provinceId;
 
-    @NotNull(message = "Vui lòng chọn quận / huyện")
+    /** Legacy — địa chỉ 2 cấp không dùng. */
     private Integer districtId;
 
     @NotBlank(message = "Vui lòng chọn phường / xã")
@@ -32,7 +32,7 @@ public class DiaChiKhachHangRequest {
     @Size(max = 50, message = "Tỉnh / thành phố tối đa 50 ký tự")
     private String tinhThanh;
 
-    @NotBlank(message = "Quận / huyện không được để trống")
+    /** Legacy — địa chỉ 2 cấp để trống. */
     @Size(max = 50, message = "Quận / huyện tối đa 50 ký tự")
     private String quanHuyen;
 

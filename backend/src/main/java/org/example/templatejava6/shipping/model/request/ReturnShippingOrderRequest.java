@@ -18,6 +18,10 @@ public class ReturnShippingOrderRequest {
     private String fromAddress;
     private Integer fromDistrictId;
     private String fromWardCode;
+    /** Tên tỉnh (địa chỉ mới 2 cấp). */
+    private String fromProvinceName;
+    /** Tên phường/xã (địa chỉ mới 2 cấp). */
+    private String fromWardName;
 
     private Long insuranceValue;
     private Integer weight;

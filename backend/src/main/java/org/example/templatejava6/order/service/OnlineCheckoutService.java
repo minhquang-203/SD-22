@@ -148,7 +148,7 @@ public class OnlineCheckoutService {
         BigDecimal tongTien = sumTongTien(lines);
 
         PhieuGiamGia phieu = resolvePhieu(request.getMaPhieuGiamGia());
-        BigDecimal phiVanChuyen = resolvePhiVanChuyen(
+        BigDecimal phiVanChuyen = resolvePhiVanChuyen(request.getToWardIdV2(), request.getToAddressV2(),
                 request.getToDistrictId(), request.getToWardCode(), tongTien);
         BigDecimal tienGiamGia = BigDecimal.ZERO;
         if (phieu != null) {
@@ -164,6 +164,10 @@ public class OnlineCheckoutService {
                     "INVALID_PAYMENT_AMOUNT");
         }
 
+        String wardCode = coGiaTri(request.getToWardCode())
+                ? request.getToWardCode().trim()
+                : (request.getToWardIdV2() != null ? String.valueOf(request.getToWardIdV2()) : null);
+
         LocalDateTime now = LocalDateTime.now();
         HoaDon hoaDon = new HoaDon();
         hoaDon.setMaHoaDon(sinhMaHoaDon(now));
@@ -175,8 +179,9 @@ public class OnlineCheckoutService {
         hoaDon.setDiaChiGiao(request.getDiaChiGiao().trim());
         hoaDon.setTenNguoiNhan(coGiaTri(request.getTenNguoiNhan()) ? request.getTenNguoiNhan().trim() : khachHang.getHoTen());
         hoaDon.setSdtNguoiNhan(coGiaTri(request.getSdtNguoiNhan()) ? request.getSdtNguoiNhan().trim() : khachHang.getSoDienThoai());
+        // Địa chỉ 2 cấp: lưu ward id mới vào ghnWardCode; ghnDistrictId để null.
         hoaDon.setGhnDistrictId(request.getToDistrictId());
-        hoaDon.setGhnWardCode(coGiaTri(request.getToWardCode()) ? request.getToWardCode().trim() : null);
+        hoaDon.setGhnWardCode(wardCode);
         hoaDon.setTongTien(tongTien);
         hoaDon.setTienGiamGia(tienGiamGia);
         hoaDon.setPhiVanChuyen(phiVanChuyen);
@@ -234,7 +239,7 @@ public class OnlineCheckoutService {
         BigDecimal tongTien = sumTongTien(lines);
 
         PhieuGiamGia phieu = resolvePhieu(request.getMaPhieuGiamGia());
-        BigDecimal phiVanChuyen = resolvePhiVanChuyen(
+        BigDecimal phiVanChuyen = resolvePhiVanChuyen(request.getToWardIdV2(), request.getToAddressV2(),
                 request.getToDistrictId(), request.getToWardCode(), tongTien);
         BigDecimal tienGiamGia = BigDecimal.ZERO;
         String maPhieu = null;
@@ -422,8 +427,12 @@ public class OnlineCheckoutService {
      * Tính phí vận chuyển phía server qua GHN. Không tin phí từ client.
      * Khi thiếu địa chỉ GHN, ShippingService trả phí fallback theo cấu hình.
      */
-    private BigDecimal resolvePhiVanChuyen(Integer toDistrictId, String toWardCode, BigDecimal tongTienHang) {
+    private BigDecimal resolvePhiVanChuyen(Integer toWardIdV2, String toAddressV2,
+                                           Integer toDistrictId, String toWardCode,
+                                           BigDecimal tongTienHang) {
         ShippingFeeRequest feeRequest = new ShippingFeeRequest();
+        feeRequest.setToWardIdV2(toWardIdV2);
+        feeRequest.setToAddressV2(coGiaTri(toAddressV2) ? toAddressV2.trim() : null);
         feeRequest.setToDistrictId(toDistrictId);
         feeRequest.setToWardCode(coGiaTri(toWardCode) ? toWardCode.trim() : null);
         if (tongTienHang != null && tongTienHang.compareTo(BigDecimal.ZERO) > 0) {
