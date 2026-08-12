@@ -53,7 +53,12 @@ public class VnpayGateway implements PaymentGateway {
         params.put("vnp_Locale", properties.getLocale());
         params.put("vnp_ReturnUrl", properties.getReturnUrl());
         params.put("vnp_IpAddr", command.getClientIp());
-        params.put("vnp_CreateDate", LocalDateTime.now().format(VNPAY_DATE_TIME));
+        LocalDateTime createDate = LocalDateTime.now();
+        params.put("vnp_CreateDate", createDate.format(VNPAY_DATE_TIME));
+        Integer expireMinutes = command.getExpireMinutes();
+        if (expireMinutes != null && expireMinutes > 0) {
+            params.put("vnp_ExpireDate", createDate.plusMinutes(expireMinutes).format(VNPAY_DATE_TIME));
+        }
 
         String query = buildQuery(params);
         String secureHash = hmacSha512(properties.getHashSecret(), query);

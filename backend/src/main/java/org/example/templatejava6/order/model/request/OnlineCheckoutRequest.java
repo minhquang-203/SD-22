@@ -53,4 +53,10 @@ public class OnlineCheckoutRequest {
      */
     @NotBlank(message = "Vui lòng chọn phường/xã giao hàng")
     private String toWardCode;
+
+    /**
+     * Khóa idempotency do client sinh cho mỗi lần đặt hàng. Gửi lại cùng key (double-click,
+     * retry mạng) sẽ trả về đúng đơn đã tạo thay vì tạo đơn mới. Không bắt buộc để giữ tương thích.
+     */
+    private String idempotencyKey;
 }

@@ -6,7 +6,9 @@ import org.example.templatejava6.notification.model.response.ThongBaoResponse;
 import org.example.templatejava6.notification.model.response.ThongBaoTongQuanResponse;
 import org.example.templatejava6.notification.repository.ThongBaoRepository;
 import org.example.templatejava6.realtime.event.AdminNotificationAppEvent;
+import org.example.templatejava6.realtime.event.CustomerNotificationAppEvent;
 import org.example.templatejava6.realtime.model.AdminNotificationEvent;
+import org.example.templatejava6.realtime.model.CustomerNotificationEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -64,6 +66,78 @@ public class ThongBaoService {
         } catch (Exception ex) {
             log.error("Không tạo được thông báo admin: {}", ex.getMessage(), ex);
         }
+    }
+
+    /**
+     * Tạo thông báo gửi riêng cho một khách hàng (chuông thông báo phía storefront).
+     * Chạy giao dịch riêng + nuốt lỗi để không ảnh hưởng luồng nghiệp vụ chính.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void taoThongBaoKhach(Integer idKhachHang, LoaiThongBao loai, String tieuDe, String noiDung,
+                                 String link, Integer idThamChieu, String maThamChieu) {
+        if (idKhachHang == null) {
+            return;
+        }
+        try {
+            ThongBao tb = new ThongBao();
+            tb.setLoai(loai);
+            tb.setTieuDe(tieuDe);
+            tb.setNoiDung(noiDung);
+            tb.setLink(link);
+            tb.setIdThamChieu(idThamChieu);
+            tb.setMaThamChieu(maThamChieu);
+            tb.setIdKhachHang(idKhachHang);
+            tb.setDaDoc(false);
+            tb.setThoiGian(LocalDateTime.now());
+            ThongBao saved = thongBaoRepository.save(tb);
+            eventPublisher.publishEvent(new CustomerNotificationAppEvent(
+                    this,
+                    CustomerNotificationEvent.builder()
+                            .type(CustomerNotificationEvent.TYPE_NOTIFICATION)
+                            .id(saved.getId())
+                            .idKhachHang(idKhachHang)
+                            .loai(loai != null ? loai.name() : null)
+                            .tieuDe(tieuDe)
+                            .noiDung(noiDung)
+                            .link(link)
+                            .idThamChieu(idThamChieu)
+                            .maThamChieu(maThamChieu)
+                            .build()));
+        } catch (Exception ex) {
+            log.error("Không tạo được thông báo khách {}: {}", idKhachHang, ex.getMessage(), ex);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public ThongBaoTongQuanResponse tongQuanKhach(Integer idKhachHang) {
+        long soChuaDoc = thongBaoRepository.countByIdKhachHangAndDaDocFalse(idKhachHang);
+        List<ThongBaoResponse> danhSach = thongBaoRepository
+                .findByIdKhachHangOrderByThoiGianDescIdDesc(idKhachHang, PageRequest.of(0, MAX_HIEN_THI))
+                .stream()
+                .map(ThongBaoResponse::new)
+                .toList();
+        return new ThongBaoTongQuanResponse(soChuaDoc, danhSach);
+    }
+
+    @Transactional(readOnly = true)
+    public long demChuaDocKhach(Integer idKhachHang) {
+        return thongBaoRepository.countByIdKhachHangAndDaDocFalse(idKhachHang);
+    }
+
+    @Transactional
+    public void danhDauDaDocTatCaKhach(Integer idKhachHang) {
+        thongBaoRepository.markAllKhachRead(idKhachHang);
+    }
+
+    @Transactional
+    public void danhDauDaDocKhach(Integer idKhachHang, Integer id) {
+        thongBaoRepository.findById(id).ifPresent(tb -> {
+            // Chỉ cho phép khách đánh dấu thông báo của chính mình.
+            if (idKhachHang.equals(tb.getIdKhachHang()) && !Boolean.TRUE.equals(tb.getDaDoc())) {
+                tb.setDaDoc(true);
+                thongBaoRepository.save(tb);
+            }
+        });
     }
 
     @Transactional(readOnly = true)

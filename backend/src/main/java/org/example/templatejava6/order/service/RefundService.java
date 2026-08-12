@@ -225,6 +225,15 @@ public class RefundService {
                 saved.getId(),
                 hoaDon.getMaHoaDon());
         orderMailService.guiHoanTienHoanTat(hoaDon, saved.getSoTien(), saved.getMaGiaoDichHoan());
+        thongBaoService.taoThongBaoKhach(
+                idKhachHangCua(hoaDon),
+                LoaiThongBao.HOAN_TIEN_THANH_CONG,
+                "Hoàn tiền thành công",
+                "Đơn " + hoaDon.getMaHoaDon() + " đã được hoàn "
+                        + dinhDangTien(saved.getSoTien()) + ".",
+                "/don-hang",
+                hoaDon.getId(),
+                hoaDon.getMaHoaDon());
         return new HoanTienResponse(saved, anhUrls);
     }
 
@@ -275,6 +284,16 @@ public class RefundService {
         if (saved.getLoai() == LoaiHoanTien.TRA_HANG) {
             ketThucYeuCauTraHang(saved.getIdYeuCauTraHang());
         }
+        HoaDon hoaDon = saved.getIdHoaDon();
+        thongBaoService.taoThongBaoKhach(
+                idKhachHangCua(hoaDon),
+                LoaiThongBao.HOAN_TIEN_BI_TU_CHOI,
+                "Hoàn tiền bị từ chối",
+                "Yêu cầu hoàn tiền cho đơn " + (hoaDon != null ? hoaDon.getMaHoaDon() : "") + " đã bị từ chối"
+                        + (lyDo != null && !lyDo.isBlank() ? ": " + lyDo : "."),
+                "/don-hang",
+                hoaDon != null ? hoaDon.getId() : null,
+                hoaDon != null ? hoaDon.getMaHoaDon() : null);
         return new HoanTienResponse(saved);
     }
 
@@ -401,6 +420,10 @@ public class RefundService {
             return null;
         }
         return nhanVienRepository.findById(idNhanVien).orElse(null);
+    }
+
+    private static Integer idKhachHangCua(HoaDon hoaDon) {
+        return hoaDon != null && hoaDon.getIdKhachHang() != null ? hoaDon.getIdKhachHang().getId() : null;
     }
 
     private void ghiNhatKy(HoaDon hoaDon, String trangThai, String ghiChu) {

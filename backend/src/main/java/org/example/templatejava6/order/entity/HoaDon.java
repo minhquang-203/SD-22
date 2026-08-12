@@ -109,6 +109,11 @@ public class HoaDon {
     @Column(name = "sdt_nguoi_nhan")
     private String sdtNguoiNhan;
 
+    /** Khóa chống tạo trùng đơn (double-submit) — do client sinh cho mỗi lần đặt hàng online. */
+    @Size(max = 64)
+    @Column(name = "idempotency_key", length = 64)
+    private String idempotencyKey;
+
     @OneToMany(mappedBy = "idHoaDon", fetch = FetchType.LAZY)
     private Set<LichSuDonHang> lichSuDonHangs = new LinkedHashSet<>();
 

@@ -13,7 +13,6 @@ import org.example.templatejava6.order.repository.ThanhToanHoaDonRepository;
 import org.example.templatejava6.order.service.OnlineOrderLifecycleService;
 import org.example.templatejava6.order.service.PosOrderLifecycleService;
 import org.example.templatejava6.notification.enums.LoaiThongBao;
-import org.example.templatejava6.notification.service.OrderMailService;
 import org.example.templatejava6.notification.service.ThongBaoService;
 import org.example.templatejava6.payment.gateway.PaymentCallbackResult;
 import org.example.templatejava6.payment.gateway.PaymentCreateCommand;
@@ -26,8 +25,11 @@ import org.example.templatejava6.payment.model.response.TaoThanhToanResponse;
 import org.example.templatejava6.payment.model.response.VnpayIpnResponse;
 import org.example.templatejava6.payment.vnpay.VnpayGateway;
 import org.example.templatejava6.realtime.service.OrderRealtimeService;
+import org.example.templatejava6.notification.event.DatHangThanhCongMailEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,8 +60,9 @@ public class PaymentService {
     private final OnlineOrderLifecycleService onlineOrderLifecycleService;
     private final PosOrderLifecycleService posOrderLifecycleService;
     private final ThongBaoService thongBaoService;
-    private final OrderMailService orderMailService;
     private final OrderRealtimeService orderRealtimeService;
+    private final ApplicationEventPublisher eventPublisher;
+    private final long paymentTimeoutMinutes;
 
     public PaymentService(
             PaymentGatewayRegistry gatewayRegistry,
@@ -70,8 +73,9 @@ public class PaymentService {
             OnlineOrderLifecycleService onlineOrderLifecycleService,
             PosOrderLifecycleService posOrderLifecycleService,
             ThongBaoService thongBaoService,
-            OrderMailService orderMailService,
-            OrderRealtimeService orderRealtimeService) {
+            OrderRealtimeService orderRealtimeService,
+            ApplicationEventPublisher eventPublisher,
+            @Value("${online.order.payment-timeout-minutes:15}") long paymentTimeoutMinutes) {
         this.gatewayRegistry = gatewayRegistry;
         this.hoaDonRepository = hoaDonRepository;
         this.thanhToanHoaDonRepository = thanhToanHoaDonRepository;
@@ -80,8 +84,9 @@ public class PaymentService {
         this.onlineOrderLifecycleService = onlineOrderLifecycleService;
         this.posOrderLifecycleService = posOrderLifecycleService;
         this.thongBaoService = thongBaoService;
-        this.orderMailService = orderMailService;
         this.orderRealtimeService = orderRealtimeService;
+        this.eventPublisher = eventPublisher;
+        this.paymentTimeoutMinutes = paymentTimeoutMinutes;
     }
 
     @Transactional
@@ -112,6 +117,7 @@ public class PaymentService {
                 .orderInfo("Thanh toan hoa don " + hoaDon.getMaHoaDon())
                 .amount(hoaDon.getThanhTien())
                 .clientIp(clientIp)
+                .expireMinutes((int) paymentTimeoutMinutes)
                 .build());
 
         ghiNhatKy(hoaDon, "CHO_THANH_TOAN",
@@ -136,26 +142,21 @@ public class PaymentService {
             return buildCallbackResponse(callback, provider, null, false, "Sai chữ ký thanh toán.");
         }
 
-        ThanhToanHoaDon thanhToan = thanhToanHoaDonRepository.findByMaGiaoDich(callback.getTransactionRef())
+        ThanhToanHoaDon thanhToan = thanhToanHoaDonRepository.findByMaGiaoDichForUpdate(callback.getTransactionRef())
                 .orElseThrow(() -> new ApiException("Không tìm thấy giao dịch thanh toán.", "PAYMENT_NOT_FOUND"));
         HoaDon hoaDon = thanhToan.getIdHoaDon();
 
         if (laTrangThaiKetThucThanhToan(thanhToan.getTrangThai())) {
             boolean daThanhCong = TRANG_THAI_THANH_CONG.equals(thanhToan.getTrangThai());
+            if (!daThanhCong && callback.isSuccessful()) {
+                canhBaoThanhToanQuaHanCanDoiSoat(hoaDon, callback);
+            }
             return buildCallbackResponse(callback, provider, hoaDon, daThanhCong,
                     daThanhCong ? "Giao dịch đã được ghi nhận trước đó." : "Giao dịch đã được ghi nhận thất bại trước đó.");
         }
 
         if (!amountMatches(hoaDon.getThanhTien(), callback.getAmount())) {
-            thanhToan.setTrangThai(TRANG_THAI_THAT_BAI);
-            thanhToan.setThoiGian(LocalDateTime.now());
-            thanhToanHoaDonRepository.save(thanhToan);
-            if (LOAI_DON_ONLINE.equalsIgnoreCase(hoaDon.getLoaiDon())
-                    && onlineOrderLifecycleService.laVnpayChuaThanhToan(hoaDon)) {
-                onlineOrderLifecycleService.xoaDonChuaThanhToan(hoaDon);
-            } else {
-                ghiNhatKy(hoaDon, "THANH_TOAN_THAT_BAI", "Số tiền VNPAY trả về không khớp hóa đơn.");
-            }
+            xuLySaiSoTien(callback, thanhToan, hoaDon);
             return buildCallbackResponse(callback, provider, hoaDon, false, "Số tiền thanh toán không khớp hóa đơn.");
         }
 
@@ -183,7 +184,7 @@ public class PaymentService {
                 return VnpayIpnResponse.of("97", "Invalid signature");
             }
 
-            ThanhToanHoaDon thanhToan = thanhToanHoaDonRepository.findByMaGiaoDich(callback.getTransactionRef())
+            ThanhToanHoaDon thanhToan = thanhToanHoaDonRepository.findByMaGiaoDichForUpdate(callback.getTransactionRef())
                     .orElse(null);
             if (thanhToan == null) {
                 return VnpayIpnResponse.of("01", "Order not found");
@@ -191,10 +192,16 @@ public class PaymentService {
 
             HoaDon hoaDon = thanhToan.getIdHoaDon();
             if (laTrangThaiKetThucThanhToan(thanhToan.getTrangThai())) {
+                if (!TRANG_THAI_THANH_CONG.equals(thanhToan.getTrangThai()) && callback.isSuccessful()) {
+                    canhBaoThanhToanQuaHanCanDoiSoat(hoaDon, callback);
+                }
                 return VnpayIpnResponse.of("02", "Order already confirmed");
             }
 
             if (!amountMatches(hoaDon.getThanhTien(), callback.getAmount())) {
+                // Chữ ký hợp lệ nhưng số tiền lệch: đánh dấu thất bại + hoàn tồn/voucher ngay,
+                // không chờ scheduler timeout; giữ bản ghi để đối soát.
+                xuLySaiSoTien(callback, thanhToan, hoaDon);
                 return VnpayIpnResponse.of("04", "Invalid amount");
             }
 
@@ -235,7 +242,8 @@ public class PaymentService {
             if (LOAI_DON_ONLINE.equalsIgnoreCase(hoaDon.getLoaiDon())) {
                 onlineOrderLifecycleService.truGioHangTheoDon(hoaDon);
                 thongBaoDonMoi(hoaDon);
-                orderMailService.guiHoaDonDatHangThanhCong(hoaDon);
+                // Gửi mail sau khi commit để không giữ khóa bản ghi thanh toán trong lúc gọi SMTP.
+                eventPublisher.publishEvent(new DatHangThanhCongMailEvent(this, hoaDon.getId()));
                 orderRealtimeService.publishCreated(hoaDon);
             }
             return;
@@ -249,7 +257,7 @@ public class PaymentService {
             ghiNhatKy(hoaDon, "THANH_TOAN_THAT_BAI",
                     "Thanh toán " + provider + " thất bại. Mã phản hồi: " + callback.getResponseCode());
         } else if (onlineOrderLifecycleService.laVnpayChuaThanhToan(hoaDon)) {
-            onlineOrderLifecycleService.xoaDonChuaThanhToan(hoaDon);
+            onlineOrderLifecycleService.huyDonChuaThanhToan(hoaDon);
         } else {
             onlineOrderLifecycleService.huyDonOnline(hoaDon, "Thanh toán " + provider + " thất bại, hủy đơn và hoàn tồn.");
             ghiNhatKy(hoaDon, "THANH_TOAN_THAT_BAI",
@@ -257,11 +265,40 @@ public class PaymentService {
         }
     }
 
-    private void danhDauThatBai(ThanhToanHoaDon thanhToan, HoaDon hoaDon, String ghiChu) {
+    /**
+     * Số tiền VNPAY trả về không khớp hóa đơn (dù chữ ký hợp lệ): đánh dấu giao dịch THAT_BAI,
+     * hoàn tồn/voucher ngay với đơn online chưa thanh toán và ghi log để đối soát.
+     */
+    private void xuLySaiSoTien(PaymentCallbackResult callback, ThanhToanHoaDon thanhToan, HoaDon hoaDon) {
         thanhToan.setTrangThai(TRANG_THAI_THAT_BAI);
         thanhToan.setThoiGian(LocalDateTime.now());
         thanhToanHoaDonRepository.save(thanhToan);
-        ghiNhatKy(hoaDon, "THANH_TOAN_THAT_BAI", ghiChu);
+        ghiNhatKy(hoaDon, "THANH_TOAN_THAT_BAI",
+                "Số tiền VNPAY trả về (" + callback.getAmount() + ") không khớp hóa đơn ("
+                        + hoaDon.getThanhTien() + "). Cần đối soát.");
+        if (LOAI_DON_ONLINE.equalsIgnoreCase(hoaDon.getLoaiDon())
+                && onlineOrderLifecycleService.laVnpayChuaThanhToan(hoaDon)) {
+            onlineOrderLifecycleService.huyDonChuaThanhToan(hoaDon);
+        }
+    }
+
+    /**
+     * VNPAY báo thành công sau khi đơn đã bị hủy/hết hạn (giao dịch đã ở trạng thái thất bại):
+     * có thể tiền đã bị trừ — ghi log và báo admin để đối soát, hoàn tiền thủ công nếu cần.
+     */
+    private void canhBaoThanhToanQuaHanCanDoiSoat(HoaDon hoaDon, PaymentCallbackResult callback) {
+        ghiNhatKy(hoaDon, "THANH_TOAN_QUA_HAN_CAN_DOI_SOAT",
+                "VNPAY báo thành công sau khi đơn đã hủy/hết hạn"
+                        + formatProviderTransaction(callback.getProviderTransactionNo())
+                        + ". Cần đối soát và hoàn tiền nếu đã thu tiền.");
+        thongBaoService.taoThongBao(
+                LoaiThongBao.YEU_CAU_HOAN_TIEN,
+                "Cần đối soát thanh toán VNPAY",
+                "Đơn " + hoaDon.getMaHoaDon() + " nhận kết quả thanh toán VNPAY thành công sau khi đã hủy/hết hạn."
+                        + " Vui lòng đối soát và hoàn tiền nếu tiền đã bị trừ.",
+                "/admin/hoa-don/chi-tiet/" + hoaDon.getId(),
+                hoaDon.getId(),
+                hoaDon.getMaHoaDon());
     }
 
     private boolean laTrangThaiKetThucThanhToan(String trangThai) {

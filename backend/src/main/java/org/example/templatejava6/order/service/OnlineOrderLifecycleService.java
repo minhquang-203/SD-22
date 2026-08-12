@@ -28,6 +28,7 @@ public class OnlineOrderLifecycleService {
     private static final String LOAI_DON_ONLINE = "ONLINE";
     private static final String MA_VNPAY = "VNPAY";
     private static final String TRANG_THAI_THANH_CONG = "THANH_CONG";
+    private static final String TRANG_THAI_THAT_BAI = "THAT_BAI";
 
     private final HoaDonRepository hoaDonRepository;
     private final HoaDonChiTietRepository hoaDonChiTietRepository;
@@ -85,9 +86,9 @@ public class OnlineOrderLifecycleService {
         }
 
         boolean daThanhToan = daThanhToanThanhCong(hoaDon);
-        // VNPAY chưa trả: xóa hẳn, không để DA_HUY ảo; hoàn tồn/voucher (giỏ vẫn nguyên).
+        // VNPAY chưa trả: hủy mềm (giữ dữ liệu để đối soát), hoàn tồn/voucher (giỏ vẫn nguyên).
         if (!daThanhToan && laVnpay(hoaDon)) {
-            xoaDonChuaThanhToan(hoaDon);
+            huyDonChuaThanhToan(hoaDon);
             return true;
         }
 
@@ -107,11 +108,11 @@ public class OnlineOrderLifecycleService {
     }
 
     /**
-     * Xóa đơn VNPAY quá hạn theo id — load lại trong transaction để tránh LazyInitializationException
+     * Hủy đơn VNPAY quá hạn theo id — load lại trong transaction để tránh LazyInitializationException
      * khi scheduler/query trả entity detached.
      */
     @Transactional
-    public void xoaDonChuaThanhToanNeuCan(Integer idHoaDon) {
+    public void huyDonChuaThanhToanNeuCan(Integer idHoaDon) {
         HoaDon hoaDon = hoaDonRepository.findById(idHoaDon).orElse(null);
         if (hoaDon == null) {
             return;
@@ -119,33 +120,53 @@ public class OnlineOrderLifecycleService {
         if (daThanhToanThanhCong(hoaDon)) {
             return;
         }
-        xoaDonChuaThanhToan(hoaDon);
+        huyDonChuaThanhToan(hoaDon);
     }
 
     /**
-     * Xóa hẳn đơn online VNPAY chưa thanh toán (hủy/thất bại/quá hạn).
-     * Hoàn tồn và voucher. Không đụng giỏ hàng — giỏ chỉ bị trừ khi thanh toán thành công.
-     * Caller phải gọi trong transaction với entity còn gắn session (hoặc dùng {@link #xoaDonChuaThanhToanNeuCan}).
+     * Hủy mềm đơn online VNPAY chưa thanh toán (hủy/thất bại/quá hạn).
+     * KHÔNG xóa dữ liệu: giữ HoaDon (DA_HUY), HoaDonChiTiet, LichSuDonHang và
+     * ThanhToanHoaDon (THAT_BAI) để đối soát nội bộ với VNPAY. Hoàn tồn và voucher.
+     * Đơn vẫn bị ẩn khỏi danh sách khách/admin vì là VNPAY chưa có thanh toán THANH_CONG.
+     * Không đụng giỏ hàng — giỏ chỉ bị trừ khi thanh toán thành công.
+     * Caller phải gọi trong transaction với entity còn gắn session (hoặc dùng {@link #huyDonChuaThanhToanNeuCan}).
      */
     @Transactional
-    public void xoaDonChuaThanhToan(HoaDon hoaDon) {
+    public void huyDonChuaThanhToan(HoaDon hoaDon) {
         if (!LOAI_DON_ONLINE.equalsIgnoreCase(hoaDon.getLoaiDon())) {
-            throw new ApiException("Chỉ hỗ trợ xóa đơn online chưa thanh toán.", "INVALID_ORDER_TYPE");
+            throw new ApiException("Chỉ hỗ trợ hủy đơn online chưa thanh toán.", "INVALID_ORDER_TYPE");
         }
         if (daThanhToanThanhCong(hoaDon)) {
-            throw new ApiException("Đơn đã thanh toán, không thể xóa.", "ORDER_ALREADY_PAID");
+            throw new ApiException("Đơn đã thanh toán, không thể hủy ở luồng này.", "ORDER_ALREADY_PAID");
         }
         if (!laVnpay(hoaDon)) {
-            throw new ApiException("Chỉ xóa được đơn VNPAY chưa thanh toán.", "INVALID_PAYMENT_METHOD");
+            throw new ApiException("Chỉ hủy được đơn VNPAY chưa thanh toán.", "INVALID_PAYMENT_METHOD");
+        }
+        // Đã kết thúc trước đó (hủy/hết hạn): tránh hoàn tồn/voucher hai lần khi callback + scheduler chạy trùng.
+        if (hoaDon.getTrangThai() != null && hoaDon.getTrangThai().laTrangThaiKetThuc()) {
+            danhDauThanhToanThatBai(hoaDon);
+            return;
         }
 
         hoanTonKho(hoaDon);
         hoanLuotVoucher(hoaDon);
+        danhDauThanhToanThatBai(hoaDon);
 
-        thanhToanHoaDonRepository.deleteByIdHoaDon(hoaDon);
-        lichSuDonHangRepository.deleteByIdHoaDon_Id(hoaDon.getId());
-        hoaDonChiTietRepository.deleteByIdHoaDon(hoaDon);
-        hoaDonRepository.delete(hoaDon);
+        hoaDon.setTrangThai(TrangThaiDonHang.DA_HUY);
+        hoaDonRepository.save(hoaDon);
+        ghiNhatKy(hoaDon, "DA_HUY", "Hủy đơn VNPAY chưa thanh toán (giữ dữ liệu để đối soát).");
+    }
+
+    /** Đánh dấu các bản ghi thanh toán chưa kết thúc của đơn thành THAT_BAI, giữ lại để đối soát. */
+    private void danhDauThanhToanThatBai(HoaDon hoaDon) {
+        for (var thanhToan : thanhToanHoaDonRepository.findByIdHoaDonOrderByThoiGianDesc(hoaDon)) {
+            if (!TRANG_THAI_THANH_CONG.equals(thanhToan.getTrangThai())
+                    && !TRANG_THAI_THAT_BAI.equals(thanhToan.getTrangThai())) {
+                thanhToan.setTrangThai(TRANG_THAI_THAT_BAI);
+                thanhToan.setThoiGian(java.time.LocalDateTime.now());
+                thanhToanHoaDonRepository.save(thanhToan);
+            }
+        }
     }
 
     /**

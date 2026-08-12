@@ -29,7 +29,7 @@ import org.example.templatejava6.order.repository.LichSuDonHangRepository;
 import org.example.templatejava6.order.repository.PhuongThucThanhToanRepository;
 import org.example.templatejava6.order.repository.ThanhToanHoaDonRepository;
 import org.example.templatejava6.notification.enums.LoaiThongBao;
-import org.example.templatejava6.notification.service.OrderMailService;
+import org.example.templatejava6.notification.event.DatHangThanhCongMailEvent;
 import org.example.templatejava6.notification.service.ThongBaoService;
 import org.example.templatejava6.payment.model.request.TaoThanhToanRequest;
 import org.example.templatejava6.payment.model.response.TaoThanhToanResponse;
@@ -43,6 +43,8 @@ import org.example.templatejava6.shipping.service.ShippingService;
 import org.example.templatejava6.voucher.model.response.VariantSaleInfo;
 import org.example.templatejava6.voucher.repository.PhieuGiamGiaRepository;
 import org.example.templatejava6.voucher.service.PhieuGiamGiaService;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,6 +57,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -81,9 +84,9 @@ public class OnlineCheckoutService {
     private final OnlineOrderLifecycleService onlineOrderLifecycleService;
     private final CheckoutPricingService checkoutPricingService;
     private final ThongBaoService thongBaoService;
-    private final OrderMailService orderMailService;
     private final OrderRealtimeService orderRealtimeService;
     private final ShippingService shippingService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public OnlineCheckoutService(
             GioHangRepository gioHangRepository,
@@ -101,9 +104,9 @@ public class OnlineCheckoutService {
             OnlineOrderLifecycleService onlineOrderLifecycleService,
             CheckoutPricingService checkoutPricingService,
             ThongBaoService thongBaoService,
-            OrderMailService orderMailService,
             OrderRealtimeService orderRealtimeService,
-            ShippingService shippingService) {
+            ShippingService shippingService,
+            ApplicationEventPublisher eventPublisher) {
         this.gioHangRepository = gioHangRepository;
         this.chiTietGioHangRepository = chiTietGioHangRepository;
         this.khachHangRepository = khachHangRepository;
@@ -119,14 +122,25 @@ public class OnlineCheckoutService {
         this.onlineOrderLifecycleService = onlineOrderLifecycleService;
         this.checkoutPricingService = checkoutPricingService;
         this.thongBaoService = thongBaoService;
-        this.orderMailService = orderMailService;
         this.orderRealtimeService = orderRealtimeService;
         this.shippingService = shippingService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
     public OnlineCheckoutResponse checkout(OnlineCheckoutRequest request, String clientIp) {
         KhachHang khachHang = getKhachDangNhap();
+
+        // Idempotency: cùng key (double-click / retry) => trả lại đúng đơn đã tạo, không tạo đơn mới.
+        String idempotencyKey = chuanHoaIdempotencyKey(request.getIdempotencyKey());
+        if (idempotencyKey != null) {
+            Optional<HoaDon> daTao = hoaDonRepository
+                    .findByIdempotencyKeyAndIdKhachHang_Id(idempotencyKey, khachHang.getId());
+            if (daTao.isPresent()) {
+                return taoLaiPhanHoiCheckout(daTao.get(), clientIp);
+            }
+        }
+
         String maPhuongThuc = normalize(request.getMaPhuongThucThanhToan());
         if (!MA_COD.equals(maPhuongThuc) && !MA_VNPAY.equals(maPhuongThuc)) {
             throw new ApiException("Chỉ hỗ trợ COD hoặc VNPAY cho bán hàng online.", "UNSUPPORTED_PAYMENT_METHOD");
@@ -188,7 +202,13 @@ public class OnlineCheckoutService {
         hoaDon.setThanhTien(thanhTien);
         hoaDon.setGhiChu(request.getGhiChu());
         hoaDon.setNgayTao(now);
-        hoaDon = hoaDonRepository.save(hoaDon);
+        hoaDon.setIdempotencyKey(idempotencyKey);
+        try {
+            hoaDon = hoaDonRepository.saveAndFlush(hoaDon);
+        } catch (DataIntegrityViolationException ex) {
+            // Hai request cùng key chạy song song: dòng này thua ràng buộc unique -> báo client thử lại.
+            throw new ApiException("Đơn đang được xử lý, vui lòng thử lại.", "DUPLICATE_CHECKOUT");
+        }
 
         for (LineCalc line : lines) {
             HoaDonChiTiet chiTiet = new HoaDonChiTiet();
@@ -218,7 +238,8 @@ public class OnlineCheckoutService {
             ghiNhatKy(hoaDon, "CHO_XAC_NHAN", "Đơn COD chờ nhân viên xác nhận");
             // COD: đơn đã đặt thành công ngay -> báo admin + gửi hóa đơn điện tử cho khách
             thongBaoDonMoi(hoaDon);
-            orderMailService.guiHoaDonDatHangThanhCong(hoaDon);
+            // Gửi mail sau khi commit để không giữ transaction trong lúc gọi SMTP.
+            eventPublisher.publishEvent(new DatHangThanhCongMailEvent(this, hoaDon.getId()));
             orderRealtimeService.publishCreated(hoaDon);
         } else {
             TaoThanhToanRequest paymentRequest = new TaoThanhToanRequest();
@@ -462,12 +483,39 @@ public class OnlineCheckoutService {
         return value != null && !value.isBlank();
     }
 
+    /**
+     * Trả lại đúng đơn đã tạo cho một idempotency key (double-submit / retry mạng).
+     * VNPAY chưa thanh toán: tạo lại phiên thanh toán cho CHÍNH đơn đó để client vẫn có paymentUrl hợp lệ.
+     */
+    private OnlineCheckoutResponse taoLaiPhanHoiCheckout(HoaDon hoaDon, String clientIp) {
+        TaoThanhToanResponse payment = null;
+        boolean laVnpay = hoaDon.getIdPhuongThucThanhToan() != null
+                && MA_VNPAY.equalsIgnoreCase(hoaDon.getIdPhuongThucThanhToan().getMa());
+        if (laVnpay && !onlineOrderLifecycleService.daThanhToanThanhCong(hoaDon)) {
+            TaoThanhToanRequest paymentRequest = new TaoThanhToanRequest();
+            paymentRequest.setIdHoaDon(hoaDon.getId());
+            payment = paymentService.taoThanhToan(MA_VNPAY, paymentRequest, clientIp);
+        }
+        return OnlineCheckoutResponse.from(hoaDon, payment);
+    }
+
+    private String chuanHoaIdempotencyKey(String key) {
+        if (key == null) {
+            return null;
+        }
+        String trimmed = key.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return trimmed.length() > 64 ? trimmed.substring(0, 64) : trimmed;
+    }
+
     private void huyDonVnpayChuaThanhToanCuaKhach(Integer idKhachHang) {
         List<HoaDon> donCu = hoaDonRepository
                 .findByIdKhachHang_IdAndLoaiDonOrderByNgayTaoDesc(idKhachHang, LOAI_DON_ONLINE);
         for (HoaDon cu : donCu) {
             if (onlineOrderLifecycleService.laVnpayChuaThanhToan(cu)) {
-                onlineOrderLifecycleService.xoaDonChuaThanhToan(cu);
+                onlineOrderLifecycleService.huyDonChuaThanhToan(cu);
             }
         }
     }

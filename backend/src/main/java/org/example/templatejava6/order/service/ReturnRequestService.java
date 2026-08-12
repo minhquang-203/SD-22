@@ -242,6 +242,15 @@ public class ReturnRequestService {
 
         ghiNhatKy(hoaDon, "TRA_HANG_DA_DUYET", "Duyệt yêu cầu trả hàng — đơn chuyển TRA_HANG, chờ khách tạo vận đơn hoàn hàng");
         orderMailService.guiYeuCauTraHangDuocDuyet(hoaDon);
+        thongBaoService.taoThongBaoKhach(
+                idKhachHangCua(hoaDon),
+                LoaiThongBao.TRA_HANG_DUOC_DUYET,
+                "Yêu cầu trả hàng được duyệt",
+                "Yêu cầu trả hàng cho đơn " + hoaDon.getMaHoaDon()
+                        + " đã được duyệt. Vui lòng tạo vận đơn hoàn hàng.",
+                "/don-hang",
+                hoaDon.getId(),
+                hoaDon.getMaHoaDon());
         return toResponse(saved);
     }
 
@@ -260,6 +269,16 @@ public class ReturnRequestService {
         ghiNhatKy(yc.getIdHoaDon(), "TRA_HANG_TU_CHOI",
                 "Từ chối yêu cầu trả hàng" + (lyDo != null && !lyDo.isBlank() ? ": " + lyDo : ""));
         orderMailService.guiYeuCauTraHangBiTuChoi(yc.getIdHoaDon(), lyDo);
+        HoaDon hoaDonTuChoi = yc.getIdHoaDon();
+        thongBaoService.taoThongBaoKhach(
+                idKhachHangCua(hoaDonTuChoi),
+                LoaiThongBao.TRA_HANG_BI_TU_CHOI,
+                "Yêu cầu trả hàng bị từ chối",
+                "Yêu cầu trả hàng cho đơn " + hoaDonTuChoi.getMaHoaDon() + " đã bị từ chối"
+                        + (lyDo != null && !lyDo.isBlank() ? ": " + lyDo : "."),
+                "/don-hang",
+                hoaDonTuChoi.getId(),
+                hoaDonTuChoi.getMaHoaDon());
         return toResponse(saved);
     }
 
@@ -664,6 +683,10 @@ public class ReturnRequestService {
         lichSu.setGhiChu(ghiChu != null && ghiChu.length() > 255 ? ghiChu.substring(0, 255) : ghiChu);
         lichSu.setThoiGian(LocalDateTime.now());
         lichSuDonHangRepository.save(lichSu);
+    }
+
+    private static Integer idKhachHangCua(HoaDon hoaDon) {
+        return hoaDon != null && hoaDon.getIdKhachHang() != null ? hoaDon.getIdKhachHang().getId() : null;
     }
 
     private static String orElse(String value, String fallback) {

@@ -39,6 +39,16 @@ const selectedPayment = ref('COD')
 const orderResult = ref(null)
 const paymentCallback = ref(null)
 
+function newIdempotencyKey() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+// Ổn định trong suốt một lần đặt hàng: double-click/retry gửi cùng key -> backend trả lại đúng đơn.
+const idempotencyKey = ref(newIdempotencyKey())
+
 const savedAddresses = ref([])
 const selectedAddressId = ref(null)
 const showRecipientModal = ref(false)
@@ -81,7 +91,7 @@ const paymentMethods = [
     code: 'VNPAY',
     name: 'VNPay',
     icon: 'solar:card-transfer-linear',
-    description: 'Chuyển đến VNPay để thanh toán. Đơn chỉ được tạo khi thanh toán thành công.',
+    description: 'Chuyển đến VNPay để thanh toán. Đơn được giữ tạm và chỉ xác nhận sau khi thanh toán thành công; nếu thất bại hoặc quá hạn, đơn sẽ tự hủy và hoàn tồn kho.',
   },
 ]
 
@@ -449,6 +459,8 @@ function parsePaymentCallback() {
 
   if (paymentCallback.value.success) {
     void syncAfterCheckout().catch(() => {})
+    // Thanh toán VNPAY xong -> xoay key cho lần đặt kế tiếp.
+    idempotencyKey.value = newIdempotencyKey()
     toast('Thanh toán thành công')
   } else {
     // Thanh toán hủy/thất bại: đơn đã xóa phía server, giỏ vẫn nguyên — sync lại UI.
@@ -487,6 +499,7 @@ async function submitCheckout() {
       idsChiTietGioHang: purchasedIds,
       maPhuongThucThanhToan: selectedPayment.value,
       maPhieuGiamGia: form.maPhieuGiamGia.trim() || null,
+      idempotencyKey: idempotencyKey.value,
       diaChiGiao,
       ghiChu: compactText(noteParts.join(' | ')),
       tenNguoiNhan: form.hoTen.trim(),
@@ -508,6 +521,8 @@ async function submitCheckout() {
     }
 
     await syncAfterCheckout(purchasedIds)
+    // Đơn đã tạo xong -> xoay key để lần đặt sau là đơn mới.
+    idempotencyKey.value = newIdempotencyKey()
     toast('Đặt hàng thành công')
   } catch (error) {
     toast(typeof error === 'string' ? error : 'Không thể đặt hàng, vui lòng thử lại')

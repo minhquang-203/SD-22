@@ -153,6 +153,8 @@ public interface HoaDonRepository extends JpaRepository<HoaDon, Integer> {
 
     Optional<HoaDon> findByIdAndIdKhachHang_Id(Integer id, Integer idKhachHang);
 
+    Optional<HoaDon> findByIdempotencyKeyAndIdKhachHang_Id(String idempotencyKey, Integer idKhachHang);
+
     Optional<HoaDon> findByIdAndIdKhachHang_IdAndLoaiDon(Integer id, Integer idKhachHang, String loaiDon);
 
     List<HoaDon> findByMaVanDonGhnNotNullAndTrangThaiNotIn(java.util.Collection<TrangThaiDonHang> trangThaiKetThuc);
