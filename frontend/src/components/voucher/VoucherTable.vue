@@ -10,24 +10,25 @@
               @change="chonTatCa"
             />
           </th>
+          <th style="width: 48px; text-align: center">STT</th>
           <th>Mã phiếu</th>
           <th>Tên chương trình</th>
           <th>Loại giảm giá</th>
           <th>Mức giảm</th>
           <th>Hiệu lực</th>
-          <th>Số lượng</th>
+          <th>Đã dùng / Tổng</th>
           <th>Trạng thái</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
         <tr v-if="items.length === 0">
-          <td colspan="9" class="trang-thai-trong">
+          <td colspan="10" class="trang-thai-trong">
             <i class="bi bi-inbox"></i>
             <span>Không có phiếu nào</span>
           </td>
         </tr>
-        <tr v-for="phieu in items" :key="phieu.id">
+        <tr v-for="(phieu, idx) in items" :key="phieu.id">
           <td>
             <input
               type="checkbox"
@@ -36,6 +37,9 @@
               :checked="selected.includes(phieu.id)"
               @change="toggleSelect(phieu.id, $event)"
             />
+          </td>
+          <td style="text-align: center; color: rgba(30, 21, 16, 0.55)">
+            {{ startIndex + idx + 1 }}
           </td>
           <td>
             <span class="coupon-code">{{ phieu.ma }}</span>
@@ -67,13 +71,12 @@
             </div>
           </td>
           <td>
-            <div style="font-size: 12px; margin-bottom: 5px">
-              {{
-                phieu.soLuong != null ? phieu.soLuong.toLocaleString("vi") : "∞"
-              }}
+            <div style="font-size: 13px; font-weight: 500">
+              {{ soLuongDaDung(phieu).toLocaleString("vi") }} /
+              {{ hienThiTong(phieu) }}
             </div>
-            <div class="progress-mini">
-              <div class="progress-mini-bar" style="width: 50%"></div>
+            <div style="font-size: 11px; color: rgba(30, 21, 16, 0.4)">
+              Còn lại {{ hienThiConLai(phieu) }}
             </div>
           </td>
           <td>
@@ -128,6 +131,7 @@ const props = defineProps({
   items: { type: Array, required: true, default: () => [] },
   selected: { type: Array, default: () => [] },
   processingId: { type: Number, default: null },
+  startIndex: { type: Number, default: 0 },
 });
 
 const emit = defineEmits(["sua", "dung", "kich-hoat", "xoa", "chon-tat-ca"]);
@@ -144,6 +148,22 @@ const toggleSelect = (id, e) => {
 };
 
 // ====================== HELPER FUNCTIONS ======================
+const soLuongDaDung = (phieu) => Number(phieu.daDung ?? 0);
+
+const soLuongConLai = (phieu) =>
+  phieu.soLuong != null ? Number(phieu.soLuong) : null;
+
+const hienThiConLai = (phieu) => {
+  const con = soLuongConLai(phieu);
+  return con != null ? con.toLocaleString("vi") : "∞";
+};
+
+const hienThiTong = (phieu) => {
+  const con = soLuongConLai(phieu);
+  if (con == null) return "∞";
+  return (soLuongDaDung(phieu) + con).toLocaleString("vi");
+};
+
 const formatTien = (so) => {
   if (!so && so !== 0) return "—";
   return new Intl.NumberFormat("vi-VN", {

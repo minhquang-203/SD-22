@@ -9,7 +9,7 @@ export function getAllVoucher(page = 1, size = 10) {
   });
 }
 
-export function searchVoucher(keyword, timeStatus, loai, page, size) {
+export function searchVoucher(keyword, timeStatus, loai, page, size, sortBy, direction) {
   return request.get("/vouchers/search", {
     params: {
       keyword,
@@ -17,6 +17,8 @@ export function searchVoucher(keyword, timeStatus, loai, page, size) {
       loai,
       page,
       size,
+      sortBy,
+      direction,
     },
   });
 }

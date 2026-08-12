@@ -59,20 +59,42 @@ function lineStatus(line) {
   if (total < need) return { text: `Thiếu ${need - total}`, tone: 'partial' }
   if (total > need) return { text: `Vượt ${total - need}`, tone: 'missing' }
 
-  // Kiểm tra tồn từng lô (gộp nếu chọn trùng)
-  const used = {}
   for (const row of line.lotRows || []) {
     if (row.idLoHang == null) continue
-    used[row.idLoHang] = (used[row.idLoHang] || 0) + (Number(row.soLuong) || 0)
-  }
-  for (const [id, qty] of Object.entries(used)) {
-    const lot = findLot(line, Number(id))
+    const qty = Number(row.soLuong) || 0
+    const lot = findLot(line, row.idLoHang)
     const max = Number(lot?.soLuongCoTheChon) || 0
     if (qty > max) {
-      return { text: `Lô ${(lot?.soLo) || id} vượt tồn`, tone: 'missing' }
+      return { text: `Lô ${(lot?.soLo) || row.idLoHang} vượt tồn`, tone: 'missing' }
     }
   }
   return { text: 'Đủ', tone: 'ok' }
+}
+
+/** Lô còn chọn được cho 1 dòng: giữ lô đang chọn của chính dòng đó, loại lô đã dùng ở dòng khác. */
+function availableLotsForRow(line, rowIndex) {
+  const usedByOthers = new Set()
+  ;(line.lotRows || []).forEach((row, idx) => {
+    if (idx === rowIndex) return
+    if (row.idLoHang != null) usedByOthers.add(Number(row.idLoHang))
+  })
+  return (line.loCoTheChon || []).filter((lot) => {
+    if (lot?.id == null) return false
+    return !usedByOthers.has(Number(lot.id))
+  })
+}
+
+function unusedLotCount(line) {
+  const used = new Set(
+    (line.lotRows || [])
+      .map((row) => (row.idLoHang != null ? Number(row.idLoHang) : null))
+      .filter((id) => id != null),
+  )
+  return (line.loCoTheChon || []).filter((lot) => lot?.id != null && !used.has(Number(lot.id))).length
+}
+
+function canAddLotRow(line) {
+  return unusedLotCount(line) > 0
 }
 
 function lotMax(line, row) {
@@ -110,6 +132,7 @@ function setRowQty(line, row, raw) {
 }
 
 function addLotRow(line) {
+  if (!canAddLotRow(line)) return
   line.lotRows.push({ idLoHang: null, soLuong: 0 })
   line.expanded = true
 }
@@ -170,22 +193,15 @@ async function submit() {
   if (!canSubmit.value || !props.orderId) return
   submitting.value = true
   try {
-    const dongHang = lines.value.map((line) => {
-      const merged = {}
-      for (const row of line.lotRows || []) {
-        if (row.idLoHang == null) continue
-        const qty = Number(row.soLuong) || 0
-        if (qty <= 0) continue
-        merged[row.idLoHang] = (merged[row.idLoHang] || 0) + qty
-      }
-      return {
-        idHoaDonChiTiet: line.idHoaDonChiTiet,
-        phanBoLo: Object.entries(merged).map(([idLoHang, soLuong]) => ({
-          idLoHang: Number(idLoHang),
-          soLuong,
+    const dongHang = lines.value.map((line) => ({
+      idHoaDonChiTiet: line.idHoaDonChiTiet,
+      phanBoLo: (line.lotRows || [])
+        .filter((row) => row.idLoHang != null && (Number(row.soLuong) || 0) > 0)
+        .map((row) => ({
+          idLoHang: Number(row.idLoHang),
+          soLuong: Number(row.soLuong) || 0,
         })),
-      }
-    })
+    }))
     await xacNhanGanLo(props.orderId, {
       dongHang,
       ghiChu: 'Admin xác nhận đơn và gán lô',
@@ -294,7 +310,7 @@ watch(
                         >
                           <option value="">-- Chọn lô --</option>
                           <option
-                            v-for="lot in line.loCoTheChon"
+                            v-for="lot in availableLotsForRow(line, rowIdx)"
                             :key="lot.id"
                             :value="lot.id"
                           >
@@ -324,7 +340,8 @@ watch(
                       <button
                         type="button"
                         class="mpl-btn-add"
-                        :disabled="submitting || !line.loCoTheChon.length"
+                        :disabled="submitting || !canAddLotRow(line)"
+                        :title="canAddLotRow(line) ? 'Thêm lô khác' : 'Đã chọn hết các lô khả dụng'"
                         @click="addLotRow(line)"
                       >
                         + Thêm lô

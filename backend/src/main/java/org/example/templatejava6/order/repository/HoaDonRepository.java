@@ -174,6 +174,14 @@ public interface HoaDonRepository extends JpaRepository<HoaDon, Integer> {
     @Query("SELECT COUNT(h) FROM HoaDon h WHERE h.idPhieuGiamGia IS NOT NULL")
     long countVoucherUsage();
 
+    @Query("""
+            SELECT h.idPhieuGiamGia.id AS voucherId, COUNT(h) AS soLan
+            FROM HoaDon h
+            WHERE h.idPhieuGiamGia.id IN :ids
+            GROUP BY h.idPhieuGiamGia.id
+            """)
+    List<Object[]> countUsageByVoucherIds(@Param("ids") List<Integer> ids);
+
     @Query("SELECT COALESCE(SUM(h.tienGiamGia), 0) FROM HoaDon h WHERE h.idPhieuGiamGia IS NOT NULL")
     BigDecimal sumVoucherSavings();
 }

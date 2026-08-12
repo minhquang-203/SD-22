@@ -22,104 +22,53 @@
 
       <!-- CAMPAIGN HEADER -->
       <div class="sd-campaign-header">
-        <div class="sd-campaign-header__deco-1"></div>
-        <div class="sd-campaign-header__deco-2"></div>
-
-        <div class="sd-campaign-header__inner">
-          <div class="sd-campaign-header__main">
-            <div class="sd-campaign-header__badges">
-              <span class="sd-badge" :class="statusBadgeClass">{{ sale.timeStatusLabel }}</span>
-              <span class="sd-campaign-code">{{ sale.ma }}</span>
-            </div>
-            <div class="sd-campaign-title-row">
-              <h1 class="sd-campaign-title">{{ sale.ten }}</h1>
-              <span class="sd-discount-chip">−{{ sale.phanTramGiam }}%</span>
-            </div>
-            <p class="sd-campaign-desc">
-              {{ formatDate(sale.ngayBatDau) }} — {{ formatDate(sale.ngayKetThuc) }}
-              <span class="sd-campaign-desc__dot">·</span>
-              {{ products.length }} sản phẩm
-            </p>
-
-            <div class="sd-timeline">
-              <div class="sd-timeline__labels">
-                <span>{{ formatDate(sale.ngayBatDau) }}</span>
-                <span>{{ timeRemainingLabel }}</span>
-                <span>{{ formatDate(sale.ngayKetThuc) }}</span>
-              </div>
-              <div class="sd-timeline__track">
-                <div class="sd-timeline__fill" :style="{ width: progressPercent + '%' }"></div>
-              </div>
-              <div class="sd-timeline__footer">
-                <span>Bắt đầu</span>
-                <span class="highlight">● {{ progressPercent }}% thời gian</span>
-                <span>Kết thúc</span>
-              </div>
-            </div>
+        <div class="sd-campaign-header__top">
+          <div class="sd-campaign-header__meta">
+            <span class="sd-badge" :class="statusBadgeClass">{{ sale.timeStatusLabel }}</span>
+            <span class="sd-campaign-code">{{ sale.ma }}</span>
           </div>
-
-          <div class="sd-stats">
-            <div v-for="stat in campaignStats" :key="stat.label" class="sd-stat-box">
-              <div class="sd-stat-box__value" :class="stat.colorClass">{{ stat.value }}</div>
-              <div class="sd-stat-box__label">{{ stat.label }}</div>
-            </div>
+          <div class="sd-campaign-actions">
+            <button class="sd-btn-ghost" @click="router.push('/admin/sale')">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+              Quay lại
+            </button>
+            <button class="sd-btn-primary" @click="showModal = true">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              Thêm sản phẩm
+            </button>
           </div>
         </div>
 
-        <div class="sd-campaign-actions">
-          <button class="sd-btn-primary" @click="showModal = true">
-            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            Thêm sản phẩm
-          </button>
-          <button class="sd-btn-ghost" @click="router.push('/admin/sale')">
-            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-            Quay lại
-          </button>
+        <div class="sd-campaign-title-row">
+          <h1 class="sd-campaign-title">{{ sale.ten }}</h1>
+          <span class="sd-discount-chip">−{{ sale.phanTramGiam }}%</span>
+        </div>
+
+        <div class="sd-campaign-facts">
+          <span class="sd-fact">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3M3 11h18M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z"/></svg>
+            {{ formatDate(sale.ngayBatDau) }} — {{ formatDate(sale.ngayKetThuc) }}
+          </span>
+          <span class="sd-fact">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+            {{ products.length }} sản phẩm áp dụng
+          </span>
+          <span class="sd-fact sd-fact--accent">{{ timeRemainingLabel }}</span>
+        </div>
+
+        <div class="sd-timeline">
+          <div class="sd-timeline__track">
+            <div class="sd-timeline__fill" :style="{ width: progressPercent + '%' }"></div>
+          </div>
+          <div class="sd-timeline__footer">
+            <span>{{ formatDate(sale.ngayBatDau) }}</span>
+            <span class="highlight">{{ progressPercent }}% thời gian</span>
+            <span>{{ formatDate(sale.ngayKetThuc) }}</span>
+          </div>
         </div>
       </div>
 
       <div class="sd-layout">
-
-        <!-- SIDEBAR -->
-        <aside class="sd-sidebar">
-
-          <div class="sd-panel sd-panel--summary">
-            <h3 class="sd-panel__title">Hiệu suất</h3>
-            <div class="sd-performance">
-              <div v-for="metric in performanceMetrics" :key="metric.label" class="sd-performance__item">
-                <div class="sd-performance__head">
-                  <span class="sd-performance__label">{{ metric.label }}</span>
-                  <span class="sd-performance__value" :class="metric.valueClass">{{ metric.display }}</span>
-                </div>
-                <div class="sd-performance__track">
-                  <div
-                    class="sd-performance__fill"
-                    :class="metric.barClass"
-                    :style="{ width: metric.percent + '%' }"
-                  ></div>
-                </div>
-              </div>
-            </div>
-            <div class="sd-performance__footer">
-              <div class="sd-performance__footer-label">Tổng doanh thu</div>
-              <div class="sd-performance__footer-value">{{ formatCurrency(performanceStats.doanhThu) }}</div>
-              <div v-if="performanceStats.tangTruong != null" class="sd-performance__growth">
-                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-                </svg>
-                +{{ performanceStats.tangTruong }}% so với đợt trước
-              </div>
-            </div>
-          </div>
-
-          <div class="sd-panel sd-panel--compact">
-            <h3 class="sd-panel__title">Lưu ý</h3>
-            <ul class="sd-conditions">
-              <li>Có thể dùng chung với phiếu giảm giá (stack)</li>
-              <li>Giá sau giảm được tính tự động theo đợt</li>
-            </ul>
-          </div>
-        </aside>
 
         <!-- MAIN -->
         <main class="sd-main">
@@ -161,12 +110,12 @@
               class="sd-product-card"
               :style="{ animationDelay: (i * 0.05) + 's' }"
             >
-              <div class="sd-product-card__image" :class="imageVariantClass(i)">
-                <div class="sd-product-card__placeholder">
-                  <div class="sd-product-card__avatar">{{ productInitials(product.name) }}</div>
-                </div>
+              <div class="sd-product-card__image">
+                <img :src="productImageUrl(product.anhUrl)" :alt="product.name" loading="lazy" />
                 <div class="sd-product-card__overlay">
-                  <button class="sd-overlay-btn sd-overlay-btn--danger" @click="removeProduct(product)">Xóa</button>
+                  <button class="sd-overlay-btn sd-overlay-btn--danger" @click="removeProduct(product)">
+                    <i class="ti ti-trash"></i> Xóa
+                  </button>
                 </div>
               </div>
               <div class="sd-product-card__body">
@@ -197,7 +146,9 @@
               :style="{ animationDelay: (i * 0.04) + 's' }"
             >
               <div class="sd-product-list-item__inner">
-                <div class="sd-product-list-item__thumb">{{ productInitials(product.name) }}</div>
+                <div class="sd-product-list-item__thumb">
+                  <img :src="productImageUrl(product.anhUrl)" :alt="product.name" loading="lazy" />
+                </div>
                 <div class="sd-product-list-item__info">
                   <div class="sd-product-card__sku-line">{{ product.sku }}</div>
                   <div class="sd-product-card__name">{{ product.name }}</div>
@@ -244,8 +195,16 @@
               <div v-if="loadingAvailable" class="sd-product-picker__empty">Đang tìm...</div>
               <div v-else-if="!availableProducts.length" class="sd-product-picker__empty">Không tìm thấy sản phẩm phù hợp</div>
               <div v-else class="sd-product-picker__list">
-                <label v-for="ap in availableProducts" :key="ap.idChiTietSanPham" class="sd-product-picker__item">
+                <label
+                  v-for="ap in availableProducts"
+                  :key="ap.idChiTietSanPham"
+                  class="sd-product-picker__item"
+                  :class="{ 'is-selected': selectedIds.includes(ap.idChiTietSanPham) }"
+                >
                   <input type="checkbox" :value="ap.idChiTietSanPham" v-model="selectedIds" />
+                  <div class="sd-product-picker__item-thumb">
+                    <img :src="productImageUrl(ap.anhUrl)" :alt="ap.tenSanPham" loading="lazy" />
+                  </div>
                   <div class="sd-product-picker__item-info">
                     <div class="sd-product-picker__item-name">{{ ap.tenSanPham }}</div>
                     <div class="sd-product-picker__item-meta">SKU: {{ ap.sku }} · {{ ap.tenMauSac || '—' }}</div>
@@ -276,6 +235,7 @@ import { useRoute, useRouter } from 'vue-router'
 import '@/styles/saleDetailCss.css'
 import { getSaleById, getSaleProducts, addSaleProduct, deleteSaleProduct } from '@/api/saleApi'
 import { getSanPhamBan } from '@/api/banHangApi'
+import { productImageUrl } from '@/utils/productImage'
 import { formatCurrency, formatDate } from '@/utils/format'
 import { confirm } from '@/composables/useConfirm'
 import { toast } from '@/composables/useToast'
@@ -333,57 +293,6 @@ const timeRemainingLabel = computed(() => {
   return days > 0 ? `Còn ${days} ngày` : 'Kết thúc hôm nay'
 })
 
-const performanceStats = computed(() => {
-  const count = products.value.length
-  const mucTieu = Math.max(count * 20, count > 0 ? 100 : 0)
-  const daBan = 0
-  const luotXem = 0
-  const chuyenDoi = 0
-  const doanhThu = 0
-
-  return {
-    daBan,
-    mucTieu,
-    luotXem,
-    chuyenDoi,
-    doanhThu,
-    tangTruong: null,
-    daBanPercent: mucTieu > 0 ? Math.min(100, Math.round((daBan / mucTieu) * 100)) : 0,
-    luotXemPercent: 0,
-    chuyenDoiPercent: 0,
-  }
-})
-
-const performanceMetrics = computed(() => [
-  {
-    label: 'Đã bán',
-    display: `${performanceStats.value.daBan} / ${performanceStats.value.mucTieu}`,
-    percent: performanceStats.value.daBanPercent,
-    valueClass: '',
-    barClass: 'sd-performance__fill--navy',
-  },
-  {
-    label: 'Lượt xem',
-    display: performanceStats.value.luotXem.toLocaleString('vi-VN'),
-    percent: performanceStats.value.luotXemPercent,
-    valueClass: '',
-    barClass: 'sd-performance__fill--gold',
-  },
-  {
-    label: 'Chuyển đổi',
-    display: `${performanceStats.value.chuyenDoi}%`,
-    percent: performanceStats.value.chuyenDoiPercent,
-    valueClass: 'sd-performance__value--coral',
-    barClass: 'sd-performance__fill--coral',
-  },
-])
-
-const campaignStats = computed(() => [
-  { label: 'Sản phẩm', value: String(products.value.length), colorClass: 'sd-stat-box__value--gold' },
-  { label: 'Giảm tối đa', value: `${sale.value?.phanTramGiam ?? 0}%`, colorClass: 'sd-stat-box__value--light' },
-  { label: 'Doanh thu', value: formatShortCurrency(performanceStats.value.doanhThu), colorClass: 'sd-stat-box__value--coral' },
-])
-
 const filteredProducts = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   if (!q) return products.value
@@ -391,25 +300,6 @@ const filteredProducts = computed(() => {
     p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q),
   )
 })
-
-function imageVariantClass(index) {
-  const variants = ['', 'sd-product-card__image--alt1', 'sd-product-card__image--alt2', 'sd-product-card__image--alt3']
-  return variants[index % variants.length]
-}
-
-function productInitials(name) {
-  if (!name) return '?'
-  const words = name.trim().split(/\s+/).filter(Boolean)
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase()
-  return (words[0][0] + words[words.length - 1][0]).toUpperCase()
-}
-
-function formatShortCurrency(value) {
-  const num = Number(value || 0)
-  if (num >= 1_000_000) return `₫${(num / 1_000_000).toFixed(1)}M`
-  if (num >= 1_000) return `₫${Math.round(num / 1_000)}K`
-  return formatCurrency(num)
-}
 
 function mapProduct(item) {
   const priceOld = Number(item.giaBan || 0)
@@ -420,6 +310,7 @@ function mapProduct(item) {
     idChiTietSanPham: item.idChiTietSanPham,
     sku: item.sku || '—',
     name: item.tenSanPham || 'Không rõ tên',
+    anhUrl: item.anhUrl || '',
     priceOld,
     priceNew,
   }

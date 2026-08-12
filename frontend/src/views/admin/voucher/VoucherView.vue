@@ -35,6 +35,18 @@ const tuKhoa = ref("");
 const locTrangThai = ref("");
 const locLoai = ref("");
 
+/* sắp xếp */
+const sapXep = ref("");
+const sortOptions = [
+  { value: "newest", label: "Mới nhất", icon: "tabler:history", sortBy: "ngayBatDau", direction: "desc" },
+  { value: "endingSoon", label: "Sắp hết hạn", icon: "tabler:hourglass", sortBy: "ngayKetThuc", direction: "asc" },
+  { value: "valueDesc", label: "Mức giảm: cao → thấp", icon: "tabler:sort-descending", sortBy: "giaTri", direction: "desc" },
+  { value: "valueAsc", label: "Mức giảm: thấp → cao", icon: "tabler:sort-ascending", sortBy: "giaTri", direction: "asc" },
+  { value: "quantityDesc", label: "Số lượng: nhiều → ít", icon: "tabler:sort-descending-numbers", sortBy: "soLuong", direction: "desc" },
+  { value: "quantityAsc", label: "Số lượng: ít → nhiều", icon: "tabler:sort-ascending-numbers", sortBy: "soLuong", direction: "asc" },
+  { value: "nameAsc", label: "Tên A → Z", icon: "tabler:sort-ascending-letters", sortBy: "ten", direction: "asc" },
+];
+
 /* pagination */
 const trangHienTai = ref(1);
 const soDong = 10;
@@ -116,12 +128,16 @@ const loadData = async (page = 1, { silent = false } = {}) => {
         : locTrangThai.value.toUpperCase()
       : null;
 
+    const sortChon = sortOptions.find((o) => o.value === sapXep.value);
+
     const res = await searchVoucher(
       tuKhoa.value || null,
       statusParam,
       locLoai.value || null,
       page,
       soDong,
+      sortChon?.sortBy || null,
+      sortChon?.direction || null,
     );
 
     danhSach.value = res.data.content || [];
@@ -143,7 +159,7 @@ const loadData = async (page = 1, { silent = false } = {}) => {
 /* ================= INIT ================= */
 onMounted(() => loadData(1));
 
-watch([tuKhoa, locTrangThai, locLoai], () => {
+watch([tuKhoa, locTrangThai, locLoai, sapXep], () => {
   loadData(1);
 });
 
@@ -287,7 +303,6 @@ const openEdit = (voucher) => {
 };
 
 /* ================= PLACEHOLDER ================= */
-const handleSort = () => console.log("sort");
 const handleExport = () => console.log("export");
 </script>
 
@@ -329,7 +344,8 @@ const handleExport = () => console.log("export");
       v-model:search="tuKhoa"
       v-model:status="locTrangThai"
       v-model:type="locLoai"
-      @sort="handleSort"
+      v-model:sort="sapXep"
+      :sort-options="sortOptions"
       @export="handleExport"
     />
 
@@ -343,6 +359,7 @@ const handleExport = () => console.log("export");
           :items="danhSach"
           v-model:selected="daDuocChon"
           :processing-id="dangXuLyId"
+          :start-index="voucherPage.number * soDong"
           @sua="openEdit"
           @dung="xacNhanDung"
           @kich-hoat="xacNhanKichHoat"

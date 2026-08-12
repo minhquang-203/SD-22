@@ -19,6 +19,7 @@ public class ChiTietDotGiamGiaResponse {
     private Integer idChiTietSanPham;
     private String sku;
     private String tenSanPham;
+    private String anhUrl;
     private BigDecimal giaBan;
     private BigDecimal giaSauGiam;
 

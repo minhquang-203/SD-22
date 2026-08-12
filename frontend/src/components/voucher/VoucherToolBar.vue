@@ -1,15 +1,19 @@
 <script setup>
+import SortDropdown from "@/components/common/SortDropdown.vue";
+
 defineProps({
   search: String,
   status: String,
   type: String,
+  sort: { type: String, default: "" },
+  sortOptions: { type: Array, default: () => [] },
 });
 
 const emit = defineEmits([
   "update:search",
   "update:status",
   "update:type",
-  "sort",
+  "update:sort",
   "export",
 ]);
 </script>
@@ -50,9 +54,12 @@ const emit = defineEmits([
       <option value="FREE_SHIP">Miễn phí ship</option>
     </select>
 
-    <button class="btn-outline-sol ms-auto" @click="emit('sort')">
-      <i class="bi bi-arrow-down-up"></i> Sắp xếp
-    </button>
+    <SortDropdown
+      class="ms-auto"
+      :model-value="sort"
+      :options="sortOptions"
+      @update:model-value="emit('update:sort', $event)"
+    />
 
     <button class="btn-outline-sol" @click="emit('export')">
       <i class="bi bi-download"></i> Xuất CSV
