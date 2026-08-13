@@ -4,7 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { createOnlineCheckout, tinhGiaOnline } from '@/api/onlineCheckout'
 import { fetchDiaChiToi, fetchKhachToi } from '@/api/khachHangApi'
-import { calcShippingFee, fetchDistricts, fetchProvinces, fetchWards } from '@/api/shipping'
+import { calcShippingFee, fetchProvinces, fetchWards, isNewWardCode } from '@/api/shipping'
 import { useAuth } from '@/composables/useAuth'
 import { useCart, variantLabel } from '@/composables/useCart'
 import { toast } from '@/composables/useToast'
@@ -39,6 +39,16 @@ const selectedPayment = ref('COD')
 const orderResult = ref(null)
 const paymentCallback = ref(null)
 
+function newIdempotencyKey() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+// Ổn định trong suốt một lần đặt hàng: double-click/retry gửi cùng key -> backend trả lại đúng đơn.
+const idempotencyKey = ref(newIdempotencyKey())
+
 const savedAddresses = ref([])
 const selectedAddressId = ref(null)
 const showRecipientModal = ref(false)
@@ -50,10 +60,8 @@ const form = reactive({
   soDienThoai: '',
   email: '',
   provinceId: null,
-  districtId: null,
   wardCode: '',
   tinhThanh: '',
-  quanHuyen: '',
   phuongXa: '',
   diaChiCuThe: '',
   maPhieuGiamGia: '',
@@ -61,14 +69,13 @@ const form = reactive({
 })
 
 const provinces = ref([])
-const districts = ref([])
 const wards = ref([])
-const addressLoading = reactive({ provinces: false, districts: false, wards: false })
+const addressLoading = reactive({ provinces: false, wards: false })
 
 const ghnFee = ref(null)
 const feeLoading = ref(false)
 const feeNotice = ref('')
-const fieldErrors = reactive({ soDienThoai: '' })
+const fieldErrors = reactive({ soDienThoai: '', diaChiCuThe: '' })
 const showVoucherModal = ref(false)
 const voucherDiscount = ref(0)
 const voucherPricingLoading = ref(false)
@@ -84,7 +91,7 @@ const paymentMethods = [
     code: 'VNPAY',
     name: 'VNPay',
     icon: 'solar:card-transfer-linear',
-    description: 'Chuyển đến VNPay để thanh toán. Đơn chỉ được tạo khi thanh toán thành công.',
+    description: 'Chuyển đến VNPay để thanh toán. Đơn được giữ tạm và chỉ xác nhận sau khi thanh toán thành công; nếu thất bại hoặc quá hạn, đơn sẽ tự hủy và hoàn tồn kho.',
   },
 ]
 
@@ -132,8 +139,8 @@ const hasSelectedRecipient = computed(() => {
   return Boolean(
     form.hoTen.trim() &&
       form.soDienThoai.trim() &&
-      form.districtId &&
-      form.wardCode &&
+      form.provinceId &&
+      isNewWardCode(form.wardCode) &&
       buildAddress(),
   )
 })
@@ -156,10 +163,14 @@ function compactText(value, maxLength = 250) {
 }
 
 function buildAddress() {
-  return [form.diaChiCuThe, form.phuongXa, form.quanHuyen, form.tinhThanh]
+  return [form.diaChiCuThe, form.phuongXa, form.tinhThanh]
     .map((part) => String(part || '').trim())
     .filter(Boolean)
     .join(', ')
+}
+
+function isUsableAddress(address) {
+  return Boolean(address?.provinceId && isNewWardCode(address?.wardCode))
 }
 
 async function applySavedAddress(address) {
@@ -168,36 +179,24 @@ async function applySavedAddress(address) {
   form.hoTen = address.hoTenNguoiNhan || ''
   form.soDienThoai = address.soDienThoai || ''
   form.provinceId = address.provinceId ?? null
-  form.districtId = address.districtId ?? null
   form.wardCode = address.wardCode || ''
   form.tinhThanh = address.tinhThanh || ''
-  form.quanHuyen = address.quanHuyen || ''
   form.phuongXa = address.phuongXa || ''
   form.diaChiCuThe = address.diaChiChiTiet || ''
   fieldErrors.soDienThoai = ''
 
-  if (form.provinceId) {
-    addressLoading.districts = true
-    try {
-      const res = await fetchDistricts(form.provinceId)
-      districts.value = res.data || []
-    } catch {
-      districts.value = []
-    } finally {
-      addressLoading.districts = false
-    }
-  }
-
-  if (form.districtId) {
+  if (form.provinceId && isUsableAddress(address)) {
     addressLoading.wards = true
     try {
-      const res = await fetchWards(form.districtId)
+      const res = await fetchWards(form.provinceId)
       wards.value = res.data || []
     } catch {
       wards.value = []
     } finally {
       addressLoading.wards = false
     }
+  } else {
+    wards.value = []
   }
 
   await recalcShippingFee()
@@ -216,7 +215,7 @@ async function loadSavedAddresses(autoSelect = true) {
       || savedAddresses.value[0]
 
     if (selected) {
-      if (!selected.districtId || !selected.wardCode) {
+      if (!isUsableAddress(selected)) {
         selectedAddressId.value = selected.id ?? null
         openRecipientModal('form', selected)
         return
@@ -288,42 +287,18 @@ async function loadProvinces() {
 }
 
 async function onProvinceChange() {
-  form.districtId = null
   form.wardCode = ''
-  districts.value = []
   wards.value = []
   ghnFee.value = null
   feeNotice.value = ''
   const selected = provinces.value.find((p) => p.provinceId === form.provinceId)
   form.tinhThanh = selected?.provinceName || ''
-  form.quanHuyen = ''
   form.phuongXa = ''
   if (!form.provinceId) return
 
-  addressLoading.districts = true
-  try {
-    const res = await fetchDistricts(form.provinceId)
-    districts.value = res.data || []
-  } catch (error) {
-    toast(typeof error === 'string' ? error : 'Không tải được danh sách quận/huyện')
-  } finally {
-    addressLoading.districts = false
-  }
-}
-
-async function onDistrictChange() {
-  form.wardCode = ''
-  wards.value = []
-  ghnFee.value = null
-  feeNotice.value = ''
-  const selected = districts.value.find((d) => d.districtId === form.districtId)
-  form.quanHuyen = selected?.districtName || ''
-  form.phuongXa = ''
-  if (!form.districtId) return
-
   addressLoading.wards = true
   try {
-    const res = await fetchWards(form.districtId)
+    const res = await fetchWards(form.provinceId)
     wards.value = res.data || []
   } catch (error) {
     toast(typeof error === 'string' ? error : 'Không tải được danh sách phường/xã')
@@ -339,7 +314,7 @@ async function onWardChange() {
 }
 
 async function recalcShippingFee() {
-  if (!form.districtId || !form.wardCode) {
+  if (!isNewWardCode(form.wardCode) || !form.diaChiCuThe.trim()) {
     ghnFee.value = null
     feeNotice.value = ''
     return
@@ -347,7 +322,8 @@ async function recalcShippingFee() {
   feeLoading.value = true
   try {
     const res = await calcShippingFee({
-      toDistrictId: form.districtId,
+      toWardIdV2: Number(form.wardCode),
+      toAddressV2: form.diaChiCuThe.trim(),
       toWardCode: form.wardCode,
     })
     ghnFee.value = typeof res.data?.total === 'number' ? res.data.total : null
@@ -382,9 +358,11 @@ function validateCheckout() {
     return phoneError
   }
   if (!form.provinceId) return 'Vui lòng chọn tỉnh / thành phố'
-  if (!form.districtId) return 'Vui lòng chọn quận / huyện'
   if (!form.wardCode) return 'Vui lòng chọn phường / xã'
-  if (!form.diaChiCuThe.trim()) return 'Vui lòng nhập địa chỉ cụ thể'
+  if (!form.diaChiCuThe.trim()) {
+    fieldErrors.diaChiCuThe = 'Vui lòng nhập địa chỉ cụ thể'
+    return fieldErrors.diaChiCuThe
+  }
   if (!buildAddress()) return 'Vui lòng nhập địa chỉ giao hàng'
   if (!selectedItems.value.every((line) => line.idChiTietGioHang)) {
     return 'Giỏ hàng chưa đồng bộ. Vui lòng tải lại giỏ hàng rồi thử lại'
@@ -407,7 +385,8 @@ async function previewVoucherPricing(code = form.maPhieuGiamGia) {
     const res = await tinhGiaOnline({
       idsChiTietGioHang: selectedItems.value.map((line) => line.idChiTietGioHang),
       maPhieuGiamGia: normalized,
-      toDistrictId: form.districtId || undefined,
+      toWardIdV2: isNewWardCode(form.wardCode) ? Number(form.wardCode) : undefined,
+      toAddressV2: form.diaChiCuThe.trim() || undefined,
       toWardCode: form.wardCode || undefined,
     })
     voucherDiscount.value = Number(res.data?.tienGiamGia) || 0
@@ -441,12 +420,24 @@ function clearVoucher() {
 }
 
 watch(
-  [selectedSubtotal, () => form.districtId, () => form.wardCode],
+  [selectedSubtotal, () => form.wardCode, () => form.diaChiCuThe],
   () => {
     if (form.maPhieuGiamGia) {
       void previewVoucherPricing()
     } else {
       voucherDiscount.value = 0
+    }
+  },
+)
+
+watch(
+  () => form.diaChiCuThe,
+  () => {
+    if (form.diaChiCuThe.trim()) {
+      fieldErrors.diaChiCuThe = ''
+    }
+    if (isNewWardCode(form.wardCode)) {
+      void recalcShippingFee()
     }
   },
 )
@@ -468,6 +459,8 @@ function parsePaymentCallback() {
 
   if (paymentCallback.value.success) {
     void syncAfterCheckout().catch(() => {})
+    // Thanh toán VNPAY xong -> xoay key cho lần đặt kế tiếp.
+    idempotencyKey.value = newIdempotencyKey()
     toast('Thanh toán thành công')
   } else {
     // Thanh toán hủy/thất bại: đơn đã xóa phía server, giỏ vẫn nguyên — sync lại UI.
@@ -506,11 +499,15 @@ async function submitCheckout() {
       idsChiTietGioHang: purchasedIds,
       maPhuongThucThanhToan: selectedPayment.value,
       maPhieuGiamGia: form.maPhieuGiamGia.trim() || null,
+      idempotencyKey: idempotencyKey.value,
       diaChiGiao,
       ghiChu: compactText(noteParts.join(' | ')),
       tenNguoiNhan: form.hoTen.trim(),
       sdtNguoiNhan: form.soDienThoai.trim(),
-      toDistrictId: form.districtId,
+      toWardIdV2: Number(form.wardCode),
+      toAddressV2: form.diaChiCuThe.trim(),
+      toProvinceName: form.tinhThanh.trim(),
+      toWardName: form.phuongXa.trim(),
       toWardCode: form.wardCode,
     })
 
@@ -524,6 +521,8 @@ async function submitCheckout() {
     }
 
     await syncAfterCheckout(purchasedIds)
+    // Đơn đã tạo xong -> xoay key để lần đặt sau là đơn mới.
+    idempotencyKey.value = newIdempotencyKey()
     toast('Đặt hàng thành công')
   } catch (error) {
     toast(typeof error === 'string' ? error : 'Không thể đặt hàng, vui lòng thử lại')
@@ -747,30 +746,11 @@ onMounted(() => {
                   </select>
                 </div>
                 <div class="sf-checkout-field">
-                  <label for="checkout-district">Quận / Huyện</label>
-                  <select
-                    id="checkout-district"
-                    v-model="form.districtId"
-                    :disabled="!form.provinceId || addressLoading.districts"
-                    @change="onDistrictChange"
-                  >
-                    <option :value="null">
-                      {{ addressLoading.districts ? 'Đang tải...' : 'Chọn quận / huyện' }}
-                    </option>
-                    <option v-for="d in districts" :key="d.districtId" :value="d.districtId">
-                      {{ d.districtName }}
-                    </option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="sf-checkout-form-row">
-                <div class="sf-checkout-field">
                   <label for="checkout-ward">Phường / Xã</label>
                   <select
                     id="checkout-ward"
                     v-model="form.wardCode"
-                    :disabled="!form.districtId || addressLoading.wards"
+                    :disabled="!form.provinceId || addressLoading.wards"
                     @change="onWardChange"
                   >
                     <option value="">
@@ -781,9 +761,21 @@ onMounted(() => {
                     </option>
                   </select>
                 </div>
+              </div>
+
+              <div class="sf-checkout-form-row">
                 <div class="sf-checkout-field">
-                  <label for="checkout-address">Địa chỉ cụ thể</label>
-                  <input id="checkout-address" v-model="form.diaChiCuThe" type="text" autocomplete="street-address" placeholder="Số nhà, tên đường..." />
+                  <label for="checkout-address">Địa chỉ cụ thể <span class="sf-required">*</span></label>
+                  <input
+                    id="checkout-address"
+                    v-model="form.diaChiCuThe"
+                    type="text"
+                    autocomplete="street-address"
+                    placeholder="Số nhà, tên đường..."
+                    :class="{ 'is-invalid': fieldErrors.diaChiCuThe }"
+                    @blur="form.diaChiCuThe.trim() || (fieldErrors.diaChiCuThe = 'Vui lòng nhập địa chỉ cụ thể')"
+                  />
+                  <span v-if="fieldErrors.diaChiCuThe" class="sf-field-error">{{ fieldErrors.diaChiCuThe }}</span>
                 </div>
               </div>
 

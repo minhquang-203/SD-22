@@ -5,6 +5,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -20,4 +21,13 @@ public interface ThongBaoRepository extends JpaRepository<ThongBao, Integer> {
     @Modifying
     @Query("update ThongBao t set t.daDoc = true where t.daDoc = false and t.idKhachHang is null")
     int markAllAdminRead();
+
+    /** Thông báo gửi riêng cho một khách hàng. */
+    List<ThongBao> findByIdKhachHangOrderByThoiGianDescIdDesc(Integer idKhachHang, Pageable pageable);
+
+    long countByIdKhachHangAndDaDocFalse(Integer idKhachHang);
+
+    @Modifying
+    @Query("update ThongBao t set t.daDoc = true where t.daDoc = false and t.idKhachHang = :idKhachHang")
+    int markAllKhachRead(@Param("idKhachHang") Integer idKhachHang);
 }

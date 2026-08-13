@@ -121,6 +121,18 @@ export function subscribeCustomerOrders(handler) {
   )
 }
 
+export function subscribeCustomerNotifications(handler) {
+  const customerId = getCustomerId()
+  if (!customerId) {
+    return () => {}
+  }
+  return customerSession.subscribe(
+    `/topic/customers/${customerId}/notifications`,
+    handler,
+    getCustomerToken,
+  )
+}
+
 export function subscribeHoTroPhien(idPhien, handler, getToken) {
   if (!idPhien) return () => {}
   return (getToken === getAdminToken ? adminSession : customerSession).subscribe(

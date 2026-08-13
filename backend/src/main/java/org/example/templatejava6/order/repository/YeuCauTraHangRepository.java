@@ -19,5 +19,7 @@ public interface YeuCauTraHangRepository extends JpaRepository<YeuCauTraHang, In
 
     List<YeuCauTraHang> findByTrangThaiOrderByNgayTaoDesc(TrangThaiTraHang trangThai);
 
+    boolean existsByIdHoaDon_Id(Integer idHoaDon);
+
     boolean existsByIdHoaDon_IdAndTrangThaiNotIn(Integer idHoaDon, java.util.Collection<TrangThaiTraHang> trangThaiKetThuc);
 }

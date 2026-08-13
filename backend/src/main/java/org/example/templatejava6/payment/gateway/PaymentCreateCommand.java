@@ -14,4 +14,6 @@ public class PaymentCreateCommand {
     private String orderInfo;
     private BigDecimal amount;
     private String clientIp;
+    /** Số phút hiệu lực của phiên thanh toán tại cổng, đồng bộ với timeout hủy đơn nội bộ. */
+    private Integer expireMinutes;
 }

@@ -33,7 +33,30 @@ public class PhieuGiamGiaService {
     @Transactional(readOnly = true)
     public Page<PhieuGiamGiaResponse> getAll(Pageable pageable) {
         Page<PhieuGiamGia> phieuGiamGiaPage = phieuGiamGiaRepository.findByTrangThaiTrue(pageable);
-                return phieuGiamGiaPage.map(PhieuGiamGiaResponse::new);
+        Page<PhieuGiamGiaResponse> mapped = phieuGiamGiaPage.map(PhieuGiamGiaResponse::new);
+        attachUsage(mapped.getContent());
+        return mapped;
+    }
+
+    /** Gắn số lượt đã dùng cho từng phiếu dựa trên số hóa đơn đã áp dụng. */
+    private void attachUsage(java.util.List<PhieuGiamGiaResponse> items) {
+        if (items == null || items.isEmpty()) {
+            return;
+        }
+        java.util.List<Integer> ids = items.stream()
+                .map(PhieuGiamGiaResponse::getId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        if (ids.isEmpty()) {
+            return;
+        }
+        java.util.Map<Integer, Long> usageMap = new java.util.HashMap<>();
+        for (Object[] row : hoaDonRepository.countUsageByVoucherIds(ids)) {
+            if (row[0] != null) {
+                usageMap.put((Integer) row[0], ((Number) row[1]).longValue());
+            }
+        }
+        items.forEach(item -> item.setDaDung(usageMap.getOrDefault(item.getId(), 0L)));
     }
 
 
@@ -225,7 +248,9 @@ public class PhieuGiamGiaService {
         }
 
         Page<PhieuGiamGia> phieuGiamGiaList = phieuGiamGiaRepository.search(keyword, timeStatus, loai, pageable);
-        return  phieuGiamGiaList.map(PhieuGiamGiaResponse::new);
+        Page<PhieuGiamGiaResponse> mapped = phieuGiamGiaList.map(PhieuGiamGiaResponse::new);
+        attachUsage(mapped.getContent());
+        return mapped;
     }
 
     @Transactional(readOnly = true)

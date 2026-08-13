@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { formatVND } from '@/utils/formatVND'
 import { productImageUrl } from '@/utils/productImage'
-import { formatOrderDate, orderStatusClass, orderStatusLabel, coTheHuyDon } from '@/utils/orderStatus'
+import { formatOrderDate, orderStatusLabel, coTheHuyDon } from '@/utils/orderStatus'
 import {
   hoanTienStatusClass,
   hoanTienStatusLabel,
@@ -50,11 +50,23 @@ const canCreateReturnLabel = computed(() => props.order?.trangThaiTraHang === 'D
 const hasReturnInfo = computed(() => Boolean(props.order?.trangThaiTraHang || props.order?.trangThaiHoanTien))
 
 const productPreview = computed(() => {
-  const lines = props.order?.chiTiets || []
-  const first = lines[0]?.tenSanPham || 'Đơn hàng SUNOVA'
+  const order = props.order || {}
+  const lines = order.chiTiets || []
+  const first = lines[0]
+  if (first) {
+    return {
+      anhUrl: first.anhUrl,
+      tenSanPham: first.tenSanPham || 'Đơn hàng SUNOVA',
+      soLuong: first.soLuong,
+      more: lines.length > 1 ? `+${lines.length - 1} sản phẩm` : '',
+    }
+  }
+  const soDong = Number(order.soDongHang || 0)
   return {
-    first,
-    more: lines.length > 1 ? `+${lines.length - 1} sản phẩm` : '',
+    anhUrl: order.anhUrl,
+    tenSanPham: order.tenSanPham || 'Đơn hàng SUNOVA',
+    soLuong: order.soLuong,
+    more: soDong > 1 ? `+${soDong - 1} sản phẩm` : '',
   }
 })
 
@@ -106,30 +118,40 @@ function canReview(line) {
   <article v-if="order" class="sf-order-card" :class="{ open: isOpen }">
     <button type="button" class="sf-order-card__head" @click="toggleOpen">
       <div class="sf-order-card__head-left">
-        <div class="sf-order-card__meta">
-          <span class="sf-order-card__code">{{ order.maHoaDon }}</span>
-          <span
-            class="sf-order-badge"
-            :class="orderStatusClass(order.trangThai)"
-          >
-            <span class="sf-order-badge__dot"></span>
-            {{ orderStatusLabel(order.trangThai) }}
-          </span>
-        </div>
-        <div class="sf-order-card__preview">
-          {{ productPreview.first }}
-          <span v-if="productPreview.more">{{ productPreview.more }}</span>
+        <img
+          :src="productImageUrl(productPreview.anhUrl)"
+          :alt="productPreview.tenSanPham"
+          class="sf-order-card__thumb"
+        />
+        <div class="sf-order-card__preview-wrap">
+          <div class="sf-order-card__preview">
+            {{ productPreview.tenSanPham }}
+          </div>
+          <div class="sf-order-card__preview-meta">
+            <span v-if="productPreview.soLuong">x{{ productPreview.soLuong }}</span>
+            <span v-if="productPreview.more">{{ productPreview.more }}</span>
+          </div>
         </div>
       </div>
 
       <div class="sf-order-card__head-right">
-        <strong class="sf-order-card__amount">{{ formatVND(order.thanhTien) }}</strong>
-        <span class="sf-order-card__date">{{ formatOrderDate(order.ngayTao) }}</span>
+        <div class="sf-order-card__head-summary">
+          <strong class="sf-order-card__amount">{{ formatVND(order.thanhTien) }}</strong>
+          <span class="sf-order-card__status-text">{{ orderStatusLabel(order.trangThai) }}</span>
+        </div>
         <span class="sf-order-card__chevron">▾</span>
       </div>
     </button>
 
     <div class="sf-order-card__body">
+      <p class="sf-order-card__order-code">
+        <template v-if="order.maHoaDon">
+          Mã đơn: <strong>{{ order.maHoaDon }}</strong>
+          <span v-if="order.ngayTao"> · </span>
+        </template>
+        <span v-if="order.ngayTao">{{ formatOrderDate(order.ngayTao) }}</span>
+      </p>
+
       <div v-if="!isCancelled && !isReturned" class="sf-order-timeline">
         <div class="sf-order-timeline__row">
           <div
@@ -240,6 +262,18 @@ function canReview(line) {
             {{ order.trangThaiTraHangLabel || traHangStatusLabel(order.trangThaiTraHang) }}
           </span>
         </div>
+        <p
+          v-if="order.trangThaiTraHang === 'TU_CHOI' && order.lyDoTuChoiTraHang"
+          class="sf-order-return-reason"
+        >
+          Lý do từ chối: <strong>{{ order.lyDoTuChoiTraHang }}</strong>
+        </p>
+        <p
+          v-else-if="order.trangThaiTraHang === 'TU_CHOI'"
+          class="sf-order-return-reason"
+        >
+          Yêu cầu trả hàng đã bị từ chối. Bạn không thể gửi yêu cầu mới cho đơn này.
+        </p>
         <p v-if="order.maVanDonTra" class="sf-order-return-tracking">
           Mã vận đơn hoàn: <strong>{{ order.maVanDonTra }}</strong>
           <template v-if="returnTrackingStatus"> · {{ returnTrackingStatus }}</template>
@@ -427,5 +461,23 @@ function canReview(line) {
   margin: 0;
   font-size: 13px;
   color: rgba(30, 21, 16, 0.75);
+}
+
+.sf-order-return-reason {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #a83a3a;
+}
+
+.sf-order-card__order-code {
+  margin: 0 0 0.85rem;
+  font-size: 0.8rem;
+  color: rgba(30, 21, 16, 0.55);
+}
+
+.sf-order-card__order-code strong {
+  color: rgba(30, 21, 16, 0.78);
+  font-weight: 600;
 }
 </style>

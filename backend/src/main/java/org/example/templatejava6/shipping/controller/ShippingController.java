@@ -4,7 +4,6 @@ import jakarta.validation.Valid;
 import org.example.templatejava6.shipping.model.request.CreateShippingOrderRequest;
 import org.example.templatejava6.shipping.model.request.ShippingFeeRequest;
 import org.example.templatejava6.shipping.model.response.CreateShippingOrderResponse;
-import org.example.templatejava6.shipping.model.response.GhnDistrictResponse;
 import org.example.templatejava6.shipping.model.response.GhnProvinceResponse;
 import org.example.templatejava6.shipping.model.response.GhnWardResponse;
 import org.example.templatejava6.shipping.model.response.ShippingFeeResponse;
@@ -28,19 +27,16 @@ public class ShippingController {
         this.shippingService = shippingService;
     }
 
+    /** Danh sách tỉnh/thành đơn vị hành chính mới (GHN v3). */
     @GetMapping("/provinces")
     public List<GhnProvinceResponse> provinces() {
         return shippingService.getProvinces();
     }
 
-    @GetMapping("/districts")
-    public List<GhnDistrictResponse> districts(@RequestParam Integer provinceId) {
-        return shippingService.getDistricts(provinceId);
-    }
-
+    /** Danh sách phường/xã theo tỉnh (GHN v3, 2 cấp). */
     @GetMapping("/wards")
-    public List<GhnWardResponse> wards(@RequestParam Integer districtId) {
-        return shippingService.getWards(districtId);
+    public List<GhnWardResponse> wards(@RequestParam Integer provinceId) {
+        return shippingService.getWardsByProvince(provinceId);
     }
 
     @PostMapping("/fee")

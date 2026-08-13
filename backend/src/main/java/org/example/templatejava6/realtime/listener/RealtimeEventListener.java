@@ -1,9 +1,11 @@
 package org.example.templatejava6.realtime.listener;
 
 import org.example.templatejava6.realtime.event.AdminNotificationAppEvent;
+import org.example.templatejava6.realtime.event.CustomerNotificationAppEvent;
 import org.example.templatejava6.realtime.event.HoTroRealtimeAppEvent;
 import org.example.templatejava6.realtime.event.OrderRealtimeAppEvent;
 import org.example.templatejava6.realtime.model.AdminNotificationEvent;
+import org.example.templatejava6.realtime.model.CustomerNotificationEvent;
 import org.example.templatejava6.realtime.model.HoTroRealtimeEvent;
 import org.example.templatejava6.realtime.model.OrderRealtimeEvent;
 import org.slf4j.Logger;
@@ -56,6 +58,22 @@ public class RealtimeEventListener {
             messagingTemplate.convertAndSend(TOPIC_ADMIN_NOTIFICATIONS, payload);
         } catch (Exception ex) {
             log.warn("Không gửi được realtime thông báo admin: {}", ex.getMessage());
+        }
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void onCustomerNotification(CustomerNotificationAppEvent event) {
+        CustomerNotificationEvent payload = event.getPayload();
+        if (payload == null || payload.getIdKhachHang() == null) {
+            return;
+        }
+        try {
+            messagingTemplate.convertAndSend(
+                    "/topic/customers/" + payload.getIdKhachHang() + "/notifications",
+                    payload);
+        } catch (Exception ex) {
+            log.warn("Không gửi được realtime thông báo khách {}: {}",
+                    payload.getIdKhachHang(), ex.getMessage());
         }
     }
 

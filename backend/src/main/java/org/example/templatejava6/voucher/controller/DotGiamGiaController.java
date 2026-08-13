@@ -11,10 +11,12 @@ import org.example.templatejava6.voucher.service.DotGiamGiaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("api/sale")
@@ -35,14 +37,28 @@ public class DotGiamGiaController {
         return dotGiamGiaService.detail(id);
     }
 
+    // Các cột được phép sắp xếp (whitelist chống PropertyReferenceException / SQL injection)
+    private static final Set<String> ALLOWED_SORT_FIELDS =
+            Set.of("ngayBatDau", "ngayKetThuc", "phanTramGiam", "ten", "ma");
+
     @GetMapping("search")
     public ResponseEntity<Page<DotGiamGiaResponse>> search(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String timeStatus,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false, defaultValue = "desc") String direction,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
-        Pageable pageable = PaginationUtil.create(page, size);
+        Pageable pageable = buildPageable(page, size, sortBy, direction);
         return ResponseEntity.ok(dotGiamGiaService.search(keyword, timeStatus, pageable));
+    }
+
+    private Pageable buildPageable(int page, int size, String sortBy, String direction) {
+        if (sortBy == null || sortBy.isBlank() || !ALLOWED_SORT_FIELDS.contains(sortBy)) {
+            return PaginationUtil.create(page, size);
+        }
+        Sort.Direction dir = "asc".equalsIgnoreCase(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        return PaginationUtil.create(page, size, Sort.by(dir, sortBy));
     }
 
     @PostMapping

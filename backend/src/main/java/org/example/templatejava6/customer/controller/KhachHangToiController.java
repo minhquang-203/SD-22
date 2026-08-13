@@ -56,6 +56,11 @@ public class KhachHangToiController {
         return diaChiKhachHangToiService.capNhat(id, request);
     }
 
+    @DeleteMapping("dia-chi/{id}")
+    public void xoaDiaChi(@PathVariable Integer id) {
+        diaChiKhachHangToiService.xoa(id);
+    }
+
     @GetMapping("quiz")
     public KetQuaQuizToiResponse layKetQuaQuiz() {
         return ketQuaQuizService.layKetQuaQuizCuaToi();

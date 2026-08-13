@@ -67,8 +67,11 @@ public class GhnOrderCreationService {
         if (!ghnProperties.isFeeConfigured()) {
             return KetQua.boQua("Chua cau hinh GHN (ShopId / kho gui).");
         }
-        if (hoaDon.getGhnDistrictId() == null
-                || hoaDon.getGhnWardCode() == null || hoaDon.getGhnWardCode().isBlank()) {
+        if (hoaDon.getGhnWardCode() == null || hoaDon.getGhnWardCode().isBlank()) {
+            return KetQua.boQua("Don thieu ma phuong/xa GHN.");
+        }
+        boolean newAddress = ShippingService.looksLikeNewWardCode(hoaDon.getGhnWardCode());
+        if (!newAddress && hoaDon.getGhnDistrictId() == null) {
             return KetQua.boQua("Don thieu ma quan/huyen hoac phuong/xa GHN.");
         }
         try {
@@ -93,8 +96,13 @@ public class GhnOrderCreationService {
         if (!ghnProperties.isFeeConfigured()) {
             throw new ApiException("Chua cau hinh ShopId / kho gui cua GHN.", "GHN_NOT_CONFIGURED");
         }
-        if (hoaDon.getGhnDistrictId() == null
-                || hoaDon.getGhnWardCode() == null || hoaDon.getGhnWardCode().isBlank()) {
+        if (hoaDon.getGhnWardCode() == null || hoaDon.getGhnWardCode().isBlank()) {
+            throw new ApiException(
+                    "Don chua co ma phuong/xa GHN nguoi nhan, khong the tao van don.",
+                    "GHN_MISSING_ADDRESS");
+        }
+        boolean newAddress = ShippingService.looksLikeNewWardCode(hoaDon.getGhnWardCode());
+        if (!newAddress && hoaDon.getGhnDistrictId() == null) {
             throw new ApiException(
                     "Don chua co ma quan/huyen hoac phuong/xa GHN nguoi nhan, khong the tao van don.",
                     "GHN_MISSING_ADDRESS");
@@ -126,11 +134,45 @@ public class GhnOrderCreationService {
         request.setToPhone(orElse(hoaDon.getSdtNguoiNhan(),
                 hoaDon.getIdKhachHang() != null ? hoaDon.getIdKhachHang().getSoDienThoai() : null));
         request.setToAddress(orElse(hoaDon.getDiaChiGiao(), "Dia chi nhan hang"));
-        request.setToDistrictId(hoaDon.getGhnDistrictId());
         request.setToWardCode(hoaDon.getGhnWardCode());
+        boolean newAddress = ShippingService.looksLikeNewWardCode(hoaDon.getGhnWardCode());
+        request.setIsNewToAddress(newAddress);
+        if (newAddress) {
+            // diaChiGiao thường dạng: "Họ tên - SĐT, địa chỉ cụ thể, Phường/Xã, Tỉnh"
+            String[] parts = splitAddressParts(hoaDon.getDiaChiGiao());
+            if (parts.length >= 1) {
+                request.setToProvinceName(parts[parts.length - 1]);
+            }
+            if (parts.length >= 2) {
+                request.setToWardName(parts[parts.length - 2]);
+            }
+        } else {
+            request.setToDistrictId(hoaDon.getGhnDistrictId());
+        }
         request.setCodAmount(tinhCodAmount(hoaDon));
         request.setItems(buildItems(hoaDon));
         return request;
+    }
+
+    private static String[] splitAddressParts(String diaChiGiao) {
+        if (diaChiGiao == null || diaChiGiao.isBlank()) {
+            return new String[0];
+        }
+        // Bỏ phần "Họ tên - SĐT, " nếu có
+        String rest = diaChiGiao;
+        int firstComma = diaChiGiao.indexOf(',');
+        if (firstComma >= 0 && diaChiGiao.substring(0, firstComma).contains(" - ")) {
+            rest = diaChiGiao.substring(firstComma + 1).trim();
+        }
+        String[] raw = rest.split(",");
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        for (String p : raw) {
+            String t = p != null ? p.trim() : "";
+            if (!t.isEmpty()) {
+                parts.add(t);
+            }
+        }
+        return parts.toArray(new String[0]);
     }
 
     /**

@@ -1,7 +1,6 @@
 package org.example.templatejava6.shipping.model.request;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -20,11 +19,20 @@ public class CreateShippingOrderRequest {
     @NotBlank(message = "Vui lòng nhập địa chỉ người nhận")
     private String toAddress;
 
-    @NotNull(message = "Vui lòng chọn quận/huyện người nhận")
-    private Integer toDistrictId;
+    /** true = địa chỉ nhận theo đơn vị hành chính mới 2 cấp (GHN v3). */
+    private Boolean isNewToAddress;
 
-    @NotBlank(message = "Vui lòng chọn phường/xã người nhận")
+    /** Tên tỉnh/thành (bắt buộc khi isNewToAddress). */
+    private String toProvinceName;
+
+    /** Tên phường/xã (dùng khi isNewToAddress). */
+    private String toWardName;
+
+    /** Mã/ID phường xã — với địa chỉ mới là String.valueOf(ward_id_v2). */
     private String toWardCode;
+
+    /** Legacy: mã quận/huyện GHN cũ. */
+    private Integer toDistrictId;
 
     /** So tien thu ho (COD). */
     private Long codAmount;

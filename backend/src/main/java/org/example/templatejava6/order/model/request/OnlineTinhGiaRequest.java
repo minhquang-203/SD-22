@@ -16,9 +16,15 @@ public class OnlineTinhGiaRequest {
 
     private String maPhieuGiamGia;
 
-    /** Ma quan/huyen GHN — server dung de tinh phi van chuyen. */
+    /** ID phường/xã đơn vị hành chính mới (GHN v3). */
+    private Integer toWardIdV2;
+
+    /** Địa chỉ text để tính phí với địa chỉ mới. */
+    private String toAddressV2;
+
+    /** Legacy 3 cấp. */
     private Integer toDistrictId;
 
-    /** Ma phuong/xa GHN — server dung de tinh phi van chuyen. */
+    /** Legacy / hoặc String.valueOf(toWardIdV2). */
     private String toWardCode;
 }

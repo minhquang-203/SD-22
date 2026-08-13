@@ -25,6 +25,10 @@ export function updateDiaChiToi(id, payload) {
   return request.put(`/khach-hang/toi/dia-chi/${id}`, payload)
 }
 
+export function deleteDiaChiToi(id) {
+  return request.delete(`/khach-hang/toi/dia-chi/${id}`)
+}
+
 export function fetchMyQuizResult() {
   return request.get('/khach-hang/toi/quiz')
 }

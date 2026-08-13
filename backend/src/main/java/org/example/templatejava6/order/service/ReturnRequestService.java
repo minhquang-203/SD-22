@@ -135,9 +135,10 @@ public class ReturnRequestService {
             throw new ApiException(
                     "Chỉ có thể yêu cầu trả hàng cho đơn đã giao thành công.", "ORDER_NOT_DELIVERED");
         }
-        if (yeuCauTraHangRepository.existsByIdHoaDon_IdAndTrangThaiNotIn(
-                idHoaDon, List.of(TrangThaiTraHang.TU_CHOI))) {
-            throw new ApiException("Đơn hàng đã có yêu cầu trả hàng đang xử lý.", "RETURN_ALREADY_EXISTS");
+        if (yeuCauTraHangRepository.existsByIdHoaDon_Id(idHoaDon)) {
+            throw new ApiException(
+                    "Đơn hàng đã có yêu cầu trả hàng. Không thể gửi yêu cầu mới.",
+                    "RETURN_ALREADY_EXISTS");
         }
         if (!laVnpay(hoaDon)) {
             if (!coGiaTri(request.getTenNganHang())) {
@@ -241,6 +242,15 @@ public class ReturnRequestService {
 
         ghiNhatKy(hoaDon, "TRA_HANG_DA_DUYET", "Duyệt yêu cầu trả hàng — đơn chuyển TRA_HANG, chờ khách tạo vận đơn hoàn hàng");
         orderMailService.guiYeuCauTraHangDuocDuyet(hoaDon);
+        thongBaoService.taoThongBaoKhach(
+                idKhachHangCua(hoaDon),
+                LoaiThongBao.TRA_HANG_DUOC_DUYET,
+                "Yêu cầu trả hàng được duyệt",
+                "Yêu cầu trả hàng cho đơn " + hoaDon.getMaHoaDon()
+                        + " đã được duyệt. Vui lòng tạo vận đơn hoàn hàng.",
+                "/don-hang",
+                hoaDon.getId(),
+                hoaDon.getMaHoaDon());
         return toResponse(saved);
     }
 
@@ -259,6 +269,16 @@ public class ReturnRequestService {
         ghiNhatKy(yc.getIdHoaDon(), "TRA_HANG_TU_CHOI",
                 "Từ chối yêu cầu trả hàng" + (lyDo != null && !lyDo.isBlank() ? ": " + lyDo : ""));
         orderMailService.guiYeuCauTraHangBiTuChoi(yc.getIdHoaDon(), lyDo);
+        HoaDon hoaDonTuChoi = yc.getIdHoaDon();
+        thongBaoService.taoThongBaoKhach(
+                idKhachHangCua(hoaDonTuChoi),
+                LoaiThongBao.TRA_HANG_BI_TU_CHOI,
+                "Yêu cầu trả hàng bị từ chối",
+                "Yêu cầu trả hàng cho đơn " + hoaDonTuChoi.getMaHoaDon() + " đã bị từ chối"
+                        + (lyDo != null && !lyDo.isBlank() ? ": " + lyDo : "."),
+                "/don-hang",
+                hoaDonTuChoi.getId(),
+                hoaDonTuChoi.getMaHoaDon());
         return toResponse(saved);
     }
 
@@ -283,7 +303,12 @@ public class ReturnRequestService {
             throw new ApiException(
                     "Yêu cầu trả hàng chưa được duyệt hoặc đã tạo vận đơn.", "INVALID_RETURN_STATUS");
         }
-        if (yc.getGhnDistrictId() == null || yc.getGhnWardCode() == null || yc.getGhnWardCode().isBlank()) {
+        if (yc.getGhnWardCode() == null || yc.getGhnWardCode().isBlank()) {
+            throw new ApiException(
+                    "Thiếu địa chỉ phường/xã để lấy hàng trả.", "GHN_MISSING_ADDRESS");
+        }
+        boolean newAddress = ShippingService.looksLikeNewWardCode(yc.getGhnWardCode());
+        if (!newAddress && yc.getGhnDistrictId() == null) {
             throw new ApiException(
                     "Thiếu địa chỉ (quận/huyện, phường/xã) để lấy hàng trả.", "GHN_MISSING_ADDRESS");
         }
@@ -297,6 +322,17 @@ public class ReturnRequestService {
         req.setFromAddress(orElse(yc.getDiaChiTra(), hoaDon.getDiaChiGiao()));
         req.setFromDistrictId(yc.getGhnDistrictId());
         req.setFromWardCode(yc.getGhnWardCode());
+        if (newAddress) {
+            // Tách tên tỉnh / phường từ địa chỉ trả hoặc địa chỉ giao đơn.
+            String source = orElse(yc.getDiaChiTra(), hoaDon.getDiaChiGiao());
+            String[] parts = source != null ? source.split(",") : new String[0];
+            if (parts.length >= 1) {
+                req.setFromProvinceName(parts[parts.length - 1].trim());
+            }
+            if (parts.length >= 2) {
+                req.setFromWardName(parts[parts.length - 2].trim());
+            }
+        }
         req.setItems(buildItems(hoaDon));
         if (caLayHang != null) {
             req.setPickShiftId(caLayHang.getId());
@@ -647,6 +683,10 @@ public class ReturnRequestService {
         lichSu.setGhiChu(ghiChu != null && ghiChu.length() > 255 ? ghiChu.substring(0, 255) : ghiChu);
         lichSu.setThoiGian(LocalDateTime.now());
         lichSuDonHangRepository.save(lichSu);
+    }
+
+    private static Integer idKhachHangCua(HoaDon hoaDon) {
+        return hoaDon != null && hoaDon.getIdKhachHang() != null ? hoaDon.getIdKhachHang().getId() : null;
     }
 
     private static String orElse(String value, String fallback) {

@@ -1,8 +1,8 @@
 import request from './request'
 
-export function searchSale(keyword, timeStatus, page, size) {
+export function searchSale(keyword, timeStatus, page, size, sortBy, direction) {
   return request.get('/sale/search', {
-    params: { keyword, timeStatus, page, size },
+    params: { keyword, timeStatus, page, size, sortBy, direction },
   })
 }
 

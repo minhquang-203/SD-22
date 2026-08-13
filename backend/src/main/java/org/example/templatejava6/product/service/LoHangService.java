@@ -343,6 +343,46 @@ public class LoHangService {
     }
 
     /**
+     * Phân bổ lại lô cho dòng hóa đơn đã trừ tồn (admin xác nhận đơn online).
+     * Hoàn lô cũ rồi trừ theo phân bổ mới — không trừ tồn lần 2.
+     */
+    @Transactional
+    public void doiPhanBoLo(HoaDonChiTiet line, List<PhanBoLo> phanBoMoi) {
+        if (line == null || line.getId() == null) {
+            throw new ApiException("Thiếu dòng hóa đơn để đổi phân bổ lô.", "VALIDATION_ERROR");
+        }
+        int soLuongDong = line.getSoLuong() != null ? line.getSoLuong() : 0;
+        if (soLuongDong <= 0) {
+            throw new ApiException("Số lượng dòng hóa đơn không hợp lệ.", "VALIDATION_ERROR");
+        }
+        if (phanBoMoi == null || phanBoMoi.isEmpty()) {
+            throw new ApiException("Danh sách phân bổ lô không được để trống.", "VALIDATION_ERROR");
+        }
+
+        int tongPhanBo = 0;
+        for (PhanBoLo item : phanBoMoi) {
+            if (item == null || item.idLoHang() == null) {
+                throw new ApiException("Thiếu id lô trong phân bổ.", "VALIDATION_ERROR");
+            }
+            if (item.soLuong() <= 0) {
+                throw new ApiException(
+                        "Số lượng lấy từ mỗi lô phải lớn hơn 0.",
+                        "VALIDATION_ERROR");
+            }
+            tongPhanBo += item.soLuong();
+        }
+        if (tongPhanBo != soLuongDong) {
+            throw new ApiException(
+                    "Tổng số lượng phân bổ không khớp (đã chọn " + tongPhanBo
+                            + ", cần " + soLuongDong + ").",
+                    "VALIDATION_ERROR");
+        }
+
+        hoanTonTheoChiTiet(line);
+        truTonVaGhiNhan(line, soLuongDong, null, phanBoMoi);
+    }
+
+    /**
      * Hoàn tồn đúng các lô đã xuất cho dòng hóa đơn.
      * Đơn cũ không có phân bổ: fallback cộng vào lô còn chỗ (ưu tiên FEFO).
      */

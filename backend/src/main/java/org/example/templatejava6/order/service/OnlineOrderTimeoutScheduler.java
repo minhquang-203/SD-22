@@ -30,9 +30,9 @@ public class OnlineOrderTimeoutScheduler {
         LocalDateTime cutoff = LocalDateTime.now().minusMinutes(paymentTimeoutMinutes);
         List<HoaDon> expiredOrders = hoaDonRepository.findExpiredUnpaidVnpayOrders(cutoff);
         for (HoaDon hoaDon : expiredOrders) {
-            // Chỉ lấy id ngoài session; load lại + xóa trong transaction của service
+            // Chỉ lấy id ngoài session; load lại + hủy mềm trong transaction của service
             // để tránh LazyInitializationException trên PhuongThucThanhToan / KhachHang.
-            onlineOrderLifecycleService.xoaDonChuaThanhToanNeuCan(hoaDon.getId());
+            onlineOrderLifecycleService.huyDonChuaThanhToanNeuCan(hoaDon.getId());
         }
     }
 }

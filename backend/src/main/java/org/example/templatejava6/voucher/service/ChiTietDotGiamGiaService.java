@@ -2,7 +2,10 @@ package org.example.templatejava6.voucher.service;
 
 import org.example.templatejava6.chat.event.CatalogCacheInvalidateEvent;
 import org.example.templatejava6.common.exception.ApiException;
+import org.example.templatejava6.product.entity.AnhSanPham;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
+import org.example.templatejava6.product.entity.SanPham;
+import org.example.templatejava6.product.repository.AnhSanPhamRepository;
 import org.example.templatejava6.product.repository.ChiTietSanPhamRepository;
 import org.example.templatejava6.voucher.entity.ChiTietDotGiamGia;
 import org.example.templatejava6.voucher.entity.DotGiamGia;
@@ -16,7 +19,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class ChiTietDotGiamGiaService {
@@ -28,6 +37,8 @@ public class ChiTietDotGiamGiaService {
     @Autowired
     private ChiTietSanPhamRepository chiTietSanPhamRepository;
     @Autowired
+    private AnhSanPhamRepository anhSanPhamRepository;
+    @Autowired
     private ApplicationEventPublisher eventPublisher;
 
     private void invalidateChatCatalog() {
@@ -37,9 +48,46 @@ public class ChiTietDotGiamGiaService {
     @Transactional(readOnly = true)
     public List<ChiTietDotGiamGiaResponse> getByDotGiamGia(Integer idDotGiamGia) {
         DotGiamGia dgg = dotGiamGiaService.getDotGiamGiaOrThrow(idDotGiamGia);
-        return chiTietDotGiamGiaRepository.findByIdDotGiamGia(dgg).stream()
-                .map(ChiTietDotGiamGiaResponse::new)
+        List<ChiTietDotGiamGia> list = chiTietDotGiamGiaRepository.findByIdDotGiamGia(dgg);
+        Map<Integer, String> imageMap = loadPrimaryImages(list);
+        return list.stream()
+                .map(ct -> {
+                    ChiTietDotGiamGiaResponse res = new ChiTietDotGiamGiaResponse(ct);
+                    ChiTietSanPham ctsp = ct.getIdChiTietSanPham();
+                    if (ctsp != null && ctsp.getSanPham() != null) {
+                        res.setAnhUrl(imageMap.get(ctsp.getSanPham().getId()));
+                    }
+                    return res;
+                })
                 .toList();
+    }
+
+    private Map<Integer, String> loadPrimaryImages(List<ChiTietDotGiamGia> list) {
+        Set<Integer> sanPhamIds = list.stream()
+                .map(ChiTietDotGiamGia::getIdChiTietSanPham)
+                .filter(Objects::nonNull)
+                .map(ChiTietSanPham::getSanPham)
+                .filter(Objects::nonNull)
+                .map(SanPham::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (sanPhamIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Integer, List<AnhSanPham>> byProduct = anhSanPhamRepository.findBySanPham_IdIn(sanPhamIds).stream()
+                .collect(Collectors.groupingBy(a -> a.getSanPham().getId()));
+        Map<Integer, String> result = new HashMap<>();
+        for (Map.Entry<Integer, List<AnhSanPham>> entry : byProduct.entrySet()) {
+            entry.getValue().stream()
+                    .sorted(Comparator
+                            .comparing((AnhSanPham a) -> !Boolean.TRUE.equals(a.getLaAnhChinh()))
+                            .thenComparing(a -> a.getThuTu() != null ? a.getThuTu() : 0))
+                    .map(AnhSanPham::getUrl)
+                    .filter(url -> url != null && !url.isBlank())
+                    .findFirst()
+                    .ifPresent(url -> result.put(entry.getKey(), url));
+        }
+        return result;
     }
 
     @Transactional(readOnly = true)

@@ -64,6 +64,24 @@ public class DiaChiKhachHangToiService {
         return new DiaChiResponse(diaChiKhachHangRepository.save(dc));
     }
 
+    @Transactional
+    public void xoa(Integer id) {
+        KhachHang kh = getKhachDangNhap();
+        DiaChiKhachHang dc = diaChiKhachHangRepository.findByIdAndKhachHang(id, kh)
+                .orElseThrow(() -> new ApiException("Không tìm thấy địa chỉ", "NOT_FOUND"));
+        boolean laMacDinh = Boolean.TRUE.equals(dc.getMacDinh());
+        diaChiKhachHangRepository.delete(dc);
+
+        if (laMacDinh) {
+            diaChiKhachHangRepository.findByKhachHangOrderByMacDinhDescIdDesc(kh).stream()
+                    .findFirst()
+                    .ifPresent((conLai) -> {
+                        conLai.setMacDinh(true);
+                        diaChiKhachHangRepository.save(conLai);
+                    });
+        }
+    }
+
     private void applyRequest(DiaChiKhachHang dc, DiaChiKhachHangRequest request) {
         dc.setHoTenNguoiNhan(request.getHoTenNguoiNhan().trim());
         dc.setSoDienThoai(request.getSoDienThoai().trim());
@@ -71,7 +89,7 @@ public class DiaChiKhachHangToiService {
         dc.setDistrictId(request.getDistrictId());
         dc.setWardCode(request.getWardCode().trim());
         dc.setTinhThanh(request.getTinhThanh().trim());
-        dc.setQuanHuyen(request.getQuanHuyen().trim());
+        dc.setQuanHuyen(request.getQuanHuyen() != null ? request.getQuanHuyen().trim() : "");
         dc.setPhuongXa(request.getPhuongXa().trim());
         dc.setDiaChiChiTiet(request.getDiaChiChiTiet().trim());
     }

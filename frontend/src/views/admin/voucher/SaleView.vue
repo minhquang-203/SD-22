@@ -66,6 +66,7 @@
         <input type="text" v-model="searchQuery" placeholder="Tìm mã hoặc tên đợt giảm giá..." />
       </div>
       <div class="filters-right">
+        <SortDropdown v-model="sapXep" :options="sortOptions" />
         <button class="btn btn-secondary" @click="loadData(currentPage)"><i class="ti ti-refresh"></i> Làm mới</button>
       </div>
     </div>
@@ -75,9 +76,10 @@
       <table>
         <thead>
           <tr>
-            <th style="width:30%">Đợt giảm giá</th>
+            <th style="width:48px; text-align:center">STT</th>
+            <th style="width:28%">Đợt giảm giá</th>
             <th style="width:12%">Loại</th>
-            <th style="width:12%">Giá trị</th>
+            <th style="width:10%">Giá trị</th>
             <th style="width:20%">Thời gian</th>
             <th style="width:12%">Trạng thái</th>
             <th style="width:14%">Hành động</th>
@@ -85,7 +87,7 @@
         </thead>
         <tbody>
           <tr v-if="initialLoading">
-            <td colspan="6">
+            <td colspan="7">
               <div class="empty-state">
                 <i class="ti ti-loader-2"></i>
                 <p>Đang tải dữ liệu...</p>
@@ -93,7 +95,10 @@
             </td>
           </tr>
           <template v-else-if="campaigns.length">
-            <tr v-for="c in campaigns" :key="c.id" class="clickable-row" @click="goToDetail(c.id)">
+            <tr v-for="(c, idx) in campaigns" :key="c.id" class="clickable-row" @click="goToDetail(c.id)">
+              <td style="text-align:center; color:#94a3b8">
+                {{ pageInfo.number * PAGE_SIZE + idx + 1 }}
+              </td>
               <td>
                 <div class="campaign-name">{{ c.name }}</div>
                 <span class="campaign-code">{{ c.code }}</span>
@@ -148,7 +153,7 @@
             </tr>
           </template>
           <tr v-else>
-            <td colspan="6">
+            <td colspan="7">
               <div class="empty-state">
                 <i class="ti ti-mood-empty"></i>
                 <p>{{ errorMessage || 'Không tìm thấy đợt giảm giá nào phù hợp' }}</p>
@@ -237,6 +242,7 @@ import { useRouter } from 'vue-router'
 import { createSale, deleteSale, searchSale, stopSale, activateSale, updateSale } from '@/api/saleApi.js'
 import { confirm } from '@/composables/useConfirm'
 import { toast } from '@/composables/useToast'
+import SortDropdown from '@/components/common/SortDropdown.vue'
 
 const router = useRouter()
 
@@ -275,6 +281,16 @@ const tabs = [
 
 const currentTab = ref('')
 const searchQuery = ref('')
+
+const sapXep = ref('')
+const sortOptions = [
+  { value: 'newest', label: 'Mới nhất', icon: 'tabler:history', sortBy: 'ngayBatDau', direction: 'desc' },
+  { value: 'oldest', label: 'Cũ nhất', icon: 'tabler:clock', sortBy: 'ngayBatDau', direction: 'asc' },
+  { value: 'endingSoon', label: 'Sắp kết thúc', icon: 'tabler:hourglass', sortBy: 'ngayKetThuc', direction: 'asc' },
+  { value: 'percentDesc', label: '% giảm: cao → thấp', icon: 'tabler:sort-descending', sortBy: 'phanTramGiam', direction: 'desc' },
+  { value: 'percentAsc', label: '% giảm: thấp → cao', icon: 'tabler:sort-ascending', sortBy: 'phanTramGiam', direction: 'asc' },
+  { value: 'nameAsc', label: 'Tên A → Z', icon: 'tabler:sort-ascending-letters', sortBy: 'ten', direction: 'asc' },
+]
 
 const statusMeta = {
   active: { cls: 'badge-active', icon: 'ti-circle-check', label: 'Đang chạy' },
@@ -386,11 +402,14 @@ async function loadData(page = 1, { silent = false } = {}) {
   errorMessage.value = ''
 
   try {
+    const sortChon = sortOptions.find((o) => o.value === sapXep.value)
     const response = await searchSale(
       searchQuery.value || null,
       tabToApiStatus[currentTab.value] || null,
       page,
       PAGE_SIZE,
+      sortChon?.sortBy || null,
+      sortChon?.direction || null,
     )
 
     const data = response.data || {}
@@ -662,6 +681,8 @@ watch([searchQuery, currentTab], () => {
   clearTimeout(searchTimer)
   searchTimer = setTimeout(() => loadData(1), 300)
 })
+
+watch(sapXep, () => loadData(1))
 
 onMounted(async () => {
   await Promise.all([loadData(1), loadMetrics()])

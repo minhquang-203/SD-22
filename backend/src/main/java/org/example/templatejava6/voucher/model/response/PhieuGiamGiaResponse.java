@@ -20,6 +20,7 @@ public class PhieuGiamGiaResponse {
     private BigDecimal giaTriDonToiThieu;
     private BigDecimal giamToiDa;
     private Integer soLuong;
+    private Long daDung = 0L;
     private LocalDateTime ngayBatDau;
     private LocalDateTime ngayKetThuc;
     private Boolean trangThai;

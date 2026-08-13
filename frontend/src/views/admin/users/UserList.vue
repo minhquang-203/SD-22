@@ -98,7 +98,7 @@ async function handleToggleStatus(customer) {
 }
 
 function formatAddress(dc) {
-  const parts = [dc.diaChiChiTiet, dc.phuongXa, dc.quanHuyen, dc.tinhThanh].filter(Boolean)
+  const parts = [dc.diaChiChiTiet, dc.phuongXa, dc.tinhThanh].filter(Boolean)
   return parts.join(', ') || '—'
 }
 
