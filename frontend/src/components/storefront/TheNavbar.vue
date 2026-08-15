@@ -84,10 +84,14 @@ async function markAllNotifications() {
 function iconForNotifLoai(loai) {
   const map = {
     DON_HANG_CAP_NHAT: 'solar:box-linear',
+    DON_HANG: 'solar:box-linear',
     TRA_HANG_DUOC_DUYET: 'solar:undo-left-round-linear',
     TRA_HANG_BI_TU_CHOI: 'solar:close-circle-linear',
     HOAN_TIEN_THANH_CONG: 'solar:wallet-money-linear',
     HOAN_TIEN_BI_TU_CHOI: 'solar:close-circle-linear',
+    KHUYEN_MAI: 'solar:ticket-sale-linear',
+    UV: 'solar:sun-linear',
+    HE_THONG: 'solar:bell-linear',
   }
   return map[loai] || 'solar:bell-linear'
 }
@@ -460,6 +464,26 @@ function toggleUser(e) {
 .sf-bell__item-icon[data-loai='HOAN_TIEN_BI_TU_CHOI'] {
   background: #fff1f2;
   color: #e11d48;
+}
+
+.sf-bell__item-icon[data-loai='DON_HANG'] {
+  background: #eef4ff;
+  color: #2563eb;
+}
+
+.sf-bell__item-icon[data-loai='KHUYEN_MAI'] {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.sf-bell__item-icon[data-loai='UV'] {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+.sf-bell__item-icon[data-loai='HE_THONG'] {
+  background: #f3f4f6;
+  color: #4b5563;
 }
 
 .sf-bell__item-body {
