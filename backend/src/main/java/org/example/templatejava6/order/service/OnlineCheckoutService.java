@@ -162,7 +162,8 @@ public class OnlineCheckoutService {
         BigDecimal tongTien = sumTongTien(lines);
 
         PhieuGiamGia phieu = resolvePhieu(request.getMaPhieuGiamGia());
-        BigDecimal phiVanChuyen = resolvePhiVanChuyen(request.getToWardIdV2(), request.getToAddressV2(),
+        BigDecimal phiVanChuyen = resolvePhiVanChuyen(
+                request.getToProvinceName(), request.getToWardName(), request.getToAddressV2(),
                 request.getToDistrictId(), request.getToWardCode(), tongTien);
         BigDecimal tienGiamGia = BigDecimal.ZERO;
         if (phieu != null) {
@@ -178,9 +179,7 @@ public class OnlineCheckoutService {
                     "INVALID_PAYMENT_AMOUNT");
         }
 
-        String wardCode = coGiaTri(request.getToWardCode())
-                ? request.getToWardCode().trim()
-                : (request.getToWardIdV2() != null ? String.valueOf(request.getToWardIdV2()) : null);
+        String wardCode = coGiaTri(request.getToWardCode()) ? request.getToWardCode().trim() : null;
 
         LocalDateTime now = LocalDateTime.now();
         HoaDon hoaDon = new HoaDon();
@@ -196,6 +195,9 @@ public class OnlineCheckoutService {
         // Địa chỉ 2 cấp: lưu ward id mới vào ghnWardCode; ghnDistrictId để null.
         hoaDon.setGhnDistrictId(request.getToDistrictId());
         hoaDon.setGhnWardCode(wardCode);
+        // GHN tạo vận đơn địa chỉ 2 cấp theo tên, nên giữ nguyên tên khách đã chọn.
+        hoaDon.setGhnProvinceName(cat(request.getToProvinceName(), 100));
+        hoaDon.setGhnWardName(cat(request.getToWardName(), 100));
         hoaDon.setTongTien(tongTien);
         hoaDon.setTienGiamGia(tienGiamGia);
         hoaDon.setPhiVanChuyen(phiVanChuyen);
@@ -260,7 +262,8 @@ public class OnlineCheckoutService {
         BigDecimal tongTien = sumTongTien(lines);
 
         PhieuGiamGia phieu = resolvePhieu(request.getMaPhieuGiamGia());
-        BigDecimal phiVanChuyen = resolvePhiVanChuyen(request.getToWardIdV2(), request.getToAddressV2(),
+        BigDecimal phiVanChuyen = resolvePhiVanChuyen(
+                request.getToProvinceName(), request.getToWardName(), request.getToAddressV2(),
                 request.getToDistrictId(), request.getToWardCode(), tongTien);
         BigDecimal tienGiamGia = BigDecimal.ZERO;
         String maPhieu = null;
@@ -446,13 +449,14 @@ public class OnlineCheckoutService {
 
     /**
      * Tính phí vận chuyển phía server qua GHN. Không tin phí từ client.
-     * Khi thiếu địa chỉ GHN, ShippingService trả phí fallback theo cấu hình.
+     * Địa chỉ 2 cấp: gửi tên tỉnh/phường. Khi thiếu, ShippingService trả phí fallback.
      */
-    private BigDecimal resolvePhiVanChuyen(Integer toWardIdV2, String toAddressV2,
+    private BigDecimal resolvePhiVanChuyen(String toProvinceName, String toWardName, String toAddressV2,
                                            Integer toDistrictId, String toWardCode,
                                            BigDecimal tongTienHang) {
         ShippingFeeRequest feeRequest = new ShippingFeeRequest();
-        feeRequest.setToWardIdV2(toWardIdV2);
+        feeRequest.setToProvinceName(coGiaTri(toProvinceName) ? toProvinceName.trim() : null);
+        feeRequest.setToWardName(coGiaTri(toWardName) ? toWardName.trim() : null);
         feeRequest.setToAddressV2(coGiaTri(toAddressV2) ? toAddressV2.trim() : null);
         feeRequest.setToDistrictId(toDistrictId);
         feeRequest.setToWardCode(coGiaTri(toWardCode) ? toWardCode.trim() : null);
@@ -479,7 +483,7 @@ public class OnlineCheckoutService {
         return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
     }
 
-    private boolean coGiaTri(String value) {
+    private static boolean coGiaTri(String value) {
         return value != null && !value.isBlank();
     }
 
@@ -497,6 +501,14 @@ public class OnlineCheckoutService {
             payment = paymentService.taoThanhToan(MA_VNPAY, paymentRequest, clientIp);
         }
         return OnlineCheckoutResponse.from(hoaDon, payment);
+    }
+
+    private static String cat(String value, int maxLength) {
+        if (!coGiaTri(value)) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.length() > maxLength ? trimmed.substring(0, maxLength) : trimmed;
     }
 
     private String chuanHoaIdempotencyKey(String key) {

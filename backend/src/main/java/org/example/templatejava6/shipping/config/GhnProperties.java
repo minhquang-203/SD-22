@@ -26,11 +26,20 @@ public class GhnProperties {
     /** Loai dich vu: 2 = hang nhe (Standard), 5 = hang nang. */
     private Integer serviceTypeId = 2;
 
-    /** Quan/huyen cua kho gui hang. */
+    /** Quan/huyen cua kho gui hang (dia chi cu). */
     private Integer fromDistrictId;
 
-    /** Phuong/xa cua kho gui hang. */
+    /** Phuong/xa cua kho gui hang (ward code cu hoac ward_id_v2). */
     private String fromWardCode;
+
+    /** Ten phuong/xa kho gui — dung khi tao van don dia chi 2 cap. */
+    private String fromWardName;
+
+    /** Ten quan/huyen kho gui (dia chi cu, neu co). */
+    private String fromDistrictName;
+
+    /** Ten tinh/thanh kho gui — dung khi tao van don dia chi 2 cap. */
+    private String fromProvinceName;
 
     /** Ten nguoi nhan tai shop (dung cho van don hoan tra hang ve shop). */
     private String shopName = "SUNOVA Shop";
@@ -61,8 +70,6 @@ public class GhnProperties {
     }
 
     public boolean isFeeConfigured() {
-        return isConfigured()
-                && shopId != null && !shopId.isBlank()
-                && fromDistrictId != null;
+        return isConfigured() && shopId != null && !shopId.isBlank();
     }
 }

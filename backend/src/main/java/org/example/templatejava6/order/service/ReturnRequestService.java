@@ -11,6 +11,7 @@ import org.example.templatejava6.notification.service.OrderMailService;
 import org.example.templatejava6.notification.service.ThongBaoService;
 import org.example.templatejava6.order.entity.AnhYeuCauTraHang;
 import org.example.templatejava6.order.entity.ChiTietTraHangLo;
+import org.example.templatejava6.order.entity.HoanTien;
 import org.example.templatejava6.order.entity.HoaDon;
 import org.example.templatejava6.order.entity.HoaDonChiTiet;
 import org.example.templatejava6.order.entity.HoaDonChiTietLo;
@@ -19,18 +20,24 @@ import org.example.templatejava6.order.entity.YeuCauTraHang;
 import org.example.templatejava6.order.model.request.NhanHangTraRequest;
 import org.example.templatejava6.order.model.request.TaoYeuCauTraHangRequest;
 import org.example.templatejava6.order.model.response.LoHangDonHangResponse;
+import org.example.templatejava6.order.model.response.StorefrontOrderLineResponse;
+import org.example.templatejava6.order.model.response.StorefrontReturnDetailResponse;
+import org.example.templatejava6.order.model.response.StorefrontReturnTimelineStepResponse;
 import org.example.templatejava6.order.model.response.YeuCauTraHangResponse;
 import org.example.templatejava6.order.repository.AnhYeuCauTraHangRepository;
 import org.example.templatejava6.order.repository.ChiTietTraHangLoRepository;
+import org.example.templatejava6.order.repository.HoanTienRepository;
 import org.example.templatejava6.order.repository.HoaDonChiTietLoRepository;
 import org.example.templatejava6.order.repository.HoaDonChiTietRepository;
 import org.example.templatejava6.order.repository.HoaDonRepository;
 import org.example.templatejava6.order.repository.LichSuDonHangRepository;
 import org.example.templatejava6.order.repository.NhanVienRepository;
 import org.example.templatejava6.order.repository.YeuCauTraHangRepository;
+import org.example.templatejava6.product.entity.AnhSanPham;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
 import org.example.templatejava6.product.entity.LoHang;
 import org.example.templatejava6.product.entity.SanPham;
+import org.example.templatejava6.product.repository.AnhSanPhamRepository;
 import org.example.templatejava6.product.service.LoHangService;
 import org.example.templatejava6.realtime.service.OrderRealtimeService;
 import org.example.templatejava6.shipping.model.request.CreateShippingOrderRequest;
@@ -90,6 +97,8 @@ public class ReturnRequestService {
     private final OrderMailService orderMailService;
     private final ProductFileStorageService productFileStorageService;
     private final OrderRealtimeService orderRealtimeService;
+    private final HoanTienRepository hoanTienRepository;
+    private final AnhSanPhamRepository anhSanPhamRepository;
 
     public ReturnRequestService(YeuCauTraHangRepository yeuCauTraHangRepository,
                                 AnhYeuCauTraHangRepository anhYeuCauTraHangRepository,
@@ -106,7 +115,9 @@ public class ReturnRequestService {
                                 ThongBaoService thongBaoService,
                                 OrderMailService orderMailService,
                                 ProductFileStorageService productFileStorageService,
-                                OrderRealtimeService orderRealtimeService) {
+                                OrderRealtimeService orderRealtimeService,
+                                HoanTienRepository hoanTienRepository,
+                                AnhSanPhamRepository anhSanPhamRepository) {
         this.yeuCauTraHangRepository = yeuCauTraHangRepository;
         this.anhYeuCauTraHangRepository = anhYeuCauTraHangRepository;
         this.hoaDonRepository = hoaDonRepository;
@@ -123,6 +134,8 @@ public class ReturnRequestService {
         this.orderMailService = orderMailService;
         this.productFileStorageService = productFileStorageService;
         this.orderRealtimeService = orderRealtimeService;
+        this.hoanTienRepository = hoanTienRepository;
+        this.anhSanPhamRepository = anhSanPhamRepository;
     }
 
     /** Khach hang gui yeu cau tra hang cho mot don da nhan (HOAN_THANH). */
@@ -208,6 +221,19 @@ public class ReturnRequestService {
     }
 
     @Transactional(readOnly = true)
+    public StorefrontReturnDetailResponse chiTietCuaToi(Integer idKhachHang, Integer id) {
+        YeuCauTraHang yc = load(id);
+        HoaDon hoaDon = yc.getIdHoaDon();
+        Integer ownerId = hoaDon != null && hoaDon.getIdKhachHang() != null
+                ? hoaDon.getIdKhachHang().getId()
+                : null;
+        if (idKhachHang == null || ownerId == null || !idKhachHang.equals(ownerId)) {
+            throw new ApiException("Không tìm thấy yêu cầu trả hàng.", "NOT_FOUND");
+        }
+        return toDetailResponse(yc);
+    }
+
+    @Transactional(readOnly = true)
     public List<YeuCauTraHangResponse> danhSach(TrangThaiTraHang trangThai) {
         List<YeuCauTraHang> list = trangThai != null
                 ? yeuCauTraHangRepository.findByTrangThaiOrderByNgayTaoDesc(trangThai)
@@ -248,7 +274,7 @@ public class ReturnRequestService {
                 "Yêu cầu trả hàng được duyệt",
                 "Yêu cầu trả hàng cho đơn " + hoaDon.getMaHoaDon()
                         + " đã được duyệt. Vui lòng tạo vận đơn hoàn hàng.",
-                "/don-hang",
+                "/tra-cuu-don/tra-hang/" + saved.getId(),
                 hoaDon.getId(),
                 hoaDon.getMaHoaDon());
         return toResponse(saved);
@@ -276,7 +302,7 @@ public class ReturnRequestService {
                 "Yêu cầu trả hàng bị từ chối",
                 "Yêu cầu trả hàng cho đơn " + hoaDonTuChoi.getMaHoaDon() + " đã bị từ chối"
                         + (lyDo != null && !lyDo.isBlank() ? ": " + lyDo : "."),
-                "/don-hang",
+                "/tra-cuu-don/tra-hang/" + saved.getId(),
                 hoaDonTuChoi.getId(),
                 hoaDonTuChoi.getMaHoaDon());
         return toResponse(saved);
@@ -304,10 +330,13 @@ public class ReturnRequestService {
                     "Yêu cầu trả hàng chưa được duyệt hoặc đã tạo vận đơn.", "INVALID_RETURN_STATUS");
         }
         if (yc.getGhnWardCode() == null || yc.getGhnWardCode().isBlank()) {
-            throw new ApiException(
-                    "Thiếu địa chỉ phường/xã để lấy hàng trả.", "GHN_MISSING_ADDRESS");
+            if (!coGiaTri(hoaDon.getGhnProvinceName()) || !coGiaTri(hoaDon.getGhnWardName())) {
+                throw new ApiException(
+                        "Thiếu địa chỉ phường/xã để lấy hàng trả.", "GHN_MISSING_ADDRESS");
+            }
         }
-        boolean newAddress = ShippingService.looksLikeNewWardCode(yc.getGhnWardCode());
+        boolean newAddress = ShippingService.looksLikeNewWardCode(yc.getGhnWardCode())
+                || (coGiaTri(hoaDon.getGhnProvinceName()) && coGiaTri(hoaDon.getGhnWardName()));
         if (!newAddress && yc.getGhnDistrictId() == null) {
             throw new ApiException(
                     "Thiếu địa chỉ (quận/huyện, phường/xã) để lấy hàng trả.", "GHN_MISSING_ADDRESS");
@@ -323,15 +352,20 @@ public class ReturnRequestService {
         req.setFromDistrictId(yc.getGhnDistrictId());
         req.setFromWardCode(yc.getGhnWardCode());
         if (newAddress) {
-            // Tách tên tỉnh / phường từ địa chỉ trả hoặc địa chỉ giao đơn.
-            String source = orElse(yc.getDiaChiTra(), hoaDon.getDiaChiGiao());
-            String[] parts = source != null ? source.split(",") : new String[0];
-            if (parts.length >= 1) {
-                req.setFromProvinceName(parts[parts.length - 1].trim());
+            String provinceName = hoaDon.getGhnProvinceName();
+            String wardName = hoaDon.getGhnWardName();
+            if (!coGiaTri(provinceName) || !coGiaTri(wardName)) {
+                String source = orElse(yc.getDiaChiTra(), hoaDon.getDiaChiGiao());
+                String[] parts = source != null ? source.split(",") : new String[0];
+                if (!coGiaTri(provinceName) && parts.length >= 1) {
+                    provinceName = parts[parts.length - 1].trim();
+                }
+                if (!coGiaTri(wardName) && parts.length >= 2) {
+                    wardName = parts[parts.length - 2].trim();
+                }
             }
-            if (parts.length >= 2) {
-                req.setFromWardName(parts[parts.length - 2].trim());
-            }
+            req.setFromProvinceName(provinceName);
+            req.setFromWardName(wardName);
         }
         req.setItems(buildItems(hoaDon));
         if (caLayHang != null) {
@@ -599,6 +633,169 @@ public class ReturnRequestService {
                 .map(AnhYeuCauTraHang::getDuongDan)
                 .toList();
         return new YeuCauTraHangResponse(yc, anhUrls);
+    }
+
+    private StorefrontReturnDetailResponse toDetailResponse(YeuCauTraHang yc) {
+        List<String> anhUrls = anhYeuCauTraHangRepository
+                .findByIdYeuCauTraHang_IdOrderByIdAsc(yc.getId())
+                .stream()
+                .map(AnhYeuCauTraHang::getDuongDan)
+                .toList();
+        StorefrontReturnDetailResponse detail = new StorefrontReturnDetailResponse(yc, anhUrls);
+        HoaDon hoaDon = yc.getIdHoaDon();
+        if (hoaDon != null) {
+            detail.setDiaChiGiao(hoaDon.getDiaChiGiao());
+            detail.setTongTien(hoaDon.getTongTien());
+            detail.setTienGiamGia(hoaDon.getTienGiamGia());
+            detail.setPhiVanChuyen(hoaDon.getPhiVanChuyen());
+            detail.setChiTiets(hoaDonChiTietRepository.findByIdHoaDon(hoaDon).stream()
+                    .map(this::toReturnLine)
+                    .toList());
+            applyRefund(detail, hoaDon, yc);
+        }
+        detail.setTimeline(buildTimeline(yc));
+        return detail;
+    }
+
+    private void applyRefund(StorefrontReturnDetailResponse detail, HoaDon hoaDon, YeuCauTraHang yc) {
+        List<HoanTien> hoanTiens = hoanTienRepository.findByIdHoaDonOrderByNgayTaoDesc(hoaDon);
+        HoanTien matched = hoanTiens.stream()
+                .filter(ht -> ht.getIdYeuCauTraHang() != null && yc.getId().equals(ht.getIdYeuCauTraHang().getId()))
+                .findFirst()
+                .orElse(hoanTiens.isEmpty() ? null : hoanTiens.get(0));
+        if (matched == null) {
+            if (hoaDon.getThanhTien() != null) {
+                detail.setSoTienHoan(hoaDon.getThanhTien());
+            }
+            return;
+        }
+        detail.setSoTienHoan(matched.getSoTien());
+        if (matched.getTrangThai() != null) {
+            detail.setTrangThaiHoanTien(matched.getTrangThai().name());
+            detail.setTrangThaiHoanTienLabel(matched.getTrangThai().getLabel());
+        }
+        detail.setMaGiaoDichHoan(matched.getMaGiaoDichHoan());
+        detail.setPhuongThucHoan(matched.getPhuongThuc());
+        detail.setNgayHoan(matched.getNgayHoan());
+    }
+
+    private StorefrontOrderLineResponse toReturnLine(HoaDonChiTiet ct) {
+        StorefrontOrderLineResponse line = new StorefrontOrderLineResponse();
+        line.setId(ct.getId());
+        ChiTietSanPham cts = ct.getIdChiTietSanPham();
+        if (cts != null) {
+            line.setIdChiTietSanPham(cts.getId());
+            SanPham sp = cts.getSanPham();
+            line.setTenSanPham(sp != null ? sp.getTen() : "Sản phẩm");
+            if (sp != null) {
+                line.setIdSanPham(sp.getId());
+                line.setAnhUrl(resolveAnhUrl(sp.getId()));
+            }
+            line.setBienThe(buildBienThe(cts));
+        } else {
+            line.setTenSanPham("Sản phẩm");
+        }
+        line.setSoLuong(ct.getSoLuong());
+        line.setDonGia(ct.getDonGia());
+        line.setThanhTien(ct.getThanhTien());
+        return line;
+    }
+
+    private String buildBienThe(ChiTietSanPham cts) {
+        String dt = cts.getDungTichMl() != null
+                ? cts.getDungTichMl().stripTrailingZeros().toPlainString() + "ml"
+                : null;
+        String ms = cts.getMauSac() != null ? cts.getMauSac().getTen() : null;
+        if (dt != null && ms != null) {
+            return dt + " · " + ms;
+        }
+        if (dt != null) {
+            return dt;
+        }
+        return ms;
+    }
+
+    private String resolveAnhUrl(Integer idSanPham) {
+        if (idSanPham == null) {
+            return null;
+        }
+        return anhSanPhamRepository.findFirstBySanPham_IdAndLaAnhChinhTrue(idSanPham)
+                .or(() -> anhSanPhamRepository.findFirstBySanPham_IdOrderByThuTuAsc(idSanPham))
+                .map(AnhSanPham::getUrl)
+                .orElse(null);
+    }
+
+    private List<StorefrontReturnTimelineStepResponse> buildTimeline(YeuCauTraHang yc) {
+        HoaDon hoaDon = yc.getIdHoaDon();
+        List<LichSuDonHang> logs = hoaDon == null
+                ? List.of()
+                : lichSuDonHangRepository.findByIdHoaDon_IdOrderByThoiGianDesc(hoaDon.getId());
+        Map<String, LocalDateTime> firstTimeByStep = new LinkedHashMap<>();
+        for (int i = logs.size() - 1; i >= 0; i--) {
+            LichSuDonHang ls = logs.get(i);
+            String mapped = mapLogToTimelineStep(ls.getTrangThai());
+            if (mapped != null && !firstTimeByStep.containsKey(mapped)) {
+                firstTimeByStep.put(mapped, ls.getThoiGian());
+            }
+        }
+        if (!firstTimeByStep.containsKey("CHO_DUYET") && yc.getNgayTao() != null) {
+            firstTimeByStep.put("CHO_DUYET", yc.getNgayTao());
+        }
+        if (yc.getNgayNhanHang() != null) {
+            firstTimeByStep.putIfAbsent("DA_NHAN_HANG", yc.getNgayNhanHang());
+        }
+
+        TrangThaiTraHang status = yc.getTrangThai();
+        boolean rejected = status == TrangThaiTraHang.TU_CHOI;
+        List<String> steps = rejected
+                ? List.of("CHO_DUYET", "TU_CHOI")
+                : List.of("CHO_DUYET", "DA_DUYET", "DANG_HOAN_HANG", "DA_NHAN_HANG", "HOAN_TAT");
+        int activeIndex = status == null ? 0 : Math.max(0, steps.indexOf(status.name()));
+
+        List<StorefrontReturnTimelineStepResponse> result = new ArrayList<>();
+        for (int i = 0; i < steps.size(); i++) {
+            String ma = steps.get(i);
+            StorefrontReturnTimelineStepResponse step = new StorefrontReturnTimelineStepResponse();
+            step.setMa(ma);
+            step.setLabel(timelineLabel(ma));
+            step.setThoiGian(firstTimeByStep.get(ma));
+            if (i < activeIndex) {
+                step.setTrangThai("done");
+            } else if (i == activeIndex) {
+                step.setTrangThai("active");
+            } else {
+                step.setTrangThai("pending");
+            }
+            result.add(step);
+        }
+        return result;
+    }
+
+    private static String mapLogToTimelineStep(String log) {
+        if (log == null) {
+            return null;
+        }
+        return switch (log) {
+            case "YEU_CAU_TRA_HANG" -> "CHO_DUYET";
+            case "TRA_HANG_DA_DUYET" -> "DA_DUYET";
+            case "TRA_HANG_TU_CHOI" -> "TU_CHOI";
+            case "TRA_HANG_DANG_HOAN" -> "DANG_HOAN_HANG";
+            case "TRA_HANG_DA_NHAN_HANG", "TRA_HANG_GHN_DA_VE" -> "DA_NHAN_HANG";
+            case "HOAN_TIEN_HOAN_TAT", "HOAN_TIEN_TU_CHOI" -> "HOAN_TAT";
+            default -> null;
+        };
+    }
+
+    private static String timelineLabel(String ma) {
+        return switch (ma) {
+            case "CHO_DUYET" -> "Chờ duyệt";
+            case "DA_DUYET" -> "Đã duyệt";
+            case "TU_CHOI" -> "Từ chối";
+            case "DANG_HOAN_HANG" -> "Đang hoàn hàng";
+            case "DA_NHAN_HANG" -> "Đã nhận hàng";
+            case "HOAN_TAT" -> "Hoàn tất";
+            default -> ma;
+        };
     }
 
     private List<MultipartFile> filterValidFiles(List<MultipartFile> files) {

@@ -5,7 +5,7 @@ import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import GanLoDonHangModal from '@/components/admin/orders/GanLoDonHangModal.vue'
 import { getHoaDonDetail, getLichSu, taoVanDonGhn, dongBoGhn, giaLapWebhookGhn, tuChoiDon } from '@/api/hoaDonApi'
-import { confirm } from '@/composables/useConfirm'
+import { confirm, alertDialog } from '@/composables/useConfirm'
 import { subscribeAdminOrders } from '@/composables/useRealtime'
 import { GHN_STATUS_OPTIONS } from '@/constants/ghnStatuses'
 import { formatCurrency } from '@/utils/format'
@@ -35,12 +35,20 @@ const selectedGhnStatus = ref(GHN_STATUS_OPTIONS[0]?.value || '')
 const webhookGhiChu = ref('')
 
 const TRANG_THAI_KET_THUC = new Set(['HOAN_THANH', 'TRA_HANG', 'DA_HUY'])
+const TRANG_THAI_TAO_VAN_DON = new Set(['DA_XAC_NHAN', 'DANG_CHUAN_BI', 'DANG_GIAO'])
 
 const coTheTaoVanDon = computed(
   () =>
     detail.value &&
     !detail.value.maVanDonGhn &&
-    !TRANG_THAI_KET_THUC.has(detail.value.trangThai),
+    TRANG_THAI_TAO_VAN_DON.has(detail.value.trangThai),
+)
+
+const choXacNhanChuaCoVanDon = computed(
+  () =>
+    detail.value &&
+    !detail.value.maVanDonGhn &&
+    detail.value.trangThai === 'CHO_XAC_NHAN',
 )
 
 const coTheXacNhanDon = computed(() => detail.value?.trangThai === 'CHO_XAC_NHAN')
@@ -69,6 +77,14 @@ const canCapNhatWebhook = computed(
 )
 
 function notifyGhn(text, type = 'success') {
+  if (type === 'error') {
+    void alertDialog({
+      title: 'Không tạo được vận đơn GHN',
+      message: String(text || 'Không tạo được vận đơn GHN. Vui lòng thử lại.'),
+      confirmText: 'Đóng',
+    })
+    return
+  }
   ghnMessage.value = text
   ghnMessageType.value = type
   setTimeout(() => { ghnMessage.value = '' }, 5000)
@@ -103,11 +119,8 @@ async function handleXacNhanDon() {
 async function onGanLoSuccess() {
   notifyAction('Đã xác nhận đơn và cập nhật phân bổ lô', 'success')
   await loadDetail()
-  const ghnOk = await tryTaoVanDonSauXacNhan()
+  await tryTaoVanDonSauXacNhan()
   await loadDetail()
-  if (!ghnOk && !detail.value?.maVanDonGhn) {
-    notifyAction('Đơn đã xác nhận nhưng chưa tạo được vận đơn GHN. Xem thông báo bên phần GHN.', 'error')
-  }
 }
 
 function onGanLoError(message) {
@@ -642,7 +655,10 @@ onUnmounted(() => {
             Mã vận đơn: <span class="soleil-sp-code">{{ detail.maVanDonGhn }}</span>
           </p>
           <p v-else class="hoa-don-ghn__hint">
-            <template v-if="coTheTaoVanDon">
+            <template v-if="choXacNhanChuaCoVanDon">
+              Cần xác nhận đơn hàng trước khi tạo vận đơn GHN.
+            </template>
+            <template v-else-if="coTheTaoVanDon">
               Đơn chưa có vận đơn GHN. Bấm "Tạo vận đơn GHN" để thử lại (ví dụ khi tạo tự động lúc xác nhận thất bại).
             </template>
             <template v-else>

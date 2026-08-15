@@ -1,27 +1,26 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { Icon } from '@iconify/vue'
 import { formatVND } from '@/utils/formatVND'
 import { productImageUrl } from '@/utils/productImage'
-import { formatOrderDate, orderStatusLabel, coTheHuyDon } from '@/utils/orderStatus'
-import {
-  hoanTienStatusClass,
-  hoanTienStatusLabel,
-  traHangStatusClass,
-  traHangStatusLabel,
-} from '@/utils/returnStatus'
+import { formatOrderDate, orderStatusLabel, orderStatusClass, coTheHuyDon } from '@/utils/orderStatus'
+import { traHangStatusLabel, traHangStatusClass } from '@/utils/returnStatus'
 
 const props = defineProps({
   order: { type: Object, required: true },
-  defaultOpen: { type: Boolean, default: true },
+  defaultOpen: { type: Boolean, default: false },
   cancelLoading: { type: Boolean, default: false },
   returnActionLoading: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['review', 'cancelOrder', 'requestReturn', 'createReturnLabel'])
+const emit = defineEmits(['review', 'cancelOrder', 'requestReturn'])
 
-const isOpen = ref(props.defaultOpen)
+const router = useRouter()
+const hasReturnRequest = computed(() => Boolean(props.order?.idYeuCauTraHang))
+const isOpen = ref(Boolean(props.defaultOpen) && !hasReturnRequest.value)
 
-const steps = ['Đặt hàng', 'Chờ Xác nhận','Đã xác nhận', 'Vận chuyển', 'Đã nhận']
+const steps = ['Đặt hàng', 'Chờ Xác nhận', 'Đã xác nhận', 'Vận chuyển', 'Đã nhận']
 
 const timelineSteps = computed(() => {
   const status = props.order?.trangThai
@@ -45,9 +44,29 @@ const canCancel = computed(() => coTheHuyDon(props.order?.trangThai))
 
 const canRequestReturn = computed(() => props.order?.coTheYeuCauTraHang === true)
 
-const canCreateReturnLabel = computed(() => props.order?.trangThaiTraHang === 'DA_DUYET')
+const headerStatus = computed(() => {
+  if (props.order?.trangThaiTraHang) {
+    return props.order.trangThaiTraHangLabel || traHangStatusLabel(props.order.trangThaiTraHang)
+  }
+  return orderStatusLabel(props.order?.trangThai)
+})
 
-const hasReturnInfo = computed(() => Boolean(props.order?.trangThaiTraHang || props.order?.trangThaiHoanTien))
+const headerStatusClass = computed(() => {
+  if (props.order?.trangThaiTraHang) {
+    return traHangStatusClass(props.order.trangThaiTraHang)
+  }
+  return orderStatusClass(props.order?.trangThai)
+})
+
+const paymentLabel = computed(() => {
+  const ma = String(props.order?.maPhuongThucThanhToan || '').toUpperCase()
+  const map = {
+    COD: 'Thanh toán khi nhận hàng',
+    VNPAY: 'VNPAY',
+    CHUYEN_KHOAN: 'Chuyển khoản',
+  }
+  return map[ma] || ''
+})
 
 const productPreview = computed(() => {
   const order = props.order || {}
@@ -70,41 +89,28 @@ const productPreview = computed(() => {
   }
 })
 
-// Trả hàng đã hoàn tất khi cửa hàng đã nhận lại hàng (hoặc đã hoàn tất).
-const returnReceived = computed(() =>
-  ['DA_NHAN_HANG', 'HOAN_TAT'].includes(props.order?.trangThaiTraHang),
-)
-
-const shippingText = computed(() => {
+const shippingInfo = computed(() => {
   const order = props.order || {}
-  // Nhãn giao hàng dựa trên trạng thái thực tế để tránh hiện "Chờ lấy hàng" khi đã giao/đã trả.
   let statusLabel = order.ghnTrangThaiLabel
-  if (returnReceived.value) {
-    statusLabel = 'Đã trả hàng'
-  } else if (order.trangThai === 'HOAN_THANH' || order.trangThai === 'TRA_HANG') {
-    // Đơn đã giao xong (kể cả đang trong quá trình trả) → hiển thị "Đã giao".
+  if (order.trangThai === 'HOAN_THANH' || order.trangThai === 'TRA_HANG') {
     statusLabel = 'Đã giao'
   }
-  if (order.maVanDon) {
-    const carrier = order.donViVanChuyen || 'Giao hàng nhanh'
-    const status = statusLabel ? ` · ${statusLabel}` : ''
-    return `${carrier} · Mã vận đơn: ${order.maVanDon}${status}`
+  const showEta = Boolean(
+    order.ghnHenGiao && order.trangThai !== 'HOAN_THANH' && order.trangThai !== 'TRA_HANG',
+  )
+  return {
+    carrier: order.donViVanChuyen || (order.maVanDon ? 'Giao hàng nhanh' : ''),
+    trackingCode: order.maVanDon || '',
+    statusLabel: statusLabel || '',
+    eta: showEta ? formatOrderDate(order.ghnHenGiao) : '',
   }
-  if (order.phiVanChuyen > 0) {
-    return `Phí vận chuyển ${formatVND(order.phiVanChuyen)}`
-  }
-  return 'Chưa có thông tin vận chuyển'
 })
 
-// Trạng thái vận đơn hoàn: khi cửa hàng đã nhận, hiển thị rõ thay vì nhãn GHN cũ ("Chờ lấy hàng").
-const returnTrackingStatus = computed(() => {
-  if (returnReceived.value) {
-    return 'Đã nhận hàng về cửa hàng'
+function onHeadClick() {
+  if (hasReturnRequest.value && props.order?.idYeuCauTraHang) {
+    router.push(`/tra-cuu-don/tra-hang/${props.order.idYeuCauTraHang}`)
+    return
   }
-  return props.order?.ghnTrangThaiTraLabel || ''
-})
-
-function toggleOpen() {
   isOpen.value = !isOpen.value
 }
 
@@ -115,42 +121,58 @@ function canReview(line) {
 </script>
 
 <template>
-  <article v-if="order" class="sf-order-card" :class="{ open: isOpen }">
-    <button type="button" class="sf-order-card__head" @click="toggleOpen">
-      <div class="sf-order-card__head-left">
-        <img
-          :src="productImageUrl(productPreview.anhUrl)"
-          :alt="productPreview.tenSanPham"
-          class="sf-order-card__thumb"
-        />
-        <div class="sf-order-card__preview-wrap">
-          <div class="sf-order-card__preview">
-            {{ productPreview.tenSanPham }}
-          </div>
-          <div class="sf-order-card__preview-meta">
-            <span v-if="productPreview.soLuong">x{{ productPreview.soLuong }}</span>
-            <span v-if="productPreview.more">{{ productPreview.more }}</span>
-          </div>
+  <article v-if="order" class="sf-order-card" :class="{ open: isOpen && !hasReturnRequest }">
+    <button type="button" class="sf-order-card__head" @click="onHeadClick">
+      <div class="sf-order-card__head-main">
+        <div v-if="order.maHoaDon || order.maVanDonTra" class="sf-order-card__codes">
+          <p v-if="order.maHoaDon" class="sf-order-card__code">{{ order.maHoaDon }}</p>
+          <span v-if="order.maVanDonTra" class="sf-order-card__return-code">
+            {{ order.maVanDonTra }}
+          </span>
         </div>
-      </div>
+        <div class="sf-order-card__head-row">
+          <div class="sf-order-card__head-left">
+            <img
+              :src="productImageUrl(productPreview.anhUrl)"
+              :alt="productPreview.tenSanPham"
+              class="sf-order-card__thumb"
+            />
+            <div class="sf-order-card__preview-wrap">
+              <div class="sf-order-card__preview">
+                {{ productPreview.tenSanPham }}
+              </div>
+              <div class="sf-order-card__preview-meta">
+                <span v-if="productPreview.soLuong">x{{ productPreview.soLuong }}</span>
+                <span v-if="productPreview.more">{{ productPreview.more }}</span>
+              </div>
+            </div>
+          </div>
 
-      <div class="sf-order-card__head-right">
-        <div class="sf-order-card__head-summary">
-          <strong class="sf-order-card__amount">{{ formatVND(order.thanhTien) }}</strong>
-          <span class="sf-order-card__status-text">{{ orderStatusLabel(order.trangThai) }}</span>
+          <div class="sf-order-card__head-right">
+            <div class="sf-order-card__head-summary">
+              <strong class="sf-order-card__amount">{{ formatVND(order.thanhTien) }}</strong>
+              <span class="sf-order-badge" :class="headerStatusClass">
+                <span class="sf-order-badge__dot"></span>
+                {{ headerStatus }}
+              </span>
+            </div>
+            <span class="sf-order-card__chevron">{{ hasReturnRequest ? '›' : '▾' }}</span>
+          </div>
         </div>
-        <span class="sf-order-card__chevron">▾</span>
       </div>
     </button>
 
-    <div class="sf-order-card__body">
-      <p class="sf-order-card__order-code">
-        <template v-if="order.maHoaDon">
-          Mã đơn: <strong>{{ order.maHoaDon }}</strong>
-          <span v-if="order.ngayTao"> · </span>
-        </template>
-        <span v-if="order.ngayTao">{{ formatOrderDate(order.ngayTao) }}</span>
-      </p>
+    <div v-if="!hasReturnRequest" class="sf-order-card__body">
+      <div v-if="order.ngayTao || paymentLabel" class="sf-detail-meta">
+        <span v-if="order.ngayTao" class="sf-info-chip">
+          <Icon icon="mdi:calendar-blank-outline" width="14" />
+          {{ formatOrderDate(order.ngayTao) }}
+        </span>
+        <span v-if="paymentLabel" class="sf-info-chip">
+          <Icon icon="mdi:wallet-outline" width="14" />
+          {{ paymentLabel }}
+        </span>
+      </div>
 
       <div v-if="!isCancelled && !isReturned" class="sf-order-timeline">
         <div class="sf-order-timeline__row">
@@ -168,30 +190,52 @@ function canReview(line) {
         </div>
       </div>
 
-      <div class="sf-order-detail-grid">
-        <div class="sf-order-detail-block">
-          <label>Địa chỉ nhận hàng</label>
-          <p>
-            <strong v-if="order.tenNguoiNhan">{{ order.tenNguoiNhan }}</strong>
-            <span v-if="order.tenNguoiNhan && order.sdtNguoiNhan"> · </span>
-            <span v-if="order.sdtNguoiNhan">{{ order.sdtNguoiNhan }}</span>
-            <br v-if="order.tenNguoiNhan || order.sdtNguoiNhan" />
-            {{ order.diaChiGiao || 'Chưa có địa chỉ giao hàng' }}
-          </p>
+      <div class="sf-info-tiles">
+        <div class="sf-info-tile">
+          <div class="sf-info-tile__icon" aria-hidden="true">
+            <Icon icon="mdi:map-marker-outline" width="18" />
+          </div>
+          <div class="sf-info-tile__body">
+            <span class="sf-info-tile__label">Người nhận</span>
+            <p class="sf-info-tile__value">{{ order.tenNguoiNhan || '—' }}</p>
+            <div v-if="order.sdtNguoiNhan" class="sf-info-tile__chips">
+              <span class="sf-info-chip">
+                <Icon icon="mdi:phone-outline" width="14" />
+                {{ order.sdtNguoiNhan }}
+              </span>
+            </div>
+            <p class="sf-info-tile__sub">{{ order.diaChiGiao || 'Chưa có địa chỉ giao hàng' }}</p>
+          </div>
         </div>
-        <div class="sf-order-detail-block">
-          <label>Vận chuyển</label>
-          <p>{{ shippingText }}</p>
-          <p
-            v-if="order.ghnHenGiao && order.trangThai !== 'HOAN_THANH' && order.trangThai !== 'TRA_HANG'"
-            class="sf-order-detail-block__muted"
-          >
-            Dự kiến giao: {{ formatOrderDate(order.ghnHenGiao) }}
-          </p>
+
+        <div class="sf-info-tile">
+          <div class="sf-info-tile__icon sf-info-tile__icon--ship" aria-hidden="true">
+            <Icon icon="mdi:truck-delivery-outline" width="18" />
+          </div>
+          <div class="sf-info-tile__body">
+            <span class="sf-info-tile__label">Vận chuyển</span>
+            <p class="sf-info-tile__value">
+              {{ shippingInfo.carrier || 'Chưa có thông tin vận chuyển' }}
+            </p>
+            <div v-if="shippingInfo.trackingCode || shippingInfo.statusLabel" class="sf-info-tile__chips">
+              <span v-if="shippingInfo.trackingCode" class="sf-code-pill">
+                {{ shippingInfo.trackingCode }}
+              </span>
+              <span v-if="shippingInfo.statusLabel" class="sf-info-chip sf-info-chip--status">
+                {{ shippingInfo.statusLabel }}
+              </span>
+            </div>
+            <p v-if="shippingInfo.eta" class="sf-info-tile__sub sf-info-tile__sub--accent">
+              Dự kiến giao {{ shippingInfo.eta }}
+            </p>
+          </div>
         </div>
       </div>
 
-      <div class="sf-order-products-label">Sản phẩm</div>
+      <div class="sf-detail-section-head">
+        <Icon icon="mdi:package-variant-closed" width="16" />
+        Sản phẩm
+      </div>
       <ul class="sf-order-card__lines">
         <li v-for="(line, idx) in order.chiTiets || []" :key="idx" class="sf-order-line">
           <img
@@ -251,52 +295,7 @@ function canReview(line) {
         · {{ formatOrderDate(order.capNhatGanNhatLuc) }}
       </p>
 
-      <div v-if="hasReturnInfo" class="sf-order-return-info">
-        <div v-if="order.trangThaiTraHang" class="sf-order-return-row">
-          <span class="sf-order-return-label">Trả hàng</span>
-          <span
-            class="sf-order-badge"
-            :class="traHangStatusClass(order.trangThaiTraHang)"
-          >
-            <span class="sf-order-badge__dot"></span>
-            {{ order.trangThaiTraHangLabel || traHangStatusLabel(order.trangThaiTraHang) }}
-          </span>
-        </div>
-        <p
-          v-if="order.trangThaiTraHang === 'TU_CHOI' && order.lyDoTuChoiTraHang"
-          class="sf-order-return-reason"
-        >
-          Lý do từ chối: <strong>{{ order.lyDoTuChoiTraHang }}</strong>
-        </p>
-        <p
-          v-else-if="order.trangThaiTraHang === 'TU_CHOI'"
-          class="sf-order-return-reason"
-        >
-          Yêu cầu trả hàng đã bị từ chối. Bạn không thể gửi yêu cầu mới cho đơn này.
-        </p>
-        <p v-if="order.maVanDonTra" class="sf-order-return-tracking">
-          Mã vận đơn hoàn: <strong>{{ order.maVanDonTra }}</strong>
-          <template v-if="returnTrackingStatus"> · {{ returnTrackingStatus }}</template>
-        </p>
-        <p v-if="order.pickShiftLabel" class="sf-order-return-tracking">
-          Ca lấy hàng: <strong>{{ order.pickShiftLabel }}</strong>
-        </p>
-        <div v-if="order.trangThaiHoanTien" class="sf-order-return-row">
-          <span class="sf-order-return-label">Hoàn tiền</span>
-          <span
-            class="sf-order-badge"
-            :class="hoanTienStatusClass(order.trangThaiHoanTien)"
-          >
-            <span class="sf-order-badge__dot"></span>
-            {{ order.trangThaiHoanTienLabel || hoanTienStatusLabel(order.trangThaiHoanTien) }}
-          </span>
-        </div>
-        <p v-if="order.maGiaoDichHoan" class="sf-order-return-tracking">
-          Mã GD hoàn: <strong>{{ order.maGiaoDichHoan }}</strong>
-        </p>
-      </div>
-
-      <div v-if="canCancel || canRequestReturn || canCreateReturnLabel" class="sf-order-card__actions">
+      <div v-if="canCancel || canRequestReturn" class="sf-order-card__actions">
         <button
           v-if="canCancel"
           type="button"
@@ -315,24 +314,11 @@ function canReview(line) {
         >
           Yêu cầu trả hàng
         </button>
-        <button
-          v-if="canCreateReturnLabel"
-          type="button"
-          class="sf-btn-return-order"
-          :disabled="returnActionLoading"
-          @click.stop="emit('createReturnLabel', order)"
-        >
-          {{ returnActionLoading ? 'Đang tạo vận đơn...' : 'Tạo vận đơn hoàn hàng' }}
-        </button>
         <p v-if="canCancel" class="sf-order-card__cancel-hint">
           Có thể hủy khi đơn chưa chuyển sang trạng thái đang giao.
         </p>
         <p v-if="canRequestReturn" class="sf-order-card__cancel-hint">
           Đơn đã giao thành công — bạn có thể gửi yêu cầu trả hàng.
-        </p>
-        <p v-if="canCreateReturnLabel" class="sf-order-card__cancel-hint">
-          Yêu cầu đã được duyệt — tạo vận đơn và chọn ca lấy hàng để gửi sản phẩm về cửa hàng.
-          Cửa hàng sẽ xử lý hoàn tiền sau khi nhận và kiểm tra hàng.
         </p>
       </div>
     </div>
@@ -430,54 +416,5 @@ function canReview(line) {
   flex-basis: 100%;
   font-size: 12px;
   color: rgba(30, 21, 16, 0.55);
-}
-
-.sf-order-return-info {
-  margin-top: 16px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: rgba(196, 149, 84, 0.08);
-  border: 1px solid rgba(196, 149, 84, 0.2);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.sf-order-return-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.sf-order-return-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(30, 21, 16, 0.65);
-  min-width: 72px;
-}
-
-.sf-order-return-tracking {
-  margin: 0;
-  font-size: 13px;
-  color: rgba(30, 21, 16, 0.75);
-}
-
-.sf-order-return-reason {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.45;
-  color: #a83a3a;
-}
-
-.sf-order-card__order-code {
-  margin: 0 0 0.85rem;
-  font-size: 0.8rem;
-  color: rgba(30, 21, 16, 0.55);
-}
-
-.sf-order-card__order-code strong {
-  color: rgba(30, 21, 16, 0.78);
-  font-weight: 600;
 }
 </style>

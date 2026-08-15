@@ -16,15 +16,18 @@ public class OnlineTinhGiaRequest {
 
     private String maPhieuGiamGia;
 
-    /** ID phường/xã đơn vị hành chính mới (GHN v3). */
-    private Integer toWardIdV2;
+    /** Tên tỉnh/thành — địa chỉ 2 cấp. */
+    private String toProvinceName;
 
-    /** Địa chỉ text để tính phí với địa chỉ mới. */
+    /** Tên phường/xã — địa chỉ 2 cấp. */
+    private String toWardName;
+
+    /** Địa chỉ cụ thể (số nhà, đường). */
     private String toAddressV2;
 
     /** Legacy 3 cấp. */
     private Integer toDistrictId;
 
-    /** Legacy / hoặc String.valueOf(toWardIdV2). */
+    /** Legacy ward code. */
     private String toWardCode;
 }

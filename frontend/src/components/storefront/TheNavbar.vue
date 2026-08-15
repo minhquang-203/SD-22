@@ -74,7 +74,7 @@ async function toggleNotif(e) {
 async function goToNotif(item) {
   notifOpen.value = false
   await markNotifRead(item)
-  router.push(item?.link || '/don-hang')
+  router.push(item?.link || '/tra-cuu-don')
 }
 
 async function markAllNotifications() {
@@ -159,13 +159,7 @@ function isLinkActive(link) {
     return path === '/quiz'
   }
   if (link.to === '/tra-cuu-don') {
-    return path === '/tra-cuu-don'
-  }
-  if (link.to === '/san-pham/goi-y') {
-    return path === '/san-pham/goi-y'
-  }
-  if (link.to === '/don-hang') {
-    return path === '/don-hang'
+    return path === '/tra-cuu-don' || path.startsWith('/tra-cuu-don/')
   }
 
   return path === link.to
@@ -280,7 +274,7 @@ function toggleUser(e) {
             </button>
             <div v-if="userOpen" class="sf-user-dropdown" @click.stop>
               <RouterLink to="/tai-khoan" @click="userOpen = false">Tài khoản</RouterLink>
-              <RouterLink to="/don-hang" @click="userOpen = false">Đơn hàng</RouterLink>
+              <RouterLink to="/tra-cuu-don" @click="userOpen = false">Tra cứu đơn</RouterLink>
               <button type="button" @click="handleLogout">Đăng xuất</button>
             </div>
           </div>

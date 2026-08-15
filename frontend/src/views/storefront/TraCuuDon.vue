@@ -1,19 +1,18 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+import AccountSidebar from '@/components/storefront/AccountSidebar.vue'
 import OrderCard from '@/components/storefront/OrderCard.vue'
 import ProductReviewModal from '@/components/storefront/ProductReviewModal.vue'
-import ReturnPickShiftModal from '@/components/storefront/ReturnPickShiftModal.vue'
 import ReturnRequestCodModal from '@/components/storefront/ReturnRequestCodModal.vue'
 import ReturnRequestWalletModal from '@/components/storefront/ReturnRequestWalletModal.vue'
 import { confirm } from '@/composables/useConfirm'
-import { getCustomerId } from '@/composables/useAuth'
 import { toast } from '@/composables/useToast'
 import { subscribeCustomerOrders } from '@/composables/useRealtime'
 import { fetchChiTietDonCuaToi, fetchDonCuaToi, huyDonCuaToi } from '@/api/donHangApi'
-import { taoVanDonTra } from '@/api/traHangApi'
 
 const route = useRoute()
+const router = useRouter()
 const search = ref(typeof route.query.ma === 'string' ? route.query.ma : '')
 const currentFilter = ref('all')
 const loading = ref(true)
@@ -27,10 +26,7 @@ const cancelNotice = ref('')
 const cancelError = ref('')
 const showReturnModal = ref(false)
 const returnOrder = ref(null)
-const returnActionLoadingId = ref(null)
 const returnNotice = ref('')
-const showPickShiftModal = ref(false)
-const pickShiftOrder = ref(null)
 
 let unsubscribeRealtime = null
 
@@ -39,7 +35,8 @@ const filters = [
   { value: 'shipping', label: 'Đang giao' },
   { value: 'processing', label: 'Đang xử lý' },
   { value: 'delivered', label: 'Đã giao' },
-  { value: 'cancelled', label: 'Đã hủy / Trả hàng' },
+  { value: 'cancelled', label: 'Đã hủy' },
+  { value: 'returned', label: 'Trả hàng' },
 ]
 
 onMounted(() => {
@@ -55,13 +52,20 @@ onUnmounted(() => {
   unsubscribeRealtime = null
 })
 
+watch(
+  () => route.query.ma,
+  (ma) => {
+    if (typeof ma === 'string') search.value = ma
+  },
+)
+
 const filteredOrders = computed(() => {
   const q = search.value.trim().toLowerCase()
   return orders.value.filter((order) => {
-    const matchFilter = currentFilter.value === 'all' || statusGroup(order.trangThai) === currentFilter.value
-    const matchSearch = !q ||
-      String(order.maHoaDon || '').toLowerCase().includes(q) ||
-      (order.chiTiets || []).some((line) => String(line.tenSanPham || '').toLowerCase().includes(q))
+    const matchFilter = currentFilter.value === 'all' || statusGroup(order) === currentFilter.value
+    const matchSearch = !q
+      || String(order.maHoaDon || '').toLowerCase().includes(q)
+      || (order.chiTiets || []).some((line) => String(line.tenSanPham || '').toLowerCase().includes(q))
     return matchFilter && matchSearch
   })
 })
@@ -128,17 +132,19 @@ async function applyRealtimeOrder(event) {
   }
 }
 
-function statusGroup(status) {
+function statusGroup(order) {
+  if (order?.idYeuCauTraHang || order?.trangThaiTraHang || order?.trangThai === 'TRA_HANG') {
+    return 'returned'
+  }
   const map = {
     CHO_XAC_NHAN: 'processing',
     DA_XAC_NHAN: 'processing',
     DANG_CHUAN_BI: 'processing',
     DANG_GIAO: 'shipping',
     HOAN_THANH: 'delivered',
-    TRA_HANG: 'cancelled',
     DA_HUY: 'cancelled',
   }
-  return map[status] || 'processing'
+  return map[order?.trangThai] || 'processing'
 }
 
 function openReview(line) {
@@ -173,72 +179,14 @@ function closeReturn() {
   returnOrder.value = null
 }
 
-async function onReturnSubmitted(result) {
+function onReturnSubmitted(result) {
+  closeReturn()
+  const returnId = result?.id
+  if (returnId) {
+    router.push(`/tra-cuu-don/tra-hang/${returnId}`)
+    return
+  }
   returnNotice.value = 'Đã gửi yêu cầu trả hàng. Cửa hàng sẽ sớm phản hồi.'
-  const orderId = returnOrder.value?.id || result?.idHoaDon
-  if (!orderId) return
-  try {
-    const res = await fetchChiTietDonCuaToi(orderId)
-    const idx = orders.value.findIndex((item) => item.id === orderId)
-    if (idx >= 0 && res.data) {
-      orders.value[idx] = res.data
-    }
-  } catch {
-    // giữ nguyên
-  }
-}
-
-function openPickShift(order) {
-  if (!order?.idYeuCauTraHang || returnActionLoadingId.value) return
-  if (!getCustomerId()) {
-    toast('Vui lòng đăng nhập để tạo vận đơn hoàn hàng.', 'warn')
-    return
-  }
-  pickShiftOrder.value = order
-  showPickShiftModal.value = true
-}
-
-function closePickShift() {
-  showPickShiftModal.value = false
-  pickShiftOrder.value = null
-}
-
-async function handleCreateReturnLabel(pickShiftId) {
-  const order = pickShiftOrder.value
-  if (!order?.idYeuCauTraHang || returnActionLoadingId.value) return
-
-  const idKhachHang = getCustomerId()
-  if (!idKhachHang) {
-    toast('Vui lòng đăng nhập để tạo vận đơn hoàn hàng.', 'warn')
-    return
-  }
-
-  returnActionLoadingId.value = order.id
-  try {
-    const res = await taoVanDonTra(order.idYeuCauTraHang, idKhachHang, pickShiftId)
-    const updated = res.data
-    const idx = orders.value.findIndex((item) => item.id === order.id)
-    if (idx >= 0 && updated) {
-      orders.value[idx] = {
-        ...orders.value[idx],
-        trangThaiTraHang: updated.trangThai,
-        trangThaiTraHangLabel: updated.trangThaiLabel,
-        maVanDonTra: updated.maVanDonTra,
-        pickShiftLabel: updated.pickShiftLabel,
-        idYeuCauTraHang: updated.id,
-        coTheYeuCauTraHang: false,
-      }
-    }
-    returnNotice.value = updated?.maVanDonTra
-      ? `Đã tạo vận đơn hoàn: ${updated.maVanDonTra}`
-      : 'Đã tạo vận đơn hoàn hàng.'
-    toast(returnNotice.value, 'info')
-    closePickShift()
-  } catch (err) {
-    toast(typeof err === 'string' ? err : 'Không tạo được vận đơn hoàn hàng.', 'warn')
-  } finally {
-    returnActionLoadingId.value = null
-  }
 }
 
 async function handleCancelOrder(order) {
@@ -272,67 +220,76 @@ async function handleCancelOrder(order) {
 </script>
 
 <template>
-  <div class="sf-order-page">
+  <div class="sf-account-page">
     <div class="sf-container">
       <nav class="sf-breadcrumb">
         <RouterLink to="/">Trang chủ</RouterLink>
         <span>/</span>
-        <span>Đơn hàng của tôi</span>
+        <RouterLink to="/tai-khoan">Tài khoản</RouterLink>
+        <span>/</span>
+        <span>Tra cứu đơn</span>
       </nav>
 
-      <section class="sf-order-content">
-        <div class="sf-order-filter-bar">
-          <label class="sf-order-filter-search">
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.35-4.35" />
-            </svg>
-            <input v-model="search" type="search" placeholder="Tìm theo tên sản phẩm, mã đơn..." autocomplete="off" />
-          </label>
+      <h1 class="sf-account-page__title">Trung tâm tài khoản</h1>
 
-          <div class="sf-order-filter-chips">
-            <button
-              v-for="filter in filters"
-              :key="filter.value"
-              type="button"
-              class="sf-order-chip"
-              :class="{ 'sf-order-chip--active': currentFilter === filter.value }"
-              @click="currentFilter = filter.value"
-            >
-              {{ filter.label }}
-            </button>
+      <div class="sf-account-layout">
+        <AccountSidebar />
+
+        <div class="sf-account-main sf-account-main--orders">
+          <h2 class="sf-account-main__heading">Tra cứu đơn</h2>
+          <p class="sf-account-main__sub">Tìm và theo dõi đơn hàng của bạn theo mã hóa đơn hoặc tên sản phẩm.</p>
+
+          <div class="sf-order-filter-bar">
+            <label class="sf-order-filter-search">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
+              <input v-model="search" type="search" placeholder="Tìm theo tên sản phẩm, mã hóa đơn..." autocomplete="off" />
+            </label>
+
+            <div class="sf-order-filter-chips">
+              <button
+                v-for="filter in filters"
+                :key="filter.value"
+                type="button"
+                class="sf-order-chip"
+                :class="{ 'sf-order-chip--active': currentFilter === filter.value }"
+                @click="currentFilter = filter.value"
+              >
+                {{ filter.label }}
+              </button>
+            </div>
+          </div>
+
+          <p v-if="error" class="sf-order-msg sf-order-msg--err">{{ error }}</p>
+          <p v-if="cancelError" class="sf-order-msg sf-order-msg--err">{{ cancelError }}</p>
+          <p v-if="reviewNotice" class="sf-order-msg sf-order-msg--ok">{{ reviewNotice }}</p>
+          <p v-if="cancelNotice" class="sf-order-msg sf-order-msg--ok">{{ cancelNotice }}</p>
+          <p v-if="returnNotice" class="sf-order-msg sf-order-msg--ok">{{ returnNotice }}</p>
+
+          <div v-if="loading" class="sf-order-skeleton" />
+
+          <div v-else-if="filteredOrders.length" class="sf-order-list">
+            <OrderCard
+              v-for="order in filteredOrders"
+              :key="order.id"
+              :order="order"
+              :default-open="false"
+              :cancel-loading="cancelLoadingId === order.id"
+              @review="openReview"
+              @cancel-order="handleCancelOrder"
+              @request-return="openReturn"
+            />
+          </div>
+
+          <div v-else class="sf-order-empty">
+            <div class="sf-order-empty__emoji">📦</div>
+            <h3>Không có đơn hàng nào</h3>
+            <p>Chưa có đơn hàng phù hợp với bộ lọc bạn chọn.</p>
           </div>
         </div>
-
-        <p v-if="error" class="sf-order-msg sf-order-msg--err">{{ error }}</p>
-        <p v-if="cancelError" class="sf-order-msg sf-order-msg--err">{{ cancelError }}</p>
-        <p v-if="reviewNotice" class="sf-order-msg sf-order-msg--ok">{{ reviewNotice }}</p>
-        <p v-if="cancelNotice" class="sf-order-msg sf-order-msg--ok">{{ cancelNotice }}</p>
-        <p v-if="returnNotice" class="sf-order-msg sf-order-msg--ok">{{ returnNotice }}</p>
-
-        <div v-if="loading" class="sf-order-skeleton" />
-
-        <div v-else-if="filteredOrders.length" class="sf-order-list">
-          <OrderCard
-            v-for="(order, idx) in filteredOrders"
-            :key="order.id"
-            :order="order"
-            :default-open="idx === 0"
-            :cancel-loading="cancelLoadingId === order.id"
-            :return-action-loading="returnActionLoadingId === order.id"
-            @review="openReview"
-            @cancel-order="handleCancelOrder"
-            @request-return="openReturn"
-            @create-return-label="openPickShift"
-          />
-        </div>
-
-        <div v-else class="sf-order-empty">
-          <div class="sf-order-empty__emoji">📦</div>
-          <h3>Không có đơn hàng nào</h3>
-          <p>Chưa có đơn hàng phù hợp với bộ lọc bạn chọn.</p>
-        </div>
-      </section>
+      </div>
     </div>
 
     <ProductReviewModal
@@ -355,14 +312,6 @@ async function handleCancelOrder(order) {
       :order="returnOrder"
       @close="closeReturn"
       @submitted="onReturnSubmitted"
-    />
-
-    <ReturnPickShiftModal
-      :visible="showPickShiftModal"
-      :order="pickShiftOrder"
-      :submitting="returnActionLoadingId === pickShiftOrder?.id"
-      @close="closePickShift"
-      @confirm="handleCreateReturnLabel"
     />
   </div>
 </template>

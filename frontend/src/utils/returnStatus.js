@@ -65,3 +65,18 @@ export function hoanTienStatusTone(trangThai) {
   if (trangThai === 'CHO_XU_LY') return 'warning'
   return 'neutral'
 }
+
+export function maskBankAccount(value) {
+  const digits = String(value || '').replace(/\s+/g, '')
+  if (digits.length <= 4) return digits
+  return `${'•'.repeat(Math.max(4, digits.length - 4))}${digits.slice(-4)}`
+}
+
+export function refundMethodLabel(phuongThuc, fallback = '') {
+  const map = {
+    VNPAY: 'Ví VNPAY',
+    CHUYEN_KHOAN: 'Chuyển khoản',
+    COD: 'Chuyển khoản',
+  }
+  return map[String(phuongThuc || '').toUpperCase()] || fallback || phuongThuc || '—'
+}

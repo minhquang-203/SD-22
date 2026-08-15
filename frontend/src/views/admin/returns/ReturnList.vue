@@ -415,7 +415,7 @@ onMounted(() => {
           />
         </div>
       </div>
-      <button type="button" class="soleil-btn-outline" style="align-self: flex-end" @click="loadList">
+      <button type="button" class="admin-btn admin-btn-default" style="align-self: flex-end" @click="loadList">
         <Icon icon="icon-park-outline:refresh" />
         Tải lại
       </button>
@@ -482,7 +482,7 @@ onMounted(() => {
                   <div class="action-row">
                     <button
                       type="button"
-                      class="soleil-act-btn-round"
+                      class="admin-btn admin-btn-default"
                       title="Chi tiết"
                       @click="toggleExpand(item.id)"
                     >
@@ -491,7 +491,7 @@ onMounted(() => {
                     <template v-if="item.trangThai === 'CHO_DUYET'">
                       <button
                         type="button"
-                        class="act-btn act-btn--ok"
+                        class="admin-btn admin-btn-info"
                         :disabled="actionLoading === item.id"
                         @click="handleDuyet(item)"
                       >
@@ -499,7 +499,7 @@ onMounted(() => {
                       </button>
                       <button
                         type="button"
-                        class="act-btn act-btn--danger"
+                        class="admin-btn admin-btn-danger"
                         :disabled="actionLoading === item.id"
                         @click="openReject(item)"
                       >
@@ -509,7 +509,7 @@ onMounted(() => {
                     <button
                       v-if="item.trangThai === 'DANG_HOAN_HANG' && item.maVanDonTra"
                       type="button"
-                      class="act-btn act-btn--ok"
+                      class="admin-btn admin-btn-info"
                       :disabled="actionLoading === item.id"
                       @click="handleDaNhanHang(item)"
                     >
@@ -518,7 +518,7 @@ onMounted(() => {
                     <button
                       v-if="item.trangThai === 'DA_NHAN_HANG'"
                       type="button"
-                      class="act-btn act-btn--info"
+                      class="admin-btn admin-btn-info"
                       title="Quyết định hoàn tiền hay từ chối"
                       @click="router.push('/admin/hoan-tien')"
                     >
@@ -572,8 +572,8 @@ onMounted(() => {
           Hiển thị {{ pagedItems.length }} / {{ filteredItems.length }} yêu cầu
         </span>
         <div class="soleil-pagination__btns">
-          <button type="button" class="soleil-page-btn" :disabled="page <= 1" @click="page--">Trước</button>
-          <button type="button" class="soleil-page-btn" :disabled="page >= totalPages" @click="page++">Sau</button>
+          <button type="button" class="admin-btn admin-btn-default" :disabled="page <= 1" @click="page--">Trước</button>
+          <button type="button" class="admin-btn admin-btn-default" :disabled="page >= totalPages" @click="page++">Sau</button>
         </div>
       </div>
     </div>
@@ -590,10 +590,10 @@ onMounted(() => {
           placeholder="Nhập lý do từ chối (tùy chọn)..."
         />
         <div class="modal-actions">
-          <button type="button" class="soleil-btn-outline" @click="closeReject">Hủy</button>
+          <button type="button" class="admin-btn admin-btn-default" @click="closeReject">Hủy</button>
           <button
             type="button"
-            class="act-btn act-btn--danger"
+            class="admin-btn admin-btn-danger"
             :disabled="actionLoading === rejectTarget?.id"
             @click="confirmReject"
           >
@@ -681,10 +681,10 @@ onMounted(() => {
         </template>
 
         <div class="modal-actions">
-          <button type="button" class="soleil-btn-outline" @click="closeReceive">Hủy</button>
+          <button type="button" class="admin-btn admin-btn-default" @click="closeReceive">Hủy</button>
           <button
             type="button"
-            class="act-btn act-btn--ok"
+            class="admin-btn admin-btn-info"
             :disabled="actionLoading === receiveTarget?.id || receiveLoading"
             @click="confirmReceive"
           >
@@ -788,19 +788,11 @@ onMounted(() => {
   justify-content: center;
   align-items: center;
 }
-.act-btn {
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: none;
-  font-size: 12px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
+.action-row .admin-btn {
+  padding: 5px 12px;
+  font-size: 13px;
+  border-radius: 6px;
 }
-.act-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-.act-btn--ok { background: rgba(72, 140, 82, 0.14); color: #3d7a4a; }
-.act-btn--danger { background: rgba(180, 72, 72, 0.12); color: #a83a3a; }
-.act-btn--info { background: rgba(72, 120, 180, 0.12); color: #3a6ea8; }
 .ghn-status {
   display: block;
   font-size: 11px;
@@ -885,7 +877,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: 999px;
+  border-radius: 8px;
   background: #fff;
   color: #0f172a;
   cursor: pointer;
@@ -1000,7 +992,7 @@ onMounted(() => {
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 12px;
   margin-top: 16px;
 }
 </style>

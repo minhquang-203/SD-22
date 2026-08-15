@@ -28,7 +28,7 @@ public class CreateShippingOrderRequest {
     /** Tên phường/xã (dùng khi isNewToAddress). */
     private String toWardName;
 
-    /** Mã/ID phường xã — với địa chỉ mới là String.valueOf(ward_id_v2). */
+    /** Legacy: mã phường/xã GHN cũ. Địa chỉ 2 cấp không dùng field này. */
     private String toWardCode;
 
     /** Legacy: mã quận/huyện GHN cũ. */

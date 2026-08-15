@@ -100,15 +100,19 @@ const router = createRouter({
         },
         {
           path: 'don-hang',
-          name: 'DonHang',
-          component: () => import('@/views/storefront/DonHang.vue'),
-          meta: { title: 'Đơn hàng của tôi — SUNOVA', requiresAuth: true },
+          redirect: '/tra-cuu-don',
         },
         {
           path: 'tra-cuu-don',
           name: 'TraCuuDon',
           component: () => import('@/views/storefront/TraCuuDon.vue'),
           meta: { title: 'Tra cứu đơn hàng — SUNOVA', requiresAuth: true },
+        },
+        {
+          path: 'tra-cuu-don/tra-hang/:id',
+          name: 'DonTraHang',
+          component: () => import('@/views/storefront/DonTraHang.vue'),
+          meta: { title: 'Đơn trả hàng — SUNOVA', requiresAuth: true },
         },
         ...infoRoutes,
         {

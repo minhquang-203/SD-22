@@ -314,7 +314,7 @@ async function onWardChange() {
 }
 
 async function recalcShippingFee() {
-  if (!isNewWardCode(form.wardCode) || !form.diaChiCuThe.trim()) {
+  if (!form.tinhThanh.trim() || !form.phuongXa.trim() || !form.diaChiCuThe.trim()) {
     ghnFee.value = null
     feeNotice.value = ''
     return
@@ -322,7 +322,8 @@ async function recalcShippingFee() {
   feeLoading.value = true
   try {
     const res = await calcShippingFee({
-      toWardIdV2: Number(form.wardCode),
+      toProvinceName: form.tinhThanh.trim(),
+      toWardName: form.phuongXa.trim(),
       toAddressV2: form.diaChiCuThe.trim(),
       toWardCode: form.wardCode,
     })
@@ -385,7 +386,8 @@ async function previewVoucherPricing(code = form.maPhieuGiamGia) {
     const res = await tinhGiaOnline({
       idsChiTietGioHang: selectedItems.value.map((line) => line.idChiTietGioHang),
       maPhieuGiamGia: normalized,
-      toWardIdV2: isNewWardCode(form.wardCode) ? Number(form.wardCode) : undefined,
+      toProvinceName: form.tinhThanh.trim() || undefined,
+      toWardName: form.phuongXa.trim() || undefined,
       toAddressV2: form.diaChiCuThe.trim() || undefined,
       toWardCode: form.wardCode || undefined,
     })
@@ -504,7 +506,6 @@ async function submitCheckout() {
       ghiChu: compactText(noteParts.join(' | ')),
       tenNguoiNhan: form.hoTen.trim(),
       sdtNguoiNhan: form.soDienThoai.trim(),
-      toWardIdV2: Number(form.wardCode),
       toAddressV2: form.diaChiCuThe.trim(),
       toProvinceName: form.tinhThanh.trim(),
       toWardName: form.phuongXa.trim(),
@@ -616,7 +617,7 @@ onMounted(() => {
           </template>
         </p>
         <div class="sf-checkout-success__actions">
-          <RouterLink to="/don-hang" class="btn-soleil"><span>Xem đơn hàng</span></RouterLink>
+          <RouterLink to="/tra-cuu-don" class="btn-soleil"><span>Xem đơn hàng</span></RouterLink>
           <RouterLink to="/san-pham" class="sf-checkout-link">Tiếp tục mua sắm</RouterLink>
         </div>
       </section>
@@ -634,7 +635,7 @@ onMounted(() => {
           {{ paymentCallback?.message || 'Giao dịch không hợp lệ hoặc đã bị hủy. Vui lòng thử lại.' }}
         </p>
         <div class="sf-checkout-success__actions">
-          <RouterLink to="/don-hang" class="btn-soleil"><span>Xem đơn hàng</span></RouterLink>
+          <RouterLink to="/tra-cuu-don" class="btn-soleil"><span>Xem đơn hàng</span></RouterLink>
           <RouterLink to="/gio-hang" class="sf-checkout-link">Quay lại giỏ hàng</RouterLink>
         </div>
       </section>

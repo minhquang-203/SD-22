@@ -31,25 +31,22 @@ public class OnlineCheckoutRequest {
     /** So dien thoai nguoi nhan thuc te. Neu trong se lay theo tai khoan. */
     private String sdtNguoiNhan;
 
-    /** ID phường/xã đơn vị hành chính mới (GHN v3). */
-    private Integer toWardIdV2;
-
-    /** Địa chỉ text cụ thể để tính phí (GHN to_address_v2). */
+    /** Địa chỉ cụ thể (số nhà, đường). */
     @NotBlank(message = "Vui lòng nhập địa chỉ cụ thể")
     private String toAddressV2;
 
-    /** Tên tỉnh/thành (địa chỉ mới). */
+    /** Tên tỉnh/thành — địa chỉ 2 cấp (GHN to_province_name). */
     private String toProvinceName;
 
-    /** Tên phường/xã (địa chỉ mới). */
+    /** Tên phường/xã — địa chỉ 2 cấp (GHN to_ward_name). */
     private String toWardName;
 
     /** Legacy: mã quận/huyện GHN cũ — không bắt buộc với địa chỉ 2 cấp. */
     private Integer toDistrictId;
 
     /**
-     * Mã phường/xã: với địa chỉ mới là String.valueOf(toWardIdV2).
-     * Vẫn bắt buộc để lưu lên hóa đơn / tạo vận đơn.
+     * Mã phường/xã lưu trên hóa đơn (ward id v3 hoặc ward code cũ).
+     * Tạo vận đơn 2 cấp dùng tên, không gửi mã này lên GHN.
      */
     @NotBlank(message = "Vui lòng chọn phường/xã giao hàng")
     private String toWardCode;
