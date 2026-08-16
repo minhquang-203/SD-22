@@ -1,6 +1,7 @@
 package org.example.templatejava6.shipping.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.shipping.client.GhnClient;
 import org.example.templatejava6.shipping.config.GhnProperties;
@@ -35,6 +36,7 @@ public class ShippingService {
     private static final Logger log = LoggerFactory.getLogger(ShippingService.class);
     private static final Collator VI_COLLATOR = Collator.getInstance(new Locale("vi", "VN"));
     private static final int PAGE_SIZE = 200;
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final GhnClient ghnClient;
     private final GhnProperties properties;
@@ -139,28 +141,27 @@ public class ShippingService {
         long fallback = properties.getFallbackFee() != null ? properties.getFallbackFee() : 0L;
         if (!properties.isFeeConfigured()) {
             return ShippingFeeResponse.fallback(fallback,
-                    "Chưa cấu hình đầy đủ GHN (ShopId / kho gửi), áp dụng phí mặc định.");
+                    "Chưa cấu hình đầy đủ GHN (ShopId), áp dụng phí mặc định.");
         }
         if (request == null) {
             return ShippingFeeResponse.fallback(fallback, "Thiếu địa chỉ nhận hàng, áp dụng phí mặc định.");
         }
 
-        Integer toWardIdV2 = resolveToWardIdV2(request);
-        boolean useNewToAddress = toWardIdV2 != null;
+        boolean useNewToAddress = isNewNameAddress(request.getToProvinceName(), request.getToWardName())
+                || looksLikeNewWardCode(request.getToWardCode());
+        if (useNewToAddress && (isBlank(request.getToProvinceName()) || isBlank(request.getToWardName()))) {
+            return ShippingFeeResponse.fallback(fallback,
+                    "Thiếu tên tỉnh/thành hoặc phường/xã, áp dụng phí mặc định.");
+        }
         if (!useNewToAddress
                 && (request.getToDistrictId() == null
                 || request.getToWardCode() == null || request.getToWardCode().isBlank())) {
             return ShippingFeeResponse.fallback(fallback, "Thiếu địa chỉ nhận hàng, áp dụng phí mặc định.");
         }
 
-        String toAddressV2 = request.getToAddressV2();
-        if (useNewToAddress && (toAddressV2 == null || toAddressV2.isBlank())) {
-            toAddressV2 = "Địa chỉ nhận hàng";
-        }
-
-        Integer serviceId = useNewToAddress
-                ? resolveServiceIdForNewToAddress(toWardIdV2, toAddressV2)
-                : resolveServiceIdLegacy(request.getToDistrictId());
+        Integer serviceId = !useNewToAddress && request.getToDistrictId() != null
+                ? resolveServiceIdLegacy(request.getToDistrictId())
+                : null;
 
         Map<String, Object> body = new LinkedHashMap<>();
         if (serviceId != null) {
@@ -168,17 +169,13 @@ public class ShippingService {
         } else {
             body.put("service_type_id", properties.getServiceTypeId());
         }
-        // Kho gửi: giữ địa chỉ cũ
-        body.put("is_new_from_address", false);
-        body.put("from_district_id", properties.getFromDistrictId());
-        if (properties.getFromWardCode() != null && !properties.getFromWardCode().isBlank()) {
-            body.put("from_ward_code", properties.getFromWardCode());
-        }
+        putFromWarehouseFromConfig(body);
 
         if (useNewToAddress) {
             body.put("is_new_to_address", true);
-            body.put("to_ward_id_v2", toWardIdV2);
-            body.put("to_address_v2", toAddressV2);
+            body.put("to_province_name", request.getToProvinceName().trim());
+            body.put("to_ward_name", request.getToWardName().trim());
+            body.put("to_address", firstNonBlank(request.getToAddressV2(), "Địa chỉ nhận hàng"));
         } else {
             body.put("is_new_to_address", false);
             body.put("to_district_id", request.getToDistrictId());
@@ -201,43 +198,11 @@ public class ShippingService {
             }
             return ShippingFeeResponse.fallback(fallback, "GHN không trả về phí, áp dụng phí mặc định.");
         } catch (RestClientException ex) {
-            log.warn("GHN tính phí thất bại (new={}, to_ward_id_v2={}, to_district={}, service_id={}): {}",
-                    useNewToAddress, toWardIdV2, request.getToDistrictId(), serviceId, ghnError(ex));
+            log.warn("GHN tính phí thất bại (new={}, tinh={}, phuong={}, to_district={}): {}",
+                    useNewToAddress, request.getToProvinceName(), request.getToWardName(),
+                    request.getToDistrictId(), ghnError(ex));
             return ShippingFeeResponse.fallback(fallback, "Không tính được phí GHN, áp dụng phí mặc định.");
         }
-    }
-
-    private Integer resolveToWardIdV2(ShippingFeeRequest request) {
-        if (request.getToWardIdV2() != null) {
-            return request.getToWardIdV2();
-        }
-        // Frontend có thể gửi ward id mới trong toWardCode (string số >= 1000000)
-        if (request.getToWardCode() != null && !request.getToWardCode().isBlank()) {
-            try {
-                int id = Integer.parseInt(request.getToWardCode().trim());
-                if (id >= 1_000_000) {
-                    return id;
-                }
-            } catch (NumberFormatException ignored) {
-                // ward code cũ dạng chuỗi alphanumeric
-            }
-        }
-        return null;
-    }
-
-    private Integer resolveServiceIdForNewToAddress(Integer toWardIdV2, String toAddressV2) {
-        Integer shopId = parseShopId();
-        if (shopId == null || toWardIdV2 == null) {
-            return null;
-        }
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("shop_id", shopId);
-        body.put("is_new_from_address", false);
-        body.put("from_district", properties.getFromDistrictId());
-        body.put("is_new_to_address", true);
-        body.put("to_ward_id_v2", toWardIdV2);
-        body.put("to_address_v2", toAddressV2 != null ? toAddressV2 : "");
-        return pickServiceId(body, "new-to ward=" + toWardIdV2);
     }
 
     private Integer resolveServiceIdLegacy(Integer toDistrictId) {
@@ -300,9 +265,48 @@ public class ShippingService {
 
     private String ghnError(RestClientException ex) {
         if (ex instanceof RestClientResponseException re) {
-            return re.getStatusCode() + " " + re.getResponseBodyAsString();
+            String body = re.getResponseBodyAsString();
+            String extracted = extractGhnMessage(body);
+            if (extracted != null && !extracted.isBlank()) {
+                return extracted;
+            }
+            return re.getStatusCode() + " " + body;
         }
         return ex.getMessage();
+    }
+
+    private static String extractGhnMessage(String body) {
+        if (body == null || body.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode node = JSON.readTree(body);
+            String message = text(node, "message_display");
+            if (message == null) {
+                message = text(node, "message");
+            }
+            if (message == null) {
+                message = text(node, "code_message");
+            }
+            return message;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static String ghnCreateFailMessage(String chiTiet) {
+        String detail = chiTiet != null ? chiTiet.trim() : "";
+        String lower = detail.toLowerCase();
+        if (lower.contains("kho") || lower.contains("warehouse")) {
+            return "Không tạo được vận đơn GHN vì không lấy được thông tin kho gửi. "
+                    + "Khai báo GHN_FROM_WARD_NAME / GHN_FROM_PROVINCE_NAME (địa chỉ 2 cấp) "
+                    + "hoặc kiểm tra ShopId trên GHN. "
+                    + (detail.isBlank() ? "" : "Chi tiết: " + detail);
+        }
+        if (detail.isBlank()) {
+            return "Không tạo được vận đơn GHN.";
+        }
+        return "Không tạo được vận đơn GHN. " + detail;
     }
 
     private String ghnMessage(JsonNode response) {
@@ -326,25 +330,14 @@ public class ShippingService {
         }
 
         boolean isNewTo = Boolean.TRUE.equals(request.getIsNewToAddress())
+                || isNewNameAddress(request.getToProvinceName(), request.getToWardName())
                 || looksLikeNewWardCode(request.getToWardCode());
 
-        Integer toWardIdV2 = null;
-        if (isNewTo && request.getToWardCode() != null) {
-            try {
-                toWardIdV2 = Integer.parseInt(request.getToWardCode().trim());
-            } catch (NumberFormatException ignored) {
-                // dùng ward name
-            }
-        }
-
-        Integer serviceId;
-        if (isNewTo && toWardIdV2 != null) {
-            serviceId = resolveServiceIdForNewToAddress(toWardIdV2, request.getToAddress());
-        } else if (!isNewTo && request.getToDistrictId() != null) {
-            serviceId = resolveServiceIdLegacy(request.getToDistrictId());
-        } else {
-            serviceId = null;
-        }
+        // available-services chi nhan from_district/to_district (ID cu). Voi dia chi 2 cap
+        // khong co district nen bo qua, dung service_type_id.
+        Integer serviceId = !isNewTo && request.getToDistrictId() != null
+                ? resolveServiceIdLegacy(request.getToDistrictId())
+                : null;
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("payment_type_id", 2);
@@ -353,20 +346,18 @@ public class ShippingService {
         body.put("to_phone", request.getToPhone());
         body.put("to_address", request.getToAddress());
 
-        // Kho gửi cũ
-        body.put("is_new_from_address", false);
+        putFromWarehouse(body);
 
         if (isNewTo) {
+            // Dia chi 2 cap (GHN docs id=122): chi gui TEN, khong gui to_ward_code / to_district_id.
+            if (isBlank(request.getToProvinceName()) || isBlank(request.getToWardName())) {
+                throw new ApiException(
+                        "Thiếu tên tỉnh/thành hoặc phường/xã người nhận (địa chỉ 2 cấp).",
+                        "GHN_MISSING_ADDRESS");
+            }
             body.put("is_new_to_address", true);
-            if (request.getToProvinceName() != null && !request.getToProvinceName().isBlank()) {
-                body.put("to_province_name", request.getToProvinceName().trim());
-            }
-            if (request.getToWardName() != null && !request.getToWardName().isBlank()) {
-                body.put("to_ward_name", request.getToWardName().trim());
-            }
-            if (request.getToWardCode() != null && !request.getToWardCode().isBlank()) {
-                body.put("to_ward_code", request.getToWardCode().trim());
-            }
+            body.put("to_province_name", request.getToProvinceName().trim());
+            body.put("to_ward_name", request.getToWardName().trim());
         } else {
             body.put("is_new_to_address", false);
             body.put("to_ward_code", request.getToWardCode());
@@ -395,8 +386,7 @@ public class ShippingService {
             JsonNode data = response != null ? response.path("data") : null;
             if (data == null || data.isMissingNode() || !data.hasNonNull("order_code")) {
                 String chiTiet = ghnMessage(response);
-                log.warn("GHN không trả về mã vận đơn (new={}, ward={}, service_id={}): {}",
-                        isNewTo, request.getToWardCode(), serviceId, chiTiet);
+                log.warn("GHN không trả về mã vận đơn (new={}, request={}): {}", isNewTo, body, chiTiet);
                 throw new ApiException("GHN không trả về mã vận đơn. Phản hồi GHN: " + chiTiet, "GHN_ERROR");
             }
             return new CreateShippingOrderResponse(
@@ -405,9 +395,8 @@ public class ShippingService {
                     text(data, "expected_delivery_time"));
         } catch (RestClientException ex) {
             String chiTiet = ghnError(ex);
-            log.warn("GHN tạo vận đơn thất bại (new={}, ward={}, service_id={}): {}",
-                    isNewTo, request.getToWardCode(), serviceId, chiTiet);
-            throw new ApiException("Không tạo được vận đơn GHN. Lỗi GHN: " + chiTiet, "GHN_ERROR");
+            log.warn("GHN tạo vận đơn thất bại (new={}, request={}): {}", isNewTo, body, chiTiet);
+            throw new ApiException(ghnCreateFailMessage(chiTiet), "GHN_ERROR");
         }
     }
 
@@ -422,52 +411,33 @@ public class ShippingService {
         }
     }
 
+    private static boolean isNewNameAddress(String provinceName, String wardName) {
+        return !isBlank(provinceName) && !isBlank(wardName);
+    }
+
     /**
      * Tao van don hoan tra hang: nguoi gui la khach hang (from_*), nguoi nhan la shop.
-     * Neu dia chi khach la 2 cap moi thi dung is_new_from_address.
+     * Dia chi 2 cap: chi gui ten tinh/phuong, khong gui from_ward_code.
      */
     public CreateShippingOrderResponse createReturnOrder(ReturnShippingOrderRequest request) {
         if (!properties.isFeeConfigured()) {
             throw new ApiException("Chưa cấu hình ShopId / kho gửi của GHN.", "GHN_NOT_CONFIGURED");
         }
-        boolean newFrom = looksLikeNewWardCode(request.getFromWardCode());
+        boolean newFrom = isNewNameAddress(request.getFromProvinceName(), request.getFromWardName())
+                || looksLikeNewWardCode(request.getFromWardCode());
+        if (newFrom && (isBlank(request.getFromProvinceName()) || isBlank(request.getFromWardName()))) {
+            throw new ApiException(
+                    "Thiếu tên tỉnh/thành hoặc phường/xã của địa chỉ lấy hàng trả.", "GHN_MISSING_ADDRESS");
+        }
         if (!newFrom && (request.getFromDistrictId() == null
                 || request.getFromWardCode() == null || request.getFromWardCode().isBlank())) {
             throw new ApiException(
                     "Thiếu quận/huyện hoặc phường/xã của địa chỉ lấy hàng trả.", "GHN_MISSING_ADDRESS");
         }
-        if (newFrom && (request.getFromWardCode() == null || request.getFromWardCode().isBlank())) {
-            throw new ApiException("Thiếu phường/xã của địa chỉ lấy hàng trả.", "GHN_MISSING_ADDRESS");
-        }
 
-        Integer fromWardIdV2 = null;
-        if (newFrom) {
-            try {
-                fromWardIdV2 = Integer.parseInt(request.getFromWardCode().trim());
-            } catch (NumberFormatException ex) {
-                throw new ApiException("Mã phường/xã trả hàng không hợp lệ.", "GHN_MISSING_ADDRESS");
-            }
-        }
-
-        Integer serviceId;
-        if (newFrom && fromWardIdV2 != null) {
-            // available-services: from = new customer, to = old shop
-            Integer shopId = parseShopId();
-            if (shopId == null) {
-                serviceId = null;
-            } else {
-                Map<String, Object> svcBody = new LinkedHashMap<>();
-                svcBody.put("shop_id", shopId);
-                svcBody.put("is_new_from_address", true);
-                svcBody.put("from_ward_id_v2", fromWardIdV2);
-                svcBody.put("from_address_v2", request.getFromAddress());
-                svcBody.put("is_new_to_address", false);
-                svcBody.put("to_district", properties.getFromDistrictId());
-                serviceId = pickServiceId(svcBody, "return new-from -> shop");
-            }
-        } else {
-            serviceId = resolveServiceId(request.getFromDistrictId(), properties.getFromDistrictId());
-        }
+        Integer serviceId = !newFrom
+                ? resolveServiceId(request.getFromDistrictId(), properties.getFromDistrictId())
+                : null;
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("payment_type_id", 1);
@@ -477,25 +447,18 @@ public class ShippingService {
         body.put("from_address", request.getFromAddress());
         if (newFrom) {
             body.put("is_new_from_address", true);
-            body.put("from_ward_code", request.getFromWardCode());
-            if (request.getFromProvinceName() != null && !request.getFromProvinceName().isBlank()) {
-                body.put("from_province_name", request.getFromProvinceName().trim());
-            }
-            if (request.getFromWardName() != null && !request.getFromWardName().isBlank()) {
-                body.put("from_ward_name", request.getFromWardName().trim());
-            }
+            body.put("from_province_name", request.getFromProvinceName().trim());
+            body.put("from_ward_name", request.getFromWardName().trim());
         } else {
             body.put("is_new_from_address", false);
             body.put("from_ward_code", request.getFromWardCode());
             body.put("from_district_id", request.getFromDistrictId());
         }
 
-        body.put("is_new_to_address", false);
         body.put("to_name", orElse(properties.getShopName(), "SUNOVA Shop"));
         body.put("to_phone", orElse(properties.getShopPhone(), "0900000000"));
         body.put("to_address", orElse(properties.getShopAddress(), "Kho SUNOVA"));
-        body.put("to_ward_code", properties.getFromWardCode());
-        body.put("to_district_id", properties.getFromDistrictId());
+        putShopAsToAddress(body);
         if (serviceId != null) {
             body.put("service_id", serviceId);
         } else {
@@ -518,8 +481,8 @@ public class ShippingService {
             JsonNode data = response != null ? response.path("data") : null;
             if (data == null || data.isMissingNode() || !data.hasNonNull("order_code")) {
                 String chiTiet = ghnMessage(response);
-                log.warn("GHN không trả về mã vận đơn hoàn trả (from_ward={}): {}",
-                        request.getFromWardCode(), chiTiet);
+                log.warn("GHN không trả về mã vận đơn hoàn trả (from={}/{}): {}",
+                        request.getFromProvinceName(), request.getFromWardName(), chiTiet);
                 throw new ApiException("GHN không trả về mã vận đơn hoàn trả. Phản hồi GHN: " + chiTiet, "GHN_ERROR");
             }
             return new CreateShippingOrderResponse(
@@ -528,8 +491,8 @@ public class ShippingService {
                     text(data, "expected_delivery_time"));
         } catch (RestClientException ex) {
             String chiTiet = ghnError(ex);
-            log.warn("GHN tạo vận đơn hoàn trả thất bại (from_ward={}): {}",
-                    request.getFromWardCode(), chiTiet);
+            log.warn("GHN tạo vận đơn hoàn trả thất bại (from={}/{}): {}",
+                    request.getFromProvinceName(), request.getFromWardName(), chiTiet);
             throw new ApiException("Không tạo được vận đơn hoàn trả GHN. Lỗi GHN: " + chiTiet, "GHN_ERROR");
         }
     }
@@ -576,6 +539,78 @@ public class ShippingService {
         single.put("weight", request.getWeight() != null ? request.getWeight() : properties.getDefaultWeight());
         items.add(single);
         return items;
+    }
+
+    /**
+     * Kho gửi địa chỉ 2 cấp: chỉ gửi tên khi đã khai báo env (GHN_FROM_WARD_NAME /
+     * GHN_FROM_PROVINCE_NAME). Không tự suy từ district_id / ward_code cũ — tên xã cũ
+     * (vd. Xã Đồng Tiến) không còn trên master data 2 cấp, GHN sẽ báo ward not found.
+     * Thiếu tên thì bỏ from_* để GHN lấy kho theo ShopId.
+     */
+    private void putFromWarehouse(Map<String, Object> body) {
+        putFromWarehouseFromConfig(body);
+        if (!body.containsKey("from_ward_name")) {
+            log.info("Không gửi from_ward_name/from_province_name, GHN lấy kho theo ShopId {}.",
+                    properties.getShopId());
+        }
+    }
+
+    /** Tính phí: chỉ gửi tên kho nếu đã khai báo env, không gọi thêm API shop. */
+    private void putFromWarehouseFromConfig(Map<String, Object> body) {
+        if (isBlank(properties.getFromWardName()) || isBlank(properties.getFromProvinceName())) {
+            return;
+        }
+        body.put("is_new_from_address", true);
+        body.put("from_ward_name", properties.getFromWardName().trim());
+        body.put("from_province_name", properties.getFromProvinceName().trim());
+        if (!isBlank(properties.getShopName())) {
+            body.put("from_name", properties.getShopName().trim());
+        }
+        if (!isBlank(properties.getShopPhone())) {
+            body.put("from_phone", sanitizePhone(properties.getShopPhone()));
+        }
+        if (!isBlank(properties.getShopAddress())) {
+            body.put("from_address", properties.getShopAddress().trim());
+        }
+    }
+
+    /** Người nhận của đơn hoàn là kho shop — cùng hợp đồng tên 2 cấp từ env, hoặc ShopId. */
+    private void putShopAsToAddress(Map<String, Object> body) {
+        if (isBlank(properties.getFromWardName()) || isBlank(properties.getFromProvinceName())) {
+            log.warn("Thiếu GHN_FROM_WARD_NAME / GHN_FROM_PROVINCE_NAME, để GHN lấy kho nhận theo ShopId {}.",
+                    properties.getShopId());
+            return;
+        }
+        body.put("is_new_to_address", true);
+        body.put("to_ward_name", properties.getFromWardName().trim());
+        body.put("to_province_name", properties.getFromProvinceName().trim());
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
+    }
+
+    private static String sanitizePhone(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String digits = raw.replaceAll("\\D+", "");
+        if (digits.startsWith("84") && digits.length() >= 11) {
+            digits = "0" + digits.substring(2);
+        }
+        return digits.isBlank() ? null : digits;
     }
 
     private void requireConfigured() {

@@ -60,10 +60,14 @@ const hasContent = computed(
 function iconForLoai(loai) {
   const map = {
     DON_HANG_MOI: 'icon-park-outline:shopping-bag',
+    DON_HANG: 'icon-park-outline:shopping-bag',
     THANH_TOAN_THANH_CONG: 'icon-park-outline:pay-code-one',
     YEU_CAU_TRA_HANG: 'icon-park-outline:return',
     YEU_CAU_HOAN_TIEN: 'icon-park-outline:wallet',
     HOAN_TIEN_HOAN_TAT: 'icon-park-outline:check-one',
+    KHUYEN_MAI: 'icon-park-outline:ticket',
+    UV: 'icon-park-outline:sun',
+    HE_THONG: 'icon-park-outline:remind',
   }
   return map[loai] || 'icon-park-outline:remind'
 }
@@ -77,6 +81,7 @@ function resolveNotifLink(item) {
     case 'HOAN_TIEN_HOAN_TAT':
       return '/admin/hoan-tien'
     case 'DON_HANG_MOI':
+    case 'DON_HANG':
     case 'THANH_TOAN_THANH_CONG':
       return item?.idThamChieu != null
         ? `/admin/hoa-don/chi-tiet/${item.idThamChieu}`
@@ -569,9 +574,25 @@ async function handleLogout() {
 }
 
 .admin-notif__item-icon[data-loai='DON_HANG_MOI'],
+.admin-notif__item-icon[data-loai='DON_HANG'],
 .admin-notif__item-icon[data-loai='THANH_TOAN_THANH_CONG'] {
   background: #eff6ff;
   color: #2563eb;
+}
+
+.admin-notif__item-icon[data-loai='KHUYEN_MAI'] {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.admin-notif__item-icon[data-loai='UV'] {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+.admin-notif__item-icon[data-loai='HE_THONG'] {
+  background: #f3f4f6;
+  color: #4b5563;
 }
 
 .admin-notif__item-body {

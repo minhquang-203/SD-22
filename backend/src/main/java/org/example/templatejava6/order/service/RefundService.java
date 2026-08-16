@@ -231,7 +231,7 @@ public class RefundService {
                 "Hoàn tiền thành công",
                 "Đơn " + hoaDon.getMaHoaDon() + " đã được hoàn "
                         + dinhDangTien(saved.getSoTien()) + ".",
-                "/don-hang",
+                linkKhachHoanTien(saved),
                 hoaDon.getId(),
                 hoaDon.getMaHoaDon());
         return new HoanTienResponse(saved, anhUrls);
@@ -291,7 +291,7 @@ public class RefundService {
                 "Hoàn tiền bị từ chối",
                 "Yêu cầu hoàn tiền cho đơn " + (hoaDon != null ? hoaDon.getMaHoaDon() : "") + " đã bị từ chối"
                         + (lyDo != null && !lyDo.isBlank() ? ": " + lyDo : "."),
-                "/don-hang",
+                linkKhachHoanTien(saved),
                 hoaDon != null ? hoaDon.getId() : null,
                 hoaDon != null ? hoaDon.getMaHoaDon() : null);
         return new HoanTienResponse(saved);
@@ -424,6 +424,13 @@ public class RefundService {
 
     private static Integer idKhachHangCua(HoaDon hoaDon) {
         return hoaDon != null && hoaDon.getIdKhachHang() != null ? hoaDon.getIdKhachHang().getId() : null;
+    }
+
+    private static String linkKhachHoanTien(HoanTien ht) {
+        if (ht != null && ht.getIdYeuCauTraHang() != null && ht.getIdYeuCauTraHang().getId() != null) {
+            return "/tra-cuu-don/tra-hang/" + ht.getIdYeuCauTraHang().getId();
+        }
+        return "/tra-cuu-don";
     }
 
     private void ghiNhatKy(HoaDon hoaDon, String trangThai, String ghiChu) {

@@ -7,12 +7,17 @@ const { visible, options } = useConfirmState()
 <template>
   <Teleport to="body">
     <div v-if="visible" class="confirm-dialog-overlay">
-      <div class="confirm-dialog-backdrop" @click="handleConfirmCancel" />
+      <div class="confirm-dialog-backdrop" @click="options.alertOnly ? handleConfirmOk() : handleConfirmCancel()" />
       <div class="confirm-dialog-panel" role="dialog" aria-modal="true">
         <h2 class="confirm-dialog-title">{{ options.title }}</h2>
         <p class="confirm-dialog-message">{{ options.message }}</p>
         <div class="confirm-dialog-actions">
-          <button type="button" class="soleil-btn-outline" @click="handleConfirmCancel">
+          <button
+            v-if="!options.alertOnly"
+            type="button"
+            class="soleil-btn-outline"
+            @click="handleConfirmCancel"
+          >
             {{ options.cancelText }}
           </button>
           <button

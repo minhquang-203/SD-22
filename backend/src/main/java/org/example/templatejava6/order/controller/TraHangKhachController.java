@@ -3,6 +3,7 @@ package org.example.templatejava6.order.controller;
 import jakarta.validation.Valid;
 import org.example.templatejava6.order.model.request.TaoVanDonTraRequest;
 import org.example.templatejava6.order.model.request.TaoYeuCauTraHangRequest;
+import org.example.templatejava6.order.model.response.StorefrontReturnDetailResponse;
 import org.example.templatejava6.order.model.response.YeuCauTraHangResponse;
 import org.example.templatejava6.order.service.ReturnRequestService;
 import org.example.templatejava6.shipping.model.response.GhnPickShiftResponse;
@@ -42,6 +43,13 @@ public class TraHangKhachController {
     @GetMapping("/tra-hang")
     public List<YeuCauTraHangResponse> danhSachCuaToi(@RequestParam Integer idKhachHang) {
         return returnRequestService.danhSachCuaToi(idKhachHang);
+    }
+
+    @GetMapping("/tra-hang/{id}")
+    public StorefrontReturnDetailResponse chiTietCuaToi(
+            @PathVariable Integer id,
+            @RequestParam Integer idKhachHang) {
+        return returnRequestService.chiTietCuaToi(idKhachHang, id);
     }
 
     /** Ca lay hang GHN de khach chon thoi diem shipper den lay hang tra. */

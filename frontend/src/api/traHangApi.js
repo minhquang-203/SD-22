@@ -21,6 +21,11 @@ export function fetchTraHangCuaToi(idKhachHang) {
   return request.get('/online/tra-hang', { params: { idKhachHang } })
 }
 
+/** Khách: chi tiết một yêu cầu trả hàng */
+export function fetchChiTietTraHangCuaToi(id, idKhachHang) {
+  return request.get(`/online/tra-hang/${id}`, { params: { idKhachHang } })
+}
+
 /** Khách: danh sách ca lấy hàng GHN để chọn thời điểm shipper đến lấy hàng trả */
 export function fetchCaLayHang() {
   return request.get('/online/tra-hang/ca-lay-hang')

@@ -26,7 +26,7 @@ public class GhnClient {
     public GhnClient(RestTemplateBuilder builder, GhnProperties properties) {
         this.restTemplate = builder
                 .connectTimeout(Duration.ofSeconds(5))
-                .readTimeout(Duration.ofSeconds(10))
+                .readTimeout(Duration.ofSeconds(20))
                 .build();
         this.properties = properties;
     }

@@ -7,6 +7,7 @@ const options = ref({
   confirmText: 'Xác nhận',
   cancelText: 'Hủy',
   danger: false,
+  alertOnly: false,
 })
 
 let resolver = null
@@ -23,6 +24,26 @@ export function confirm(opts = {}) {
       confirmText: opts.confirmText ?? 'Xác nhận',
       cancelText: opts.cancelText ?? 'Hủy',
       danger: opts.danger ?? false,
+      alertOnly: false,
+    }
+    visible.value = true
+    resolver = resolve
+  })
+}
+
+/**
+ * Hiện hộp thông báo lỗi/thông tin (một nút Đóng).
+ * @param {{ title?: string, message?: string, confirmText?: string }} opts
+ */
+export function alertDialog(opts = {}) {
+  return new Promise((resolve) => {
+    options.value = {
+      title: opts.title ?? 'Thông báo',
+      message: opts.message ?? '',
+      confirmText: opts.confirmText ?? 'Đóng',
+      cancelText: '',
+      danger: false,
+      alertOnly: true,
     }
     visible.value = true
     resolver = resolve

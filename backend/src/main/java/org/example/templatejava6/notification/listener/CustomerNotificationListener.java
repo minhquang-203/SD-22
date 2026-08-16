@@ -20,7 +20,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @Component
 public class CustomerNotificationListener {
 
-    private static final String LINK_DON_HANG = "/don-hang";
+    private static final String LINK_DON_HANG = "/tra-cuu-don";
 
     private final ThongBaoService thongBaoService;
 

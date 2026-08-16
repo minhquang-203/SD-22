@@ -199,15 +199,36 @@ h2,
 }
 
 .admin-btn-danger {
-  background: rgba(212, 98, 74, 0.08);
-  border-color: rgba(212, 98, 74, 0.28);
-  color: var(--coral);
+  background: #dc3545;
+  border-color: #dc3545;
+  color: #fff;
+}
+
+.admin-btn-danger:hover:not(:disabled) {
+  background: #bb2d3b;
+  border-color: #b02a37;
 }
 
 .admin-btn-success {
-  background: rgba(122, 140, 110, 0.12);
-  border-color: rgba(122, 140, 110, 0.28);
-  color: var(--sage);
+  background: #198754;
+  border-color: #198754;
+  color: #fff;
+}
+
+.admin-btn-success:hover:not(:disabled) {
+  background: #157347;
+  border-color: #146c43;
+}
+
+.admin-btn-info {
+  background: #0d6efd;
+  border-color: #0d6efd;
+  color: #fff;
+}
+
+.admin-btn-info:hover:not(:disabled) {
+  background: #0b5ed7;
+  border-color: #0a58ca;
 }
 
 .admin-input,

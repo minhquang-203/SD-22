@@ -14,5 +14,11 @@ public enum LoaiThongBao {
     TRA_HANG_DUOC_DUYET,
     TRA_HANG_BI_TU_CHOI,
     HOAN_TIEN_THANH_CONG,
-    HOAN_TIEN_BI_TU_CHOI
+    HOAN_TIEN_BI_TU_CHOI,
+
+    // Giá trị seed cũ — giữ để Hibernate đọc được dòng đã insert, không dùng khi tạo mới
+    DON_HANG,
+    KHUYEN_MAI,
+    UV,
+    HE_THONG
 }

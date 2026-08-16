@@ -87,6 +87,18 @@ public class HoaDon {
     @Column(name = "ghn_ward_code", length = 20)
     private String ghnWardCode;
 
+    /** Ten tinh/thanh nguoi nhan — GHN dia chi 2 cap dung to_province_name. */
+    @Size(max = 100)
+    @Nationalized
+    @Column(name = "ghn_province_name", length = 100)
+    private String ghnProvinceName;
+
+    /** Ten phuong/xa nguoi nhan — GHN dia chi 2 cap dung to_ward_name. */
+    @Size(max = 100)
+    @Nationalized
+    @Column(name = "ghn_ward_name", length = 100)
+    private String ghnWardName;
+
     @ColumnDefault("0")
     @Column(name = "thanh_tien", precision = 12)
     private BigDecimal thanhTien;

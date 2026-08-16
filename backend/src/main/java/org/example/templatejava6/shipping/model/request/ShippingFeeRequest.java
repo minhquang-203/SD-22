@@ -7,19 +7,19 @@ import lombok.Setter;
 @Setter
 public class ShippingFeeRequest {
 
-    /**
-     * ID phường/xã đơn vị hành chính mới (GHN v3 {@code _id}).
-     * Dùng với {@code is_new_to_address=true}.
-     */
-    private Integer toWardIdV2;
+    /** Tên tỉnh/thành — địa chỉ 2 cấp (GHN {@code to_province_name}). */
+    private String toProvinceName;
 
-    /** Địa chỉ text nhận hàng (bắt buộc khi tính phí bằng địa chỉ mới). */
+    /** Tên phường/xã — địa chỉ 2 cấp (GHN {@code to_ward_name}). */
+    private String toWardName;
+
+    /** Địa chỉ cụ thể (số nhà, đường). */
     private String toAddressV2;
 
-    /** Legacy 3 cấp — chỉ dùng khi không có toWardIdV2. */
+    /** Legacy 3 cấp — chỉ dùng khi thiếu tên tỉnh/phường. */
     private Integer toDistrictId;
 
-    /** Legacy ward code — chỉ dùng khi không có toWardIdV2. */
+    /** Legacy ward code — chỉ dùng khi thiếu tên tỉnh/phường. */
     private String toWardCode;
 
     /** Khoi luong don hang (gram). Neu trong se dung mac dinh trong cau hinh. */

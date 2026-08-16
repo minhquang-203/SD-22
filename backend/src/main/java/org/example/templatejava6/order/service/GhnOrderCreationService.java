@@ -1,5 +1,6 @@
 package org.example.templatejava6.order.service;
 
+import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.order.entity.HoaDon;
 import org.example.templatejava6.order.entity.HoaDonChiTiet;
@@ -25,8 +26,8 @@ import java.util.List;
 /**
  * Tao van don Giao Hang Nhanh (GHN) cho mot hoa don va luu lai ma van don.
  *
- * <p>Idempotent: neu hoa don da co {@code maVanDonGhn} thi bo qua. Yeu cau hoa don da luu
- * {@code ghnDistrictId} va {@code ghnWardCode} (lay tu buoc chon dia chi khi dat hang).</p>
+ * <p>Idempotent: neu hoa don da co {@code maVanDonGhn} thi bo qua. Dia chi 2 cap dung
+ * {@code ghnProvinceName} + {@code ghnWardName} (ten tinh/phuong luc dat hang).</p>
  */
 @Service
 public class GhnOrderCreationService {
@@ -67,12 +68,8 @@ public class GhnOrderCreationService {
         if (!ghnProperties.isFeeConfigured()) {
             return KetQua.boQua("Chua cau hinh GHN (ShopId / kho gui).");
         }
-        if (hoaDon.getGhnWardCode() == null || hoaDon.getGhnWardCode().isBlank()) {
-            return KetQua.boQua("Don thieu ma phuong/xa GHN.");
-        }
-        boolean newAddress = ShippingService.looksLikeNewWardCode(hoaDon.getGhnWardCode());
-        if (!newAddress && hoaDon.getGhnDistrictId() == null) {
-            return KetQua.boQua("Don thieu ma quan/huyen hoac phuong/xa GHN.");
+        if (!duDiaChiGhn(hoaDon)) {
+            return KetQua.boQua("Don thieu ten tinh/phuong hoac ma quan/huyen GHN.");
         }
         try {
             return taoVanDon(hoaDon);
@@ -89,22 +86,21 @@ public class GhnOrderCreationService {
     @Transactional
     public KetQua taoVanDonTheoId(Integer id) {
         HoaDon hoaDon = hoaDonRepository.findById(id)
-                .orElseThrow(() -> new ApiException("Khong tim thay hoa don.", "NOT_FOUND"));
+                .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn.", "NOT_FOUND"));
+        if (!canTaoVanDonGhn(hoaDon.getTrangThai())) {
+            throw new ApiException(
+                    "Cần xác nhận đơn hàng trước khi tạo vận đơn Giao Hàng Nhanh.",
+                    "INVALID_ORDER_STATUS");
+        }
         if (daCoVanDon(hoaDon)) {
-            return KetQua.boQua("Don da co ma van don GHN: " + hoaDon.getMaVanDonGhn());
+            return KetQua.boQua("Đơn đã có mã vận đơn GHN: " + hoaDon.getMaVanDonGhn());
         }
         if (!ghnProperties.isFeeConfigured()) {
-            throw new ApiException("Chua cau hinh ShopId / kho gui cua GHN.", "GHN_NOT_CONFIGURED");
+            throw new ApiException("Chưa cấu hình ShopId / kho gửi của GHN.", "GHN_NOT_CONFIGURED");
         }
-        if (hoaDon.getGhnWardCode() == null || hoaDon.getGhnWardCode().isBlank()) {
+        if (!duDiaChiGhn(hoaDon)) {
             throw new ApiException(
-                    "Don chua co ma phuong/xa GHN nguoi nhan, khong the tao van don.",
-                    "GHN_MISSING_ADDRESS");
-        }
-        boolean newAddress = ShippingService.looksLikeNewWardCode(hoaDon.getGhnWardCode());
-        if (!newAddress && hoaDon.getGhnDistrictId() == null) {
-            throw new ApiException(
-                    "Don chua co ma quan/huyen hoac phuong/xa GHN nguoi nhan, khong the tao van don.",
+                    "Đơn thiếu tên tỉnh/thành hoặc phường/xã người nhận, không thể tạo vận đơn GHN.",
                     "GHN_MISSING_ADDRESS");
         }
         return taoVanDon(hoaDon);
@@ -133,19 +129,22 @@ public class GhnOrderCreationService {
                 hoaDon.getIdKhachHang() != null ? hoaDon.getIdKhachHang().getHoTen() : "Khach hang"));
         request.setToPhone(orElse(hoaDon.getSdtNguoiNhan(),
                 hoaDon.getIdKhachHang() != null ? hoaDon.getIdKhachHang().getSoDienThoai() : null));
-        request.setToAddress(orElse(hoaDon.getDiaChiGiao(), "Dia chi nhan hang"));
+        // GHN geocode theo to_address, nên bỏ tiền tố "Họ tên - SĐT, " của diaChiGiao.
+        request.setToAddress(orElse(boTienToNguoiNhan(hoaDon.getDiaChiGiao()), "Dia chi nhan hang"));
         request.setToWardCode(hoaDon.getGhnWardCode());
-        boolean newAddress = ShippingService.looksLikeNewWardCode(hoaDon.getGhnWardCode());
+        boolean newAddress = ShippingService.looksLikeNewWardCode(hoaDon.getGhnWardCode())
+                || (coGiaTri(hoaDon.getGhnProvinceName()) && coGiaTri(hoaDon.getGhnWardName()));
         request.setIsNewToAddress(newAddress);
         if (newAddress) {
-            // diaChiGiao thường dạng: "Họ tên - SĐT, địa chỉ cụ thể, Phường/Xã, Tỉnh"
-            String[] parts = splitAddressParts(hoaDon.getDiaChiGiao());
-            if (parts.length >= 1) {
-                request.setToProvinceName(parts[parts.length - 1]);
+            TenDiaChi ten = resolveTenDiaChi(hoaDon);
+            if (!coGiaTri(ten.provinceName()) || !coGiaTri(ten.wardName())) {
+                throw new ApiException(
+                        "Đơn thiếu tên tỉnh/thành hoặc phường/xã người nhận nên không tạo được "
+                                + "vận đơn GHN (địa chỉ 2 cấp). Cập nhật lại địa chỉ giao của đơn.",
+                        "GHN_MISSING_ADDRESS");
             }
-            if (parts.length >= 2) {
-                request.setToWardName(parts[parts.length - 2]);
-            }
+            request.setToProvinceName(ten.provinceName());
+            request.setToWardName(ten.wardName());
         } else {
             request.setToDistrictId(hoaDon.getGhnDistrictId());
         }
@@ -154,25 +153,61 @@ public class GhnOrderCreationService {
         return request;
     }
 
-    private static String[] splitAddressParts(String diaChiGiao) {
-        if (diaChiGiao == null || diaChiGiao.isBlank()) {
-            return new String[0];
+    /**
+     * Ten tinh/phuong de gui GHN. Uu tien cot da luu luc dat hang; cac don tao truoc khi co
+     * cot nay thi tam suy ra tu diaChiGiao (chi dung lam fallback vi de sai khi dia chi cu the
+     * co dau phay hoac chuoi bi cat 255 ky tu).
+     */
+    private static TenDiaChi resolveTenDiaChi(HoaDon hoaDon) {
+        String provinceName = hoaDon.getGhnProvinceName();
+        String wardName = hoaDon.getGhnWardName();
+        if (coGiaTri(provinceName) && coGiaTri(wardName)) {
+            return new TenDiaChi(provinceName.trim(), wardName.trim());
         }
-        // Bỏ phần "Họ tên - SĐT, " nếu có
-        String rest = diaChiGiao;
+        // diaChiGiao thường dạng: "Họ tên - SĐT, địa chỉ cụ thể, Phường/Xã, Tỉnh"
+        String[] parts = splitAddressParts(hoaDon.getDiaChiGiao());
+        if (!coGiaTri(provinceName) && parts.length >= 1) {
+            provinceName = parts[parts.length - 1];
+        }
+        if (!coGiaTri(wardName) && parts.length >= 2) {
+            wardName = parts[parts.length - 2];
+        }
+        log.warn("Don {} thieu ten tinh/phuong GHN, suy ra tu diaChiGiao: tinh={}, phuong={}",
+                hoaDon.getMaHoaDon(), provinceName, wardName);
+        return new TenDiaChi(provinceName, wardName);
+    }
+
+    private record TenDiaChi(String provinceName, String wardName) {
+    }
+
+    private static String boTienToNguoiNhan(String diaChiGiao) {
+        if (!coGiaTri(diaChiGiao)) {
+            return null;
+        }
         int firstComma = diaChiGiao.indexOf(',');
         if (firstComma >= 0 && diaChiGiao.substring(0, firstComma).contains(" - ")) {
-            rest = diaChiGiao.substring(firstComma + 1).trim();
+            return diaChiGiao.substring(firstComma + 1).trim();
         }
-        String[] raw = rest.split(",");
-        java.util.List<String> parts = new java.util.ArrayList<>();
-        for (String p : raw) {
+        return diaChiGiao.trim();
+    }
+
+    private static String[] splitAddressParts(String diaChiGiao) {
+        String rest = boTienToNguoiNhan(diaChiGiao);
+        if (rest == null) {
+            return new String[0];
+        }
+        List<String> parts = new ArrayList<>();
+        for (String p : rest.split(",")) {
             String t = p != null ? p.trim() : "";
             if (!t.isEmpty()) {
                 parts.add(t);
             }
         }
         return parts.toArray(new String[0]);
+    }
+
+    private static boolean coGiaTri(String value) {
+        return value != null && !value.isBlank();
     }
 
     /**
@@ -214,6 +249,24 @@ public class GhnOrderCreationService {
 
     private boolean daCoVanDon(HoaDon hoaDon) {
         return hoaDon.getMaVanDonGhn() != null && !hoaDon.getMaVanDonGhn().isBlank();
+    }
+
+    private static boolean duDiaChiGhn(HoaDon hoaDon) {
+        if (coGiaTri(hoaDon.getGhnProvinceName()) && coGiaTri(hoaDon.getGhnWardName())) {
+            return true;
+        }
+        if (ShippingService.looksLikeNewWardCode(hoaDon.getGhnWardCode())) {
+            return true;
+        }
+        return hoaDon.getGhnDistrictId() != null
+                && hoaDon.getGhnWardCode() != null
+                && !hoaDon.getGhnWardCode().isBlank();
+    }
+
+    private static boolean canTaoVanDonGhn(TrangThaiDonHang trangThai) {
+        return trangThai == TrangThaiDonHang.DA_XAC_NHAN
+                || trangThai == TrangThaiDonHang.DANG_CHUAN_BI
+                || trangThai == TrangThaiDonHang.DANG_GIAO;
     }
 
     private void ghiLichSu(HoaDon hoaDon, String ghiChu) {

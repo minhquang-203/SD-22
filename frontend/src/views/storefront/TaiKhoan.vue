@@ -1,6 +1,6 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import {
   fetchKhachToi,
@@ -13,6 +13,7 @@ import {
 } from '@/api/khachHangApi'
 import { useAuth } from '@/composables/useAuth'
 import { confirm } from '@/composables/useConfirm'
+import AccountSidebar from '@/components/storefront/AccountSidebar.vue'
 import CheckoutRecipientModal from '@/components/storefront/CheckoutRecipientModal.vue'
 import { getProducts } from '@/api/sanPhamApi'
 import { getRoutinesByLoaiDa } from '@/api/routineApi'
@@ -20,7 +21,8 @@ import { formatVND } from '@/utils/formatVND'
 import { productImageUrl } from '@/utils/productImage'
 
 const router = useRouter()
-const { dangXuat, updateHoTen } = useAuth()
+const route = useRoute()
+const { updateHoTen } = useAuth()
 
 const activeSection = ref('info')
 const loading = ref(true)
@@ -57,13 +59,11 @@ const showOldPw = ref(false)
 const showNewPw = ref(false)
 const showConfirmPw = ref(false)
 
-const menuItems = [
-  { id: 'info', label: 'Thông tin tài khoản', icon: 'solar:user-circle-linear' },
-  { id: 'addresses', label: 'Địa chỉ', icon: 'solar:map-point-linear' },
-  { id: 'orders', label: 'Đơn hàng của tôi', icon: 'solar:bag-check-linear', to: '/don-hang' },
-  { id: 'quiz', label: 'Hồ sơ da (Quiz)', icon: 'solar:clipboard-list-linear' },
-  { id: 'password', label: 'Đổi mật khẩu', icon: 'solar:lock-keyhole-linear' },
-]
+function sectionFromRoute() {
+  const section = route.query.section
+  if (section === 'addresses' || section === 'quiz' || section === 'password') return section
+  return 'info'
+}
 
 const selectedAddress = computed(() => {
   return addresses.value.find((item) => item.id === selectedAddressId.value)
@@ -323,19 +323,17 @@ function selectSection(id) {
   }
 }
 
-async function handleLogout() {
-  const ok = await confirm({
-    title: 'Đăng xuất',
-    message: 'Bạn có chắc muốn đăng xuất?',
-    confirmText: 'Đăng xuất',
-    danger: true,
-  })
-  if (!ok) return
-  dangXuat()
-  router.push('/')
-}
+watch(
+  () => route.query.section,
+  () => {
+    selectSection(sectionFromRoute())
+  },
+)
 
-onMounted(loadProfile)
+onMounted(() => {
+  selectSection(sectionFromRoute())
+  loadProfile()
+})
 </script>
 
 <template>
@@ -350,32 +348,7 @@ onMounted(loadProfile)
       <h1 class="sf-account-page__title">Trung tâm tài khoản</h1>
 
       <div class="sf-account-layout">
-        <aside class="sf-account-sidebar">
-          <template v-for="item in menuItems" :key="item.id">
-            <RouterLink
-              v-if="item.to"
-              :to="item.to"
-              class="sf-account-sidebar__item"
-            >
-              <Icon v-if="item.icon" :icon="item.icon" width="18" />
-              {{ item.label }}
-            </RouterLink>
-            <button
-              v-else
-              type="button"
-              class="sf-account-sidebar__item"
-              :class="{ active: activeSection === item.id }"
-              @click="selectSection(item.id)"
-            >
-              <Icon v-if="item.icon" :icon="item.icon" width="18" />
-              {{ item.label }}
-            </button>
-          </template>
-          <button type="button" class="sf-account-sidebar__item sf-account-sidebar__item--logout" @click="handleLogout">
-            <Icon icon="solar:logout-2-linear" width="18" />
-            Đăng xuất
-          </button>
-        </aside>
+        <AccountSidebar :active-section="activeSection" />
 
         <div class="sf-account-main">
           <div v-if="loading" class="sf-account-loading">Đang tải...</div>
