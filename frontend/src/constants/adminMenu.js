@@ -146,6 +146,13 @@ const RECOMMENDATION_MENU = {
       path: "/admin/recommendation/routine",
       roles: MANAGER_AND_OWNER,
     },
+    {
+      key: "quiz-history",
+      label: "Insight khách hàng",
+      icon: "icon-park-outline:people",
+      path: "/admin/recommendation/quiz-history",
+      roles: ALL_STAFF_ROLES,
+    },
   ],
 };
 

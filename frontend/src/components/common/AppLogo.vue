@@ -21,7 +21,7 @@ const props = defineProps({
 })
 
 const markStyle = computed(() => ({
-  height: `${props.size}px`,
+  height: `${Math.round(props.size * 1.5)}px`,
   width: 'auto',
 }))
 

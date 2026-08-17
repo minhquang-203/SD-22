@@ -193,7 +193,10 @@ function toggleUser(e) {
     <!-- Tầng trên -->
     <div class="sf-header__top">
       <div class="sf-header__inner">
-        <RouterLink to="/" class="sf-navbar__brand">SUN<span>OVA</span></RouterLink>
+        <RouterLink to="/" class="sf-navbar__brand">
+          <img src="@/assets/logo/sunova_mark.png" alt="SUNOVA Logo" class="sf-navbar__logo-img" />
+          <span class="sf-navbar__brand-text">SUN<span>OVA</span></span>
+        </RouterLink>
 
         <form class="sf-header__search" @submit.prevent="submitSearch">
           <input

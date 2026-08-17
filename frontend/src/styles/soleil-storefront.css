@@ -81,9 +81,22 @@
   color: var(--sf-charcoal);
   text-decoration: none;
   text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.sf-navbar__brand span {
+.sf-navbar__logo-img {
+  height: 52px;
+  width: auto;
+  object-fit: contain;
+}
+
+.sf-navbar__brand-text {
+  transform: translateY(-3px); /* Nhích chữ lên một xíu để cân bằng với logo */
+}
+
+.sf-navbar__brand-text span {
   color: var(--sf-gold);
 }
 

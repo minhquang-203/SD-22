@@ -288,6 +288,12 @@ const router = createRouter({
           meta: { title: 'Routine chống nắng', breadcrumb: 'Gợi ý & Cá nhân hóa / Routine chống nắng', role: ADMIN_ROLES.QUAN_LY },
         },
         {
+          path: 'recommendation/quiz-history',
+          name: 'AdminQuizHistory',
+          component: () => import('@/views/admin/recommendation/QuizHistory.vue'),
+          meta: { title: 'Insight khách hàng', breadcrumb: 'Gợi ý & Cá nhân hóa / Insight khách hàng' },
+        },
+        {
           path: 'banners',
           name: 'AdminBanners',
           component: () => import('@/views/admin/content/BannerManager.vue'),
