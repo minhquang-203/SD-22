@@ -77,6 +77,9 @@ public class PhieuGiamGiaService {
         if (pgg.getGiaTriDonToiThieu() == null) {
             pgg.setGiaTriDonToiThieu(java.math.BigDecimal.ZERO);
         }
+        if (pgg.getPhamVi() == null) {
+            pgg.setPhamVi(org.example.templatejava6.common.enums.PhamViPhieuGiamGia.CONG_KHAI);
+        }
         pgg.setTrangThai(true);
         pgg.setIsActive(true);
         phieuGiamGiaRepository.save(pgg);
@@ -105,6 +108,9 @@ public class PhieuGiamGiaService {
         pgg.setId(id);
         if (pgg.getGiaTriDonToiThieu() == null) {
             pgg.setGiaTriDonToiThieu(java.math.BigDecimal.ZERO);
+        }
+        if (pgg.getPhamVi() == null) {
+            pgg.setPhamVi(org.example.templatejava6.common.enums.PhamViPhieuGiamGia.CONG_KHAI);
         }
         phieuGiamGiaRepository.save(pgg);
     }

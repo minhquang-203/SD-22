@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.example.templatejava6.common.entity.PhieuGiamGia;
 import org.example.templatejava6.common.enums.LoaiPhieuGiamGia;
+import org.example.templatejava6.common.enums.PhamViPhieuGiamGia;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -16,6 +17,7 @@ public class PhieuGiamGiaResponse {
     private String ma;
     private String ten;
     private LoaiPhieuGiamGia loai;
+    private PhamViPhieuGiamGia phamVi;
     private BigDecimal giaTri;
     private BigDecimal giaTriDonToiThieu;
     private BigDecimal giamToiDa;
@@ -33,6 +35,7 @@ public class PhieuGiamGiaResponse {
         this.ma = pgg.getMa();
         this.ten = pgg.getTen();
         this.loai = pgg.getLoai();
+        this.phamVi = pgg.getPhamVi();
         this.giaTri = pgg.getGiaTri();
         this.giaTriDonToiThieu = pgg.getGiaTriDonToiThieu();
         this.giamToiDa = pgg.getGiamToiDa();

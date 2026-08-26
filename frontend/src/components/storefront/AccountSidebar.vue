@@ -23,6 +23,12 @@ const menuItems = [
   },
   { id: 'orders', label: 'Đơn hàng của tôi', icon: 'solar:bag-check-linear', to: '/tra-cuu-don' },
   {
+    id: 'vouchers',
+    label: 'Voucher của tôi',
+    icon: 'solar:ticket-sale-linear',
+    to: { path: '/tai-khoan', query: { section: 'vouchers' } },
+  },
+  {
     id: 'quiz',
     label: 'Hồ sơ da (Quiz)',
     icon: 'solar:clipboard-list-linear',
@@ -40,7 +46,7 @@ const currentId = computed(() => {
   if (route.path.startsWith('/tra-cuu-don')) return 'orders'
   if (props.activeSection) return props.activeSection
   const section = route.query.section
-  if (section === 'addresses' || section === 'quiz' || section === 'password') return section
+  if (section === 'addresses' || section === 'quiz' || section === 'password' || section === 'vouchers') return section
   return 'info'
 })
 

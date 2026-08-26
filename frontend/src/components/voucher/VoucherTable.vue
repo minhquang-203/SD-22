@@ -45,7 +45,15 @@
             <span class="coupon-code">{{ phieu.ma }}</span>
           </td>
           <td>
-            <div style="font-weight: 400">{{ phieu.ten }}</div>
+            <div style="font-weight: 400">
+              {{ phieu.ten }}
+              <span
+                v-if="phieu.phamVi === 'CA_NHAN'"
+                style="font-size: 10px; color: var(--bronze, #c9a96e); border: 1px solid var(--bronze, #c9a96e); border-radius: 999px; padding: 1px 6px; margin-left: 4px;"
+              >
+                Dành riêng
+              </span>
+            </div>
             <div style="font-size: 11px; color: rgba(30, 21, 16, 0.4)">
               Tối thiểu {{ formatTien(phieu.giaTriDonToiThieu) }}
             </div>
@@ -88,6 +96,14 @@
             <div class="actions-cell">
               <button class="act-btn" title="Sửa" @click="$emit('sua', phieu)">
                 <Icon icon="mdi:pencil"></Icon>
+              </button>
+              <button
+                v-if="phieu.phamVi === 'CA_NHAN'"
+                class="act-btn"
+                title="Gán khách hàng"
+                @click="$emit('gan-khach', phieu)"
+              >
+                <Icon icon="mdi:account-multiple-plus"></Icon>
               </button>
               <button
                 v-if="dangHoatDong(phieu)"
@@ -134,7 +150,7 @@ const props = defineProps({
   startIndex: { type: Number, default: 0 },
 });
 
-const emit = defineEmits(["sua", "dung", "kich-hoat", "xoa", "chon-tat-ca"]);
+const emit = defineEmits(["sua", "dung", "kich-hoat", "xoa", "chon-tat-ca", "gan-khach"]);
 
 const toggleSelect = (id, e) => {
   if (e.target.checked) {

@@ -155,7 +155,17 @@ function showToast(msg) {
 
 function selectVariant(v) {
   selectedVariantId.value = v.id
+  const max = Number(v.soLuongTon) || 1
+  if (quantity.value > max) quantity.value = Math.max(1, max)
 }
+
+watch(
+  () => selectedVariant.value?.soLuongTon,
+  (ton) => {
+    const max = Number(ton) || 1
+    if (quantity.value > max) quantity.value = Math.max(1, max)
+  },
+)
 
 async function addToCart() {
   const v = selectedVariant.value
@@ -382,9 +392,19 @@ onUnmounted(() => {
           <div class="sf-pdp__qty">
             <span class="sf-pdp__option-label">Số lượng</span>
             <div class="sf-qty-control">
-              <button type="button" @click="quantity = Math.max(1, quantity - 1)">−</button>
+              <button
+                type="button"
+                aria-label="Giảm số lượng"
+                :disabled="quantity <= 1"
+                @click="quantity = Math.max(1, quantity - 1)"
+              >−</button>
               <span>{{ quantity }}</span>
-              <button type="button" @click="quantity++">+</button>
+              <button
+                type="button"
+                aria-label="Tăng số lượng"
+                :disabled="selectedVariant?.soLuongTon != null && quantity >= selectedVariant.soLuongTon"
+                @click="quantity++"
+              >+</button>
             </div>
           </div>
 
@@ -544,10 +564,16 @@ onUnmounted(() => {
 .sf-pdp__stock { font-size: 14px; color: #059669; margin-bottom: 32px; }
 .sf-pdp__stock.out { color: #ef4444; }
 .sf-pdp__actions { display: flex; flex-direction: column; gap: 16px; }
-.sf-pdp__qty { display: flex; align-items: center; border: 1px solid #cbd5e1; border-radius: 4px; width: max-content; }
-.sf-pdp__qty button { width: 40px; height: 48px; background: transparent; border: none; font-size: 18px; cursor: pointer; }
-.sf-pdp__qty input { width: 50px; height: 48px; border: none; text-align: center; font-size: 16px; }
-.sf-pdp__qty input:focus { outline: none; }
+.sf-pdp__qty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+.sf-pdp__qty .sf-pdp__option-label {
+  margin-bottom: 0;
+}
 .sf-pdp__buttons { display: grid; grid-template-columns: 1fr; gap: 16px; }
 @media (min-width: 640px) { .sf-pdp__buttons { grid-template-columns: 1fr 1fr; } }
 .sf-pdp__meta { margin-top: 48px; padding-top: 32px; border-top: 1px solid #f1f5f9; }

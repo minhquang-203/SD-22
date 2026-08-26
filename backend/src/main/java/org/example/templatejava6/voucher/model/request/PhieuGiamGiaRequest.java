@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.example.templatejava6.common.enums.LoaiPhieuGiamGia;
+import org.example.templatejava6.common.enums.PhamViPhieuGiamGia;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -25,6 +26,8 @@ public class PhieuGiamGiaRequest {
 
     @NotNull(message = "Loại phiếu giảm giá không được để trống")
     private LoaiPhieuGiamGia loai;
+
+    private PhamViPhieuGiamGia phamVi;
 
     @NotNull(message = "Giá trị giảm không được để trống")
     @Positive(message = "Giá trị giảm phải lớn hơn 0")

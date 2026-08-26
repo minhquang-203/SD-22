@@ -2,6 +2,7 @@
 import "@/styles/voucherCss.css";
 import DashboardStat from "@/components/voucher/DashboardStat.vue";
 import { ref, onMounted, watch } from "vue";
+import { useRouter } from "vue-router";
 
 import {
   searchVoucher,
@@ -18,6 +19,8 @@ import Pagination from "@/components/voucher/Pagination.vue";
 import VoucherCreateModal from "@/components/voucher/VoucherCreateModal.vue";
 import { confirm } from "@/composables/useConfirm";
 import { toast } from "@/composables/useToast";
+
+const router = useRouter();
 
 /* ================= STATE ================= */
 const showModal = ref(false);
@@ -302,6 +305,13 @@ const openEdit = (voucher) => {
   showModal.value = true;
 };
 
+const openAssign = (voucher) => {
+  router.push({
+    name: "AdminUsers",
+    query: { voucherId: String(voucher.id), voucherMa: voucher.ma || "" },
+  });
+};
+
 /* ================= PLACEHOLDER ================= */
 const handleExport = () => console.log("export");
 </script>
@@ -365,6 +375,7 @@ const handleExport = () => console.log("export");
           @kich-hoat="xacNhanKichHoat"
           @xoa="xacNhanXoa"
           @chon-tat-ca="chonTatCa"
+          @gan-khach="openAssign"
         />
 
         <Pagination

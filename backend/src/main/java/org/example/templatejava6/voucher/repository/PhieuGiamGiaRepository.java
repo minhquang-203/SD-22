@@ -101,4 +101,22 @@ public interface PhieuGiamGiaRepository extends JpaRepository<PhieuGiamGia, Inte
     Page<PhieuGiamGia> findAvailableForCustomer(
             @Param("keyword") String keyword,
             Pageable pageable);
+
+    /** Voucher công khai đang hiệu lực - dùng cho tab "Tất cả voucher" ở tài khoản. */
+    @Query("""
+        SELECT v FROM PhieuGiamGia v
+        WHERE v.trangThai = true
+          AND v.isActive = true
+          AND v.soLuong > 0
+          AND v.phamVi = org.example.templatejava6.common.enums.PhamViPhieuGiamGia.CONG_KHAI
+          AND v.ngayBatDau <= CURRENT_TIMESTAMP
+          AND v.ngayKetThuc >= CURRENT_TIMESTAMP
+          AND (:keyword IS NULL OR :keyword = ''
+              OR LOWER(v.ma) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              OR LOWER(v.ten) LIKE LOWER(CONCAT('%', :keyword, '%')))
+        ORDER BY v.ngayKetThuc ASC
+        """)
+    Page<PhieuGiamGia> findPublicAvailableForCustomer(
+            @Param("keyword") String keyword,
+            Pageable pageable);
 }

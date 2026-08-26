@@ -91,6 +91,7 @@ public class BanHangService {
     @Autowired private PhuongThucThanhToanRepository phuongThucThanhToanRepository;
     @Autowired private PhieuGiamGiaRepository phieuGiamGiaRepository;
     @Autowired private PhieuGiamGiaService phieuGiamGiaService;
+    @Autowired private org.example.templatejava6.voucher.service.VoucherKhachHangService voucherKhachHangService;
     @Autowired private KhachHangRepository khachHangRepository;
     @Autowired private NhanVienRepository nhanVienRepository;
     @Autowired private LoHangService loHangService;
@@ -187,6 +188,10 @@ public class BanHangService {
             PhieuGiamGia phieu = phieuGiamGiaRepository.findByMa(maPhieuTrimmed)
                     .orElseThrow(() -> new ApiException(
                             "Mã giảm giá \"" + maPhieuTrimmed + "\" không tồn tại.", "INVALID_VOUCHER"));
+            if (!voucherKhachHangService.khachDuocDungVoucher(null, phieu)) {
+                throw new ApiException(
+                        "Mã giảm giá này chỉ dành cho khách hàng được chỉ định.", "INVALID_VOUCHER");
+            }
             tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien);
         }
 
@@ -354,6 +359,10 @@ public class BanHangService {
             phieu = phieuGiamGiaRepository.findByMa(req.getMaPhieuGiamGia().trim())
                     .orElseThrow(() -> new ApiException(
                             "Mã giảm giá \"" + req.getMaPhieuGiamGia() + "\" không tồn tại.", "INVALID_VOUCHER"));
+            if (!voucherKhachHangService.khachDuocDungVoucher(req.getIdKhachHang(), phieu)) {
+                throw new ApiException(
+                        "Mã giảm giá này chỉ dành cho khách hàng được chỉ định.", "INVALID_VOUCHER");
+            }
             tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien);
         }
 

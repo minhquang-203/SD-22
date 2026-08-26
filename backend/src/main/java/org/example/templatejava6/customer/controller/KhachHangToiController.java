@@ -10,8 +10,12 @@ import org.example.templatejava6.customer.service.DiaChiKhachHangToiService;
 import org.example.templatejava6.customer.service.KhachHangToiService;
 import org.example.templatejava6.quiz.model.response.KetQuaQuizToiResponse;
 import org.example.templatejava6.quiz.service.KetQuaQuizService;
+import org.example.templatejava6.voucher.model.response.PhieuGiamGiaResponse;
+import org.example.templatejava6.voucher.service.VoucherKhachHangService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("api/khach-hang/toi")
@@ -25,6 +29,9 @@ public class KhachHangToiController {
 
     @Autowired
     private DiaChiKhachHangToiService diaChiKhachHangToiService;
+
+    @Autowired
+    private VoucherKhachHangService voucherKhachHangService;
 
     @GetMapping
     public KhachHangToiResponse layThongTin() {
@@ -64,5 +71,15 @@ public class KhachHangToiController {
     @GetMapping("quiz")
     public KetQuaQuizToiResponse layKetQuaQuiz() {
         return ketQuaQuizService.layKetQuaQuizCuaToi();
+    }
+
+    @GetMapping("voucher/cong-khai")
+    public List<PhieuGiamGiaResponse> voucherCongKhai(@RequestParam(required = false) String keyword) {
+        return voucherKhachHangService.voucherCongKhai(keyword);
+    }
+
+    @GetMapping("voucher/ca-nhan")
+    public List<PhieuGiamGiaResponse> voucherCaNhan() {
+        return voucherKhachHangService.voucherCaNhanCuaToi();
     }
 }

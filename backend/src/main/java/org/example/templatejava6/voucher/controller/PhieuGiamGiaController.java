@@ -2,10 +2,14 @@ package org.example.templatejava6.voucher.controller;
 
 import jakarta.validation.Valid;
 import org.example.templatejava6.common.util.PaginationUtil;
+import org.example.templatejava6.customer.model.response.KhachHangResponse;
+import org.example.templatejava6.voucher.model.request.GanVoucherRequest;
+import org.example.templatejava6.voucher.model.request.GanVoucherTheoNhomRequest;
 import org.example.templatejava6.voucher.model.request.PhieuGiamGiaRequest;
 import org.example.templatejava6.voucher.model.response.PhieuGiamGiaResponse;
 import org.example.templatejava6.voucher.model.response.PhieuGiamGiaStatsResponse;
 import org.example.templatejava6.voucher.service.PhieuGiamGiaService;
+import org.example.templatejava6.voucher.service.VoucherKhachHangService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,6 +17,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 
@@ -22,6 +28,9 @@ public class PhieuGiamGiaController {
 
     @Autowired
     private PhieuGiamGiaService phieuGiamGiaService;
+
+    @Autowired
+    private VoucherKhachHangService voucherKhachHangService;
 
     @GetMapping
     public ResponseEntity<Page<PhieuGiamGiaResponse>> getAllPhieuGiamGia
@@ -94,6 +103,45 @@ public class PhieuGiamGiaController {
         }
         Sort.Direction dir = "asc".equalsIgnoreCase(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
         return PaginationUtil.create(page, size, Sort.by(dir, sortBy));
+    }
+
+    /* ===================== GÁN VOUCHER CÁ NHÂN ===================== */
+
+    // Danh sách khách hàng đã được gán voucher
+    @GetMapping("/{id}/khach-hang")
+    public ResponseEntity<List<KhachHangResponse>> danhSachKhachDaGan(@PathVariable Integer id) {
+        return ResponseEntity.ok(voucherKhachHangService.danhSachKhachDaGan(id));
+    }
+
+    // Gán voucher cho các khách hàng cụ thể
+    @PostMapping("/{id}/khach-hang")
+    public ResponseEntity<Map<String, Integer>> ganChoKhachHang(
+            @PathVariable Integer id,
+            @Valid @RequestBody GanVoucherRequest request) {
+        int added = voucherKhachHangService.ganChoKhachHang(id, request.getIdKhachHangs());
+        return ResponseEntity.ok(Map.of("soKhachGanMoi", added));
+    }
+
+    // Gán voucher theo bộ lọc nhóm
+    @PostMapping("/{id}/khach-hang/theo-nhom")
+    public ResponseEntity<Map<String, Integer>> ganTheoNhom(
+            @PathVariable Integer id,
+            @RequestBody GanVoucherTheoNhomRequest request) {
+        int added = voucherKhachHangService.ganTheoNhom(id, request);
+        return ResponseEntity.ok(Map.of("soKhachGanMoi", added));
+    }
+
+    // Xem trước khách hàng khớp bộ lọc nhóm (không lưu)
+    @PostMapping("/khach-hang/theo-nhom/preview")
+    public ResponseEntity<List<KhachHangResponse>> previewNhom(
+            @RequestBody GanVoucherTheoNhomRequest request) {
+        return ResponseEntity.ok(voucherKhachHangService.previewNhom(request));
+    }
+
+    // Bỏ gán voucher khỏi một khách hàng
+    @DeleteMapping("/{id}/khach-hang/{idKhachHang}")
+    public void boGan(@PathVariable Integer id, @PathVariable Integer idKhachHang) {
+        voucherKhachHangService.boGan(id, idKhachHang);
     }
 
 }

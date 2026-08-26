@@ -262,7 +262,7 @@ function toggleUser(e) {
           </div>
 
           <RouterLink to="/gio-hang" class="sf-nav-icon sf-nav-icon--cart" title="Giỏ hàng" aria-label="Giỏ hàng">
-            <Icon icon="solar:bag-3-linear" width="22" />
+            <Icon icon="solar:cart-large-2-bold" width="24" />
             <span v-if="count > 0" class="sf-cart-badge">{{ count > 99 ? '99+' : count }}</span>
           </RouterLink>
 

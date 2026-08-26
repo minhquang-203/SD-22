@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.example.templatejava6.common.enums.LoaiPhieuGiamGia;
+import org.example.templatejava6.common.enums.PhamViPhieuGiamGia;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.Nationalized;
 
@@ -36,6 +37,11 @@ public class PhieuGiamGia {
     @Enumerated(EnumType.STRING)
     @Column(name = "loai", nullable = false, length = 10)
     private LoaiPhieuGiamGia loai;
+
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'CONG_KHAI'")
+    @Column(name = "pham_vi", length = 10)
+    private PhamViPhieuGiamGia phamVi;
 
     @NotNull
     @Column(name = "gia_tri", nullable = false, precision = 12)

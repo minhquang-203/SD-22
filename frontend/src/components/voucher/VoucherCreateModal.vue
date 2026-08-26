@@ -72,6 +72,42 @@
           </div>
         </div>
 
+        <!-- PHẠM VI -->
+        <div class="mb-3">
+          <label class="text-[11px] uppercase text-[rgba(30,21,16,0.5)] block mb-[6px]">
+            Phạm vi áp dụng
+          </label>
+
+          <div class="flex gap-2">
+            <button
+              type="button"
+              class="flex-1 py-[9px] border rounded-[8px] text-[12px]"
+              :class="form.phamVi === 'CONG_KHAI'
+                ? 'bg-[#1e1510] border-[#1e1510] text-[#c8a97e]'
+                : 'border-[#e6d8c8]'"
+              @click="form.phamVi = 'CONG_KHAI'"
+            >
+              Công khai
+            </button>
+
+            <button
+              type="button"
+              class="flex-1 py-[9px] border rounded-[8px] text-[12px]"
+              :class="form.phamVi === 'CA_NHAN'
+                ? 'bg-[#1e1510] border-[#1e1510] text-[#c8a97e]'
+                : 'border-[#e6d8c8]'"
+              @click="form.phamVi = 'CA_NHAN'"
+            >
+              Cá nhân (gán riêng)
+            </button>
+          </div>
+          <p class="text-[11px] text-[rgba(30,21,16,0.4)] mt-[6px]">
+            {{ form.phamVi === 'CA_NHAN'
+              ? 'Chỉ khách được gán mới dùng được. Sau khi lưu, bấm nút gán trên bảng để chuyển sang Quản lý khách hàng.'
+              : 'Mọi khách hàng đều thấy và dùng được.' }}
+          </p>
+        </div>
+
         <!-- GRID -->
         <div class="grid grid-cols-12 gap-3">
 
@@ -255,6 +291,7 @@ const form = reactive({
   ma: "",
   ten: "",
   loai: "PHAN_TRAM",
+  phamVi: "CONG_KHAI",
   giaTri: null,
   giaTriDonToiThieu: null,
   giamToiDa: null,
@@ -463,6 +500,7 @@ watch(
     if (props.voucher) {
       Object.assign(form, {
         ...props.voucher,
+        phamVi: props.voucher.phamVi || "CONG_KHAI",
         ngayBatDau: props.voucher.ngayBatDau?.slice(0, 10),
         ngayKetThuc: props.voucher.ngayKetThuc?.slice(0, 10),
       });
@@ -471,6 +509,7 @@ watch(
         ma: "",
         ten: "",
         loai: "PHAN_TRAM",
+        phamVi: "CONG_KHAI",
         giaTri: null,
         giaTriDonToiThieu: null,
         giamToiDa: null,

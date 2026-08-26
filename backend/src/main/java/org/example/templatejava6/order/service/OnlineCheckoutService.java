@@ -43,6 +43,7 @@ import org.example.templatejava6.shipping.service.ShippingService;
 import org.example.templatejava6.voucher.model.response.VariantSaleInfo;
 import org.example.templatejava6.voucher.repository.PhieuGiamGiaRepository;
 import org.example.templatejava6.voucher.service.PhieuGiamGiaService;
+import org.example.templatejava6.voucher.service.VoucherKhachHangService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -79,6 +80,7 @@ public class OnlineCheckoutService {
     private final LichSuDonHangRepository lichSuDonHangRepository;
     private final PhieuGiamGiaRepository phieuGiamGiaRepository;
     private final PhieuGiamGiaService phieuGiamGiaService;
+    private final VoucherKhachHangService voucherKhachHangService;
     private final LoHangService loHangService;
     private final PaymentService paymentService;
     private final OnlineOrderLifecycleService onlineOrderLifecycleService;
@@ -99,6 +101,7 @@ public class OnlineCheckoutService {
             LichSuDonHangRepository lichSuDonHangRepository,
             PhieuGiamGiaRepository phieuGiamGiaRepository,
             PhieuGiamGiaService phieuGiamGiaService,
+            VoucherKhachHangService voucherKhachHangService,
             LoHangService loHangService,
             PaymentService paymentService,
             OnlineOrderLifecycleService onlineOrderLifecycleService,
@@ -117,6 +120,7 @@ public class OnlineCheckoutService {
         this.lichSuDonHangRepository = lichSuDonHangRepository;
         this.phieuGiamGiaRepository = phieuGiamGiaRepository;
         this.phieuGiamGiaService = phieuGiamGiaService;
+        this.voucherKhachHangService = voucherKhachHangService;
         this.loHangService = loHangService;
         this.paymentService = paymentService;
         this.onlineOrderLifecycleService = onlineOrderLifecycleService;
@@ -161,7 +165,7 @@ public class OnlineCheckoutService {
         List<LineCalc> lines = buildLines(selectedItems, saleMap);
         BigDecimal tongTien = sumTongTien(lines);
 
-        PhieuGiamGia phieu = resolvePhieu(request.getMaPhieuGiamGia());
+        PhieuGiamGia phieu = resolvePhieu(request.getMaPhieuGiamGia(), khachHang.getId());
         BigDecimal phiVanChuyen = resolvePhiVanChuyen(
                 request.getToProvinceName(), request.getToWardName(), request.getToAddressV2(),
                 request.getToDistrictId(), request.getToWardCode(), tongTien);
@@ -261,7 +265,7 @@ public class OnlineCheckoutService {
         List<LineCalc> lines = buildLines(selectedItems, saleMap);
         BigDecimal tongTien = sumTongTien(lines);
 
-        PhieuGiamGia phieu = resolvePhieu(request.getMaPhieuGiamGia());
+        PhieuGiamGia phieu = resolvePhieu(request.getMaPhieuGiamGia(), khachHang.getId());
         BigDecimal phiVanChuyen = resolvePhiVanChuyen(
                 request.getToProvinceName(), request.getToWardName(), request.getToAddressV2(),
                 request.getToDistrictId(), request.getToWardCode(), tongTien);
@@ -397,12 +401,17 @@ public class OnlineCheckoutService {
         return phuongThuc;
     }
 
-    private PhieuGiamGia resolvePhieu(String maPhieuGiamGia) {
+    private PhieuGiamGia resolvePhieu(String maPhieuGiamGia, Integer idKhachHang) {
         if (maPhieuGiamGia == null || maPhieuGiamGia.isBlank()) {
             return null;
         }
-        return phieuGiamGiaRepository.findByMa(maPhieuGiamGia.trim())
+        PhieuGiamGia phieu = phieuGiamGiaRepository.findByMa(maPhieuGiamGia.trim())
                 .orElseThrow(() -> new ApiException("Mã giảm giá không tồn tại.", "INVALID_VOUCHER"));
+        if (!voucherKhachHangService.khachDuocDungVoucher(idKhachHang, phieu)) {
+            throw new ApiException(
+                    "Mã giảm giá này chỉ dành cho khách hàng được chỉ định.", "INVALID_VOUCHER");
+        }
+        return phieu;
     }
 
     private void taoThanhToanCod(HoaDon hoaDon, PhuongThucThanhToan phuongThuc, LocalDateTime now) {

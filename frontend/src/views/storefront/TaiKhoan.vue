@@ -15,6 +15,8 @@ import { useAuth } from '@/composables/useAuth'
 import { confirm } from '@/composables/useConfirm'
 import AccountSidebar from '@/components/storefront/AccountSidebar.vue'
 import CheckoutRecipientModal from '@/components/storefront/CheckoutRecipientModal.vue'
+import VoucherCard from '@/components/storefront/VoucherCard.vue'
+import { getMyPublicVouchers, getMyPersonalVouchers } from '@/api/voucherApi'
 import { getProducts } from '@/api/sanPhamApi'
 import { getRoutinesByLoaiDa } from '@/api/routineApi'
 import { formatVND } from '@/utils/formatVND'
@@ -61,8 +63,31 @@ const showConfirmPw = ref(false)
 
 function sectionFromRoute() {
   const section = route.query.section
-  if (section === 'addresses' || section === 'quiz' || section === 'password') return section
+  if (section === 'addresses' || section === 'quiz' || section === 'password' || section === 'vouchers') return section
   return 'info'
+}
+
+const voucherTab = ref('all')
+const publicVouchers = ref([])
+const personalVouchers = ref([])
+const vouchersLoading = ref(false)
+const vouchersError = ref('')
+
+async function loadVouchers() {
+  vouchersLoading.value = true
+  vouchersError.value = ''
+  try {
+    const [publicRes, personalRes] = await Promise.all([
+      getMyPublicVouchers(),
+      getMyPersonalVouchers(),
+    ])
+    publicVouchers.value = publicRes.data || []
+    personalVouchers.value = personalRes.data || []
+  } catch (e) {
+    vouchersError.value = typeof e === 'string' ? e : 'Không tải được danh sách voucher'
+  } finally {
+    vouchersLoading.value = false
+  }
 }
 
 const selectedAddress = computed(() => {
@@ -320,6 +345,8 @@ function selectSection(id) {
     void loadAddresses()
   } else if (id === 'quiz') {
     void loadQuizResult()
+  } else if (id === 'vouchers') {
+    void loadVouchers()
   }
 }
 
@@ -564,6 +591,59 @@ onMounted(() => {
             </div>
           </template>
 
+          <template v-else-if="activeSection === 'vouchers'">
+            <h2 class="sf-account-main__heading">Voucher của tôi</h2>
+            <p class="sf-account-main__sub">
+              Xem các voucher đang có. Bấm "Sao chép" để lấy mã và dán khi thanh toán.
+            </p>
+
+            <div class="sf-voucher-tabs">
+              <button
+                type="button"
+                class="sf-voucher-tab"
+                :class="{ active: voucherTab === 'all' }"
+                @click="voucherTab = 'all'"
+              >
+                Tất cả voucher
+                <span class="sf-voucher-tab__count">{{ publicVouchers.length }}</span>
+              </button>
+              <button
+                type="button"
+                class="sf-voucher-tab"
+                :class="{ active: voucherTab === 'personal' }"
+                @click="voucherTab = 'personal'"
+              >
+                Voucher cá nhân
+                <span class="sf-voucher-tab__count">{{ personalVouchers.length }}</span>
+              </button>
+            </div>
+
+            <div v-if="vouchersLoading" class="sf-account-alert">Đang tải...</div>
+            <div v-else-if="vouchersError" class="sf-account-alert sf-account-alert--err">{{ vouchersError }}</div>
+
+            <template v-else>
+              <div v-if="voucherTab === 'all'">
+                <div v-if="publicVouchers.length" class="sf-voucher-list">
+                  <VoucherCard v-for="v in publicVouchers" :key="v.id" :voucher="v" />
+                </div>
+                <div v-else class="sf-account-card sf-voucher-empty">
+                  <Icon icon="solar:ticket-sale-linear" width="32" />
+                  <p>Hiện chưa có voucher công khai nào.</p>
+                </div>
+              </div>
+
+              <div v-else>
+                <div v-if="personalVouchers.length" class="sf-voucher-list">
+                  <VoucherCard v-for="v in personalVouchers" :key="v.id" :voucher="v" />
+                </div>
+                <div v-else class="sf-account-card sf-voucher-empty">
+                  <Icon icon="solar:ticket-sale-linear" width="32" />
+                  <p>Bạn chưa có voucher cá nhân nào.</p>
+                </div>
+              </div>
+            </template>
+          </template>
+
           <template v-else-if="activeSection === 'password'">
             <h2 class="sf-account-main__heading">Đổi mật khẩu</h2>
             <p class="sf-account-main__sub">Mật khẩu mới tối thiểu 6 ký tự.</p>
@@ -624,3 +704,66 @@ onMounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.sf-voucher-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 20px;
+  border-bottom: 1px solid var(--border-color, #e6d8c8);
+}
+
+.sf-voucher-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 0.9rem;
+  color: #777;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.sf-voucher-tab.active {
+  color: var(--primary-color, #c9a96e);
+  border-bottom-color: var(--primary-color, #c9a96e);
+  font-weight: 600;
+}
+
+.sf-voucher-tab__count {
+  font-size: 0.72rem;
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(201, 169, 110, 0.16);
+  color: var(--primary-color, #c9a96e);
+}
+
+.sf-voucher-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 900px) {
+  .sf-voucher-list {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.sf-voucher-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 24px;
+  text-align: center;
+  color: #999;
+  background: #fff;
+  border: 1px solid var(--border-color, #e6d8c8);
+  border-radius: 12px;
+}
+</style>

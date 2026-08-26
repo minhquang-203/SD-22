@@ -50,3 +50,29 @@ export function activateVoucher(id) {
 export function getVoucherStats() {
   return request.get("/vouchers/stats");
 }
+
+/* ===================== GÁN VOUCHER CÁ NHÂN (ADMIN) ===================== */
+
+export function getVoucherCustomers(id) {
+  return request.get(`/vouchers/${id}/khach-hang`);
+}
+
+export function assignVoucherToCustomers(id, idKhachHangs) {
+  return request.post(`/vouchers/${id}/khach-hang`, { idKhachHangs });
+}
+
+export function unassignVoucherCustomer(id, idKhachHang) {
+  return request.delete(`/vouchers/${id}/khach-hang/${idKhachHang}`);
+}
+
+/* ===================== VOUCHER CỦA KHÁCH (STOREFRONT) ===================== */
+
+export function getMyPublicVouchers(keyword) {
+  return request.get("/khach-hang/toi/voucher/cong-khai", {
+    params: { keyword },
+  });
+}
+
+export function getMyPersonalVouchers() {
+  return request.get("/khach-hang/toi/voucher/ca-nhan");
+}

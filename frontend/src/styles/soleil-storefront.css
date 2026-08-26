@@ -1389,36 +1389,57 @@
 .sf-qty-control {
   display: inline-flex;
   align-items: center;
-  border: 1px solid var(--sf-sand);
-  border-radius: 8px;
+  height: 40px;
+  border: 1px solid #d6cfc6;
+  border-radius: 6px;
   overflow: hidden;
+  background: #fff;
 }
 
 .sf-qty-control button {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 100%;
   border: none;
-  background: var(--sf-cream);
+  background: transparent;
+  color: #1e1510;
+  font-size: 1.05rem;
+  font-weight: 500;
+  line-height: 1;
   cursor: pointer;
-  font-size: 1.1rem;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sf-qty-control button:hover:not(:disabled) {
+  background: #f5f0ea;
+}
+
+.sf-qty-control button:disabled {
+  color: #c4bbb0;
+  cursor: not-allowed;
 }
 
 .sf-qty-control span {
-  min-width: 40px;
+  min-width: 44px;
+  padding: 0 4px;
   text-align: center;
+  font-size: 0.95rem;
   font-weight: 600;
+  color: #1e1510;
+  border-left: 1px solid #e8e2da;
+  border-right: 1px solid #e8e2da;
+  line-height: 40px;
 }
 
 .sf-qty-control input {
   width: 44px;
-  height: 36px;
+  height: 40px;
   border: none;
-  border-left: 1px solid var(--sf-sand);
-  border-right: 1px solid var(--sf-sand);
+  border-left: 1px solid #e8e2da;
+  border-right: 1px solid #e8e2da;
   text-align: center;
   font-weight: 600;
-  font-size: 0.9rem;
-  background: var(--sf-white);
+  font-size: 0.95rem;
+  background: #fff;
   -moz-appearance: textfield;
 }
 
@@ -1549,23 +1570,30 @@
 
 .sf-nav-icon--cart {
   position: relative;
+  color: var(--sf-espresso);
+  transform: scale(1.08);
+}
+
+.sf-nav-icon--cart:hover {
+  color: var(--sf-gold);
 }
 
 .sf-cart-badge {
   position: absolute;
-  top: -4px;
-  right: -6px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
+  top: -5px;
+  right: -7px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
   border-radius: 999px;
   background: var(--sf-gold);
   color: var(--sf-espresso);
-  font-size: 0.6rem;
+  font-size: 0.65rem;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 0 0 2px #fff;
 }
 
 .sf-navbar__links a {
