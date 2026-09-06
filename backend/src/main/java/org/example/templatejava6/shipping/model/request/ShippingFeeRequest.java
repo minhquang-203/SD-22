@@ -10,6 +10,9 @@ public class ShippingFeeRequest {
     /** Tên tỉnh/thành — địa chỉ 2 cấp (GHN {@code to_province_name}). */
     private String toProvinceName;
 
+    /** Province _id v3 — GHN fee dùng {@code to_province_id_v2}. */
+    private Integer toProvinceId;
+
     /** Tên phường/xã — địa chỉ 2 cấp (GHN {@code to_ward_name}). */
     private String toWardName;
 
@@ -19,7 +22,7 @@ public class ShippingFeeRequest {
     /** Legacy 3 cấp — chỉ dùng khi thiếu tên tỉnh/phường. */
     private Integer toDistrictId;
 
-    /** Legacy ward code — chỉ dùng khi thiếu tên tỉnh/phường. */
+    /** Mã xã GHN: _id v3 khi địa chỉ 2 cấp, hoặc ward code cũ khi thiếu tên. */
     private String toWardCode;
 
     /** Khoi luong don hang (gram). Neu trong se dung mac dinh trong cau hinh. */

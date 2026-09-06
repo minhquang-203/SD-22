@@ -19,6 +19,9 @@ public class OnlineTinhGiaRequest {
     /** Tên tỉnh/thành — địa chỉ 2 cấp. */
     private String toProvinceName;
 
+    /** Province _id GHN v3 (to_province_id_v2). */
+    private Integer toProvinceId;
+
     /** Tên phường/xã — địa chỉ 2 cấp. */
     private String toWardName;
 

@@ -168,7 +168,7 @@ public class OnlineCheckoutService {
         PhieuGiamGia phieu = resolvePhieu(request.getMaPhieuGiamGia(), khachHang.getId());
         BigDecimal phiVanChuyen = resolvePhiVanChuyen(
                 request.getToProvinceName(), request.getToWardName(), request.getToAddressV2(),
-                request.getToDistrictId(), request.getToWardCode(), tongTien);
+                request.getToProvinceId(), request.getToDistrictId(), request.getToWardCode(), tongTien);
         BigDecimal tienGiamGia = BigDecimal.ZERO;
         if (phieu != null) {
             tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien, phiVanChuyen);
@@ -268,7 +268,7 @@ public class OnlineCheckoutService {
         PhieuGiamGia phieu = resolvePhieu(request.getMaPhieuGiamGia(), khachHang.getId());
         BigDecimal phiVanChuyen = resolvePhiVanChuyen(
                 request.getToProvinceName(), request.getToWardName(), request.getToAddressV2(),
-                request.getToDistrictId(), request.getToWardCode(), tongTien);
+                request.getToProvinceId(), request.getToDistrictId(), request.getToWardCode(), tongTien);
         BigDecimal tienGiamGia = BigDecimal.ZERO;
         String maPhieu = null;
         if (phieu != null) {
@@ -461,12 +461,13 @@ public class OnlineCheckoutService {
      * Địa chỉ 2 cấp: gửi tên tỉnh/phường. Khi thiếu, ShippingService trả phí fallback.
      */
     private BigDecimal resolvePhiVanChuyen(String toProvinceName, String toWardName, String toAddressV2,
-                                           Integer toDistrictId, String toWardCode,
+                                           Integer toProvinceId, Integer toDistrictId, String toWardCode,
                                            BigDecimal tongTienHang) {
         ShippingFeeRequest feeRequest = new ShippingFeeRequest();
         feeRequest.setToProvinceName(coGiaTri(toProvinceName) ? toProvinceName.trim() : null);
         feeRequest.setToWardName(coGiaTri(toWardName) ? toWardName.trim() : null);
         feeRequest.setToAddressV2(coGiaTri(toAddressV2) ? toAddressV2.trim() : null);
+        feeRequest.setToProvinceId(toProvinceId);
         feeRequest.setToDistrictId(toDistrictId);
         feeRequest.setToWardCode(coGiaTri(toWardCode) ? toWardCode.trim() : null);
         if (tongTienHang != null && tongTienHang.compareTo(BigDecimal.ZERO) > 0) {

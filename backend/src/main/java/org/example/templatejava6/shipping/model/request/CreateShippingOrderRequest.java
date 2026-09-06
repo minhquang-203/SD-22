@@ -25,6 +25,9 @@ public class CreateShippingOrderRequest {
     /** Tên tỉnh/thành (bắt buộc khi isNewToAddress). */
     private String toProvinceName;
 
+    /** Province _id GHN v3 (to_province_id_v2). */
+    private Integer toProvinceId;
+
     /** Tên phường/xã (dùng khi isNewToAddress). */
     private String toWardName;
 

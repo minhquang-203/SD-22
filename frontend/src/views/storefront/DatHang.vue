@@ -325,6 +325,7 @@ async function recalcShippingFee() {
       toProvinceName: form.tinhThanh.trim(),
       toWardName: form.phuongXa.trim(),
       toAddressV2: form.diaChiCuThe.trim(),
+      toProvinceId: form.provinceId || undefined,
       toWardCode: form.wardCode,
     })
     ghnFee.value = typeof res.data?.total === 'number' ? res.data.total : null
@@ -389,6 +390,7 @@ async function previewVoucherPricing(code = form.maPhieuGiamGia) {
       toProvinceName: form.tinhThanh.trim() || undefined,
       toWardName: form.phuongXa.trim() || undefined,
       toAddressV2: form.diaChiCuThe.trim() || undefined,
+      toProvinceId: form.provinceId || undefined,
       toWardCode: form.wardCode || undefined,
     })
     voucherDiscount.value = Number(res.data?.tienGiamGia) || 0
@@ -509,6 +511,7 @@ async function submitCheckout() {
       toAddressV2: form.diaChiCuThe.trim(),
       toProvinceName: form.tinhThanh.trim(),
       toWardName: form.phuongXa.trim(),
+      toProvinceId: form.provinceId || undefined,
       toWardCode: form.wardCode,
     })
 
