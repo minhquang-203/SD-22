@@ -558,18 +558,17 @@ onUnmounted(() => {
 .sf-pdp__option { margin-bottom: 24px; }
 .sf-pdp__option-label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 12px; color: #334155; }
 .sf-pdp__chips { display: flex; flex-wrap: wrap; gap: 12px; }
-.sf-chip { padding: 8px 16px; border: 1px solid #cbd5e1; border-radius: 4px; background: white; color: #334155; font-size: 14px; cursor: pointer; transition: all 0.2s; }
+.sf-chip { padding: 0 14px; min-height: 36px; border: 1px solid #cbd5e1; border-radius: 2px; background: white; color: #334155; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
 .sf-chip:hover { border-color: #94a3b8; }
-.sf-chip.active { border-color: #0f172a; background: #0f172a; color: white; }
-.sf-pdp__stock { font-size: 14px; color: #059669; margin-bottom: 32px; }
+.sf-chip.active { border-color: #0f172a; background: #f3efe8; color: #1a1814; }
+.sf-pdp__stock { font-size: 14px; color: #059669; margin-bottom: 16px; }
 .sf-pdp__stock.out { color: #ef4444; }
-.sf-pdp__actions { display: flex; flex-direction: column; gap: 16px; }
+.sf-pdp__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .sf-pdp__qty {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 28px;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
 }
 .sf-pdp__qty .sf-pdp__option-label {
   margin-bottom: 0;
@@ -585,8 +584,15 @@ onUnmounted(() => {
 .sf-tabs-nav button.active { color: #0f172a; }
 .sf-tabs-nav button.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #c9a96e; }
 .sf-tab-panel { font-size: 15px; line-height: 1.6; color: #334155; animation: fadeIn 0.3s ease; }
-.sf-tag-list { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 12px; }
-.sf-tag-list li { background: #f1f5f9; padding: 6px 16px; border-radius: 20px; font-size: 14px; }
+.sf-tag-list { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.sf-tag-list li { background: #f7f5f1; padding: 6px 12px; border: 1px solid #e3e9ef; border-radius: 2px; font-size: 13px; font-weight: 500; }
+.sf-pdp :deep(.sf-qty-control) { border-radius: 0; }
+.sf-pdp :deep(.btn-soleil),
+.sf-pdp :deep(.btn-soleil-outline) {
+  border-radius: 2px;
+  min-height: 48px;
+}
+@media (max-width: 640px) { .sf-pdp__actions { grid-template-columns: 1fr; } }
 
 /* CUSTOMER REVIEWS STYLING */
 .sf-review-card { display: flex; gap: 16px; padding: 24px 0; border-bottom: 1px solid #f1f5f9; }

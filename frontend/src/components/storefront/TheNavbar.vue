@@ -1,17 +1,23 @@
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useAuth } from '@/composables/useAuth'
 import { useAuthModal } from '@/composables/useAuthModal'
 import { useCart } from '@/composables/useCart'
 import { useCustomerNotifications } from '@/composables/useCustomerNotifications'
-import { fetchDanhMucList } from '@/api/storefrontApi'
 import { confirm } from '@/composables/useConfirm'
 
 const router = useRouter()
 const route = useRoute()
 const { isLoggedIn, hoTen, dangXuat } = useAuth()
+
+const lastName = computed(() => {
+  const parts = String(hoTen.value || '').trim().split(/\s+/).filter(Boolean)
+  return parts[parts.length - 1] || 'Bạn'
+})
+
+const avatarLetter = computed(() => lastName.value.charAt(0).toUpperCase())
 const { openAuthModal } = useAuthModal()
 const { count } = useCart()
 const {
@@ -26,28 +32,28 @@ const {
 } = useCustomerNotifications()
 
 const searchQuery = ref('')
+const searchOpen = ref(false)
+const searchInput = ref(null)
+const navEl = ref(null)
+const searchBarPx = ref(0)
 const megaOpen = ref(false)
 const userOpen = ref(false)
 const notifOpen = ref(false)
-const categories = ref([])
+let megaTimer
 
 const navLinks = [
   { to: '/', label: 'Trang chủ', exact: true },
-  { to: '/san-pham', label: 'Kem chống nắng' },
-  { to: '/san-pham/khuyen-mai', label: 'Khuyến mãi' },
+  { to: '/san-pham', label: 'Sản phẩm' },
   { to: '/quiz', label: 'Quiz da' },
+]
+
+const extraLinks = [
+  { to: '/san-pham/khuyen-mai', label: 'Khuyến mãi' },
   { to: '/blog', label: 'Blog' },
-  { to: '/tra-cuu-don', label: 'Tra cứu đơn', requiresAuth: true },
   { to: '/san-pham/goi-y', label: 'Sản phẩm gợi ý' },
 ]
 
-onMounted(async () => {
-  try {
-    const res = await fetchDanhMucList()
-    categories.value = (res.data || []).filter((d) => d.trangThai !== false)
-  } catch {
-    categories.value = []
-  }
+onMounted(() => {
   document.addEventListener('click', onDocClick)
   startNotifPolling()
 })
@@ -55,17 +61,41 @@ onMounted(async () => {
 onUnmounted(() => {
   document.removeEventListener('click', onDocClick)
   stopNotifPolling()
+  clearTimeout(megaTimer)
 })
+
+function openMega() {
+  clearTimeout(megaTimer)
+  megaOpen.value = true
+}
+
+function closeMega() {
+  clearTimeout(megaTimer)
+  megaTimer = setTimeout(() => {
+    megaOpen.value = false
+  }, 180)
+}
+
+function toggleMega(e) {
+  e.stopPropagation()
+  clearTimeout(megaTimer)
+  megaOpen.value = !megaOpen.value
+}
 
 function onDocClick() {
   userOpen.value = false
   notifOpen.value = false
+  searchOpen.value = false
+  clearTimeout(megaTimer)
+  megaOpen.value = false
 }
 
 async function toggleNotif(e) {
   e.stopPropagation()
   notifOpen.value = !notifOpen.value
   userOpen.value = false
+  searchOpen.value = false
+  megaOpen.value = false
   if (notifOpen.value) {
     await loadNotifications()
   }
@@ -116,6 +146,7 @@ function formatNotifTime(value) {
 
 function submitSearch() {
   const q = searchQuery.value.trim()
+  searchOpen.value = false
   if (!q) {
     router.push('/san-pham')
     return
@@ -127,46 +158,34 @@ function openLogin() {
   openAuthModal('login')
 }
 
-function openRegister() {
-  openAuthModal('register')
-}
-
-function handleNavClick(link, e) {
-  if (link.disabled) {
-    e.preventDefault()
-    return
-  }
-  if (link.requiresAuth && !isLoggedIn.value) {
-    e.preventDefault()
-    openAuthModal('login', link.to)
-    return
-  }
-  if (link.requiresAuth) {
-    router.push(link.to)
-    return
-  }
-}
-
 function isLinkActive(link) {
   const path = route.path
-  const q = route.query
-
   if (link.exact) return path === '/'
+  if (link.to === '/san-pham') {
+    return path === '/san-pham' || (path.startsWith('/san-pham/') && !extraLinks.some((x) => path.startsWith(x.to)))
+  }
+  return path === link.to || path.startsWith(`${link.to}/`)
+}
 
-  if (link.label === 'Kem chống nắng') {
-    return path === '/san-pham' && !q.noiBat && !q.thuongHieu && !q.danhMuc
-  }
-  if (link.label === 'Khuyến mãi') {
-    return path === '/san-pham/khuyen-mai'
-  }
-  if (link.label === 'Quiz da') {
-    return path === '/quiz'
-  }
-  if (link.to === '/tra-cuu-don') {
-    return path === '/tra-cuu-don' || path.startsWith('/tra-cuu-don/')
-  }
+function isExtraActive() {
+  return extraLinks.some((link) => isLinkActive(link))
+}
 
-  return path === link.to
+async function toggleSearch(e) {
+  e.stopPropagation()
+  if (!searchOpen.value) {
+    const w = navEl.value?.getBoundingClientRect().width || 0
+    const max = Math.max(280, window.innerWidth - 48)
+    searchBarPx.value = Math.min(Math.round(w * 1.5), max)
+  }
+  searchOpen.value = !searchOpen.value
+  userOpen.value = false
+  notifOpen.value = false
+  megaOpen.value = false
+  if (searchOpen.value) {
+    await nextTick()
+    searchInput.value?.focus()
+  }
 }
 
 async function handleLogout() {
@@ -189,164 +208,163 @@ function toggleUser(e) {
 </script>
 
 <template>
-  <header class="sf-header">
-    <!-- Tầng trên -->
-    <div class="sf-header__top">
-      <div class="sf-header__inner">
-        <RouterLink to="/" class="sf-navbar__brand">
-          <img src="@/assets/logo/sunova_mark.png" alt="SUNOVA Logo" class="sf-navbar__logo-img" />
-          <span class="sf-navbar__brand-text">SUN<span>OVA</span></span>
+  <header class="sf-header" :class="{ 'is-searching': searchOpen }">
+    <div class="sf-header__inner">
+      <RouterLink to="/" class="sf-navbar__brand">
+        <img src="@/assets/logo/sunova_mark.png" alt="SUNOVA Logo" class="sf-navbar__logo-img" />
+        <span class="sf-navbar__brand-text">SUN<span>OVA</span></span>
+      </RouterLink>
+
+      <div class="sf-header__center">
+      <form
+        v-show="searchOpen"
+        class="sf-header__search-bar"
+        :style="searchBarPx ? { width: `${searchBarPx}px` } : undefined"
+        @click.stop
+        @submit.prevent="submitSearch"
+      >
+        <input
+          ref="searchInput"
+          v-model="searchQuery"
+          type="search"
+          placeholder="Tìm kem chống nắng, thương hiệu..."
+          aria-label="Tìm kiếm sản phẩm"
+        />
+        <button type="submit" class="sf-header__search-go">Tìm</button>
+        <button type="button" class="sf-header__search-close" aria-label="Đóng tìm kiếm" @click="searchOpen = false">
+          <Icon icon="solar:close-linear" width="18" />
+        </button>
+      </form>
+
+      <nav v-show="!searchOpen" ref="navEl" class="sf-header__links" aria-label="Chính">
+        <RouterLink
+          v-for="link in navLinks"
+          :key="link.label"
+          :to="link.to"
+          class="sf-header__link"
+          active-class=""
+          exact-active-class=""
+          :class="{ active: isLinkActive(link) }"
+        >
+          {{ link.label }}
         </RouterLink>
 
-        <form class="sf-header__search" @submit.prevent="submitSearch">
-          <input
-            v-model="searchQuery"
-            type="search"
-            placeholder="Tìm kem chống nắng, thương hiệu..."
-            aria-label="Tìm kiếm sản phẩm"
-          />
-          <button type="submit" aria-label="Tìm kiếm">
-            <Icon icon="solar:magnifer-linear" width="20" />
-          </button>
-        </form>
-
-        <div class="sf-header__actions">
-          <div v-if="isLoggedIn" class="sf-bell" @click.stop>
-            <button
-              type="button"
-              class="sf-nav-icon sf-bell__btn"
-              :class="{ 'sf-bell__btn--active': notifOpen }"
-              title="Thông báo"
-              aria-label="Thông báo"
-              @click="toggleNotif"
-            >
-              <Icon icon="solar:bell-linear" width="22" />
-              <span v-if="hasNotifBadge" class="sf-cart-badge sf-bell__badge">{{ notifBadgeText }}</span>
-            </button>
-
-            <div v-if="notifOpen" class="sf-bell__panel">
-              <div class="sf-bell__header">
-                <span>Thông báo</span>
-                <button
-                  v-if="notifications.length"
-                  type="button"
-                  class="sf-bell__mark-all"
-                  @click="markAllNotifications"
-                >
-                  Đọc tất cả
-                </button>
-              </div>
-
-              <ul v-if="notifications.length" class="sf-bell__list">
-                <li
-                  v-for="item in notifications"
-                  :key="item.id"
-                  class="sf-bell__item"
-                  :class="{ 'sf-bell__item--unread': !item.daDoc }"
-                  @click="goToNotif(item)"
-                >
-                  <div class="sf-bell__item-icon" :data-loai="item.loai">
-                    <Icon :icon="iconForNotifLoai(item.loai)" width="18" />
-                  </div>
-                  <div class="sf-bell__item-body">
-                    <div class="sf-bell__item-title">{{ item.tieuDe || 'Thông báo' }}</div>
-                    <div class="sf-bell__item-desc">{{ item.noiDung || '—' }}</div>
-                    <div class="sf-bell__item-time">{{ formatNotifTime(item.ngayTao) }}</div>
-                  </div>
-                  <span v-if="!item.daDoc" class="sf-bell__item-dot" />
-                </li>
-              </ul>
-
-              <div v-else class="sf-bell__empty">Chưa có thông báo nào.</div>
-            </div>
-          </div>
-
-          <RouterLink to="/gio-hang" class="sf-nav-icon sf-nav-icon--cart" title="Giỏ hàng" aria-label="Giỏ hàng">
-            <Icon icon="solar:cart-large-2-bold" width="24" />
-            <span v-if="count > 0" class="sf-cart-badge">{{ count > 99 ? '99+' : count }}</span>
-          </RouterLink>
-
-          <template v-if="!isLoggedIn">
-            <button type="button" class="sf-header__auth-text" @click="openRegister">Đăng ký</button>
-            <span class="sf-header__auth-sep">/</span>
-            <button type="button" class="sf-header__auth-text" @click="openLogin">Đăng nhập</button>
-            <button type="button" class="sf-nav-icon" title="Đăng nhập" aria-label="Đăng nhập" @click="openLogin">
-              <Icon icon="solar:user-circle-linear" width="22" />
-            </button>
-          </template>
-          <div v-else class="sf-user-menu">
-            <button type="button" class="sf-user-trigger" @click="toggleUser">
-              <Icon icon="solar:user-circle-linear" width="20" />
-              <span>{{ hoTen }}</span>
-            </button>
-            <div v-if="userOpen" class="sf-user-dropdown" @click.stop>
-              <RouterLink to="/tai-khoan" @click="userOpen = false">Tài khoản</RouterLink>
-              <RouterLink to="/tra-cuu-don" @click="userOpen = false">Tra cứu đơn</RouterLink>
-              <button type="button" @click="handleLogout">Đăng xuất</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tầng dưới -->
-    <div class="sf-header__nav">
-      <div class="sf-header__inner">
         <div
-          class="sf-mega-trigger"
-          @mouseenter="megaOpen = true"
-          @mouseleave="megaOpen = false"
+          class="sf-nav-drop"
+          @mouseenter="openMega"
+          @mouseleave="closeMega"
         >
-          <button type="button" class="sf-mega-trigger__btn">
-            <Icon icon="solar:hamburger-menu-linear" width="18" />
-            Danh mục sản phẩm
+          <button
+            type="button"
+            class="sf-header__link sf-nav-drop__btn"
+            :class="{ active: isExtraActive() || megaOpen }"
+            @click="toggleMega"
+          >
+            Danh mục
+            <span class="sf-nav-drop__chev" aria-hidden="true">▾</span>
           </button>
-          <div v-if="megaOpen && categories.length" class="sf-mega-panel">
+          <div v-show="megaOpen" class="sf-nav-drop__panel" @click.stop>
             <RouterLink
-              v-for="cat in categories"
-              :key="cat.id"
-              :to="`/san-pham?danhMuc=${cat.id}`"
-              class="sf-mega-panel__item"
+              v-for="link in extraLinks"
+              :key="link.to"
+              :to="link.to"
+              class="sf-nav-drop__item"
+              :class="{ active: isLinkActive(link) }"
               @click="megaOpen = false"
             >
-              {{ cat.ten }}
+              {{ link.label }}
             </RouterLink>
           </div>
         </div>
+      </nav>
+      </div>
 
-        <nav class="sf-header__links">
-          <template v-for="link in navLinks" :key="link.label">
-            <RouterLink
-              v-if="!link.disabled && !link.requiresAuth"
-              :to="link.to"
-              class="sf-header__link"
-              active-class=""
-              exact-active-class=""
-              :class="{ active: isLinkActive(link) }"
-              @click="handleNavClick(link, $event)"
-            >
-              {{ link.label }}
-            </RouterLink>
-            <button
-              v-else-if="link.disabled"
-              type="button"
-              class="sf-header__link sf-header__link--muted"
-              disabled
-              title="Sắp ra mắt"
-            >
-              {{ link.label }}
-            </button>
-            <button
-              v-else
-              type="button"
-              class="sf-header__link"
-              :class="{ active: isLinkActive(link) }"
-              @click="handleNavClick(link, $event)"
-            >
-              {{ link.label }}
-            </button>
-          </template>
-        </nav>
+      <div class="sf-header__actions">
+        <button
+          type="button"
+          class="sf-nav-icon"
+          :class="{ 'is-on': searchOpen }"
+          title="Tìm kiếm"
+          aria-label="Tìm kiếm"
+          @click.stop="toggleSearch"
+        >
+          <Icon icon="solar:magnifer-linear" width="20" />
+        </button>
+
+        <div v-if="isLoggedIn" class="sf-bell" @click.stop>
+          <button
+            type="button"
+            class="sf-nav-icon sf-bell__btn"
+            :class="{ 'sf-bell__btn--active': notifOpen }"
+            title="Thông báo"
+            aria-label="Thông báo"
+            @click="toggleNotif"
+          >
+            <Icon icon="solar:bell-linear" width="22" />
+            <span v-if="hasNotifBadge" class="sf-cart-badge sf-bell__badge">{{ notifBadgeText }}</span>
+          </button>
+
+          <div v-if="notifOpen" class="sf-bell__panel">
+            <div class="sf-bell__header">
+              <span>Thông báo</span>
+              <button
+                v-if="notifications.length"
+                type="button"
+                class="sf-bell__mark-all"
+                @click="markAllNotifications"
+              >
+                Đọc tất cả
+              </button>
+            </div>
+
+            <ul v-if="notifications.length" class="sf-bell__list">
+              <li
+                v-for="item in notifications"
+                :key="item.id"
+                class="sf-bell__item"
+                :class="{ 'sf-bell__item--unread': !item.daDoc }"
+                @click="goToNotif(item)"
+              >
+                <div class="sf-bell__item-icon" :data-loai="item.loai">
+                  <Icon :icon="iconForNotifLoai(item.loai)" width="18" />
+                </div>
+                <div class="sf-bell__item-body">
+                  <div class="sf-bell__item-title">{{ item.tieuDe || 'Thông báo' }}</div>
+                  <div class="sf-bell__item-desc">{{ item.noiDung || '—' }}</div>
+                  <div class="sf-bell__item-time">{{ formatNotifTime(item.ngayTao) }}</div>
+                </div>
+                <span v-if="!item.daDoc" class="sf-bell__item-dot" />
+              </li>
+            </ul>
+
+            <div v-else class="sf-bell__empty">Chưa có thông báo nào.</div>
+          </div>
+        </div>
+
+        <RouterLink to="/gio-hang" class="sf-nav-icon sf-nav-icon--cart" title="Giỏ hàng" aria-label="Giỏ hàng">
+          <Icon icon="solar:cart-large-2-linear" width="20" />
+          <span v-if="count > 0" class="sf-cart-badge">{{ count > 99 ? '99+' : count }}</span>
+        </RouterLink>
+
+        <button
+          v-if="!isLoggedIn"
+          type="button"
+          class="sf-header__cta"
+          @click="openLogin"
+        >
+          Đăng nhập
+        </button>
+        <div v-else class="sf-user-menu">
+          <button type="button" class="sf-header__user" :title="hoTen" @click="toggleUser">
+            <span class="sf-header__avatar" aria-hidden="true">{{ avatarLetter }}</span>
+          </button>
+          <div v-if="userOpen" class="sf-user-dropdown" @click.stop>
+            <div class="sf-user-dropdown__name">{{ hoTen }}</div>
+            <RouterLink to="/tai-khoan" @click="userOpen = false">Tài khoản</RouterLink>
+            <RouterLink to="/tra-cuu-don" @click="userOpen = false">Tra cứu đơn</RouterLink>
+            <button type="button" @click="handleLogout">Đăng xuất</button>
+          </div>
+        </div>
       </div>
     </div>
   </header>

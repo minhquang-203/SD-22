@@ -4,57 +4,47 @@ import { RouterLink } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import axios from 'axios'
 import ProductCard from '@/components/storefront/ProductCard.vue'
-import HorizontalScroll from '@/components/storefront/HorizontalScroll.vue'
-import { categoryIcon, brandDisplayName } from '@/utils/categoryIcon'
-import { fetchAllProducts, fetchDanhMucList, fetchThuongHieuList } from '@/api/storefrontApi'
+import { fetchAllProducts, fetchDanhMucList } from '@/api/storefrontApi'
 import { fetchActiveBanners } from '@/api/bannerApi'
 import { productImageUrl } from '@/utils/productImage'
 import { rankProductsByQuiz, resolveQuizProfile } from '@/utils/quizRecommend'
+
+const DEFAULT_HERO = {
+  id: 'fallback-hero',
+  tieuDe: '',
+  tieuDeChinh: 'Sunova',
+  moTa: 'Mang đến trải nghiệm chống nắng cá nhân hóa theo loại da của bạn',
+  nutText: 'Xem sản phẩm',
+  linkUrl: '/san-pham',
+  anhUrl: '/hero-banner.png',
+  isFallback: true,
+}
 
 const loading = ref(true)
 const featured = ref([])
 const suggestions = ref([])
 const quizSuggestions = ref([])
 const quizSkinName = ref('')
-const homeBanners = ref([])
 const categories = ref([])
-const brands = ref([])
+const homeBanners = ref([DEFAULT_HERO])
 
-const DEFAULT_QUIZ_BANNER = {
-  id: 'fallback-quiz',
-  tieuDe: 'Trắc nghiệm da',
-  tieuDeChinh: 'Tìm sản phẩm chống nắng phù hợp với bạn',
-  moTa: 'Trả lời vài câu hỏi ngắn — hệ thống SUNOVA sẽ phân tích làn da và gợi ý sản phẩm hoàn hảo dành riêng cho bạn.',
-  nutText: 'Làm Quiz Ngay',
-  linkUrl: '/quiz',
-  anhUrl: null,
-}
+const BANNER_INTERVAL_MS = 5000
+const currentBannerIndex = ref(0)
+let bannerTimer = null
+
+const activeBanner = computed(() => homeBanners.value[currentBannerIndex.value] || DEFAULT_HERO)
+const hasMultipleBanners = computed(() => homeBanners.value.length > 1)
+const isFallbackHero = computed(() => !!activeBanner.value?.isFallback)
 
 function isExternalLink(url) {
   return /^https?:\/\//i.test(String(url || ''))
 }
 
-function bannerImageUrl(url) {
-  if (!url) return ''
+function bannerImageSrc(banner) {
+  const url = banner?.anhUrl
+  if (!url || url === '/hero-banner.png') return '/hero-banner.png'
   return productImageUrl(url)
 }
-
-function bannerBgStyle(banner) {
-  if (!banner?.anhUrl) return undefined
-  return {
-    backgroundImage: `linear-gradient(90deg, rgba(36,26,18,0.92) 0%, rgba(36,26,18,0.72) 55%, rgba(36,26,18,0.45) 100%), url(${bannerImageUrl(banner.anhUrl)})`,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-  }
-}
-
-// --- Carousel banner ở vùng hero ---
-const BANNER_INTERVAL_MS = 5000
-const currentBannerIndex = ref(0)
-let bannerTimer = null
-
-const activeBanner = computed(() => homeBanners.value[currentBannerIndex.value] || null)
-const hasMultipleBanners = computed(() => homeBanners.value.length > 1)
 
 function goToBanner(index) {
   const total = homeBanners.value.length
@@ -97,12 +87,10 @@ watch(
 
 onBeforeUnmount(stopAutoplay)
 
-// --- Thời tiết & UV (cố định Hà Nội) ---
 const weather = ref(null)
 const isHighUvAlert = ref(false)
 const weatherLoading = ref(true)
 
-// Mức UV -> SPF khuyến nghị (đồng bộ với logic backend /weather/suggest)
 const uvInfo = computed(() => {
   if (!weather.value) return null
   const uv = weather.value.uvIndex
@@ -124,8 +112,7 @@ const uvInfo = computed(() => {
     spf = 'SPF 50+'
     pa = 'PA++++'
   }
-  const percent = Math.max(0, Math.min(100, Math.round((uv / 12) * 100)))
-  return { level, spf, pa, percent }
+  return { level, spf, pa }
 })
 
 const weatherDesc = computed(() => {
@@ -137,16 +124,16 @@ const weatherDesc = computed(() => {
   return 'Se lạnh'
 })
 
-const blogBanner = {
-  title: 'Chưa biết chọn kem chống nắng?',
-  desc: 'Cẩm nang SUNOVA — hiểu SPF, PA và chọn đúng cho da bạn',
-  to: '/blog',
-}
+const showUvChip = computed(() => {
+  if (!uvInfo.value) return false
+  return isHighUvAlert.value || (weather.value?.uvIndex ?? 0) >= 6
+})
 
-const promises = [
-  { icon: 'solar:verified-check-linear', title: 'Chính hãng', desc: 'Nguồn gốc rõ ràng' },
-  { icon: 'solar:delivery-linear', title: 'Giao nhanh', desc: 'Toàn quốc 2–5 ngày' },
-  { icon: 'solar:refresh-linear', title: 'Đổi trả', desc: 'Trong 7 ngày' },
+const trustItems = [
+  { title: 'Chính hãng 100%', desc: 'Nguồn gốc rõ ràng, hóa đơn đầy đủ' },
+  { title: 'Giao 2–5 ngày', desc: 'Toàn quốc, theo dõi đơn realtime' },
+  { title: 'Đổi trả 7 ngày', desc: 'Sản phẩm còn nguyên seal' },
+  { title: 'Tư vấn theo da', desc: 'Quiz + chat hỗ trợ khi cần' },
 ]
 
 async function loadWeather() {
@@ -167,10 +154,9 @@ async function loadWeather() {
 onMounted(async () => {
   loadWeather()
   try {
-    const [prodRes, dmRes, thRes, quizProfile, bannerRes] = await Promise.all([
+    const [prodRes, dmRes, quizProfile, bannerRes] = await Promise.all([
       fetchAllProducts(),
       fetchDanhMucList(),
-      fetchThuongHieuList(),
       resolveQuizProfile(),
       fetchActiveBanners().catch(() => ({ data: [] })),
     ])
@@ -179,9 +165,8 @@ onMounted(async () => {
     if (!featured.value.length) featured.value = active.slice(0, 8)
     suggestions.value = active.slice(0, 8)
     categories.value = (dmRes.data || []).filter((d) => d.trangThai !== false)
-    brands.value = (thRes.data || []).filter((b) => b.trangThai !== false).slice(0, 12)
     const fromApi = Array.isArray(bannerRes.data) ? bannerRes.data : []
-    homeBanners.value = fromApi.length ? fromApi : [DEFAULT_QUIZ_BANNER]
+    homeBanners.value = fromApi.length ? fromApi : [DEFAULT_HERO]
 
     if (quizProfile) {
       quizSkinName.value = quizProfile.tenLoaiDa || ''
@@ -203,203 +188,121 @@ onMounted(async () => {
 
 <template>
   <div class="sf-home">
-    <!-- Hero: placeholder trái + 2 card phải -->
-    <section class="sf-hero-split sf-container">
-      <div
-        v-if="activeBanner"
-        class="sf-hero-banner-wrap"
-        @mouseenter="stopAutoplay"
-        @mouseleave="startAutoplay"
-      >
-        <transition name="sf-banner-fade" mode="out-in">
-          <component
-            :is="isExternalLink(activeBanner.linkUrl) ? 'a' : RouterLink"
+    <section
+      class="sf-home-hero"
+      aria-label="Giới thiệu"
+      @mouseenter="stopAutoplay"
+      @mouseleave="startAutoplay"
+    >
+      <div class="sf-home-hero__media" aria-hidden="true">
+        <transition name="sf-home-hero-fade" mode="out-in">
+          <img
             :key="activeBanner.id"
-            class="sf-hero-banner"
-            :href="isExternalLink(activeBanner.linkUrl) ? activeBanner.linkUrl : undefined"
-            :target="isExternalLink(activeBanner.linkUrl) ? '_blank' : undefined"
-            :rel="isExternalLink(activeBanner.linkUrl) ? 'noopener noreferrer' : undefined"
-            :to="isExternalLink(activeBanner.linkUrl) ? undefined : (activeBanner.linkUrl || '/')"
-            :style="bannerBgStyle(activeBanner)"
-          >
-            <div class="sf-hero-banner__content">
-              <p v-if="activeBanner.tieuDe" class="sf-hero-banner__eyebrow">{{ activeBanner.tieuDe }}</p>
-              <h2 class="sf-hero-banner__title">{{ activeBanner.tieuDeChinh }}</h2>
-              <p v-if="activeBanner.moTa" class="sf-hero-banner__desc">{{ activeBanner.moTa }}</p>
-              <span class="sf-hero-banner__btn">{{ activeBanner.nutText || 'Xem ngay' }}</span>
-            </div>
-          </component>
+            :src="bannerImageSrc(activeBanner)"
+            alt=""
+          />
         </transition>
-
-        <template v-if="hasMultipleBanners">
-          <button
-            type="button"
-            class="sf-hero-nav sf-hero-nav--prev"
-            aria-label="Banner trước"
-            @click="prevBanner"
-          >
-            <Icon icon="solar:alt-arrow-left-linear" width="22" />
-          </button>
-          <button
-            type="button"
-            class="sf-hero-nav sf-hero-nav--next"
-            aria-label="Banner sau"
-            @click="nextBanner"
-          >
-            <Icon icon="solar:alt-arrow-right-linear" width="22" />
-          </button>
-          <div class="sf-hero-dots">
-            <button
-              v-for="(banner, i) in homeBanners"
-              :key="banner.id"
-              type="button"
-              class="sf-hero-dot"
-              :class="{ 'sf-hero-dot--active': i === currentBannerIndex }"
-              :aria-label="`Chuyển tới banner ${i + 1}`"
-              @click="goToBanner(i)"
-            />
-          </div>
-        </template>
       </div>
-      <div v-else class="sf-hero-placeholder" aria-hidden="true" />
-
-      <div class="sf-hero-side">
-        <RouterLink :to="blogBanner.to" class="sf-hero-side__card sf-hero-side__card--blog">
-          <span class="sf-hero-side__blog-icon" aria-hidden="true">
-            <Icon icon="solar:notebook-bookmark-bold-duotone" width="22" />
-          </span>
-          <p class="sf-hero-side__kicker">{{ blogBanner.desc }}</p>
-          <h2 class="sf-hero-side__title">{{ blogBanner.title }}</h2>
-          <span class="sf-hero-side__cta">
-            Đọc blog <span aria-hidden="true">→</span>
-          </span>
-        </RouterLink>
-
-        <div
-          class="sf-hero-side__card sf-hero-side__card--weather"
-          aria-live="polite"
-          :aria-busy="weatherLoading"
-        >
-          <div class="sf-hero-wx">
-            <div class="sf-hero-wx__top">
-              <span class="sf-hero-wx__loc">
-                <Icon icon="solar:map-point-bold" width="14" />
-                Hà Nội
-              </span>
-              <span
-                class="sf-hero-wx__sun"
-                :class="{ 'sf-hero-wx__sun--muted': weatherLoading || !weather }"
-                aria-hidden="true"
+      <div class="sf-container sf-home-hero__inner">
+        <div class="sf-home-hero__content">
+          <template v-if="isFallbackHero">
+            <h1 class="sf-home-hero__brand">Sunova</h1>
+            <p class="sf-home-hero__line">{{ activeBanner.moTa }}</p>
+            <div class="sf-home-hero__actions">
+              <RouterLink to="/san-pham" class="sf-home-btn sf-home-btn--solid">Xem sản phẩm</RouterLink>
+              <RouterLink to="/quiz" class="sf-home-btn sf-home-btn--ghost">Làm quiz 2 phút</RouterLink>
+            </div>
+          </template>
+          <template v-else>
+            <h2 class="sf-home-hero__title">{{ activeBanner.tieuDeChinh }}</h2>
+            <p v-if="activeBanner.tieuDe" class="sf-home-hero__line">{{ activeBanner.tieuDe }}</p>
+            <p v-if="activeBanner.moTa" class="sf-home-hero__line">{{ activeBanner.moTa }}</p>
+            <div class="sf-home-hero__actions">
+              <component
+                :is="isExternalLink(activeBanner.linkUrl) ? 'a' : RouterLink"
+                class="sf-home-btn sf-home-btn--solid"
+                :href="isExternalLink(activeBanner.linkUrl) ? activeBanner.linkUrl : undefined"
+                :target="isExternalLink(activeBanner.linkUrl) ? '_blank' : undefined"
+                :rel="isExternalLink(activeBanner.linkUrl) ? 'noopener noreferrer' : undefined"
+                :to="isExternalLink(activeBanner.linkUrl) ? undefined : (activeBanner.linkUrl || '/')"
               >
-                <Icon
-                  :icon="!weatherLoading && weather ? 'solar:sun-bold' : 'solar:sun-linear'"
-                  width="28"
-                />
-              </span>
+                {{ activeBanner.nutText || 'Xem ngay' }}
+              </component>
+              <RouterLink to="/quiz" class="sf-home-btn sf-home-btn--ghost">Làm quiz 2 phút</RouterLink>
             </div>
+          </template>
+        </div>
+      </div>
 
-            <!-- Skeleton: khớp vị trí temp / desc / meta -->
-            <div v-if="weatherLoading" class="sf-hero-wx__body sf-hero-wx__body--skel" key="skel">
-              <span class="sf-skel sf-skel--temp" />
-              <span class="sf-skel sf-skel--desc" />
-              <div class="sf-hero-wx__meta sf-hero-wx__meta--skel">
-                <span class="sf-skel sf-skel--chip" />
-                <span class="sf-skel sf-skel--chip sf-skel--chip-sm" />
-              </div>
-            </div>
+      <template v-if="hasMultipleBanners">
+        <button type="button" class="sf-home-hero__nav sf-home-hero__nav--prev" aria-label="Banner trước" @click="prevBanner">
+          <Icon icon="solar:alt-arrow-left-linear" width="22" />
+        </button>
+        <button type="button" class="sf-home-hero__nav sf-home-hero__nav--next" aria-label="Banner sau" @click="nextBanner">
+          <Icon icon="solar:alt-arrow-right-linear" width="22" />
+        </button>
+        <div class="sf-home-hero__dots">
+          <button
+            v-for="(banner, i) in homeBanners"
+            :key="banner.id"
+            type="button"
+            class="sf-home-hero__dot"
+            :class="{ 'is-active': i === currentBannerIndex }"
+            :aria-label="`Chuyển tới banner ${i + 1}`"
+            @click="goToBanner(i)"
+          />
+        </div>
+      </template>
+    </section>
 
-            <!-- Data -->
-            <div
-              v-else-if="weather && uvInfo"
-              class="sf-hero-wx__body sf-hero-wx__body--fade"
-              key="data"
-            >
-              <div class="sf-hero-wx__temp">{{ Math.round(weather.temp) }}°</div>
-              <p class="sf-hero-wx__desc">{{ weatherDesc }}</p>
-              <div class="sf-hero-wx__meta">
-                <span>UV {{ weather.uvIndex }} · {{ uvInfo.level }}</span>
-                <span v-if="uvInfo.spf">{{ uvInfo.spf }}{{ uvInfo.pa ? ` ${uvInfo.pa}` : '' }}</span>
-              </div>
-            </div>
-
-            <!-- Lỗi / không data -->
-            <div v-else class="sf-hero-wx__body sf-hero-wx__body--error" key="err">
-              <p class="sf-hero-wx__error">Không tải được thời tiết</p>
-            </div>
+    <div class="sf-uvbar">
+      <div class="sf-container sf-uvbar__row">
+        <div class="sf-uvbar__left">
+          <div class="sf-uvbar__city">
+            <Icon icon="solar:map-point-bold" width="14" />
+            Hà Nội hôm nay
           </div>
+          <template v-if="weatherLoading">
+            <span class="sf-uvbar__skel sf-uvbar__skel--temp" />
+            <span class="sf-uvbar__skel sf-uvbar__skel--meta" />
+          </template>
+          <template v-else-if="weather && uvInfo">
+            <div class="sf-uvbar__temp">{{ Math.round(weather.temp) }}°</div>
+            <div class="sf-uvbar__meta">{{ weatherDesc }} · UV {{ weather.uvIndex }}</div>
+            <div v-if="showUvChip" class="sf-uvbar__chip">
+              <span />
+              Nên dùng {{ uvInfo.spf }}{{ uvInfo.pa ? ` ${uvInfo.pa}` : '' }}
+            </div>
+          </template>
+          <div v-else class="sf-uvbar__meta">Không tải được thời tiết</div>
         </div>
+        <RouterLink to="/san-pham" class="sf-home-more">Xem gợi ý theo UV →</RouterLink>
+      </div>
+    </div>
+
+    <section v-if="loading || categories.length" class="sf-cats" aria-label="Danh mục">
+      <div v-if="loading" class="sf-container sf-cats__skel" />
+      <div v-else class="sf-container sf-cats__row">
+        <RouterLink
+          v-for="cat in categories"
+          :key="cat.id"
+          :to="`/san-pham?danhMuc=${cat.id}`"
+          class="sf-cat"
+        >
+          <span class="sf-cat__label">{{ cat.ten }}</span>
+          <span v-if="cat.moTa" class="sf-cat__sub">{{ cat.moTa }}</span>
+        </RouterLink>
       </div>
     </section>
 
-    <!-- Vòng tròn danh mục -->
-    <section class="sf-section sf-section--tight">
-      <div class="sf-container">
-        <div class="sf-section-head sf-section-head--row">
-          <h2 class="sf-section-title">Danh mục</h2>
-          <RouterLink to="/san-pham" class="sf-link-more">Xem tất cả →</RouterLink>
-        </div>
-        <div v-if="loading" class="sf-circle-skeleton" />
-        <HorizontalScroll v-else aria-label="Danh mục sản phẩm" :item-count="categories.length">
-          <RouterLink
-            v-for="cat in categories"
-            :key="cat.id"
-            :to="`/san-pham?danhMuc=${cat.id}`"
-            class="sf-circle-item"
-          >
-            <span class="sf-circle-item__ring">
-              <img
-                v-if="cat.anhUrl || cat.urlAnh"
-                :src="productImageUrl(cat.anhUrl || cat.urlAnh)"
-                :alt="cat.ten"
-                class="sf-circle-item__img"
-              />
-              <Icon v-else :icon="categoryIcon(cat.ten, cat.ma, cat.id)" width="32" />
-            </span>
-            <span class="sf-circle-item__label">{{ cat.ten }}</span>
-          </RouterLink>
-        </HorizontalScroll>
-      </div>
-    </section>
-
-    <!-- Vòng tròn thương hiệu -->
-    <section id="sf-brands" class="sf-section sf-section--tight sf-section--muted">
-      <div class="sf-container">
-        <div class="sf-section-head sf-section-head--row">
-          <h2 class="sf-section-title">Thương hiệu</h2>
-          <RouterLink to="/san-pham" class="sf-link-more">Xem tất cả →</RouterLink>
-        </div>
-        <div v-if="loading" class="sf-circle-skeleton" />
-        <HorizontalScroll v-else aria-label="Thương hiệu" :item-count="brands.length">
-          <RouterLink
-            v-for="brand in brands"
-            :key="brand.id"
-            :to="`/san-pham?thuongHieu=${brand.id}`"
-            class="sf-circle-item"
-          >
-            <span class="sf-circle-item__ring sf-circle-item__ring--brand">
-              <img
-                v-if="brand.logoUrl || brand.anhUrl"
-                :src="productImageUrl(brand.logoUrl || brand.anhUrl)"
-                :alt="brand.ten"
-                class="sf-circle-item__logo"
-              />
-              <span v-else class="sf-circle-item__brand-text">{{ brandDisplayName(brand.ten) }}</span>
-            </span>
-            <span class="sf-circle-item__label">{{ brand.ten }}</span>
-          </RouterLink>
-        </HorizontalScroll>
-      </div>
-    </section>
-
-    <!-- Sản phẩm nổi bật -->
     <section class="sf-section">
       <div class="sf-container">
         <div class="sf-section-head sf-section-head--row">
           <div>
-            <p class="sf-eyebrow">Nổi bật</p>
             <h2 class="sf-section-title">Sản phẩm nổi bật</h2>
+            <p class="sf-home-sub">Chính hãng · Có SPF / PA rõ ràng trên từng sản phẩm</p>
           </div>
-          <RouterLink to="/san-pham?noiBat=1" class="sf-link-more">Xem tất cả →</RouterLink>
+          <RouterLink to="/san-pham?noiBat=1" class="sf-home-more">Xem tất cả →</RouterLink>
         </div>
         <div v-if="loading" class="sf-skeleton-grid" />
         <div v-else-if="featured.length" class="sf-product-grid">
@@ -409,17 +312,16 @@ onMounted(async () => {
       </div>
     </section>
 
-    <!-- Gợi ý theo kết quả quiz (chỉ hiện khi đã làm quiz) -->
     <section v-if="!loading && quizSuggestions.length" class="sf-section">
       <div class="sf-container">
         <div class="sf-section-head sf-section-head--row">
           <div>
-            <p class="sf-eyebrow">Theo quiz da</p>
             <h2 class="sf-section-title">
               Sản phẩm gợi ý{{ quizSkinName ? ` — ${quizSkinName}` : '' }}
             </h2>
+            <p class="sf-home-sub">Theo kết quả quiz da của bạn</p>
           </div>
-          <RouterLink to="/san-pham/goi-y" class="sf-link-more">Xem tất cả →</RouterLink>
+          <RouterLink to="/san-pham/goi-y" class="sf-home-more">Xem tất cả →</RouterLink>
         </div>
         <div class="sf-product-grid">
           <ProductCard v-for="p in quizSuggestions" :key="`q-${p.id}`" :product="p" />
@@ -427,15 +329,14 @@ onMounted(async () => {
       </div>
     </section>
 
-    <!-- Gợi ý (không có API giảm giá công khai) -->
     <section class="sf-section sf-section--muted">
       <div class="sf-container">
         <div class="sf-section-head sf-section-head--row">
           <div>
-            <p class="sf-eyebrow">Gợi ý</p>
             <h2 class="sf-section-title">Có thể bạn sẽ thích</h2>
+            <p class="sf-home-sub">Gợi ý thêm từ danh mục đang có</p>
           </div>
-          <RouterLink to="/san-pham" class="sf-link-more">Xem tất cả →</RouterLink>
+          <RouterLink to="/san-pham" class="sf-home-more">Xem tất cả →</RouterLink>
         </div>
         <div v-if="loading" class="sf-skeleton-grid" />
         <div v-else-if="suggestions.length" class="sf-product-grid">
@@ -444,184 +345,385 @@ onMounted(async () => {
       </div>
     </section>
 
-    <!-- Cam kết -->
-    <section class="sf-section sf-promise-strip">
-      <div class="sf-container sf-promise-grid">
-        <div v-for="item in promises" :key="item.title" class="sf-promise-item">
-          <Icon :icon="item.icon" width="28" class="sf-promise-icon" />
-          <div>
-            <strong>{{ item.title }}</strong>
-            <span>{{ item.desc }}</span>
-          </div>
+    <div class="sf-trust">
+      <div class="sf-container sf-trust__row">
+        <div v-for="item in trustItems" :key="item.title" class="sf-trust__item">
+          <strong>{{ item.title }}</strong>
+          <span>{{ item.desc }}</span>
         </div>
       </div>
-    </section>
-
+    </div>
   </div>
 </template>
 
 <style scoped>
-/* Carousel banner ở vùng hero (cột trái) — thay cho ô trống cũ */
-.sf-hero-banner-wrap {
-  position: relative;
-  min-height: 380px;
-  height: 100%;
-  border-radius: 14px;
+.sf-home {
+  --home-teal: #0b6e75;
+  --home-teal-deep: #08545a;
+  --home-line: #e3e9ef;
+  --home-muted: #5a6a78;
 }
 
-.sf-banner-fade-enter-active,
-.sf-banner-fade-leave-active {
+.sf-home-hero {
+  position: relative;
+  min-height: min(72vh, 620px);
+  display: grid;
+  align-items: end;
+  overflow: hidden;
+  background: #e8f1f4;
+}
+
+.sf-home-hero__media {
+  position: absolute;
+  inset: 0;
+}
+
+.sf-home-hero__media img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 45%;
+}
+
+.sf-home-hero-fade-enter-active,
+.sf-home-hero-fade-leave-active {
   transition: opacity 0.45s ease;
 }
 
-.sf-banner-fade-enter-from,
-.sf-banner-fade-leave-to {
+.sf-home-hero-fade-enter-from,
+.sf-home-hero-fade-leave-to {
   opacity: 0;
 }
 
-.sf-hero-banner {
+.sf-home-hero__inner {
   position: relative;
-  display: flex;
-  align-items: flex-end;
-  min-height: 380px;
-  height: 100%;
-  padding: 2.25rem;
-  border-radius: 14px;
-  overflow: hidden;
-  text-decoration: none;
-  background: linear-gradient(150deg, #241a12 0%, #3a2a1c 55%, #4a3422 100%);
-  background-size: cover;
-  background-position: center;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  z-index: 1;
+  width: 100%;
+  padding-top: 4rem;
+  padding-bottom: 3.5rem;
 }
 
-.sf-hero-banner:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 30px rgba(36, 26, 18, 0.18);
+.sf-home-hero__content {
+  max-width: 34rem;
 }
 
-.sf-hero-banner__content {
-  position: relative;
-  max-width: 560px;
-}
-
-.sf-hero-banner__eyebrow {
-  margin: 0 0 0.6rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--sf-gold, #c9a96e);
-}
-
-.sf-hero-banner__title {
-  margin: 0 0 0.6rem;
+.sf-home-hero__brand,
+.sf-home-hero__title {
+  margin: 0 0 1rem;
   font-family: var(--sf-font-display, 'Playfair Display', serif);
-  font-size: clamp(1.6rem, 2.6vw, 2.4rem);
-  font-weight: 600;
-  line-height: 1.2;
-  color: var(--sf-cream, #f9f5f0);
+  font-weight: 700;
+  color: var(--home-teal-deep);
 }
 
-.sf-hero-banner__desc {
-  margin: 0 0 1.4rem;
-  color: rgba(249, 245, 240, 0.8);
-  line-height: 1.7;
+.sf-home-hero__brand {
+  font-size: clamp(3rem, 7vw, 5rem);
+  letter-spacing: 0.08em;
+  line-height: 0.92;
+  text-transform: uppercase;
 }
 
-.sf-hero-banner__btn {
+.sf-home-hero__title {
+  font-size: clamp(1.7rem, 3.4vw, 2.6rem);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.sf-home-hero__line {
+  margin: 0 0 1.6rem;
+  font-size: clamp(1.05rem, 2vw, 1.25rem);
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--home-teal-deep);
+  max-width: 28ch;
+}
+
+.sf-home-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.sf-home-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.85rem 1.75rem;
-  border-radius: 8px;
-  background: var(--sf-gold, #c9a96e);
-  color: var(--sf-espresso, #241a12);
-  font-size: 0.85rem;
+  min-height: 48px;
+  padding: 0 1.35rem;
+  font-size: 14px;
   font-weight: 600;
-  transition: background 0.2s ease, color 0.2s ease;
+  text-decoration: none;
+  border-radius: 2px;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
 
-.sf-hero-banner:hover .sf-hero-banner__btn {
-  background: var(--sf-gold-dark, #9e7340);
+.sf-home-btn--solid {
+  background: var(--home-teal);
   color: #fff;
 }
 
-/* Nút điều hướng trái/phải */
-.sf-hero-nav {
+.sf-home-btn--solid:hover {
+  background: var(--home-teal-deep);
+  color: #fff;
+}
+
+.sf-home-btn--ghost {
+  border: 1px solid rgba(8, 84, 90, 0.35);
+  color: var(--home-teal-deep);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.sf-home-btn--ghost:hover {
+  border-color: var(--home-teal);
+  background: #fff;
+  color: var(--home-teal);
+}
+
+.sf-home-hero__nav {
   position: absolute;
   top: 50%;
-  transform: translateY(-50%);
   z-index: 2;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 2.5rem;
   height: 2.5rem;
-  border: none;
+  border: 0;
   border-radius: 50%;
   cursor: pointer;
-  color: var(--sf-espresso, #241a12);
-  background: rgba(249, 245, 240, 0.85);
-  box-shadow: 0 2px 8px rgba(36, 26, 18, 0.18);
-  transition: background 0.2s ease, transform 0.2s ease;
+  color: var(--home-teal-deep);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 2px 8px rgba(8, 84, 90, 0.12);
+  transform: translateY(-50%);
 }
 
-.sf-hero-nav:hover {
+.sf-home-hero__nav:hover {
   background: #fff;
-  transform: translateY(-50%) scale(1.06);
 }
 
-.sf-hero-nav--prev {
-  left: 0.9rem;
-}
+.sf-home-hero__nav--prev { left: 1rem; }
+.sf-home-hero__nav--next { right: 1rem; }
 
-.sf-hero-nav--next {
-  right: 0.9rem;
-}
-
-/* Chấm điều hướng */
-.sf-hero-dots {
+.sf-home-hero__dots {
   position: absolute;
   left: 50%;
-  bottom: 1rem;
-  transform: translateX(-50%);
+  bottom: 1.1rem;
   z-index: 2;
   display: flex;
-  gap: 0.5rem;
+  gap: 0.45rem;
+  transform: translateX(-50%);
 }
 
-.sf-hero-dot {
+.sf-home-hero__dot {
   width: 9px;
   height: 9px;
   padding: 0;
-  border: none;
+  border: 0;
   border-radius: 50%;
   cursor: pointer;
-  background: rgba(249, 245, 240, 0.5);
-  transition: background 0.2s ease, transform 0.2s ease;
+  background: rgba(8, 84, 90, 0.28);
 }
 
-.sf-hero-dot:hover {
-  background: rgba(249, 245, 240, 0.8);
+.sf-home-hero__dot.is-active {
+  background: var(--home-teal);
+  transform: scale(1.2);
 }
 
-.sf-hero-dot--active {
-  background: var(--sf-gold, #c9a96e);
-  transform: scale(1.25);
+.sf-uvbar {
+  background: #fff;
+  border-bottom: 1px solid var(--home-line);
 }
 
-@media (max-width: 991px) {
-  .sf-hero-banner-wrap {
-    min-height: 220px;
+.sf-uvbar__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 0.9rem 1.5rem;
+  flex-wrap: wrap;
+}
+
+.sf-uvbar__left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.sf-uvbar__city {
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--home-teal-deep);
+}
+
+.sf-uvbar__temp {
+  font-family: var(--sf-font-display, 'Playfair Display', serif);
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--home-teal-deep);
+}
+
+.sf-uvbar__meta {
+  font-size: 13px;
+  color: var(--home-muted);
+}
+
+.sf-uvbar__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+}
+
+.sf-uvbar__chip span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #d97706;
+}
+
+.sf-uvbar__skel {
+  display: block;
+  border-radius: 6px;
+  background: #eef2f5;
+}
+
+.sf-uvbar__skel--temp {
+  width: 2.4rem;
+  height: 1.35rem;
+}
+
+.sf-uvbar__skel--meta {
+  width: 8.5rem;
+  height: 0.85rem;
+}
+
+.sf-home-more {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--home-teal);
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.sf-home-more:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.sf-home-sub {
+  margin: 0.35rem 0 0;
+  color: var(--home-muted);
+  font-size: 14px;
+}
+
+.sf-cats {
+  background: #fff;
+  border-bottom: 1px solid var(--home-line);
+  padding: 0;
+}
+
+.sf-cats__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.sf-cat {
+  padding: 1.35rem 1rem;
+  text-align: center;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid var(--home-line);
+  margin: -1px 0 0 -1px;
+  transition: background 0.2s;
+}
+
+.sf-cat:hover {
+  background: #e6f3f4;
+}
+
+.sf-cat__label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--home-teal-deep);
+}
+
+.sf-cat__sub {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 11px;
+  color: var(--home-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sf-cats__skel {
+  height: 72px;
+  background: #f7f9fb;
+}
+
+.sf-trust {
+  background: #fff;
+  border-block: 1px solid var(--home-line);
+  padding: 1.75rem 0;
+}
+
+.sf-trust__row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+}
+
+.sf-trust__item strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 0.2rem;
+  color: var(--home-teal-deep);
+}
+
+.sf-trust__item span {
+  font-size: 13px;
+  color: var(--home-muted);
+}
+
+@media (max-width: 980px) {
+  .sf-home-hero {
+    min-height: 58vh;
   }
-  .sf-hero-banner {
-    min-height: 220px;
-    padding: 1.5rem;
-  }
-  .sf-hero-nav {
+  .sf-home-hero__nav {
     width: 2.1rem;
     height: 2.1rem;
+  }
+  .sf-cats__row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .sf-trust__row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .sf-home-hero__inner {
+    padding-top: 3rem;
+    padding-bottom: 2.5rem;
+  }
+  .sf-cats__row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .sf-trust__row {
+    grid-template-columns: 1fr;
   }
 }
 </style>
