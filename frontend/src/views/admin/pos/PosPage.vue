@@ -2,7 +2,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { NQrCode } from 'naive-ui'
-import PageHeader from '@/components/ui/PageHeader.vue'
 import PosVoucherModal from '@/components/admin/PosVoucherModal.vue'
 import {
   getSanPhamBan,
@@ -20,15 +19,13 @@ import {
   layDonCho,
   huyDonCho,
 } from '@/api/banHangApi'
-import { formatCurrency, formatDate, formatMonthYear } from '@/utils/format'
+import { formatCurrency, formatDate } from '@/utils/format'
 import { formatDiscountPercent } from '@/utils/formatVND'
 import { productImageUrl } from '@/utils/productImage'
 import { confirm } from '@/composables/useConfirm'
-import { useAdminAuth } from '@/composables/useAdminAuth'
 import { getPhoneValidationError, normalizePhoneDigits } from '@/utils/phone'
 import { getLoHangConHangTheoBienThe } from '@/api/loHangApi'
-
-const { hoTen: currentStaffName } = useAdminAuth()
+import '@/styles/posAdmin.css'
 
 /**
  * Cấu hình VietQR nhận chuyển khoản tại quầy (1 chỗ sửa).
@@ -52,6 +49,8 @@ const keyword = ref('')
 const searchResults = ref([])
 const productsLoaded = ref(false)
 const searchInput = ref(null)
+/** null = tất cả danh mục */
+const categoryFilter = ref(null)
 
 const cart = ref([])
 const lotModalOpen = ref(false)
@@ -144,6 +143,23 @@ const paymentByMa = computed(() => {
 const tongTienHang = computed(() =>
   cart.value.reduce((sum, line) => sum + line.giaBan * line.soLuong, 0),
 )
+
+const cartItemCount = computed(() =>
+  cart.value.reduce((sum, line) => sum + Number(line.soLuong || 0), 0),
+)
+
+const categoryChips = computed(() => {
+  const set = new Set()
+  for (const p of searchResults.value) {
+    if (p.tenDanhMuc) set.add(p.tenDanhMuc)
+  }
+  return [...set].sort((a, b) => a.localeCompare(b, 'vi'))
+})
+
+const filteredProducts = computed(() => {
+  if (!categoryFilter.value) return searchResults.value
+  return searchResults.value.filter((p) => p.tenDanhMuc === categoryFilter.value)
+})
 
 const thanhTien = computed(() => Math.max(0, tongTienHang.value - voucherDiscount.value))
 
@@ -543,8 +559,8 @@ function lineDisplayHsd(line) {
 }
 
 function onSearchEnter() {
-  if (searchResults.value.length > 0) {
-    const first = searchResults.value.find((p) => p.soLuongTon > 0) || searchResults.value[0]
+  if (filteredProducts.value.length > 0) {
+    const first = filteredProducts.value.find((p) => p.soLuongTon > 0) || filteredProducts.value[0]
     if (first.soLuongTon > 0) addToCart(first)
   }
 }
@@ -552,8 +568,9 @@ function onSearchEnter() {
 async function loadMeta() {
   try {
     const ptRes = await getPhuongThuc()
-    // POS tại quầy: chỉ TIEN_MAT / VNPAY — COD (thanh toán khi nhận) chỉ dùng online
-    paymentMethods.value = (ptRes.data || []).filter((p) => p.ma !== 'COD')
+    // POS tại quầy: chỉ Tiền mặt + VNPay (bỏ COD, CK, MoMo…)
+    const allow = new Set(['TIEN_MAT', 'VNPAY'])
+    paymentMethods.value = (ptRes.data || []).filter((p) => allow.has(String(p.ma || '').toUpperCase()))
     const cash = paymentMethods.value.find((p) => p.ma === 'TIEN_MAT')
     if (cash) selectedPaymentId.value = cash.id
   } catch (err) {
@@ -692,6 +709,26 @@ function toggleSplitMode() {
   transferRef.value = ''
   const cash = paymentMethods.value.find((p) => p.ma === 'TIEN_MAT')
   if (cash) selectedPaymentId.value = cash.id
+}
+
+function payMethodLabel(pt) {
+  if (!pt) return ''
+  if (pt.ma === 'TIEN_MAT') return 'Tiền mặt'
+  if (pt.ma === 'VNPAY') return 'VNPay'
+  if (pt.ma === 'CHUYEN_KHOAN' || /chuyển|ck/i.test(pt.ten || '')) return 'CK'
+  return pt.ten
+}
+
+function selectPayMethod(pt) {
+  if (isSplitMode.value) {
+    isSplitMode.value = false
+    resetSplitFields()
+  }
+  selectedPaymentId.value = pt.id
+}
+
+function selectSplitPay() {
+  if (!isSplitMode.value) toggleSplitMode()
 }
 
 function openVietQrModal() {
@@ -998,14 +1035,14 @@ async function cancelHeldOrder(order) {
 
 async function checkout() {
   if (!canCheckout.value) return
-  const ok = await confirm({
-    title: isVnpay.value ? 'Tạo mã QR thanh toán' : 'Tạo hóa đơn',
-    message: isVnpay.value
-      ? 'Tạo hóa đơn và hiển thị mã QR VNPay cho khách thanh toán?'
-      : 'Bạn có chắc muốn tạo hóa đơn này?',
-    confirmText: isVnpay.value ? 'Tạo mã QR' : 'Tạo hóa đơn',
-  })
-  if (!ok) return
+  if (!isVnpay.value) {
+    const ok = await confirm({
+      title: 'Tạo hóa đơn',
+      message: 'Bạn có chắc muốn tạo hóa đơn này?',
+      confirmText: 'Tạo hóa đơn',
+    })
+    if (!ok) return
+  }
   paying.value = true
   try {
     const cashPt = paymentByMa.value.TIEN_MAT
@@ -1046,32 +1083,34 @@ async function checkout() {
 
     const res = await taoDonTaiQuay(payload)
     if (res.data?.paymentUrl) {
+      // Giữ giỏ / khách — chỉ xóa khi thanh toán xong (modal hoặc IPN)
       openQrPayment(res.data)
-      activeHeldOrderId.value = null
-      clearCustomer()
-      cart.value = []
-      isSplitMode.value = false
-      resetSplitFields()
-      void loadProducts()
-      await loadHeldOrders()
       notify('Đã tạo mã QR — chờ khách thanh toán')
       return
     }
     receipt.value = res.data
     showReceipt.value = true
-    activeHeldOrderId.value = null
-    clearCustomer()
-    cart.value = []
-    isSplitMode.value = false
-    resetSplitFields()
-    void loadProducts()
-    await loadHeldOrders()
+    clearSaleAfterPaid()
     notify('Thanh toán thành công!')
   } catch (err) {
     notify(String(err), 'error')
   } finally {
     paying.value = false
   }
+}
+
+/** Xóa giỏ / khách sau khi đơn đã thanh toán xong (tiền mặt hoặc QR). */
+function clearSaleAfterPaid() {
+  activeHeldOrderId.value = null
+  clearCustomer()
+  cart.value = []
+  clearVoucher()
+  cashGiven.value = ''
+  transferRef.value = ''
+  isSplitMode.value = false
+  resetSplitFields()
+  void loadProducts()
+  void loadHeldOrders()
 }
 
 function openQrPayment(data) {
@@ -1105,6 +1144,7 @@ async function pollQrPaymentStatus() {
       showQrModal.value = false
       receipt.value = res.data.hoaDon
       showReceipt.value = true
+      clearSaleAfterPaid()
       notify('Thanh toán QR thành công!')
     } else if (status === 'THAT_BAI') {
       stopQrPolling()
@@ -1168,7 +1208,7 @@ async function completeQrPayment() {
       receipt.value = res.data.hoaDon
       showReceipt.value = true
     }
-    void loadProducts()
+    clearSaleAfterPaid()
     notify('Thanh toán QR thành công!')
   } catch (err) {
     notify(String(err), 'error')
@@ -1252,470 +1292,359 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="admin-page">
-    <PageHeader title="Bán hàng tại quầy" description="Point of sale — chọn sản phẩm, thu tiền, in biên lai">
-      <template #actions>
-        <button type="button" class="soleil-btn-outline mr-3" @click="openHeldDrawer">
+  <div class="pos-page">
+  <div class="pos-counter">
+    <header class="pos-top">
+      <div class="pos-search pos-search--top">
+        <Icon icon="icon-park-outline:search" class="pos-search__icon" />
+        <input
+          ref="searchInput"
+          v-model="keyword"
+          type="search"
+          placeholder="Tìm tên, mã SP, quét barcode…"
+          @keydown.enter.prevent="onSearchEnter"
+        />
+        <span class="pos-search__hint">Enter</span>
+      </div>
+      <div class="pos-top__right">
+        <button type="button" class="pos-top-btn pos-top-btn--held" @click="openHeldDrawer">
           Đơn chờ
-          <span v-if="heldCount > 0" class="pos-held-badge">{{ heldCount }}</span>
+          <span v-if="heldCount > 0" class="pos-badge">{{ heldCount }}</span>
         </button>
-        <div class="pos-current-staff" title="Nhân viên bán hàng (tài khoản đang đăng nhập)">
-          <Icon icon="icon-park-outline:user" class="text-base opacity-70" />
-          <span>{{ currentStaffName || '—' }}</span>
-        </div>
-      </template>
-    </PageHeader>
+        <button type="button" class="pos-top-btn" @click="loadProducts">Làm mới</button>
+      </div>
+    </header>
 
     <div
       v-if="message"
-      class="admin-alert mb-4"
+      class="admin-alert pos-alert"
       :class="messageType === 'error' ? 'admin-alert-error' : 'admin-alert-success'"
     >
       {{ message }}
     </div>
 
-    <div class="pos-layout">
-      <!-- Cột trái: chọn sản phẩm -->
-      <div class="pos-panel">
-        <p class="soleil-eyebrow mb-3">Chọn sản phẩm</p>
-        <div class="pos-search-wrap">
-          <input
-            ref="searchInput"
-            v-model="keyword"
-            type="text"
-            class="pos-search-input"
-            placeholder="Tìm theo SKU hoặc tên sản phẩm..."
-            @keydown.enter.prevent="onSearchEnter"
-          />
+    <div class="pos-main">
+      <section class="pos-catalog" aria-label="Chọn sản phẩm">
+        <div class="pos-chips">
+          <button
+            type="button"
+            class="pos-chip"
+            :class="{ 'is-on': categoryFilter == null }"
+            @click="categoryFilter = null"
+          >
+            Tất cả
+          </button>
+          <button
+            v-for="cat in categoryChips"
+            :key="cat"
+            type="button"
+            class="pos-chip"
+            :class="{ 'is-on': categoryFilter === cat }"
+            @click="categoryFilter = cat"
+          >
+            {{ cat }}
+          </button>
         </div>
 
-        <div v-if="loading && !productsLoaded" class="text-sm text-[var(--admin-muted)] py-8 text-center">
-          Đang tải sản phẩm...
-        </div>
-        <div v-else-if="productsLoaded && searchResults.length === 0" class="pos-cart-empty">
-          {{ keyword.trim() ? 'Không tìm thấy sản phẩm phù hợp' : 'Không có sản phẩm đang bán' }}
-        </div>
-        <div v-else class="pos-product-grid">
+        <div class="pos-grid">
+          <div v-if="loading && !productsLoaded" class="pos-grid-loading">Đang tải sản phẩm...</div>
+          <div v-else-if="productsLoaded && filteredProducts.length === 0" class="pos-grid-empty">
+            {{ keyword.trim() ? 'Không tìm thấy sản phẩm phù hợp' : 'Không có sản phẩm đang bán' }}
+          </div>
           <button
-            v-for="item in searchResults"
+            v-for="item in filteredProducts"
             :key="item.idChiTietSanPham"
             type="button"
-            class="pos-product-card"
-            :class="{ 'pos-product-card--out': isOutOfStock(item) }"
+            class="pos-card"
+            :class="{ 'pos-card--out': isOutOfStock(item) }"
             :disabled="isOutOfStock(item)"
             @click="addToCart(item)"
           >
-            <span v-if="!isOutOfStock(item)" class="pos-product-card__add" aria-hidden="true">
-              <Icon icon="mdi:plus" width="18" />
-            </span>
-            <span
-              v-if="isOnSale(item) && saleLabel(item) && !isOutOfStock(item)"
-              class="pos-product-card__badge-sale"
-            >
+            <span v-if="isOnSale(item) && saleLabel(item) && !isOutOfStock(item)" class="pos-card__tag">
               {{ saleLabel(item) }}
             </span>
-            <span v-if="isOutOfStock(item)" class="pos-product-card__badge-out">Hết hàng</span>
-            <div class="pos-product-card__thumb">
-              <img
-                :src="productImageUrl(item.anhUrl)"
-                :alt="item.tenSanPham"
-                loading="lazy"
-              />
-            </div>
-            <p class="pos-product-card__name">{{ item.tenSanPham }}</p>
-            <p class="pos-product-card__variant">{{ formatVariant(item) }}</p>
-            <div v-if="isOnSale(item)" class="pos-product-card__prices">
-              <p class="pos-product-card__price pos-product-card__price--sale">{{ formatCurrency(item.giaBan) }}</p>
-              <p class="pos-product-card__price pos-product-card__price--original">{{ formatCurrency(item.giaGoc) }}</p>
-            </div>
-            <p v-else class="pos-product-card__price">{{ formatCurrency(item.giaBan) }}</p>
-            <p class="pos-product-card__stock">
-              {{ isOutOfStock(item) ? 'Hết hàng' : `Còn ${item.soLuongTon}` }}
-            </p>
-            <p
-              v-if="item.hanSuDungGanNhat && !isOutOfStock(item)"
-              class="pos-product-card__hsd"
-            >
-              HSD: {{ formatMonthYear(item.hanSuDungGanNhat) }}
-            </p>
+            <span v-else-if="isOutOfStock(item)" class="pos-card__tag pos-card__tag--out">Hết</span>
             <span
-              v-if="posExpiryBadge(item) === 'expired' && !isOutOfStock(item)"
-              class="pos-product-card__badge-expiry pos-product-card__badge-expiry--danger"
-            >
-              Hết hạn
-            </span>
+              v-else-if="posExpiryBadge(item) === 'expired'"
+              class="pos-card__tag pos-card__tag--warn"
+            >Hết hạn</span>
             <span
-              v-else-if="posExpiryBadge(item) === 'warning' && !isOutOfStock(item)"
-              class="pos-product-card__badge-expiry pos-product-card__badge-expiry--warn"
-            >
-              Sắp hết hạn
-            </span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Cột phải: hóa đơn -->
-      <div class="pos-panel pos-panel--sticky">
-        <p class="soleil-eyebrow mb-3">Hóa đơn</p>
-
-        <!-- Khách hàng -->
-        <div class="pos-customer-bar pos-customer-bar--stack">
-          <template v-if="selectedCustomer">
-            <div class="pos-customer-info">
-              <strong>{{ selectedCustomer.hoTen }}</strong>
-              <span class="text-[var(--admin-muted)]"> · {{ selectedCustomer.soDienThoai }}</span>
-              <span v-if="selectedCustomer.diemTichLuy != null" class="block text-sm mt-1">
-                Điểm tích lũy: <span class="text-[var(--warm-tan)]">{{ selectedCustomer.diemTichLuy }}</span>
+              v-else-if="posExpiryBadge(item) === 'warning'"
+              class="pos-card__tag pos-card__tag--warn"
+            >Sắp HSD</span>
+            <div class="pos-card__img">
+              <img :src="productImageUrl(item.anhUrl)" :alt="item.tenSanPham" loading="lazy" />
+            </div>
+            <p class="pos-card__name">{{ item.tenSanPham }}</p>
+            <p v-if="formatVariant(item)" class="pos-card__variant">{{ formatVariant(item) }}</p>
+            <div class="pos-card__meta">
+              <div v-if="isOnSale(item)" class="pos-card__prices">
+                <p class="pos-card__price pos-card__price--original">{{ formatCurrency(item.giaGoc) }}</p>
+                <p class="pos-card__price pos-card__price--sale">{{ formatCurrency(item.giaBan) }}</p>
+              </div>
+              <p v-else class="pos-card__price">{{ formatCurrency(item.giaBan) }}</p>
+              <span
+                class="pos-card__stock"
+                :class="{ 'is-low': !isOutOfStock(item) && item.soLuongTon <= 10 }"
+              >
+                {{ isOutOfStock(item) ? '0' : item.soLuongTon }}
               </span>
             </div>
-            <button type="button" class="admin-btn admin-btn-default text-sm" @click="clearCustomer">
-              Bỏ chọn
-            </button>
+          </button>
+        </div>
+      </section>
+
+      <aside class="pos-checkout" aria-label="Thanh toán">
+        <div class="pos-customer">
+          <template v-if="selectedCustomer">
+            <div class="pos-customer__who">
+              <div>
+                <strong>{{ selectedCustomer.hoTen }}</strong>
+                <span class="muted"> · {{ selectedCustomer.soDienThoai }}</span>
+              </div>
+              <button type="button" class="pos-pill" @click="clearCustomer">Bỏ chọn</button>
+            </div>
+            <p v-if="selectedCustomer.diemTichLuy != null" class="pos-customer__hint">
+              Điểm tích lũy: {{ selectedCustomer.diemTichLuy }}
+            </p>
           </template>
           <template v-else>
-            <div class="pos-customer-row">
+            <div class="pos-customer__row">
               <input
                 v-model="customerSdt"
                 type="text"
-                class="admin-input flex-1 min-w-[120px]"
-                placeholder="Số điện thoại"
+                placeholder="SĐT khách hàng"
                 inputmode="numeric"
                 maxlength="10"
                 @input="customerSdt = normalizePhoneDigits(customerSdt)"
                 @keyup.enter="findCustomer"
               />
-              <button type="button" class="admin-btn admin-btn-default" @click="findCustomer">
-                Tìm
-              </button>
-              <button
-                type="button"
-                class="admin-btn admin-btn-primary"
-                title="Thêm nhanh khách hàng"
-                @click="openCreateCustomerModal"
-              >
-                ＋
-              </button>
+              <button type="button" class="pos-icon-btn" title="Tìm" @click="findCustomer">⌕</button>
+              <button type="button" class="pos-icon-btn pos-icon-btn--cream" title="Thêm khách" @click="openCreateCustomerModal">＋</button>
             </div>
-            <input
-              v-model="customerName"
-              type="text"
-              class="admin-input w-full"
-              placeholder="Tên khách * (bắt buộc khi giữ đơn)"
-              maxlength="100"
-            />
-            <p class="text-xs text-[var(--admin-muted)]">
-              Giữ đơn cần tên + SĐT hợp lệ (10 số, đầu 03/05/07/08/09) — hoặc chọn khách thành viên.
-            </p>
-          </template>
-        </div>
-
-        <div v-if="showQuickCreate && !selectedCustomer" class="mb-4 p-3 rounded-lg bg-[var(--cream)] border border-[var(--admin-border)]">
-          <p class="text-sm mb-2 text-[var(--admin-muted)]">Chưa có khách với SĐT này — tạo nhanh?</p>
-          <input
-            v-model="quickName"
-            type="text"
-            class="admin-input w-full mb-2"
-            placeholder="Họ tên *"
-          />
-          <button type="button" class="admin-btn admin-btn-primary w-full" @click="createQuickCustomer">
-            Tạo nhanh
-          </button>
-        </div>
-
-        <!-- Giỏ hàng -->
-        <div v-if="cart.length === 0" class="pos-cart-empty">
-          Chưa có sản phẩm trong đơn
-        </div>
-        <div v-else class="pos-cart-lines">
-          <div v-for="line in cart" :key="cartKey(line)" class="pos-cart-line">
-            <div class="pos-cart-line__thumb">
-              <img
-                :src="productImageUrl(line.anhUrl)"
-                :alt="line.tenSanPham"
-                loading="lazy"
+            <div class="pos-customer__row">
+              <input
+                v-model="customerName"
+                type="text"
+                placeholder="Tên khách * (bắt buộc khi giữ đơn)"
+                maxlength="100"
               />
             </div>
-            <div class="pos-cart-line__info">
-              <div class="pos-cart-line__name">{{ line.tenSanPham }}</div>
-              <div class="pos-cart-line__variant">{{ line.bienThe }}</div>
+          </template>
+
+          <div v-if="showQuickCreate && !selectedCustomer" class="pos-quick-inline">
+            <p>Chưa có khách với SĐT này — tạo nhanh?</p>
+            <input v-model="quickName" type="text" class="pos-input" placeholder="Họ tên *" />
+            <button type="button" class="pos-btn-pay" style="height:36px;font-size:13px" @click="createQuickCustomer">
+              Tạo nhanh
+            </button>
+          </div>
+        </div>
+
+        <div class="pos-cart">
+          <div v-if="cart.length === 0" class="pos-cart__empty">Chưa có sản phẩm trong đơn</div>
+          <div v-for="line in cart" :key="cartKey(line)" class="pos-line">
+            <div class="pos-line__thumb">
+              <img :src="productImageUrl(line.anhUrl)" :alt="line.tenSanPham" loading="lazy" />
+            </div>
+            <div>
+              <div class="pos-line__name">{{ line.tenSanPham }}</div>
+              <div class="pos-line__sub">
+                {{ formatCurrency(line.giaBan) }}
+                <template v-if="line.bienThe"> · {{ line.bienThe }}</template>
+              </div>
               <div
                 v-if="lineDisplayHsd(line)"
-                class="pos-cart-line__hsd"
+                class="pos-line__sub"
                 :class="{
-                  'pos-cart-line__hsd--warn': expiryTone(line) === 'warning',
-                  'pos-cart-line__hsd--expired': expiryTone(line) === 'expired',
+                  'pos-line__sub--warn': expiryTone(line) === 'warning',
+                  'pos-line__sub--expired': expiryTone(line) === 'expired',
                 }"
               >
                 HSD: {{ formatDate(lineDisplayHsd(line)) }}
-                <span v-if="line.phanBoLos?.length" class="pos-cart-line__hsd-note">
-                  (thủ công)
-                </span>
-                <span v-else-if="line.idLoHang && line.soLo" class="pos-cart-line__hsd-note">
-                  (lô {{ line.soLo }})
-                </span>
-                <span v-else class="pos-cart-line__hsd-note">(FEFO)</span>
+                <template v-if="line.phanBoLos?.length"> · thủ công</template>
+                <template v-else-if="line.idLoHang && line.soLo"> · lô {{ line.soLo }}</template>
+                <template v-else> · FEFO</template>
               </div>
-              <p v-if="lineLotHint(line)" class="pos-cart-line__lot-hint">
-                {{ lineLotHint(line) }}
-              </p>
-              <div v-if="line.dangGiamGia" class="pos-cart-line__prices">
-                <span class="pos-cart-line__price pos-cart-line__price--sale">
-                  {{ formatCurrency(line.giaBan) }} / sp
-                </span>
-                <span class="pos-cart-line__price pos-cart-line__price--original">
-                  {{ formatCurrency(line.giaGoc) }}
-                </span>
-              </div>
-              <div v-else class="pos-cart-line__price">{{ formatCurrency(line.giaBan) }} / sp</div>
-              <button
-                type="button"
-                class="pos-lot-btn"
-                @click="openLotPicker(line)"
-              >
+              <p v-if="lineLotHint(line)" class="pos-line__sub">{{ lineLotHint(line) }}</p>
+              <button type="button" class="pos-line__lot" @click="openLotPicker(line)">
                 {{ lineLotLabel(line) }}
               </button>
             </div>
-            <button
-              type="button"
-              class="soleil-act-btn-round self-start"
-              title="Xóa dòng"
-              @click="removeLine(line)"
-            >
-              <Icon icon="mdi:close" width="16" />
-            </button>
-            <div class="pos-qty-control">
-              <button
-                type="button"
-                class="pos-qty-btn"
-                :disabled="line.soLuong <= 1"
-                @click="changeQty(line, -1)"
-              >−</button>
-              <span class="pos-qty-value">{{ line.soLuong }}</span>
-              <button
-                type="button"
-                class="pos-qty-btn"
-                :disabled="line.soLuong >= line.soLuongTon"
-                @click="changeQty(line, 1)"
-              >+</button>
-            </div>
-            <div class="pos-cart-line__total">
-              {{ formatCurrency(line.giaBan * line.soLuong) }}
+            <div class="pos-line__right">
+              <div class="pos-line__sum">{{ formatCurrency(line.giaBan * line.soLuong) }}</div>
+              <div class="pos-qty">
+                <button type="button" :disabled="line.soLuong <= 1" @click="changeQty(line, -1)">−</button>
+                <span>{{ line.soLuong }}</span>
+                <button type="button" :disabled="line.soLuong >= line.soLuongTon" @click="changeQty(line, 1)">＋</button>
+              </div>
+              <button type="button" class="pos-line__rm" @click="removeLine(line)">Xóa</button>
             </div>
           </div>
         </div>
 
-        <!-- Voucher -->
-        <div class="mb-4">
-          <p class="pos-section-title">Mã giảm giá</p>
-          <div class="flex gap-2">
+        <div class="pos-pay">
+          <div class="pos-voucher">
+            <input
+              v-model="voucherCode"
+              type="text"
+              placeholder="Mã giảm giá"
+              :disabled="voucherLoading || cart.length === 0"
+              @keydown.enter.prevent="applyVoucher()"
+            />
             <button
               type="button"
-              class="admin-input flex-1 pos-voucher-trigger"
+              class="pos-btn-ghost"
               :disabled="voucherLoading || cart.length === 0"
-              @click="openVoucherModal"
+              @click="applyVoucher()"
             >
-              <Icon icon="icon-park-outline:ticket" width="16" />
-              <span>{{ appliedVoucher || 'Chọn / tìm mã giảm giá...' }}</span>
+              Áp mã
             </button>
             <button
               type="button"
-              class="admin-btn admin-btn-default"
+              class="pos-btn-ghost"
               :disabled="voucherLoading || cart.length === 0"
               @click="openVoucherModal"
             >
-              {{ voucherLoading ? 'Đang kiểm tra...' : 'Chọn mã' }}
+              Chọn
             </button>
           </div>
-          <p v-if="appliedVoucher" class="text-xs text-[var(--admin-muted)] mt-1">
-            Mã đã áp dụng: <strong>{{ appliedVoucher }}</strong>
-            — giảm <strong class="text-[var(--sage)]">{{ formatCurrency(voucherDiscount) }}</strong>
-            <button
-              type="button"
-              class="pos-voucher-clear"
-              :disabled="voucherLoading"
-              @click="clearVoucher"
-            >
+          <p v-if="appliedVoucher" class="pos-voucher-applied">
+            Đã áp <strong>{{ appliedVoucher }}</strong>
+            — giảm <strong>{{ formatCurrency(voucherDiscount) }}</strong>
+            <button type="button" class="pos-voucher-clear" :disabled="voucherLoading" @click="clearVoucher">
               Bỏ mã
             </button>
           </p>
-        </div>
 
-        <!-- Tổng tiền -->
-        <div class="pos-totals">
-          <div class="pos-totals__row">
-            <span>Tổng tiền hàng</span>
-            <span>{{ formatCurrency(tongTienHang) }}</span>
-          </div>
-          <div v-if="voucherDiscount > 0" class="pos-totals__row">
-            <span>Giảm giá ({{ appliedVoucher }})</span>
-            <span class="text-[var(--sage)]">−{{ formatCurrency(voucherDiscount) }}</span>
-          </div>
-          <div class="pos-totals__grand">
-            <span class="pos-totals__grand-label">Thành tiền</span>
-            <span class="pos-totals__grand-value">{{ formatCurrency(thanhTien) }}</span>
-          </div>
-        </div>
-
-        <!-- Thanh toán -->
-        <p class="pos-section-title">Phương thức thanh toán</p>
-
-        <label class="pos-split-toggle">
-          <input
-            type="checkbox"
-            :checked="isSplitMode"
-            @change="toggleSplitMode"
-          />
-          <span>Thanh toán kết hợp (Tiền mặt + Chuyển khoản)</span>
-        </label>
-
-        <div v-if="!isSplitMode" class="pos-pay-methods">
-          <button
-            v-for="pt in paymentMethods"
-            :key="pt.id"
-            type="button"
-            class="pos-pay-btn"
-            :class="{ 'pos-pay-btn--active': selectedPaymentId === pt.id }"
-            @click="selectedPaymentId = pt.id"
-          >
-            {{ pt.ten }}
-          </button>
-        </div>
-
-        <div v-if="isSplitMode" class="pos-split-panel mb-4">
-          <div>
-            <label class="soleil-label block mb-2">Tiền mặt</label>
-            <input
-              v-model="splitCashAmount"
-              type="number"
-              min="0"
-              class="admin-input w-full text-lg"
-              placeholder="0"
-            />
-            <p v-if="splitCashNum > 0 && splitCashNum >= thanhTien" class="text-sm mt-2 text-[var(--coral)] font-medium">
-              Tiền mặt đã đủ thành tiền — dùng phương thức Tiền mặt thường, hoặc nhập ít hơn để kết hợp.
-            </p>
-          </div>
-
-          <div>
-            <label class="soleil-label block mb-2">Chuyển khoản (tự tính)</label>
-            <div class="pos-split-transfer-row">
-              <input
-                type="text"
-                class="admin-input w-full text-lg"
-                :value="formatCurrency(splitTransferNum)"
-                readonly
-                tabindex="-1"
-              />
-              <button
-                type="button"
-                class="pos-pay-btn pos-split-qr-btn"
-                :disabled="splitTransferNum <= 0"
-                @click="openVietQrModal"
-              >
-                Tạo QR
-              </button>
+          <div class="pos-totals">
+            <div class="pos-totals__row">
+              <span>Tạm tính ({{ cartItemCount }} SP)</span>
+              <strong>{{ formatCurrency(tongTienHang) }}</strong>
             </div>
-            <p
-              v-if="splitTransferConfirmed"
-              class="text-sm mt-2 text-[var(--sage)] font-medium"
-            >
-              Đã xác nhận nhận chuyển khoản
-            </p>
-            <p
-              v-else-if="splitTransferNum > 0"
-              class="text-sm mt-2 text-[var(--admin-muted)]"
-            >
-              Tạo QR → kiểm tra app ngân hàng → bấm “Đã nhận chuyển khoản”
-            </p>
-          </div>
-
-          <div>
-            <label class="soleil-label block mb-2">Mã giao dịch CK (tùy chọn)</label>
-            <input
-              v-model="splitTransferRef"
-              type="text"
-              class="admin-input w-full"
-              placeholder="Mã GD / tham chiếu..."
-            />
-          </div>
-
-          <div class="pos-split-summary text-sm">
-            <div class="flex justify-between">
-              <span>Tiền mặt</span>
-              <strong>{{ formatCurrency(splitCashNum) }}</strong>
+            <div v-if="voucherDiscount > 0" class="pos-totals__row pos-totals__row--disc">
+              <span>Giảm giá</span>
+              <strong>−{{ formatCurrency(voucherDiscount) }}</strong>
             </div>
-            <div class="flex justify-between">
-              <span>Chuyển khoản</span>
-              <strong>{{ formatCurrency(splitTransferNum) }}</strong>
-            </div>
-            <div class="flex justify-between pos-split-summary__total">
-              <span>Thành tiền</span>
+            <div class="pos-totals__due">
+              <span>Tổng tiền</span>
               <strong>{{ formatCurrency(thanhTien) }}</strong>
             </div>
           </div>
-        </div>
 
-        <div v-if="!isSplitMode && isCash" class="mb-4">
-          <label class="soleil-label block mb-2">Tiền khách đưa</label>
-          <input
-            v-model="cashGiven"
-            type="number"
-            min="0"
-            class="admin-input w-full text-lg"
-            placeholder="0"
-          />
-          <div class="flex flex-wrap gap-2 mt-2">
-            <button type="button" class="pos-denom-btn" @click="addDenomination(50000)">+50k</button>
-            <button type="button" class="pos-denom-btn" @click="addDenomination(100000)">+100k</button>
-            <button type="button" class="pos-denom-btn" @click="addDenomination(200000)">+200k</button>
-            <button type="button" class="pos-denom-btn" @click="addDenomination(500000)">+500k</button>
-            <button type="button" class="pos-denom-btn pos-denom-btn--accent" @click="fillExactCash">
-              Đủ tiền
+          <div class="pos-methods">
+            <button
+              v-for="pt in paymentMethods"
+              :key="pt.id"
+              type="button"
+              class="pos-method"
+              :class="{ 'is-on': !isSplitMode && selectedPaymentId === pt.id }"
+              @click="selectPayMethod(pt)"
+            >
+              {{ payMethodLabel(pt) }}
             </button>
-            <button type="button" class="pos-denom-btn" @click="clearCash">Xóa</button>
+            <button
+              type="button"
+              class="pos-method"
+              :class="{ 'is-on': isSplitMode }"
+              @click="selectSplitPay"
+            >
+              Kết hợp
+            </button>
           </div>
-          <p v-if="cashShortage > 0" class="text-sm mt-2 text-[var(--coral)] font-medium">
-            Khách chưa đưa đủ tiền (thiếu {{ formatCurrency(cashShortage) }})
+
+          <div v-if="isSplitMode" class="pos-pay-extra">
+            <div>
+              <label>Tiền mặt</label>
+              <input v-model="splitCashAmount" type="number" min="0" placeholder="0" />
+              <p v-if="splitCashNum > 0 && splitCashNum >= thanhTien" class="pos-pay-msg pos-pay-msg--warn">
+                Tiền mặt đã đủ — dùng Tiền mặt thường, hoặc nhập ít hơn để kết hợp.
+              </p>
+            </div>
+            <div>
+              <label>Chuyển khoản (tự tính)</label>
+              <div class="pos-split-transfer-row">
+                <input type="text" :value="formatCurrency(splitTransferNum)" readonly tabindex="-1" />
+                <button
+                  type="button"
+                  class="pos-btn-ghost"
+                  :disabled="splitTransferNum <= 0"
+                  @click="openVietQrModal"
+                >
+                  Tạo QR
+                </button>
+              </div>
+              <p v-if="splitTransferConfirmed" class="pos-pay-msg pos-pay-msg--ok">
+                Đã xác nhận nhận chuyển khoản
+              </p>
+              <p v-else-if="splitTransferNum > 0" class="pos-pay-msg">
+                Tạo QR → kiểm tra app ngân hàng → bấm “Đã nhận chuyển khoản”
+              </p>
+            </div>
+            <div>
+              <label>Mã giao dịch CK (tùy chọn)</label>
+              <input v-model="splitTransferRef" type="text" placeholder="Mã GD / tham chiếu..." />
+            </div>
+            <div class="pos-split-summary">
+              <div><span>Tiền mặt</span><strong>{{ formatCurrency(splitCashNum) }}</strong></div>
+              <div><span>Chuyển khoản</span><strong>{{ formatCurrency(splitTransferNum) }}</strong></div>
+              <div><span>Thành tiền</span><strong>{{ formatCurrency(thanhTien) }}</strong></div>
+            </div>
+          </div>
+
+          <div v-else-if="isCash" class="pos-pay-extra">
+            <div>
+              <label>Tiền khách đưa</label>
+              <input v-model="cashGiven" type="number" min="0" placeholder="0" />
+            </div>
+            <div class="pos-denoms">
+              <button type="button" class="pos-denom" @click="addDenomination(50000)">+50k</button>
+              <button type="button" class="pos-denom" @click="addDenomination(100000)">+100k</button>
+              <button type="button" class="pos-denom" @click="addDenomination(200000)">+200k</button>
+              <button type="button" class="pos-denom" @click="addDenomination(500000)">+500k</button>
+              <button type="button" class="pos-denom pos-denom--accent" @click="fillExactCash">Đủ tiền</button>
+              <button type="button" class="pos-denom" @click="clearCash">Xóa</button>
+            </div>
+            <p v-if="cashShortage > 0" class="pos-pay-msg pos-pay-msg--warn">
+              Khách chưa đưa đủ (thiếu {{ formatCurrency(cashShortage) }})
+            </p>
+            <p v-else-if="cashGiven" class="pos-pay-msg">
+              Tiền thối: <strong>{{ formatCurrency(tienThua) }}</strong>
+            </p>
+          </div>
+
+          <div v-else-if="isManualTransfer" class="pos-pay-extra">
+            <div>
+              <label>Mã giao dịch (tùy chọn)</label>
+              <input v-model="transferRef" type="text" placeholder="Mã GD / tham chiếu..." />
+            </div>
+          </div>
+
+          <div class="pos-actions">
+            <button
+              type="button"
+              class="pos-btn-hold"
+              :disabled="cart.length === 0 || holding"
+              @click="holdCurrentOrder"
+            >
+              {{ holding ? 'Đang giữ...' : 'Giữ đơn' }}
+            </button>
+            <button
+              type="button"
+              class="pos-btn-pay"
+              :disabled="!canCheckout || paying"
+              @click="checkout"
+            >
+              {{ checkoutButtonLabel }}
+            </button>
+          </div>
+          <p v-if="activeHeldOrderId" class="pos-held-note">
+            Đang tiếp tục đơn chờ — thanh toán sẽ hoàn tất đơn này
           </p>
-          <p v-else-if="cashGiven" class="text-sm mt-2 text-[var(--admin-muted)]">
-            Tiền thối:
-            <strong class="text-[var(--warm-tan)]">{{ formatCurrency(tienThua) }}</strong>
-          </p>
         </div>
-
-        <div v-else-if="!isSplitMode && isManualTransfer" class="mb-4">
-          <label class="soleil-label block mb-2">Mã giao dịch (tùy chọn)</label>
-          <input v-model="transferRef" type="text" class="admin-input w-full" placeholder="Mã GD / tham chiếu..." />
-        </div>
-
-        <!-- <div v-else-if="isVnpay" class="mb-4 pos-qr-hint">
-          <Icon icon="solar:qr-code-linear" class="text-xl shrink-0" />
-          <p>Khách quét mã QR VNPay trên điện thoại. Hệ thống tự xác nhận khi thanh toán thành công.</p>
-        </div> -->
-
-        <div class="pos-checkout-row">
-          <button
-            type="button"
-            class="soleil-btn-outline pos-hold-btn"
-            :disabled="cart.length === 0 || holding"
-            @click="holdCurrentOrder"
-          >
-            {{ holding ? 'Đang giữ...' : 'Giữ đơn' }}
-          </button>
-          <button
-            type="button"
-            class="pos-create-invoice-btn pos-checkout-btn"
-            :disabled="!canCheckout || paying"
-            @click="checkout"
-          >
-            {{ checkoutButtonLabel }}
-          </button>
-        </div>
-        <p v-if="activeHeldOrderId" class="text-xs text-[var(--admin-muted)] mt-2 text-center">
-          Đang tiếp tục đơn chờ — thanh toán sẽ hoàn tất đơn này
-        </p>
-      </div>
+      </aside>
     </div>
+  </div>
 
     <!-- Khay đơn chờ -->
     <div v-if="showHeldDrawer" class="pos-drawer-overlay" @click="closeHeldDrawer" />

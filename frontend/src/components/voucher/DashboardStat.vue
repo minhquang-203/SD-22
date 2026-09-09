@@ -35,35 +35,27 @@ function formatCurrency(num) {
 const stats = computed(() => [
   {
     title: 'Đang hoạt động',
-    value: loading.value ? '...' : rawStats.value.active,
+    value: loading.value ? '–' : rawStats.value.active,
     change: 'Đang áp dụng',
-    trend: 'neutral',
-    icon: 'mdi:ticket-percent',
-    iconClass: 'ic-primary',
+    accent: 'c-blue',
   },
   {
     title: 'Lượt sử dụng',
-    value: loading.value ? '...' : formatCount(rawStats.value.usageCount),
+    value: loading.value ? '–' : formatCount(rawStats.value.usageCount),
     change: 'Từ đơn hàng',
-    trend: 'neutral',
-    icon: 'mdi:check-circle-outline',
-    iconClass: 'ic-success',
+    accent: 'c-green',
   },
   {
     title: 'Tiết kiệm',
-    value: loading.value ? '...' : formatCurrency(rawStats.value.totalSavings),
+    value: loading.value ? '–' : formatCurrency(rawStats.value.totalSavings),
     change: 'Tổng giảm giá',
-    trend: 'neutral',
-    icon: 'mdi:cash-minus',
-    iconClass: 'ic-warning',
+    accent: 'c-gold',
   },
   {
     title: 'Sắp hết hạn',
-    value: loading.value ? '...' : rawStats.value.expiringSoon,
+    value: loading.value ? '–' : rawStats.value.expiringSoon,
     change: 'Trong 7 ngày',
-    trend: 'neutral',
-    icon: 'mdi:clock-outline',
-    iconClass: 'ic-info',
+    accent: 'c-red',
   },
 ]);
 
@@ -89,36 +81,14 @@ watch(() => props.refreshKey, loadStats);
 </script>
 
 <template>
-  <div class="stats-grid">
+  <section class="stats-grid">
     <VoucherStats
       v-for="item in stats"
       :key="item.title"
       :title="item.title"
       :value="item.value"
       :change="item.change"
-      :trend="item.trend"
-      :icon="item.icon"
-      :icon-class="item.iconClass"
+      :accent="item.accent"
     />
-  </div>
+  </section>
 </template>
-
-<style scoped>
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-}
-
-@media (max-width: 1200px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 768px) {
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

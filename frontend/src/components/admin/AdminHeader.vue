@@ -13,6 +13,7 @@ import { confirm } from '@/composables/useConfirm'
 const props = defineProps({
   title: { type: String, default: 'SUNOVA Admin' },
   breadcrumb: { type: String, default: '' },
+  sidebarCollapsed: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['toggle-sidebar'])
@@ -46,6 +47,7 @@ const avatarLetter = computed(() => {
 })
 
 const showDropdown = ref(false)
+const showUserMenu = ref(false)
 const loadingNotif = ref(false)
 
 const hasBadge = hasNotifBadge
@@ -102,6 +104,7 @@ function statusLabel(trangThai) {
 }
 
 async function toggleDropdown() {
+  showUserMenu.value = false
   showDropdown.value = !showDropdown.value
   if (showDropdown.value) {
     loadingNotif.value = true
@@ -112,6 +115,12 @@ async function toggleDropdown() {
     ])
     loadingNotif.value = false
   }
+}
+
+function toggleUserMenu(event) {
+  event.stopPropagation()
+  showDropdown.value = false
+  showUserMenu.value = !showUserMenu.value
 }
 
 function goToOrder(order) {
@@ -148,9 +157,13 @@ function goToAllPendingReturns() {
 }
 
 function onClickOutside(event) {
-  const el = document.getElementById('admin-notif-wrap')
-  if (el && !el.contains(event.target)) {
+  const notifEl = document.getElementById('admin-notif-wrap')
+  if (notifEl && !notifEl.contains(event.target)) {
     showDropdown.value = false
+  }
+  const userEl = document.getElementById('admin-user-wrap')
+  if (userEl && !userEl.contains(event.target)) {
+    showUserMenu.value = false
   }
 }
 
@@ -183,6 +196,7 @@ onBeforeUnmount(() => {
 })
 
 async function handleLogout() {
+  showUserMenu.value = false
   const ok = await confirm({
     title: 'Đăng xuất',
     message: 'Bạn có chắc muốn đăng xuất khỏi trang quản trị?',
@@ -201,7 +215,8 @@ async function handleLogout() {
       <button
         type="button"
         class="admin-topbar__btn-icon admin-topbar__btn-icon--menu"
-        aria-label="Thu gọn menu"
+        :aria-label="sidebarCollapsed ? 'Hiện menu' : 'Ẩn menu'"
+        :aria-expanded="!sidebarCollapsed"
         @click="emit('toggle-sidebar')"
       >
         <Icon icon="icon-park-outline:hamburger-button" />
@@ -353,17 +368,40 @@ async function handleLogout() {
         </div>
       </div>
 
-      <div class="admin-topbar__user hidden md:flex">
-        <div class="admin-topbar__user-text">
-          <span class="admin-topbar__user-name">{{ displayName }}</span>
-          <span class="admin-topbar__user-role">{{ roleLabel }}</span>
+      <div id="admin-user-wrap" class="admin-user-menu">
+        <button
+          type="button"
+          class="admin-topbar__user hidden md:flex"
+          @click="toggleUserMenu"
+        >
+          <div class="admin-topbar__user-text">
+            <span class="admin-topbar__user-name">{{ displayName }}</span>
+            <span class="admin-topbar__user-role">{{ roleLabel }}</span>
+          </div>
+        </button>
+        <button
+          type="button"
+          class="admin-topbar__avatar"
+          :class="{ 'admin-topbar__avatar--open': showUserMenu }"
+          :title="displayName"
+          :aria-expanded="showUserMenu"
+          aria-haspopup="menu"
+          aria-label="Tài khoản quản trị"
+          @click="toggleUserMenu"
+        >
+          {{ avatarLetter }}
+        </button>
+        <div v-if="showUserMenu" class="admin-user-dropdown" role="menu" @click.stop>
+          <div class="admin-user-dropdown__meta">
+            <span class="admin-user-dropdown__name">{{ displayName }}</span>
+            <span class="admin-user-dropdown__role">{{ roleLabel }}</span>
+          </div>
+          <button type="button" class="admin-user-dropdown__logout" role="menuitem" @click="handleLogout">
+            <Icon icon="icon-park-outline:logout" />
+            Đăng xuất
+          </button>
         </div>
       </div>
-      <button type="button" class="admin-topbar__btn-logout" @click="handleLogout">
-        <Icon icon="icon-park-outline:logout" />
-        <span class="hidden sm:inline">Đăng xuất</span>
-      </button>
-      <div class="admin-topbar__avatar" :title="displayName">{{ avatarLetter }}</div>
     </div>
   </header>
 </template>
@@ -644,5 +682,91 @@ async function handleLogout() {
   text-align: center;
   color: #9aa0aa;
   font-size: 14px;
+}
+
+.admin-user-menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-user-menu :deep(.admin-topbar__user) {
+  border: 0;
+  border-right: 0;
+  margin-right: 0;
+  padding-right: 0;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.admin-user-menu :deep(.admin-topbar__avatar) {
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  transition: box-shadow 0.15s ease;
+}
+
+.admin-user-menu :deep(.admin-topbar__avatar:hover),
+.admin-user-menu :deep(.admin-topbar__avatar--open) {
+  box-shadow: 0 0 0 2px rgba(166, 124, 61, 0.28);
+}
+
+.admin-user-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 220px;
+  background: #fff;
+  border: 1px solid #eef0f3;
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.22);
+  padding: 8px;
+  z-index: 1200;
+}
+
+.admin-user-dropdown__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #f1f2f4;
+}
+
+.admin-user-dropdown__name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2430;
+  word-break: break-word;
+}
+
+.admin-user-dropdown__role {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bronze, #a67c3d);
+}
+
+.admin-user-dropdown__logout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: #9f1239;
+  cursor: pointer;
+  text-align: left;
+}
+
+.admin-user-dropdown__logout:hover {
+  background: #fff1f2;
 }
 </style>

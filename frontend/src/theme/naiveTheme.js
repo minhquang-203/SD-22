@@ -16,7 +16,7 @@ export const naiveThemeOverrides = {
     errorColor: '#D4624A',
     errorColorHover: '#E07A63',
     errorColorPressed: '#B84E38',
-    bodyColor: '#F9F5F0',
+    bodyColor: '#FFFFFF',
     cardColor: '#FFFFFF',
     borderColor: '#EDE5D8',
     textColor1: '#1E1510',

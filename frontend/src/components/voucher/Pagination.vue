@@ -1,7 +1,8 @@
 <template>
   <div class="pagination-wrap">
     <div class="page-info">
-      Hiển thị {{ numberOfElements }} / {{ totalElements }} kết quả
+      Hiển thị <strong>{{ numberOfElements }}</strong> /
+      <strong>{{ totalElements }}</strong> phiếu
     </div>
 
     <div class="page-btns">

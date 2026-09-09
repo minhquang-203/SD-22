@@ -4,7 +4,7 @@ import { naiveThemeOverrides } from '@/theme/naiveTheme'
 </script>
 
 <template>
-  <NConfigProvider :theme-overrides="naiveThemeOverrides">
+  <NConfigProvider class="h-full" :theme-overrides="naiveThemeOverrides">
     <router-view />
   </NConfigProvider>
 </template>

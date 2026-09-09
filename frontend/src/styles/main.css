@@ -27,7 +27,7 @@
   --admin-warning: #d99838;
   --admin-sidebar: #ffffff;
   --admin-sidebar-active: var(--warm-tan);
-  --admin-bg: var(--cream);
+  --admin-bg: #ffffff;
   --admin-card: #ffffff;
   --admin-border: var(--sand);
   --admin-text: var(--ink);
@@ -50,6 +50,11 @@ body,
 #app {
   height: 100%;
   margin: 0;
+  background: #ffffff;
+}
+
+#app > .n-config-provider {
+  height: 100%;
 }
 
 body {
@@ -57,7 +62,7 @@ body {
   font-size: 14px;
   font-weight: 300;
   color: var(--ink);
-  background: var(--cream);
+  background: #ffffff;
 }
 
 /* Thanh cuộn — vùng nội dung sáng */
@@ -459,7 +464,7 @@ h2,
 /* ===== Soleil layout — topbar & page header ===== */
 .admin-topbar {
   height: 64px;
-  background: var(--cream);
+  background: #ffffff;
   border-bottom: 1px solid var(--sand);
   padding: 0 24px;
   display: flex;
@@ -539,6 +544,23 @@ h2,
 .admin-main-content {
   padding: 24px 20px;
   scrollbar-gutter: stable;
+  background: #ffffff;
+}
+
+.admin-main-content--pos {
+  padding: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.admin-main-content--pos > * {
+  flex: 1 0 auto;
+  min-height: 100%;
+  height: auto;
+  width: 100%;
 }
 
 .admin-page-fade-enter-active,
@@ -604,11 +626,13 @@ h2,
 .admin-sidebar-wrap {
   width: 260px;
   flex-shrink: 0;
-  transition: width 0.2s ease;
+  overflow: hidden;
+  transition: width 0.28s ease;
 }
 
 .admin-sidebar-wrap--collapsed {
-  width: 64px;
+  width: 0;
+  border: none;
 }
 
 .admin-sidebar-naive {
@@ -623,12 +647,15 @@ h2,
   height: 100vh;
   background: var(--ink);
   border-right: none;
-  transition: width 0.2s ease;
+  transform: translateX(0);
+  transition: transform 0.28s ease;
   z-index: 20;
+  will-change: transform;
 }
 
 .admin-sidebar-naive--collapsed {
-  width: 64px;
+  transform: translateX(-100%);
+  pointer-events: none;
 }
 
 .admin-sidebar-naive__brand {

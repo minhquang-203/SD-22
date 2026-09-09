@@ -70,13 +70,13 @@ public interface ChiTietSanPhamRepository extends JpaRepository<ChiTietSanPham, 
             + "ORDER BY c.sanPham.id ASC, c.dungTichMl ASC")
     List<VariantPriceRow> listActiveVariantPrices();
 
-    @Query("SELECT c FROM ChiTietSanPham c JOIN FETCH c.sanPham sp LEFT JOIN FETCH c.mauSac ms "
+    @Query("SELECT c FROM ChiTietSanPham c JOIN FETCH c.sanPham sp LEFT JOIN FETCH sp.danhMuc LEFT JOIN FETCH c.mauSac ms "
             + "WHERE c.trangThai = true AND sp.trangThai = true AND ("
             + "LOWER(c.sku) LIKE LOWER(CONCAT('%', :keyword, '%')) OR "
             + "LOWER(sp.ten) LIKE LOWER(CONCAT('%', :keyword, '%')))")
     List<ChiTietSanPham> timBienTheBan(@Param("keyword") String keyword, Pageable pageable);
 
-    @Query("SELECT c FROM ChiTietSanPham c JOIN FETCH c.sanPham sp LEFT JOIN FETCH c.mauSac ms "
+    @Query("SELECT c FROM ChiTietSanPham c JOIN FETCH c.sanPham sp LEFT JOIN FETCH sp.danhMuc LEFT JOIN FETCH c.mauSac ms "
             + "WHERE c.trangThai = true AND sp.trangThai = true AND ("
             + ":keyword = '' OR LOWER(c.sku) LIKE LOWER(CONCAT('%', :keyword, '%')) OR "
             + "LOWER(sp.ten) LIKE LOWER(CONCAT('%', :keyword, '%'))) "

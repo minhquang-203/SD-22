@@ -233,11 +233,23 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6 order-list-page">
-    <PageHeader
-      :title="pageTitle"
-      :description="pageDescription"
-    />
+  <div class="order-list-page">
+    <div class="order-list-page__head">
+      <PageHeader
+        :title="pageTitle"
+        :description="pageDescription"
+      />
+      <div class="order-stats">
+        <div class="order-stat">
+          <div class="order-stat__n">{{ tabCounts.ALL ?? 0 }}</div>
+          <div class="order-stat__l">Tất cả</div>
+        </div>
+        <div class="order-stat order-stat--warn">
+          <div class="order-stat__n">{{ tabCounts.CHO_XAC_NHAN ?? 0 }}</div>
+          <div class="order-stat__l">Chờ xác nhận</div>
+        </div>
+      </div>
+    </div>
 
     <div class="order-tabs">
       <button
@@ -255,13 +267,13 @@ onUnmounted(() => {
 
     <div
       v-if="message"
-      class="admin-alert rounded-lg px-4 py-3 text-sm"
+      class="admin-alert px-4 py-3 text-sm"
       :class="messageType === 'error' ? 'admin-alert-error' : 'admin-alert-success'"
     >
       {{ message }}
     </div>
 
-    <div class="soleil-toolbar soleil-toolbar--filter">
+    <div class="soleil-toolbar soleil-toolbar--filter order-filters">
       <div class="soleil-toolbar__field soleil-toolbar__field--wide">
         <label class="soleil-toolbar__label">Tìm kiếm</label>
         <div class="soleil-toolbar__search">
@@ -298,16 +310,16 @@ onUnmounted(() => {
         <label class="soleil-toolbar__label">Đến ngày</label>
         <input v-model="dateTo" type="date" class="soleil-toolbar__input" />
       </div>
-      <button type="button" class="soleil-btn-outline" style="align-self: flex-end" @click="loadOrders()">
+      <button type="button" class="soleil-btn-outline order-reload-btn" @click="loadOrders()">
         <Icon icon="icon-park-outline:refresh" />
         Tải lại
       </button>
     </div>
 
-    <div class="soleil-table-card">
+    <div class="soleil-table-card order-table-card">
       <div class="soleil-table-card__head">
-        <span class="soleil-label" style="margin: 0">{{ tableTitle }}</span>
-        <span class="text-xs text-[rgba(30,21,16,0.45)]">Trang {{ page }} / {{ totalPages }}</span>
+        <span class="order-table-title">{{ tableTitle }}</span>
+        <span class="order-table-meta">Trang {{ page }} / {{ totalPages }}</span>
       </div>
 
       <div class="overflow-x-auto">
@@ -326,57 +338,77 @@ onUnmounted(() => {
           </thead>
           <tbody>
             <tr v-if="loading">
-              <td colspan="8" class="text-center py-10 text-[var(--admin-muted)]">
+              <td colspan="8" class="text-center py-10 text-[#5a6a72]">
                 Đang tải dữ liệu...
               </td>
             </tr>
             <tr v-else-if="orders.length === 0">
-              <td colspan="8" class="text-center py-10 text-[var(--admin-muted)]">
+              <td colspan="8" class="text-center py-10 text-[#5a6a72]">
                 {{ emptyMessage }}
               </td>
             </tr>
-            <tr v-for="item in orders" :key="item.id">
-              <td class="soleil-col-text">
-                <span class="soleil-sp-code">{{ item.maHoaDon }}</span>
-              </td>
-              <td class="soleil-col-center">
-                <span
-                  class="order-badge"
-                  :class="`order-badge--${loaiDonTone(item.loaiDon)}`"
-                >
-                  {{ loaiDonLabel(item.loaiDon) }}
-                </span>
-              </td>
-              <td class="soleil-col-text text-sm">{{ customerDisplay(item) }}</td>
-              <td class="soleil-col-text text-sm">{{ item.tenPhuongThucThanhToan || '—' }}</td>
-              <td class="soleil-col-num font-medium">{{ formatCurrency(item.thanhTien) }}</td>
-              <td class="soleil-col-center">
-                <span
-                  class="order-badge"
-                  :class="`order-badge--${statusTone(item.trangThai)}`"
-                >
-                  {{ statusLabel(item.trangThai) }}
-                </span>
-              </td>
-              <td class="soleil-col-text text-sm text-[var(--admin-muted)]">
-                {{ formatDateTime(item.ngayTao) }}
-              </td>
-              <td class="soleil-col-center">
-                <button
-                  type="button"
-                  class="soleil-act-btn-round"
-                  title="Xem chi tiết"
-                  @click="openDetail(item)"
-                >
-                  <Icon icon="icon-park-outline:eyes" />
-                </button>
-              </td>
-            </tr>
+            <template v-else>
+              <tr
+                v-for="item in orders"
+                :key="item.id"
+                :class="{ 'order-row--pending': item.trangThai === 'CHO_XAC_NHAN' }"
+              >
+                <td class="soleil-col-text">
+                  <button type="button" class="order-code" @click="openDetail(item)">
+                    {{ item.maHoaDon }}
+                  </button>
+                </td>
+                <td class="soleil-col-center">
+                  <span
+                    class="order-badge"
+                    :class="`order-badge--${loaiDonTone(item.loaiDon)}`"
+                  >
+                    {{ loaiDonLabel(item.loaiDon) }}
+                  </span>
+                </td>
+                <td class="soleil-col-text">
+                  <span class="order-customer">{{ customerDisplay(item) }}</span>
+                </td>
+                <td class="soleil-col-text order-pay">{{ item.tenPhuongThucThanhToan || '—' }}</td>
+                <td class="soleil-col-num">
+                  <span class="order-money">{{ formatCurrency(item.thanhTien) }}</span>
+                </td>
+                <td class="soleil-col-center">
+                  <span
+                    class="order-badge"
+                    :class="`order-badge--${statusTone(item.trangThai)}`"
+                  >
+                    {{ statusLabel(item.trangThai) }}
+                  </span>
+                </td>
+                <td class="soleil-col-text">
+                  <span class="order-date">{{ formatDateTime(item.ngayTao) }}</span>
+                </td>
+                <td class="soleil-col-center">
+                  <button
+                    type="button"
+                    class="order-act-btn"
+                    title="Xem chi tiết"
+                    @click="openDetail(item)"
+                  >
+                    <Icon icon="icon-park-outline:eyes" />
+                  </button>
+                </td>
+              </tr>
+              <tr
+                v-for="n in Math.max(0, 5 - orders.length)"
+                :key="`pad-${n}`"
+                class="table-pad-row"
+                aria-hidden="true"
+              >
+                <td colspan="8" />
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
 
-      <div class="soleil-pagination">
+      <div class="soleil-pagination order-pager">
         <span class="soleil-pagination__info">
           Hiển thị {{ orders.length }} / {{ totalElements }} {{ listLabel }}
         </span>
@@ -419,96 +451,458 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* Token copy 1:1 từ docs/sunova-hoadon-list-concept.html (bản lúc tạo) */
+.order-list-page {
+  --hd-bg: #eef2f5;
+  --hd-surface: #ffffff;
+  --hd-ink: #0f1a1c;
+  --hd-muted: #5a6a72;
+  --hd-line: #d5dde6;
+  --hd-line-strong: #b8c4cc;
+  --hd-accent: #0b6e75;
+  --hd-accent-deep: #06484e;
+  --hd-accent-soft: #e0eff0;
+  --hd-ok: #166534;
+  --hd-ok-bg: #e8f5ec;
+  --hd-warn: #9a3412;
+  --hd-warn-bg: #fff1e8;
+  --hd-danger: #991b1b;
+  --hd-danger-bg: #fdecec;
+  --hd-info: #1e4d7b;
+  --hd-info-bg: #e8f0f8;
+  --hd-tab-active: #b8976a;
+  --hd-cream-ink: #fffef9;
+  --hd-radius: 2px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  color: var(--hd-ink);
+}
+
+.order-list-page__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.order-list-page__head :deep(.soleil-page-header) {
+  margin: 0;
+  margin-bottom: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.order-list-page__head :deep(.soleil-page-header__title) {
+  font-family: inherit;
+  font-size: 1.35rem;
+  font-weight: 800;
+  font-style: normal;
+  letter-spacing: 0.02em;
+  color: var(--hd-ink);
+}
+
+.order-list-page__head :deep(.soleil-page-header__desc) {
+  margin: 0.25rem 0 0;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--hd-muted);
+}
+
+.order-stats {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.order-stat {
+  min-width: 88px;
+  padding: 0.45rem 0.7rem;
+  background: var(--hd-surface);
+  border: 1px solid var(--hd-line);
+  border-left: 3px solid var(--hd-accent);
+}
+
+.order-stat--warn {
+  border-left-color: var(--hd-warn);
+}
+
+.order-stat__n {
+  font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--hd-ink);
+}
+
+.order-stat__l {
+  margin-top: 0.2rem;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hd-muted);
+}
+
 .order-tabs {
   display: flex;
-  gap: 2px;
   width: fit-content;
-  padding: 3px;
-  border-radius: 10px;
-  background: rgba(30, 21, 16, 0.05);
+  border: 1px solid var(--hd-line-strong);
+  background: var(--hd-surface);
 }
 
 .order-tab-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.45rem 0.9rem;
+  min-height: 36px;
+  padding: 0 0.95rem;
   border: none;
-  border-radius: 8px;
+  border-right: 1px solid var(--hd-line-strong);
+  border-radius: 0;
   background: transparent;
-  color: rgba(30, 21, 16, 0.55);
-  font-size: 0.8125rem;
+  color: var(--hd-muted);
+  font-size: 13px;
+  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
-  transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.order-tab-btn:last-child {
+  border-right: 0;
 }
 
 .order-tab-btn:hover:not(.active) {
-  color: rgba(30, 21, 16, 0.75);
+  color: var(--hd-ink);
+  background: #f5f8fa;
 }
 
 .order-tab-btn.active {
-  background: #fff;
-  color: var(--bronze, #a67c3d);
-  font-weight: 600;
-  box-shadow: 0 1px 3px rgba(30, 21, 16, 0.08);
+  background: var(--hd-tab-active);
+  color: var(--hd-cream-ink);
+  font-weight: 800;
+  box-shadow: none;
 }
 
 .order-tab-count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.25rem;
+  min-width: 1.35rem;
   height: 1.25rem;
   padding: 0 0.35rem;
-  border-radius: 999px;
-  background: rgba(30, 21, 16, 0.08);
-  font-size: 0.6875rem;
-  font-weight: 600;
+  border-radius: var(--hd-radius);
+  background: rgba(15, 26, 28, 0.08);
+  font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .order-tab-btn.active .order-tab-count {
-  background: rgba(196, 149, 84, 0.18);
-  color: var(--bronze, #a67c3d);
+  background: rgba(255, 254, 249, 0.22);
+  color: var(--hd-cream-ink);
+}
+
+.order-filters {
+  border-radius: var(--hd-radius) !important;
+  background: var(--hd-surface) !important;
+  border-color: var(--hd-line) !important;
+  padding: 0.85rem 1rem;
+}
+
+.order-filters :deep(.soleil-toolbar__label) {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--hd-ink);
+}
+
+.order-filters :deep(.soleil-toolbar__input),
+.order-filters :deep(.soleil-toolbar__select) {
+  min-height: 36px;
+  border-radius: var(--hd-radius) !important;
+  border-color: var(--hd-line-strong) !important;
+  background: #fff !important;
+  color: var(--hd-ink);
+  font-weight: 600;
+}
+
+.order-filters :deep(.soleil-toolbar__input:focus),
+.order-filters :deep(.soleil-toolbar__select:focus) {
+  outline: 2px solid rgba(11, 110, 117, 0.25);
+  border-color: var(--hd-accent) !important;
+}
+
+.order-filters :deep(.soleil-toolbar__search-icon) {
+  color: var(--hd-muted);
+}
+
+.order-reload-btn {
+  align-self: flex-end;
+  border-radius: var(--hd-radius) !important;
+  font-weight: 700 !important;
+  background: var(--hd-surface) !important;
+  border-color: var(--hd-line-strong) !important;
+  color: var(--hd-ink) !important;
+}
+
+.order-reload-btn:hover {
+  border-color: var(--hd-ink) !important;
+  color: var(--hd-ink) !important;
+  background: var(--hd-surface) !important;
+}
+
+.order-table-card {
+  border: 1.5px solid var(--hd-ink) !important;
+  border-radius: var(--hd-radius) !important;
+  border-color: var(--hd-ink) !important;
+  background: var(--hd-surface) !important;
+  overflow: hidden;
+}
+
+.order-table-card {
+  --tbl-row-h: 52px;
+}
+
+.order-table-card :deep(.overflow-x-auto) {
+  min-height: calc(var(--tbl-row-h) * 5 + 40px);
+  max-height: calc(var(--tbl-row-h) * 12 + 40px);
+  overflow: auto;
+}
+
+.order-table-card :deep(table.soleil-table--orders) {
+  width: 100%;
+  min-width: 880px;
+}
+
+.order-table-card :deep(tr.table-pad-row td) {
+  height: var(--tbl-row-h);
+  padding: 0 !important;
+  border-bottom: 1px solid var(--hd-line);
+  vertical-align: middle;
+  pointer-events: none;
+}
+
+.order-table-card :deep(tr.table-pad-row:hover) {
+  background: transparent !important;
+}
+
+.order-table-card :deep(.soleil-table-card__head) {
+  background: #f7fafb;
+  border-bottom-color: var(--hd-line);
+  padding: 0.7rem 1rem;
+}
+
+.order-table-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--hd-ink);
+}
+
+.order-table-meta {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--hd-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.order-table-card :deep(table.admin-table--soleil thead th),
+.order-table-card :deep(thead th) {
+  background: #b8976a !important;
+  color: #fffef9 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+  padding: 0.6rem 0.75rem !important;
+  border-bottom: none !important;
+}
+
+.order-table-card :deep(thead th:first-child),
+.order-table-card :deep(tbody td:first-child) {
+  padding-left: 0.85rem !important;
+}
+
+.order-table-card :deep(tbody td) {
+  padding: 0.72rem 0.75rem !important;
+  border-bottom: 1px solid var(--hd-line);
+  vertical-align: middle;
+  color: var(--hd-ink);
+}
+
+.order-table-card :deep(tbody tr) {
+  background: #fff;
+  border-bottom: none;
+}
+
+.order-table-card :deep(tbody tr:hover) {
+  background: #f3f8f8 !important;
+}
+
+.order-table-card :deep(tbody tr.order-row--pending) {
+  box-shadow: inset 3px 0 0 var(--hd-warn);
+}
+
+.order-code {
+  font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--hd-accent-deep);
+  letter-spacing: 0.01em;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.order-code:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.order-customer {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--hd-ink);
+}
+
+.order-pay {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--hd-ink);
+}
+
+.order-money {
+  font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  color: var(--hd-ink);
+}
+
+.order-date {
+  font-variant-numeric: tabular-nums;
+  color: var(--hd-muted);
+  font-size: 12.5px;
+  white-space: nowrap;
 }
 
 .order-badge {
-  display: inline-block;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 0.45rem;
+  border-radius: var(--hd-radius);
+  border: 1px solid currentColor;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   white-space: nowrap;
-  transition: background-color 0.2s, color 0.2s;
 }
+
+/* tag--pos */
 .order-badge--gold {
-  background: rgba(196, 149, 84, 0.15);
-  color: var(--bronze, #a67c3d);
+  color: #7c4a12;
+  background: #fff4e5;
+  border-color: #d4a574;
 }
+
+/* tag--online */
 .order-badge--teal {
-  background: rgba(72, 140, 130, 0.12);
-  color: var(--sage, #488c82);
+  color: var(--hd-accent-deep);
+  background: var(--hd-accent-soft);
 }
+
 .order-badge--success {
-  background: rgba(72, 140, 82, 0.12);
-  color: #3d7a4a;
+  color: var(--hd-ok);
+  background: var(--hd-ok-bg);
 }
+
 .order-badge--info {
-  background: rgba(72, 120, 180, 0.12);
-  color: #3a6ea8;
+  color: var(--hd-info);
+  background: var(--hd-info-bg);
 }
+
 .order-badge--danger {
-  background: rgba(180, 72, 72, 0.12);
-  color: #a83a3a;
+  color: var(--hd-danger);
+  background: var(--hd-danger-bg);
 }
+
 .order-badge--warning {
-  background: rgba(196, 149, 84, 0.18);
-  color: #8a6428;
+  color: var(--hd-warn);
+  background: var(--hd-warn-bg);
 }
+
 .order-badge--neutral {
-  background: rgba(30, 21, 16, 0.06);
-  color: rgba(30, 21, 16, 0.55);
+  color: #4b5563;
+  background: #f1f3f5;
+  border-color: #c5ccd3;
+}
+
+.order-act-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--hd-line-strong);
+  border-radius: var(--hd-radius);
+  background: #fff;
+  color: var(--hd-ink);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.order-act-btn:hover {
+  border-color: var(--hd-accent);
+  color: var(--hd-accent-deep);
+  background: var(--hd-accent-soft);
+}
+
+.order-pager {
+  background: #f7fafb !important;
+  border-top: 1px solid var(--hd-line);
+}
+
+.order-pager :deep(.soleil-pagination__info) {
+  font-size: 12.5px;
+  color: var(--hd-muted);
+}
+
+.order-pager :deep(.soleil-page-btn) {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 0.4rem;
+  border: 1px solid var(--hd-line-strong) !important;
+  background: #fff !important;
+  border-radius: var(--hd-radius) !important;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--hd-ink) !important;
+}
+
+.order-pager :deep(.soleil-page-btn:hover:not(:disabled):not(.soleil-page-btn--active)) {
+  border-color: #0b6e75 !important;
+  color: #06484e !important;
+  background: #fff !important;
+}
+
+.order-pager :deep(.soleil-page-btn--active),
+.order-pager :deep(.soleil-page-btn.soleil-page-btn--active) {
+  background: #06484e !important;
+  border-color: #06484e !important;
+  color: #fff !important;
+}
+
+.order-pager :deep(.soleil-page-btn:disabled) {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .soleil-page-ellipsis {
@@ -517,7 +911,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: rgba(30, 21, 16, 0.4);
+  color: var(--hd-muted);
   font-size: 13px;
   user-select: none;
 }

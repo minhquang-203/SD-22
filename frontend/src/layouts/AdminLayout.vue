@@ -11,6 +11,7 @@ const route = useRoute()
 
 const breadcrumb = computed(() => route.meta.breadcrumb || 'SUNOVA Admin')
 const title = computed(() => route.meta.title || 'SUNOVA Admin')
+const isPosPage = computed(() => route.path === '/admin/pos' || route.path.endsWith('/pos'))
 </script>
 
 <template>
@@ -20,9 +21,13 @@ const title = computed(() => route.meta.title || 'SUNOVA Admin')
       <AdminHeader
         :title="title"
         :breadcrumb="breadcrumb"
+        :sidebar-collapsed="collapsed"
         @toggle-sidebar="collapsed = !collapsed"
       />
-      <main class="admin-main-content flex-1 overflow-auto">
+      <main
+        class="admin-main-content flex-1"
+        :class="isPosPage ? 'admin-main-content--pos' : 'overflow-auto'"
+      >
         <router-view v-slot="{ Component }">
           <transition name="admin-page-fade" mode="out-in">
             <component :is="Component" />

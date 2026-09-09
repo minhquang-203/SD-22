@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import GanLoDonHangModal from '@/components/admin/orders/GanLoDonHangModal.vue'
-import { getHoaDonDetail, getLichSu, taoVanDonGhn, dongBoGhn, giaLapWebhookGhn, tuChoiDon } from '@/api/hoaDonApi'
+import { getHoaDonDetail, getLichSu, taoVanDonGhn, giaLapWebhookGhn, tuChoiDon } from '@/api/hoaDonApi'
 import { confirm, alertDialog } from '@/composables/useConfirm'
 import { subscribeAdminOrders } from '@/composables/useRealtime'
 import { GHN_STATUS_OPTIONS } from '@/constants/ghnStatuses'
@@ -20,8 +20,6 @@ const detail = ref(null)
 const lichSu = ref([])
 
 const ghnLoading = ref(false)
-const ghnMessage = ref('')
-const ghnMessageType = ref('success')
 
 const actionLoading = ref(false)
 const actionMessage = ref('')
@@ -42,13 +40,6 @@ const coTheTaoVanDon = computed(
     detail.value &&
     !detail.value.maVanDonGhn &&
     TRANG_THAI_TAO_VAN_DON.has(detail.value.trangThai),
-)
-
-const choXacNhanChuaCoVanDon = computed(
-  () =>
-    detail.value &&
-    !detail.value.maVanDonGhn &&
-    detail.value.trangThai === 'CHO_XAC_NHAN',
 )
 
 const coTheXacNhanDon = computed(() => detail.value?.trangThai === 'CHO_XAC_NHAN')
@@ -85,9 +76,7 @@ function notifyGhn(text, type = 'success') {
     })
     return
   }
-  ghnMessage.value = text
-  ghnMessageType.value = type
-  setTimeout(() => { ghnMessage.value = '' }, 5000)
+  toast(text, 'success')
 }
 
 function notifyAction(text, type = 'success') {
@@ -190,13 +179,13 @@ async function tryTaoVanDonSauXacNhan() {
       return true
     }
     notifyGhn(
-      payload?.thongDiep || 'Không tạo được vận đơn GHN. Vui lòng thử lại bằng nút bên dưới.',
+      payload?.thongDiep || 'Không tạo được vận đơn GHN.',
       'error',
     )
     return false
   } catch (err) {
     notifyGhn(
-      typeof err === 'string' ? err : 'Không tạo được vận đơn GHN. Vui lòng thử lại bằng nút bên dưới.',
+      typeof err === 'string' ? err : 'Không tạo được vận đơn GHN.',
       'error',
     )
     return false
@@ -233,39 +222,6 @@ async function handleCapNhatWebhook() {
     notifyWebhook(typeof err === 'string' ? err : 'Không cập nhật được trạng thái đơn', 'error')
   } finally {
     webhookLoading.value = false
-  }
-}
-
-async function handleTaoVanDon() {
-  if (!orderId.value) return
-  ghnLoading.value = true
-  try {
-    const res = await taoVanDonGhn(orderId.value)
-    const payload = res.data
-    if (payload?.thanhCong) {
-      notifyGhn(payload.thongDiep || `Đã tạo vận đơn GHN: ${payload.maVanDon}`, 'success')
-      await loadDetail()
-    } else {
-      notifyGhn(payload?.thongDiep || 'Không tạo được vận đơn GHN', 'error')
-    }
-  } catch (err) {
-    notifyGhn(typeof err === 'string' ? err : 'Không tạo được vận đơn GHN', 'error')
-  } finally {
-    ghnLoading.value = false
-  }
-}
-
-async function handleDongBoGhn() {
-  if (!orderId.value) return
-  ghnLoading.value = true
-  try {
-    const res = await dongBoGhn(orderId.value)
-    notifyGhn(res.data?.thongDiep || 'Đã đồng bộ trạng thái GHN', 'success')
-    await loadDetail()
-  } catch (err) {
-    notifyGhn(typeof err === 'string' ? err : 'Không đồng bộ được trạng thái GHN', 'error')
-  } finally {
-    ghnLoading.value = false
   }
 }
 
@@ -317,22 +273,11 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString('vi-VN')
 }
 
-function actionIcon(ma) {
-  const map = {
-    TAO_DON: 'icon-park-outline:bill',
-    THEM_HANG: 'mdi:plus-circle-outline',
-    AP_MA: 'mdi:ticket-percent-outline',
-    THANH_TOAN: 'icon-park-outline:pay-code-two',
-    HOAN_THANH: 'mdi:check-circle-outline',
-    CHO_XAC_NHAN: 'mdi:clock-outline',
-    DA_XAC_NHAN: 'mdi:check',
-    DANG_CHUAN_BI: 'mdi:package-variant',
-    DANG_GIAO: 'mdi:truck-delivery-outline',
-    TRA_HANG: 'mdi:package-variant-closed-remove',
-    DA_HUY: 'mdi:close-circle-outline',
-    CHO: 'mdi:pause-circle-outline',
-  }
-  return map[ma] || 'mdi:history'
+function timelineToneClass(ma) {
+  if (ma === 'HOAN_THANH' || ma === 'DA_XAC_NHAN' || ma === 'THANH_TOAN') return 'is-done'
+  if (ma === 'CHO_XAC_NHAN' || ma === 'CHO' || ma === 'TRA_HANG' || ma === 'DANG_GIAO') return 'is-warn'
+  if (ma === 'DA_HUY') return 'is-danger'
+  return ''
 }
 
 function timelineText(entry) {
@@ -411,127 +356,128 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="hoa-don-detail-page space-y-6">
+  <div class="hoa-don-detail-page">
     <PageHeader
       class="no-print"
       title="Chi tiết hóa đơn"
-      description="Xem thông tin đơn, dòng hàng và nhật ký hành động"
+      description="Xử lý đơn · phân bổ lô · vận đơn GHN · nhật ký trạng thái"
     >
       <template #actions>
-        <button type="button" class="soleil-btn-outline" @click="goBack">
+        <button type="button" class="soleil-btn-outline hd-btn" @click="goBack">
           <Icon icon="icon-park-outline:back" />
           Danh sách
         </button>
       </template>
     </PageHeader>
 
-    <div v-if="loading" class="soleil-card p-12 text-center text-[var(--admin-muted)]">
+    <div v-if="loading" class="soleil-card hd-panel p-12 text-center text-[#5a6a72]">
       Đang tải hóa đơn...
     </div>
 
-    <div v-else-if="error" class="admin-alert admin-alert-error rounded-lg px-4 py-3">
+    <div v-else-if="error" class="admin-alert admin-alert-error px-4 py-3">
       {{ error }}
     </div>
 
     <template v-else-if="detail">
       <div id="hoa-don-print-area" class="hoa-don-print-area">
-        <section class="hoa-don-summary soleil-card">
+        <section class="hoa-don-summary soleil-card hd-panel">
           <div class="hoa-don-print-brand">SUNOVA</div>
           <div class="hoa-don-summary__main">
-          <div>
-            <p class="soleil-eyebrow mb-1">Hóa đơn</p>
-            <h1 class="hoa-don-summary__code">{{ detail.maHoaDon }}</h1>
-            <p class="hoa-don-summary__datetime">{{ formatDateTime(detail.ngayTao) }}</p>
+            <div>
+              <p class="hoa-don-summary__kicker">Hóa đơn bán hàng</p>
+              <h1 class="hoa-don-summary__code">{{ detail.maHoaDon }}</h1>
+              <p class="hoa-don-summary__datetime">{{ formatDateTime(detail.ngayTao) }}</p>
+            </div>
+            <div class="hoa-don-summary__badges">
+              <span class="hd-badge" :class="`hd-badge--${loaiDonTone(detail.loaiDon)}`">
+                {{ loaiDonLabel(detail.loaiDon) }}
+              </span>
+              <span class="hd-badge" :class="`hd-badge--${statusTone(detail.trangThai)}`">
+                {{ statusLabel(detail.trangThai) }}
+              </span>
+            </div>
           </div>
-          <div class="hoa-don-summary__badges">
-            <span class="hd-badge" :class="`hd-badge--${loaiDonTone(detail.loaiDon)}`">
-              {{ loaiDonLabel(detail.loaiDon) }}
-            </span>
-            <span class="hd-badge" :class="`hd-badge--${statusTone(detail.trangThai)}`">
-              {{ statusLabel(detail.trangThai) }}
-            </span>
-          </div>
-        </div>
 
-        <div class="hoa-don-summary__meta">
-          <div class="hoa-don-summary__meta-item">
-            <span class="hoa-don-summary__label">Khách hàng</span>
-            <span>{{ detail.tenKhachHang || 'Khách lẻ' }}</span>
-            <span v-if="detail.soDienThoaiKhachHang" class="text-sm text-[var(--admin-muted)]">
-              {{ detail.soDienThoaiKhachHang }}
-            </span>
+          <div class="hoa-don-summary__meta">
+            <div class="hoa-don-summary__meta-item">
+              <span class="hoa-don-summary__label">Khách hàng</span>
+              <span class="hoa-don-summary__value">{{ detail.tenKhachHang || 'Khách lẻ' }}</span>
+              <span v-if="detail.soDienThoaiKhachHang" class="hoa-don-summary__sub">
+                {{ detail.soDienThoaiKhachHang }}
+              </span>
+            </div>
+            <div v-if="detail.tenNhanVien" class="hoa-don-summary__meta-item">
+              <span class="hoa-don-summary__label">Nhân viên</span>
+              <span class="hoa-don-summary__value">{{ detail.tenNhanVien }}</span>
+            </div>
+            <div v-if="detail.tenPhuongThucThanhToan" class="hoa-don-summary__meta-item">
+              <span class="hoa-don-summary__label">Thanh toán</span>
+              <span class="hoa-don-summary__value">{{ detail.tenPhuongThucThanhToan }}</span>
+            </div>
+            <div v-if="detail.diaChiGiao" class="hoa-don-summary__meta-item">
+              <span class="hoa-don-summary__label">Địa chỉ nhận hàng</span>
+              <span class="hoa-don-summary__value">{{ detail.diaChiGiao }}</span>
+            </div>
+            <div v-if="detail.maVanDonGhn" class="hoa-don-summary__meta-item">
+              <span class="hoa-don-summary__label">Mã vận đơn</span>
+              <span class="hoa-don-summary__value">
+                <span class="hoa-don-mono">{{ detail.maVanDonGhn }}</span>
+              </span>
+            </div>
           </div>
-          <div v-if="detail.tenNhanVien" class="hoa-don-summary__meta-item">
-            <span class="hoa-don-summary__label">Nhân viên</span>
-            <span>{{ detail.tenNhanVien }}</span>
-          </div>
-          <div v-if="detail.tenPhuongThucThanhToan" class="hoa-don-summary__meta-item">
-            <span class="hoa-don-summary__label">Thanh toán</span>
-            <span>{{ detail.tenPhuongThucThanhToan }}</span>
-          </div>
-          <div v-if="detail.diaChiGiao" class="hoa-don-summary__meta-item">
-            <span class="hoa-don-summary__label">Địa chỉ nhận hàng</span>
-            <span>{{ detail.diaChiGiao }}</span>
-          </div>
-        </div>
 
-        <div class="hoa-don-summary__footer">
-          <div class="hoa-don-summary__total">
-            <span class="hoa-don-summary__total-label">Thành tiền</span>
-            <span class="hoa-don-summary__total-value">{{ formatCurrency(detail.thanhTien) }}</span>
+          <div class="hoa-don-summary__footer">
+            <div class="hoa-don-summary__total">
+              <span class="hoa-don-summary__total-label">Thành tiền</span>
+              <span class="hoa-don-summary__total-value">{{ formatCurrency(detail.thanhTien) }}</span>
+            </div>
+            <button type="button" class="soleil-btn-outline hd-btn no-print" @click="printInvoice">
+              <Icon icon="icon-park-outline:printer" />
+              In hóa đơn
+            </button>
           </div>
-          <button type="button" class="soleil-btn-outline no-print" @click="printInvoice">
-            <Icon icon="icon-park-outline:printer" />
-            In hóa đơn
-          </button>
-        </div>
         </section>
 
-        <section v-if="coTheXuLyDon" class="soleil-card hoa-don-actions no-print">
-          <div class="hoa-don-actions__head">
-            <h2 class="hoa-don-section-title" style="margin: 0">
-              <Icon icon="mdi:clipboard-check-outline" width="18" class="hoa-don-actions__title-icon" />
-              Xử lý đơn hàng
-            </h2>
+        <section v-if="coTheXuLyDon" class="hoa-don-strip no-print">
+          <div>
+            <h2 class="hoa-don-strip__title">Cần xử lý</h2>
+            <p class="hoa-don-strip__hint">
+              <template v-if="coTheXacNhanDon">
+                Đơn chờ xác nhận. Xác nhận sẽ mở phân bổ lô (FEFO / chỉnh tay), chuyển sang
+                <strong>Đã xác nhận</strong>, rồi tự thử tạo vận đơn GHN.
+              </template>
+              <template v-else-if="coTheHuyDonDaXacNhan">
+                Đơn online chưa chuyển sang đang giao — có thể hủy và hoàn hàng về kho.
+              </template>
+            </p>
           </div>
-
-          <p class="hoa-don-actions__hint">
-            <template v-if="coTheXacNhanDon">
-              Đơn đang chờ xác nhận. Xác nhận sẽ mở phân bổ lô (FEFO / chỉnh tay), rồi chuyển sang
-              <strong>Đã xác nhận</strong> và tự thử tạo vận đơn GHN.
-            </template>
-            <template v-else-if="coTheHuyDonDaXacNhan">
-              Đơn online chưa chuyển sang đang giao — có thể hủy và hoàn hàng về kho.
-            </template>
-          </p>
-
-          <div class="hoa-don-actions__buttons">
+          <div class="hoa-don-strip__btns">
             <button
               v-if="coTheXacNhanDon"
               type="button"
-              class="soleil-btn-primary"
+              class="soleil-btn-primary hd-btn hoa-don-strip__primary"
               :disabled="actionLoading || ghnLoading"
               @click="handleXacNhanDon"
             >
               <Icon icon="mdi:check-circle-outline" />
-              {{ actionLoading ? 'Đang xử lý...' : 'Xác nhận đơn hàng' }}
+              {{ actionLoading ? 'Đang xử lý...' : 'Xác nhận đơn' }}
             </button>
 
             <button
               v-if="coTheTuChoiDon"
               type="button"
-              class="soleil-btn-outline hoa-don-actions__danger"
+              class="soleil-btn-outline hd-btn hoa-don-strip__danger"
               :disabled="actionLoading"
               @click="handleTuChoiDon"
             >
               <Icon icon="mdi:close-circle-outline" />
-              {{ actionLoading ? 'Đang xử lý...' : 'Từ chối đơn' }}
+              {{ actionLoading ? 'Đang xử lý...' : 'Từ chối' }}
             </button>
 
             <button
               v-if="coTheHuyDonDaXacNhan"
               type="button"
-              class="soleil-btn-outline hoa-don-actions__danger"
+              class="soleil-btn-outline hd-btn hoa-don-strip__danger"
               :disabled="actionLoading"
               @click="handleHuyDonDaXacNhan"
             >
@@ -539,254 +485,222 @@ onUnmounted(() => {
               {{ actionLoading ? 'Đang xử lý...' : 'Hủy đơn' }}
             </button>
           </div>
-
           <div
             v-if="actionMessage"
-            class="admin-alert rounded-lg px-4 py-2 mt-3 text-sm"
+            class="admin-alert px-4 py-2 text-sm hoa-don-strip__msg"
             :class="actionMessageType === 'error' ? 'admin-alert-error' : 'admin-alert-success'"
           >
             {{ actionMessage }}
           </div>
         </section>
 
-        <section v-if="coTheGiaLapWebhook" class="soleil-card hoa-don-webhook no-print">
-          <div class="hoa-don-webhook__head">
-            <h2 class="hoa-don-section-title" style="margin: 0">
-              <Icon icon="mdi:webhook" width="18" class="hoa-don-webhook__title-icon" />
-              Cập nhật trạng thái đơn hàng
-            </h2>
-          </div>
+        <div class="hoa-don-modules">
+        <div v-if="coTheGiaLapWebhook" class="hoa-don-ops no-print">
+          <section class="soleil-card hd-panel hd-module hoa-don-webhook">
+            <div class="hoa-don-ops__head hd-module__head">
+              <h2 class="hoa-don-ops__title">
+                <span class="hd-module__idx" aria-hidden="true" />
+                Cập nhật trạng thái
+              </h2>
+            </div>
 
-          <div class="hoa-don-webhook__form">
-            <div class="hoa-don-webhook__field">
-              <span class="hoa-don-webhook__label">Trạng thái đơn hiện tại</span>
-              <div class="hoa-don-webhook__select hoa-don-webhook__current" aria-readonly="true">
-                {{ statusLabel(detail.trangThai) }}
+            <div class="hd-module__body">
+            <div class="hoa-don-webhook__form">
+              <div class="hoa-don-webhook__field">
+                <span class="hoa-don-webhook__label">Trạng thái hiện tại</span>
+                <div class="hoa-don-webhook__select hoa-don-webhook__current" aria-readonly="true">
+                  {{ statusLabel(detail.trangThai) }}
+                </div>
               </div>
-            </div>
 
-            <div class="hoa-don-webhook__field">
-              <label class="hoa-don-webhook__label" for="webhook-ghn-status">Trạng thái GHN</label>
-              <select
-                id="webhook-ghn-status"
-                v-model="selectedGhnStatus"
-                class="hoa-don-webhook__select"
-              >
-                <option
-                  v-for="opt in GHN_STATUS_OPTIONS"
-                  :key="opt.value"
-                  :value="opt.value"
+              <div class="hoa-don-webhook__field">
+                <label class="hoa-don-webhook__label" for="webhook-ghn-status">Trạng thái GHN</label>
+                <select
+                  id="webhook-ghn-status"
+                  v-model="selectedGhnStatus"
+                  class="hoa-don-webhook__select"
                 >
-                  {{ opt.label }} ({{ opt.value }})
-                </option>
-              </select>
-            </div>
+                  <option
+                    v-for="opt in GHN_STATUS_OPTIONS"
+                    :key="opt.value"
+                    :value="opt.value"
+                  >
+                    {{ opt.label }} ({{ opt.value }})
+                  </option>
+                </select>
+              </div>
 
-            <div class="hoa-don-webhook__field hoa-don-webhook__field--wide">
-              <label class="hoa-don-webhook__label" for="webhook-ghi-chu">Ghi chú (tuỳ chọn)</label>
-              <input
-                id="webhook-ghi-chu"
-                v-model="webhookGhiChu"
-                type="text"
-                class="hoa-don-webhook__input"
-                placeholder="Ví dụ: Đơn đang giao, khách hẹn nhận chiều"
-              />
-            </div>
+              <div class="hoa-don-webhook__field hoa-don-webhook__field--wide">
+                <label class="hoa-don-webhook__label" for="webhook-ghi-chu">Ghi chú</label>
+                <input
+                  id="webhook-ghi-chu"
+                  v-model="webhookGhiChu"
+                  type="text"
+                  class="hoa-don-webhook__input"
+                  placeholder="Ví dụ: Khách hẹn nhận chiều"
+                />
+              </div>
 
-            <button
-              type="button"
-              class="soleil-btn-primary hoa-don-webhook__submit"
-              :disabled="!canCapNhatWebhook || webhookLoading"
-              @click="handleCapNhatWebhook"
-            >
-              <Icon icon="icon-park-outline:refresh" />
-              {{ webhookLoading ? 'Đang cập nhật...' : 'Cập nhật trạng thái' }}
-            </button>
-          </div>
-
-          <div
-            v-if="webhookMessage"
-            class="admin-alert rounded-lg px-4 py-2 mt-3 text-sm"
-            :class="webhookMessageType === 'error' ? 'admin-alert-error' : 'admin-alert-success'"
-          >
-            {{ webhookMessage }}
-          </div>
-        </section>
-
-        <section class="soleil-card hoa-don-ghn no-print">
-          <div class="hoa-don-ghn__head">
-            <h2 class="hoa-don-section-title" style="margin: 0">
-              <Icon icon="mdi:truck-delivery-outline" width="18" class="hoa-don-ghn__title-icon" />
-              Vận chuyển (Giao Hàng Nhanh)
-            </h2>
-            <div class="hoa-don-ghn__actions">
               <button
-                v-if="coTheTaoVanDon"
                 type="button"
-                class="soleil-btn-outline"
-                :disabled="ghnLoading"
-                @click="handleTaoVanDon"
-              >
-                <Icon icon="mdi:package-variant-closed-plus" />
-                {{ ghnLoading ? 'Đang xử lý...' : 'Tạo vận đơn GHN' }}
-              </button>
-              <button
-                v-if="detail.maVanDonGhn"
-                type="button"
-                class="soleil-btn-outline"
-                :disabled="ghnLoading"
-                @click="handleDongBoGhn"
+                class="soleil-btn-primary hd-btn hoa-don-webhook__submit"
+                :disabled="!canCapNhatWebhook || webhookLoading"
+                @click="handleCapNhatWebhook"
               >
                 <Icon icon="icon-park-outline:refresh" />
-                {{ ghnLoading ? 'Đang xử lý...' : 'Đồng bộ trạng thái' }}
+                {{ webhookLoading ? 'Đang cập nhật...' : 'Cập nhật trạng thái' }}
               </button>
             </div>
-          </div>
 
-          <div
-            v-if="ghnMessage"
-            class="admin-alert rounded-lg px-4 py-2 mt-3 text-sm"
-            :class="ghnMessageType === 'error' ? 'admin-alert-error' : 'admin-alert-success'"
-          >
-            {{ ghnMessage }}
-          </div>
-
-          <p v-if="detail.maVanDonGhn" class="hoa-don-ghn__code">
-            Mã vận đơn: <span class="soleil-sp-code">{{ detail.maVanDonGhn }}</span>
-          </p>
-          <p v-else class="hoa-don-ghn__hint">
-            <template v-if="choXacNhanChuaCoVanDon">
-              Cần xác nhận đơn hàng trước khi tạo vận đơn GHN.
-            </template>
-            <template v-else-if="coTheTaoVanDon">
-              Đơn chưa có vận đơn GHN. Bấm "Tạo vận đơn GHN" để thử lại (ví dụ khi tạo tự động lúc xác nhận thất bại).
-            </template>
-            <template v-else>
-              Đơn ở trạng thái này không thể tạo vận đơn GHN.
-            </template>
-          </p>
-        </section>
+            <div
+              v-if="webhookMessage"
+              class="admin-alert px-4 py-2 mt-3 text-sm"
+              :class="webhookMessageType === 'error' ? 'admin-alert-error' : 'admin-alert-success'"
+            >
+              {{ webhookMessage }}
+            </div>
+            </div>
+          </section>
+        </div>
 
         <div class="hoa-don-detail-grid">
-          <section class="soleil-card hoa-don-lines">
-          <h2 class="hoa-don-section-title">Hóa đơn chi tiết</h2>
+          <section class="soleil-card hd-panel hd-module hoa-don-lines">
+            <h2 class="hoa-don-section-title hd-module__head">
+              <span class="hd-module__label">
+                <span class="hd-module__idx" aria-hidden="true" />
+                Dòng hàng
+              </span>
+              <span v-if="detail.chiTiets?.length">{{ detail.chiTiets.length }} dòng</span>
+            </h2>
 
-          <div class="overflow-x-auto">
-            <table class="soleil-table admin-table--soleil w-full">
-              <thead>
-                <tr>
-                  <th>Sản phẩm</th>
-                  <th class="text-center">SL</th>
-                  <th class="text-right">Đơn giá</th>
-                  <th class="text-right">Thành tiền</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-if="!detail.chiTiets?.length">
-                  <td colspan="4" class="text-center py-8 text-[var(--admin-muted)]">Không có dòng hàng</td>
-                </tr>
-                <template v-for="line in detail.chiTiets || []" :key="line.id">
+            <div class="hd-module__body">
+            <div class="overflow-x-auto">
+              <table class="soleil-table admin-table--soleil hoa-don-lines-table w-full">
+                <thead>
                   <tr>
-                    <td>
-                      <div class="font-medium">{{ line.tenSanPham }}</div>
-                      <div v-if="line.bienThe || line.sku" class="text-xs text-[var(--admin-muted)]">
-                        {{ line.bienThe || line.sku }}
-                      </div>
-                    </td>
-                    <td class="text-center">{{ line.soLuong }}</td>
-                    <td class="text-right">{{ formatCurrency(line.donGia) }}</td>
-                    <td class="text-right font-medium">{{ formatCurrency(line.thanhTien) }}</td>
+                    <th>Sản phẩm</th>
+                    <th class="text-center">SL</th>
+                    <th class="text-right">Đơn giá</th>
+                    <th class="text-right">Thành tiền</th>
                   </tr>
-                  <tr v-if="line.loHangs?.length" class="hoa-don-lot-row">
-                    <td colspan="4">
-                      <div class="hoa-don-lots">
-                        <span class="hoa-don-lots__label">Lô:</span>
-                        <span
-                          v-for="(lo, idx) in line.loHangs"
-                          :key="lo.idLoHang"
-                          class="hoa-don-lots__item"
-                        >
-                          <template v-if="idx > 0">; </template>
-                          {{ lo.soLo || `#${lo.idLoHang}` }}
-                          · SL {{ lo.soLuongDaBan }}
-                          <template v-if="lo.hanSuDung"> · HSD {{ formatDate(lo.hanSuDung) }}</template>
-                        </span>
-                      </div>
-                    </td>
+                </thead>
+                <tbody>
+                  <tr v-if="!detail.chiTiets?.length">
+                    <td colspan="4" class="text-center py-8 text-[#5a6a72]">Không có dòng hàng</td>
                   </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="hoa-don-totals">
-            <div class="hoa-don-totals__row">
-              <span>Tổng tiền hàng</span>
-              <span>{{ formatCurrency(detail.tongTien) }}</span>
+                  <template v-for="line in detail.chiTiets || []" :key="line.id">
+                    <tr>
+                      <td>
+                        <div class="hoa-don-prod-name">{{ line.tenSanPham }}</div>
+                        <div v-if="line.bienThe || line.sku" class="hoa-don-prod-sku">
+                          {{ line.bienThe || line.sku }}
+                        </div>
+                        <div v-if="line.loHangs?.length" class="hoa-don-lots">
+                          <strong>Lô:</strong>
+                          <span
+                            v-for="(lo, idx) in line.loHangs"
+                            :key="lo.idLoHang"
+                            class="hoa-don-lots__item"
+                          >
+                            <template v-if="idx > 0">; </template>
+                            {{ lo.soLo || `#${lo.idLoHang}` }}
+                            · SL {{ lo.soLuongDaBan }}
+                            <template v-if="lo.hanSuDung"> · HSD {{ formatDate(lo.hanSuDung) }}</template>
+                          </span>
+                        </div>
+                      </td>
+                      <td class="text-center"><strong>{{ line.soLuong }}</strong></td>
+                      <td class="text-right hoa-don-money">{{ formatCurrency(line.donGia) }}</td>
+                      <td class="text-right hoa-don-money hoa-don-money--strong">{{ formatCurrency(line.thanhTien) }}</td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
             </div>
-            <div v-if="detail.tienGiamGia > 0" class="hoa-don-totals__row text-[var(--sage)]">
-              <span>
-                Giảm giá
-                <template v-if="detail.maPhieuGiamGia"> ({{ detail.maPhieuGiamGia }})</template>
-              </span>
-              <span>−{{ formatCurrency(detail.tienGiamGia) }}</span>
-            </div>
-            <div v-if="detail.phiVanChuyen > 0" class="hoa-don-totals__row">
-              <span>Phí vận chuyển</span>
-              <span>{{ formatCurrency(detail.phiVanChuyen) }}</span>
-            </div>
-            <div class="hoa-don-totals__grand">
-              <span>Thành tiền</span>
-              <span>{{ formatCurrency(detail.thanhTien) }}</span>
-            </div>
-          </div>
 
-          <div v-if="detail.soTienKhachDua != null || detail.maGiaoDich" class="hoa-don-pay-block">
-            <p v-if="detail.soTienKhachDua != null" class="text-sm">
-              Tiền khách đưa: <strong>{{ formatCurrency(detail.soTienKhachDua) }}</strong>
-              <span v-if="detail.tienThua != null">
-                · Tiền thối: <strong class="text-[var(--warm-tan)]">{{ formatCurrency(detail.tienThua) }}</strong>
-              </span>
-            </p>
-            <p v-if="detail.maGiaoDich" class="text-sm mt-1">
-              Mã giao dịch: <span class="soleil-sp-code">{{ detail.maGiaoDich }}</span>
-            </p>
-          </div>
-
-          <div v-if="detail.trangThaiHoanTien" class="hoa-don-pay-block">
-            <p class="text-sm font-medium mb-1">Hoàn tiền</p>
-            <p class="text-sm">
-              Trạng thái:
-              <strong>{{ detail.trangThaiHoanTienLabel || detail.trangThaiHoanTien }}</strong>
-              <template v-if="detail.soTienHoan != null">
-                · Số tiền: <strong>{{ formatCurrency(detail.soTienHoan) }}</strong>
-              </template>
-            </p>
-            <p v-if="detail.maGiaoDichHoan" class="text-sm mt-1">
-              Mã GD hoàn: <span class="soleil-sp-code">{{ detail.maGiaoDichHoan }}</span>
-            </p>
-          </div>
-        </section>
-
-        <aside class="soleil-card hoa-don-timeline no-print">
-          <h2 class="hoa-don-section-title">Nhật ký hành động</h2>
-
-          <div v-if="lichSu.length === 0" class="text-sm text-[var(--admin-muted)] py-8 text-center">
-            Chưa có nhật ký
-          </div>
-
-          <ul v-else class="hoa-don-timeline__list">
-            <li v-for="entry in lichSu" :key="entry.id" class="hoa-don-timeline__item">
-              <span class="hoa-don-timeline__icon" aria-hidden="true">
-                <Icon :icon="actionIcon(entry.trangThai)" width="18" />
-              </span>
-              <div class="hoa-don-timeline__body">
-                <p class="hoa-don-timeline__text">{{ timelineText(entry) }}</p>
-                <time class="hoa-don-timeline__time">{{ formatDateTime(entry.thoiGian) }}</time>
+            <div class="hoa-don-totals">
+              <div class="hoa-don-totals__row">
+                <span>Tổng tiền hàng</span>
+                <span>{{ formatCurrency(detail.tongTien) }}</span>
               </div>
-            </li>
-          </ul>
-        </aside>
+              <div v-if="detail.tienGiamGia > 0" class="hoa-don-totals__row hoa-don-totals__row--disc">
+                <span>
+                  Giảm giá
+                  <template v-if="detail.maPhieuGiamGia"> ({{ detail.maPhieuGiamGia }})</template>
+                </span>
+                <span>−{{ formatCurrency(detail.tienGiamGia) }}</span>
+              </div>
+              <div v-if="detail.phiVanChuyen > 0" class="hoa-don-totals__row">
+                <span>Phí vận chuyển</span>
+                <span>{{ formatCurrency(detail.phiVanChuyen) }}</span>
+              </div>
+              <div class="hoa-don-totals__grand">
+                <span>Thành tiền</span>
+                <span>{{ formatCurrency(detail.thanhTien) }}</span>
+              </div>
+            </div>
+
+            <div v-if="detail.soTienKhachDua != null || detail.maGiaoDich" class="hoa-don-pay-block">
+              <p v-if="detail.soTienKhachDua != null" class="text-sm">
+                Tiền khách đưa: <strong>{{ formatCurrency(detail.soTienKhachDua) }}</strong>
+                <span v-if="detail.tienThua != null">
+                  · Tiền thối: <strong>{{ formatCurrency(detail.tienThua) }}</strong>
+                </span>
+              </p>
+              <p v-if="detail.maGiaoDich" class="text-sm mt-1">
+                Mã giao dịch: <span class="hoa-don-mono">{{ detail.maGiaoDich }}</span>
+              </p>
+            </div>
+
+            <div v-if="detail.trangThaiHoanTien" class="hoa-don-pay-block">
+              <p class="text-sm font-medium mb-1">Hoàn tiền</p>
+              <p class="text-sm">
+                Trạng thái:
+                <strong>{{ detail.trangThaiHoanTienLabel || detail.trangThaiHoanTien }}</strong>
+                <template v-if="detail.soTienHoan != null">
+                  · Số tiền: <strong>{{ formatCurrency(detail.soTienHoan) }}</strong>
+                </template>
+              </p>
+              <p v-if="detail.maGiaoDichHoan" class="text-sm mt-1">
+                Mã GD hoàn: <span class="hoa-don-mono">{{ detail.maGiaoDichHoan }}</span>
+              </p>
+            </div>
+            </div>
+          </section>
+
+          <aside class="soleil-card hd-panel hd-module hoa-don-timeline no-print">
+            <h2 class="hoa-don-section-title hd-module__head">
+              <span class="hd-module__label">
+                <span class="hd-module__idx" aria-hidden="true" />
+                Nhật ký
+              </span>
+              <span v-if="detail.maVanDonGhn" class="hoa-don-mono">{{ detail.maVanDonGhn }}</span>
+            </h2>
+
+            <div class="hd-module__body">
+            <div v-if="lichSu.length === 0" class="text-sm text-[#5a6a72] py-8 text-center">
+              Chưa có nhật ký
+            </div>
+
+            <ul v-else class="hoa-don-timeline__list">
+              <li
+                v-for="entry in lichSu"
+                :key="entry.id"
+                class="hoa-don-timeline__item"
+                :class="timelineToneClass(entry.trangThai)"
+              >
+                <div class="hoa-don-timeline__rail" aria-hidden="true">
+                  <span class="hoa-don-timeline__mark" />
+                </div>
+                <div class="hoa-don-timeline__body">
+                  <p class="hoa-don-timeline__text">{{ timelineText(entry) }}</p>
+                  <time class="hoa-don-timeline__time">{{ formatDateTime(entry.thoiGian) }}</time>
+                </div>
+              </li>
+            </ul>
+            </div>
+          </aside>
+        </div>
         </div>
       </div>
     </template>
@@ -804,18 +718,155 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.soleil-card {
-  background: #fff;
-  border: 1px solid var(--admin-border, rgba(30, 21, 16, 0.1));
-  border-radius: 1rem;
-  padding: 1.5rem;
+/* Token copy 1:1 từ docs/sunova-hoadon-admin-concept.html (bản lúc tạo) */
+.hoa-don-detail-page {
+  --hd-bg: #eef2f5;
+  --hd-surface: #ffffff;
+  --hd-ink: #0f1a1c;
+  --hd-muted: #5a6a72;
+  --hd-line: #d5dde6;
+  --hd-line-strong: #b8c4cc;
+  --hd-accent: #0b6e75;
+  --hd-accent-deep: #06484e;
+  --hd-accent-soft: #e0eff0;
+  --hd-ok: #166534;
+  --hd-ok-bg: #e8f5ec;
+  --hd-warn: #9a3412;
+  --hd-warn-bg: #fff1e8;
+  --hd-danger: #991b1b;
+  --hd-danger-bg: #fdecec;
+  --hd-info: #1e4d7b;
+  --hd-info-bg: #e8f0f8;
+  --hd-radius: 2px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  color: var(--hd-ink);
+}
+
+.hd-panel {
+  background: var(--hd-surface) !important;
+  border: 1px solid var(--hd-line) !important;
+  border-radius: var(--hd-radius) !important;
+  padding: 1rem 1.15rem !important;
+}
+
+.hoa-don-modules {
+  counter-reset: hd-mod;
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
+.hd-module {
+  counter-increment: hd-mod;
+  padding: 0 !important;
+  overflow: hidden;
+  border-left: 4px solid var(--hd-accent) !important;
+}
+
+.hd-module__idx {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.55rem;
+  font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--hd-accent-deep);
+}
+
+.hd-module__idx::before {
+  content: counter(hd-mod, decimal-leading-zero);
+}
+
+.hd-module__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hd-module__head,
+.hd-module .hoa-don-ops__head,
+.hd-module .hoa-don-section-title {
+  margin: 0;
+  padding: 0.55rem 1rem;
+  background: #f3f6f8;
+  border-bottom: 1px solid var(--hd-line);
+}
+
+.hd-module__body {
+  padding: 0.9rem 1.15rem 1.05rem;
+}
+
+.hd-module__body > :first-child {
+  margin-top: 0;
+}
+
+.hoa-don-detail-page :deep(.soleil-page-header) {
+  margin-bottom: 0;
+}
+
+.hoa-don-detail-page :deep(.soleil-page-header__title) {
+  font-family: inherit;
+  font-size: 1.35rem;
+  font-weight: 800;
+  font-style: normal;
+  letter-spacing: 0.02em;
+  color: var(--hd-ink);
+}
+
+.hoa-don-detail-page :deep(.soleil-page-header__desc) {
+  margin: 0.25rem 0 0;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--hd-muted);
+}
+
+.hd-btn {
+  border-radius: var(--hd-radius) !important;
+  font-weight: 700 !important;
+  min-height: 36px;
+}
+
+.hd-btn--sm {
+  min-height: 32px;
+  font-size: 12px !important;
+  padding: 0 0.75rem !important;
+}
+
+/* btn-ghost / btn-primary từ concept — đè soleil-btn ink + vàng kim */
+.hoa-don-detail-page :deep(.soleil-btn-outline) {
+  background: var(--hd-surface) !important;
+  border-color: var(--hd-line-strong) !important;
+  color: var(--hd-ink) !important;
+}
+
+.hoa-don-detail-page :deep(.soleil-btn-outline:hover) {
+  border-color: var(--hd-ink) !important;
+  color: var(--hd-ink) !important;
+  background: var(--hd-surface) !important;
+}
+
+.hoa-don-detail-page :deep(.soleil-btn-primary) {
+  background: #0b6e75 !important;
+  color: #fff !important;
+  border: none !important;
+}
+
+.hoa-don-detail-page :deep(.soleil-btn-primary:hover) {
+  background: #06484e !important;
+  color: #fff !important;
 }
 
 .hoa-don-print-brand {
   display: none;
-  font-family: var(--font-serif, Georgia, serif);
-  font-size: 1.25rem;
-  letter-spacing: 0.3em;
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.28em;
   text-align: center;
   margin-bottom: 0.75rem;
 }
@@ -826,285 +877,490 @@ onUnmounted(() => {
   }
 }
 
+.hoa-don-summary {
+  border-left: 4px solid var(--hd-accent) !important;
+}
+
 .hoa-don-summary__main {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
   flex-wrap: wrap;
-  margin-bottom: 1.25rem;
-  padding-bottom: 1.25rem;
-  border-bottom: 1px dashed var(--admin-border);
 }
+
+.hoa-don-summary__kicker {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hd-accent);
+}
+
 .hoa-don-summary__code {
-  font-family: var(--font-serif, Georgia, serif);
-  font-size: 1.75rem;
-  font-weight: 600;
-  color: var(--ink);
+  margin: 0.2rem 0 0;
+  font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  color: var(--hd-ink);
 }
+
 .hoa-don-summary__datetime {
-  font-size: 0.85rem;
-  color: var(--admin-muted);
-  margin-top: 0.25rem;
+  margin: 0.35rem 0 0;
+  font-size: 12.5px;
+  color: var(--hd-muted);
+  font-variant-numeric: tabular-nums;
 }
+
 .hoa-don-summary__badges {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
 }
+
 .hd-badge {
-  display: inline-block;
-  padding: 0.25rem 0.65rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 0.55rem;
+  border-radius: var(--hd-radius);
+  border: 1px solid currentColor;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
-.hd-badge--gold { background: rgba(196, 149, 84, 0.15); color: var(--bronze, #a67c3d); }
-.hd-badge--teal { background: rgba(72, 140, 130, 0.12); color: var(--sage, #488c82); }
-.hd-badge--success { background: rgba(72, 140, 82, 0.12); color: #3d7a4a; }
-.hd-badge--info { background: rgba(72, 120, 180, 0.12); color: #3a6ea8; }
-.hd-badge--danger { background: rgba(180, 72, 72, 0.12); color: #a83a3a; }
-.hd-badge--warning { background: rgba(196, 149, 84, 0.18); color: #8a6428; }
-.hd-badge--neutral { background: rgba(30, 21, 16, 0.06); color: rgba(30, 21, 16, 0.55); }
+
+/* tag--pos */
+.hd-badge--gold {
+  color: #7c4a12;
+  background: #fff4e5;
+  border-color: #d4a574;
+}
+/* tag--online */
+.hd-badge--teal {
+  color: var(--hd-accent-deep);
+  background: var(--hd-accent-soft);
+}
+.hd-badge--success {
+  color: var(--hd-ok);
+  background: var(--hd-ok-bg);
+}
+.hd-badge--info {
+  color: var(--hd-info);
+  background: var(--hd-info-bg);
+}
+.hd-badge--danger {
+  color: var(--hd-danger);
+  background: var(--hd-danger-bg);
+}
+.hd-badge--warning {
+  color: var(--hd-warn);
+  background: var(--hd-warn-bg);
+}
+.hd-badge--neutral {
+  color: #4b5563;
+  background: #f1f3f5;
+  border-color: #c5ccd3;
+}
 
 .hoa-don-summary__meta {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: 1.5rem;
-  margin-bottom: 1.25rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--hd-line);
+  margin-top: 1rem;
 }
+
 .hoa-don-summary__meta-item {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  font-size: 0.9rem;
+  padding: 0.85rem 1rem 0.15rem 0;
+  border-right: 1px solid var(--hd-line);
   min-width: 0;
 }
-.hoa-don-summary__meta-item > span:not(.hoa-don-summary__label) {
-  word-break: break-word;
+
+.hoa-don-summary__meta-item:last-child {
+  border-right: 0;
+  padding-right: 0;
 }
-@media (max-width: 640px) {
-  .hoa-don-summary__meta {
-    grid-auto-flow: row;
-    grid-auto-columns: auto;
-    grid-template-columns: 1fr;
-  }
-}
+
 .hoa-don-summary__label {
-  font-size: 0.7rem;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--admin-muted);
+  color: var(--hd-muted);
 }
+
+.hoa-don-summary__value {
+  font-size: 13.5px;
+  font-weight: 600;
+  word-break: break-word;
+  color: var(--hd-ink);
+}
+
+.hoa-don-summary__sub {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--hd-muted);
+}
+
 .hoa-don-summary__footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
-  padding-top: 1rem;
-  border-top: 1px solid var(--admin-border);
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 2px solid var(--hd-ink);
 }
+
 .hoa-don-summary__total-label {
   display: block;
-  font-size: 0.7rem;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--admin-muted);
-}
-.hoa-don-summary__total-value {
-  font-family: var(--font-serif, Georgia, serif);
-  font-size: 1.75rem;
-  font-weight: 600;
-  color: var(--bronze, #a67c3d);
+  color: var(--hd-muted);
 }
 
-.hoa-don-actions {
-  margin-top: 1.5rem;
+.hoa-don-summary__total-value {
+  font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: var(--hd-accent-deep);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
 }
-.hoa-don-actions__head {
+
+.hoa-don-strip {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.85rem 1.05rem;
+  background: var(--hd-accent-deep);
+  color: #fff;
+  border-radius: var(--hd-radius);
+  margin-bottom: 1.15rem;
+}
+
+.hoa-don-strip__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.hoa-don-strip__hint {
+  margin: 0.25rem 0 0;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.72);
+  max-width: 52rem;
+}
+
+.hoa-don-strip__hint strong {
+  color: #fff;
+}
+
+.hoa-don-strip__btns {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.hoa-don-detail-page :deep(.hoa-don-strip .soleil-btn-primary.hoa-don-strip__primary),
+.hoa-don-strip__primary {
+  background: #fff !important;
+  color: #06484e !important;
+}
+
+.hoa-don-detail-page :deep(.hoa-don-strip .soleil-btn-primary.hoa-don-strip__primary:hover),
+.hoa-don-strip__primary:hover {
+  background: #e0eff0 !important;
+  color: #06484e !important;
+}
+
+.hoa-don-detail-page :deep(.hoa-don-strip .soleil-btn-outline.hoa-don-strip__danger),
+.hoa-don-strip__danger {
+  background: transparent !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  color: #fff !important;
+}
+
+.hoa-don-detail-page :deep(.hoa-don-strip .soleil-btn-outline.hoa-don-strip__danger:hover),
+.hoa-don-strip__danger:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: #fff !important;
+  color: #fff !important;
+}
+
+.hoa-don-strip__msg {
+  grid-column: 1 / -1;
+}
+
+.hoa-don-ops {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 0.85rem;
+  margin-bottom: 0;
+}
+
+.hoa-don-ops:has(> :only-child) {
+  grid-template-columns: 1fr;
+}
+
+.hoa-don-ops__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-.hoa-don-actions__title-icon {
-  vertical-align: -3px;
-  margin-right: 0.35rem;
-}
-.hoa-don-actions__hint {
-  margin-top: 0.85rem;
-  font-size: 0.85rem;
-  color: var(--admin-muted);
-}
-.hoa-don-actions__buttons {
-  margin-top: 1rem;
-  display: flex;
-  flex-wrap: wrap;
   gap: 0.75rem;
 }
-.hoa-don-actions__danger {
-  border-color: rgba(180, 72, 72, 0.35);
-  color: #a83a3a;
-}
-.hoa-don-actions__danger:hover {
-  background: rgba(180, 72, 72, 0.06);
+
+.hoa-don-ops__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--hd-ink);
 }
 
-.hoa-don-webhook {
-  margin-top: 1.5rem;
+.hoa-don-mono {
+  font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
+  font-weight: 600;
+  font-size: 12.5px;
+  background: var(--hd-accent-soft);
+  color: var(--hd-accent-deep);
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--hd-radius);
 }
-.hoa-don-webhook__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-.hoa-don-webhook__title-icon {
-  vertical-align: -3px;
-  margin-right: 0.35rem;
-}
-.hoa-don-webhook__hint {
-  margin-top: 0.85rem;
-  font-size: 0.85rem;
-  color: var(--admin-muted);
-}
+
 .hoa-don-webhook__form {
-  margin-top: 1rem;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: 1rem;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
   align-items: end;
 }
+
 .hoa-don-webhook__field {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.3rem;
 }
+
 .hoa-don-webhook__field--wide {
   grid-column: 1 / -1;
 }
+
 .hoa-don-webhook__label {
-  font-size: 0.72rem;
-  text-transform: uppercase;
+  font-size: 10.5px;
+  font-weight: 700;
   letter-spacing: 0.08em;
-  color: var(--admin-muted);
+  text-transform: uppercase;
+  color: var(--hd-muted);
 }
+
 .hoa-don-webhook__select,
 .hoa-don-webhook__input {
   width: 100%;
-  padding: 0.55rem 0.75rem;
-  border: 1px solid var(--admin-border, rgba(30, 21, 16, 0.12));
-  border-radius: 0.5rem;
+  min-height: 36px;
+  padding: 0 0.65rem;
+  border: 1px solid var(--hd-line-strong);
+  border-radius: var(--hd-radius);
   background: #fff;
-  font-size: 0.9rem;
-  color: var(--ink);
+  font-size: 13px;
+  color: var(--hd-ink);
 }
+
+.hoa-don-webhook__select:focus,
+.hoa-don-webhook__input:focus {
+  outline: 2px solid rgba(11, 110, 117, 0.25);
+  border-color: #0b6e75;
+}
+
 .hoa-don-webhook__current {
-  background: var(--cream, #faf6f0);
+  display: flex;
+  align-items: center;
+  background: #f3f6f8;
+  font-weight: 600;
   cursor: default;
   user-select: none;
 }
+
 .hoa-don-webhook__submit {
   justify-self: start;
-}
-
-.hoa-don-ghn {
-  margin-top: 1.5rem;
-}
-.hoa-don-ghn__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-.hoa-don-ghn__title-icon {
-  vertical-align: -3px;
-  margin-right: 0.35rem;
-}
-.hoa-don-ghn__actions {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-.hoa-don-ghn__code {
-  margin-top: 0.85rem;
-  font-size: 0.9rem;
-}
-.hoa-don-ghn__hint {
-  margin-top: 0.85rem;
-  font-size: 0.85rem;
-  color: var(--admin-muted);
 }
 
 .hoa-don-detail-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1.5rem;
+  gap: 0.85rem;
 }
+
 @media (min-width: 1024px) {
   .hoa-don-detail-grid {
-    grid-template-columns: 3fr 2fr;
+    grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr);
   }
 }
 
 .hoa-don-section-title {
-  font-family: var(--font-serif, Georgia, serif);
-  font-size: 1.05rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
-  color: var(--ink);
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--hd-ink);
 }
 
-.hoa-don-lot-row td {
-  padding-top: 0 !important;
-  border-top: none !important;
+.hoa-don-section-title span {
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--hd-muted);
+  font-size: 12px;
 }
+
+.hoa-don-section-title .hoa-don-mono {
+  color: var(--hd-accent-deep);
+}
+
+.hoa-don-lines-table.admin-table--soleil thead th,
+.hoa-don-lines-table thead th,
+.hoa-don-lines-table :deep(table.admin-table--soleil thead th),
+.hoa-don-lines-table :deep(thead th) {
+  background: #b8976a !important;
+  color: #fffef9 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+  padding: 0.55rem 0.7rem !important;
+  border-bottom: none !important;
+}
+
+.hoa-don-lines-table :deep(tbody td) {
+  padding: 0.7rem !important;
+  border-bottom: 1px solid var(--hd-line);
+  vertical-align: top;
+  color: var(--hd-ink);
+}
+
+.hoa-don-lines-table :deep(tbody tr:hover) {
+  background: #f3f8f8 !important;
+}
+
+.hoa-don-prod-name {
+  font-weight: 700;
+  font-size: 13.5px;
+}
+
+.hoa-don-prod-sku {
+  margin-top: 0.15rem;
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+  font-size: 11.5px;
+  color: var(--hd-muted);
+}
+
 .hoa-don-lots {
-  padding: 0.15rem 0 0.35rem;
-  font-size: 0.78rem;
-  color: var(--admin-muted);
-  line-height: 1.45;
+  margin-top: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  background: #f3f6f8;
+  border-left: 2px solid var(--hd-line-strong);
+  font-size: 11.5px;
+  color: var(--hd-muted);
+  line-height: 1.4;
 }
-.hoa-don-lots__label {
-  margin-right: 0.35rem;
-  font-weight: 500;
-  color: var(--admin-muted);
+
+.hoa-don-lots strong {
+  color: var(--hd-ink);
+  font-weight: 700;
+  margin-right: 0.25rem;
 }
+
 .hoa-don-lots__item {
-  color: var(--ink, #1e1510);
+  color: var(--hd-ink);
 }
+
+.hoa-don-money {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+.hoa-don-money--strong {
+  font-weight: 700;
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+  font-size: 12.5px;
+}
+
 .hoa-don-totals {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px dashed var(--admin-border);
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--hd-line);
+  max-width: 280px;
+  margin-left: auto;
 }
+
 .hoa-don-totals__row {
   display: flex;
   justify-content: space-between;
-  font-size: 0.875rem;
-  color: var(--admin-muted);
+  gap: 1.5rem;
   padding: 0.2rem 0;
+  font-size: 13px;
+  color: var(--hd-muted);
 }
+
+.hoa-don-totals__row span:last-child {
+  color: var(--hd-ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.hoa-don-totals__row--disc span:last-child {
+  color: var(--hd-ok);
+}
+
 .hoa-don-totals__grand {
   display: flex;
   justify-content: space-between;
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--admin-border);
-  font-weight: 600;
-  font-size: 1rem;
-  color: var(--ink);
+  gap: 1.5rem;
+  margin-top: 0.45rem;
+  padding-top: 0.55rem;
+  border-top: 2px solid var(--hd-ink);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--hd-ink);
 }
+
+.hoa-don-totals__grand span:last-child {
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+  font-size: 1.05rem;
+  color: var(--hd-accent-deep);
+}
+
 .hoa-don-pay-block {
-  margin-top: 1rem;
-  padding: 0.75rem 1rem;
-  background: var(--cream, #faf6f0);
-  border-radius: 0.5rem;
+  margin-top: 0.85rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px dashed var(--hd-line-strong);
+  border-radius: var(--hd-radius);
+  background: transparent;
+  font-size: 12.5px;
 }
 
 .hoa-don-timeline__list {
@@ -1112,35 +1368,108 @@ onUnmounted(() => {
   margin: 0;
   padding: 0;
 }
+
 .hoa-don-timeline__item {
-  display: flex;
-  gap: 0.75rem;
-  padding: 0.85rem 0;
-  border-bottom: 1px solid rgba(30, 21, 16, 0.06);
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 0.7rem;
+  padding-bottom: 1rem;
 }
+
 .hoa-don-timeline__item:last-child {
-  border-bottom: none;
+  padding-bottom: 0;
 }
-.hoa-don-timeline__icon {
-  flex-shrink: 0;
-  width: 2rem;
-  height: 2rem;
+
+.hoa-don-timeline__rail {
+  position: relative;
   display: flex;
-  align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background: rgba(201, 169, 110, 0.15);
-  color: var(--bronze, #a67c3d);
 }
+
+.hoa-don-timeline__rail::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--hd-line-strong);
+}
+
+.hoa-don-timeline__item:last-child .hoa-don-timeline__rail::before {
+  display: none;
+}
+
+.hoa-don-timeline__mark {
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  background: var(--hd-accent);
+  border: 2px solid var(--hd-surface);
+  box-shadow: 0 0 0 1px var(--hd-accent);
+  position: relative;
+  z-index: 1;
+}
+
+.hoa-don-timeline__item.is-done .hoa-don-timeline__mark {
+  background: var(--hd-ok);
+  box-shadow: 0 0 0 1px var(--hd-ok);
+}
+
+.hoa-don-timeline__item.is-warn .hoa-don-timeline__mark {
+  background: var(--hd-warn);
+  box-shadow: 0 0 0 1px var(--hd-warn);
+}
+
+.hoa-don-timeline__item.is-danger .hoa-don-timeline__mark {
+  background: var(--hd-danger);
+  box-shadow: 0 0 0 1px var(--hd-danger);
+}
+
 .hoa-don-timeline__text {
-  font-size: 0.85rem;
-  line-height: 1.45;
-  color: var(--ink);
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--hd-ink);
 }
+
 .hoa-don-timeline__time {
-  font-size: 0.75rem;
-  color: var(--admin-muted);
-  margin-top: 0.2rem;
   display: block;
+  margin-top: 0.2rem;
+  font-size: 11.5px;
+  color: var(--hd-muted);
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+}
+
+@media (max-width: 1100px) {
+  .hoa-don-ops {
+    grid-template-columns: 1fr;
+  }
+  .hoa-don-summary__meta {
+    grid-template-columns: 1fr 1fr;
+  }
+  .hoa-don-summary__meta-item {
+    border-right: 0;
+    border-bottom: 1px solid var(--hd-line);
+    padding: 0.75rem 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .hoa-don-summary__meta {
+    grid-template-columns: 1fr;
+  }
+  .hoa-don-summary__badges {
+    align-items: flex-start;
+    flex-direction: row;
+  }
+  .hoa-don-strip {
+    grid-template-columns: 1fr;
+  }
+  .hoa-don-webhook__form {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
+

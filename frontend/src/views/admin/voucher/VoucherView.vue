@@ -52,7 +52,7 @@ const sortOptions = [
 
 /* pagination */
 const trangHienTai = ref(1);
-const soDong = 10;
+const soDong = 12;
 
 const voucherPage = ref({
   content: [],
@@ -312,33 +312,73 @@ const openAssign = (voucher) => {
   });
 };
 
-/* ================= PLACEHOLDER ================= */
-const handleExport = () => console.log("export");
+/* ================= EXPORT CSV ================= */
+const formatNgayCsv = (chuoi) => {
+  if (!chuoi) return "";
+  return new Date(chuoi).toLocaleDateString("vi-VN");
+};
+
+const tenLoaiCsv = (loai) =>
+  ({ PHAN_TRAM: "Phần trăm", TIEN_MAT: "Số tiền", FREE_SHIP: "Miễn ship" }[loai] ||
+  loai ||
+  "");
+
+const mucGiamCsv = (p) => {
+  if (p.loai === "PHAN_TRAM") return `${p.giaTri}%`;
+  if (p.loai === "FREE_SHIP") return "Miễn phí";
+  return `${Number(p.giaTri || 0).toLocaleString("vi-VN")} đ`;
+};
+
+const handleExport = () => {
+  const header = [
+    "Mã phiếu",
+    "Tên chương trình",
+    "Loại",
+    "Mức giảm",
+    "Hiệu lực",
+    "Đã dùng",
+    "Còn lại",
+    "Trạng thái",
+  ];
+  const rows = danhSach.value.map((p) => [
+    p.ma,
+    p.ten,
+    tenLoaiCsv(p.loai),
+    mucGiamCsv(p),
+    formatNgayCsv(p.ngayKetThuc),
+    p.daDung ?? 0,
+    p.soLuong ?? "",
+    p.timeStatusLabel || "",
+  ]);
+  const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const csv = [header, ...rows].map((r) => r.map(escape).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "phieu-giam-gia.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+  toast("Đã xuất CSV trang hiện tại", "info");
+};
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
-
-    <!-- HEADER -->
-    <div class="flex justify-between items-end">
+  <div class="voucher-page">
+    <div class="page-head">
       <div>
-        <h1 class="font-display text-[42px] italic">
-          Phiếu Giảm Giá
-        </h1>
-        <p class="text-[13px] opacity-60">
-          Quản lý chương trình ưu đãi
-        </p>
+        <h1 class="page-title">Phiếu giảm giá</h1>
+        <p class="page-sub">Quản lý chương trình ưu đãi</p>
       </div>
 
-      <button
-        @click="openCreate"
-        class="bg-black text-[#C9A96E] px-5 py-2 rounded-lg"
-      >
-        + Tạo phiếu mới
+      <button type="button" class="btn-primary-sol" @click="openCreate">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M7 1.5v11M1.5 7h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+        </svg>
+        Tạo phiếu mới
       </button>
     </div>
 
-    <!-- MODAL -->
     <VoucherCreateModal
       v-model="showModal"
       :voucher="editingVoucher"
@@ -346,10 +386,8 @@ const handleExport = () => console.log("export");
       @update="handleUpdate"
     />
 
-    <!-- STATS -->
     <DashboardStat :refresh-key="statsRefreshKey" />
 
-    <!-- TOOLBAR -->
     <VoucherToolBar
       v-model:search="tuKhoa"
       v-model:status="locTrangThai"
@@ -359,7 +397,6 @@ const handleExport = () => console.log("export");
       @export="handleExport"
     />
 
-    <!-- TABLE -->
     <div class="table-card">
       <div v-if="taiLanDau" class="table-loading">Đang tải...</div>
       <div v-else-if="loi" class="table-error">{{ loi }}</div>
@@ -391,17 +428,3 @@ const handleExport = () => console.log("export");
     </div>
   </div>
 </template>
-
-<style scoped>
-.font-display {
-  font-family: "Cormorant Garamond", serif;
-}
-
-.table-loading,
-.table-error {
-  padding: 48px 24px;
-  text-align: center;
-  color: rgba(30, 21, 16, 0.55);
-  font-size: 14px;
-}
-</style>

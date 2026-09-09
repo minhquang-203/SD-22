@@ -24,6 +24,7 @@ public class BienTheBanResponse {
     private LocalDate hanSuDungGanNhat;
     private Integer soNgayConLai;
     private String anhUrl;
+    private String tenDanhMuc;
 
     public BienTheBanResponse(ChiTietSanPham cts) {
         this.idChiTietSanPham = cts.getId();
@@ -33,5 +34,8 @@ public class BienTheBanResponse {
         this.tenMauSac = cts.getMauSac() != null ? cts.getMauSac().getTen() : null;
         this.giaBan = cts.getGiaBan();
         this.soLuongTon = cts.getSoLuongTon();
+        if (cts.getSanPham() != null && cts.getSanPham().getDanhMuc() != null) {
+            this.tenDanhMuc = cts.getSanPham().getDanhMuc().getTen();
+        }
     }
 }

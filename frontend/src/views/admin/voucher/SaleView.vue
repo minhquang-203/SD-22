@@ -1,54 +1,39 @@
 <template>
   <div class="sale-page">
 
-    <!-- Page Header -->
     <div class="page-header">
       <div>
         <h1 class="page-title">Đợt giảm giá</h1>
-        <p class="page-sub">Quản lý tất cả chiến dịch khuyến mãi và mã giảm giá</p>
+        <p class="page-sub">Quản lý chương trình khuyến mãi theo sản phẩm</p>
       </div>
       <button class="btn btn-primary" @click="openModal">
         <i class="ti ti-plus"></i> Tạo đợt giảm giá
       </button>
     </div>
 
-    <!-- Metrics -->
     <div class="metrics-grid">
-      <div class="metric-card">
-        <div class="metric-icon" style="background:#EBF0FF; color:#2D5BE3;">
-          <i class="ti ti-layout-grid"></i>
-        </div>
+      <div class="metric-card c-blue">
         <div class="metric-label">Tổng chiến dịch</div>
         <div class="metric-value">{{ metrics.total }}</div>
-        <div class="metric-trend trend-neutral"><i class="ti ti-database"></i> Tổng tất cả chiến dịch</div>
+        <div class="metric-trend">Tổng tất cả chiến dịch</div>
       </div>
-      <div class="metric-card">
-        <div class="metric-icon" style="background:#DCFCE7; color:#15803D;">
-          <i class="ti ti-player-play"></i>
-        </div>
+      <div class="metric-card c-green">
         <div class="metric-label">Đang chạy</div>
         <div class="metric-value">{{ metrics.active }}</div>
-        <div class="metric-trend trend-neutral"><i class="ti ti-clock"></i> Đang áp dụng</div>
+        <div class="metric-trend">Đang áp dụng</div>
       </div>
-      <div class="metric-card">
-        <div class="metric-icon" style="background:#FEF3C7; color:#B45309;">
-          <i class="ti ti-coin"></i>
-        </div>
+      <div class="metric-card c-gold">
         <div class="metric-label">Sắp diễn ra</div>
         <div class="metric-value">{{ metrics.upcoming }}</div>
-        <div class="metric-trend trend-neutral"><i class="ti ti-calendar"></i> Theo ngày bắt đầu</div>
+        <div class="metric-trend">Theo ngày bắt đầu</div>
       </div>
-      <div class="metric-card">
-        <div class="metric-icon" style="background:#F3E8FF; color:#7C3AED;">
-          <i class="ti ti-ticket"></i>
-        </div>
+      <div class="metric-card c-red">
         <div class="metric-label">Đã kết thúc</div>
         <div class="metric-value">{{ metrics.expired }}</div>
-        <div class="metric-trend trend-neutral"><i class="ti ti-percentage"></i> Theo ngày kết thúc</div>
+        <div class="metric-trend">Theo ngày kết thúc</div>
       </div>
     </div>
 
-    <!-- Tabs -->
     <div class="tabs">
       <button
         v-for="tab in tabs"
@@ -59,30 +44,31 @@
       >{{ tab.label }}</button>
     </div>
 
-    <!-- Filters -->
     <div class="filters-bar">
       <div class="search-wrap">
         <i class="ti ti-search"></i>
         <input type="text" v-model="searchQuery" placeholder="Tìm mã hoặc tên đợt giảm giá..." />
       </div>
       <div class="filters-right">
-        <SortDropdown v-model="sapXep" :options="sortOptions" />
-        <button class="btn btn-secondary" @click="loadData(currentPage)"><i class="ti ti-refresh"></i> Làm mới</button>
+        <SortDropdown v-model="sapXep" :options="sortOptions" label="Sắp xếp: mặc định" />
+        <button class="btn btn-secondary" @click="loadData(currentPage)">
+          <i class="ti ti-refresh"></i> Làm mới
+        </button>
       </div>
     </div>
 
-    <!-- Table -->
     <div class="table-card">
+      <div class="table-scroll">
       <table>
         <thead>
           <tr>
-            <th style="width:48px; text-align:center">STT</th>
-            <th style="width:28%">Đợt giảm giá</th>
-            <th style="width:12%">Loại</th>
-            <th style="width:10%">Giá trị</th>
-            <th style="width:20%">Thời gian</th>
-            <th style="width:12%">Trạng thái</th>
-            <th style="width:14%">Hành động</th>
+            <th style="width:44px">STT</th>
+            <th>Đợt giảm giá</th>
+            <th>Loại</th>
+            <th>Giá trị</th>
+            <th>Thời gian</th>
+            <th>Trạng thái</th>
+            <th style="width:120px">Thao tác</th>
           </tr>
         </thead>
         <tbody>
@@ -96,7 +82,7 @@
           </tr>
           <template v-else-if="campaigns.length">
             <tr v-for="(c, idx) in campaigns" :key="c.id" class="clickable-row" @click="goToDetail(c.id)">
-              <td style="text-align:center; color:#94a3b8">
+              <td class="stt-cell">
                 {{ pageInfo.number * PAGE_SIZE + idx + 1 }}
               </td>
               <td>
@@ -113,7 +99,6 @@
               </td>
               <td>
                 <span class="badge" :class="statusMeta[c.status]?.cls">
-                  <i :class="'ti ' + statusMeta[c.status]?.icon" style="font-size:12px;"></i>
                   {{ c.statusLabel }}
                 </span>
               </td>
@@ -151,20 +136,29 @@
                 </div>
               </td>
             </tr>
+            <tr
+              v-for="n in Math.max(0, 5 - campaigns.length)"
+              :key="`pad-${n}`"
+              class="table-pad-row"
+              aria-hidden="true"
+            >
+              <td colspan="7" />
+            </tr>
           </template>
           <tr v-else>
             <td colspan="7">
               <div class="empty-state">
-                <i class="ti ti-mood-empty"></i>
-                <p>{{ errorMessage || 'Không tìm thấy đợt giảm giá nào phù hợp' }}</p>
+                <p>{{ errorMessage || 'Không tìm thấy đợt giảm giá phù hợp với bộ lọc hiện tại.' }}</p>
               </div>
             </td>
           </tr>
         </tbody>
       </table>
+      </div>
       <div class="pagination-wrap" v-if="pageInfo.totalPages > 0">
         <div class="page-info">
-          Hiển thị {{ pageInfo.numberOfElements }} / {{ pageInfo.totalElements }} kết quả
+          Hiển thị <strong>{{ pageInfo.numberOfElements }}</strong> /
+          <strong>{{ pageInfo.totalElements }}</strong> đợt
         </div>
         <div class="page-btns">
           <button class="page-btn" :disabled="pageInfo.first" @click="changePage(1)">
@@ -186,7 +180,6 @@
       </div>
     </div>
 
-    <!-- Create Modal -->
     <div v-if="modalOpen" class="sale-modal-backdrop" @click.self="closeModal">
       <div class="sale-modal" role="dialog" aria-modal="true">
         <div class="modal-header">
@@ -216,7 +209,7 @@
               <input type="date" v-model="form.end" :min="form.start || minDate" />
             </div>
             <div class="form-group full">
-              <label>Ghi chú nội bộ</label>
+              <label>Ghi chú</label>
               <textarea placeholder=""></textarea>
             </div>
           </div>
@@ -246,7 +239,7 @@ import SortDropdown from '@/components/common/SortDropdown.vue'
 
 const router = useRouter()
 
-const PAGE_SIZE = 10
+const PAGE_SIZE = 12
 
 const campaigns = ref([])
 const initialLoading = ref(true)

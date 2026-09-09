@@ -1,240 +1,189 @@
 <template>
   <div
     v-if="modelValue"
-    class="admin-modal-backdrop backdrop-blur-sm"
+    class="admin-modal-backdrop voucher-modal"
     @click.self="close"
   >
-    <!-- MODAL BOX -->
-    <div
-      class="bg-white rounded-[16px] w-[540px] max-w-[calc(100vw-40px)] max-h-[calc(100vh-60px)] overflow-y-auto border border-[#e6d8c8] shadow-[0_24px_80px_rgba(30,21,16,0.2)] animate-[slideUp_0.3s_ease]"
-    >
-      <!-- HEADER -->
-      <div class="p-[28px_32px_20px] border-b border-[#e6d8c8] flex items-start justify-between">
+    <div class="voucher-modal-box">
+      <div class="voucher-modal-head">
         <div>
-          <div class="text-[28px] font-light italic leading-[1.1] text-[#1e1510]">
+          <div class="voucher-modal-title">
             {{ isEdit ? "Cập nhật phiếu giảm giá" : "Tạo phiếu mới" }}
           </div>
-
-          <div class="text-[12px] text-[rgba(30,21,16,0.4)] mt-[3px]">
-            Cấu hình chương trình ưu đãi
-          </div>
+          <div class="voucher-modal-sub">Cấu hình chương trình ưu đãi</div>
         </div>
 
-        <button
-          class="w-8 h-8 border border-[#e6d8c8] rounded-[8px] flex items-center justify-center text-[rgba(30,21,16,0.5)] text-sm hover:border-[#ff6b6b] hover:text-[#ff6b6b]"
-          @click="close"
-        >
+        <button type="button" class="voucher-modal-close" @click="close">
           <Icon icon="mdi:close" />
         </button>
       </div>
 
-      <!-- BODY -->
-      <div class="p-[24px_32px]">
-        <!-- LOẠI GIẢM GIÁ -->
+      <div class="voucher-modal-body">
         <div class="mb-3">
-          <label class="text-[11px] uppercase text-[rgba(30,21,16,0.5)] block mb-[6px]">
-            Loại giảm giá
-          </label>
-
+          <label class="voucher-label">Loại giảm giá</label>
           <div class="flex gap-2">
             <button
               type="button"
-              class="flex-1 py-[9px] border rounded-[8px] text-[12px]"
-              :class="form.loai === 'PHAN_TRAM'
-                ? 'bg-[#1e1510] border-[#1e1510] text-[#c8a97e]'
-                : 'border-[#e6d8c8]'"
+              class="type-btn"
+              :class="{ active: form.loai === 'PHAN_TRAM' }"
               @click="setType('PHAN_TRAM')"
             >
               % Phần trăm
             </button>
-
             <button
               type="button"
-              class="flex-1 py-[9px] border rounded-[8px] text-[12px]"
-              :class="form.loai === 'TIEN_MAT'
-                ? 'bg-[#1e1510] border-[#1e1510] text-[#c8a97e]'
-                : 'border-[#e6d8c8]'"
+              class="type-btn"
+              :class="{ active: form.loai === 'TIEN_MAT' }"
               @click="setType('TIEN_MAT')"
             >
               ₫ Số tiền
             </button>
-
             <button
               type="button"
-              class="flex-1 py-[9px] border rounded-[8px] text-[12px]"
-              :class="form.loai === 'FREE_SHIP'
-                ? 'bg-[#1e1510] border-[#1e1510] text-[#c8a97e]'
-                : 'border-[#e6d8c8]'"
+              class="type-btn"
+              :class="{ active: form.loai === 'FREE_SHIP' }"
               @click="setType('FREE_SHIP')"
             >
-              🚚 Miễn ship
+              Miễn ship
             </button>
           </div>
         </div>
 
-        <!-- PHẠM VI -->
         <div class="mb-3">
-          <label class="text-[11px] uppercase text-[rgba(30,21,16,0.5)] block mb-[6px]">
-            Phạm vi áp dụng
-          </label>
-
+          <label class="voucher-label">Phạm vi áp dụng</label>
           <div class="flex gap-2">
             <button
               type="button"
-              class="flex-1 py-[9px] border rounded-[8px] text-[12px]"
-              :class="form.phamVi === 'CONG_KHAI'
-                ? 'bg-[#1e1510] border-[#1e1510] text-[#c8a97e]'
-                : 'border-[#e6d8c8]'"
+              class="type-btn"
+              :class="{ active: form.phamVi === 'CONG_KHAI' }"
               @click="form.phamVi = 'CONG_KHAI'"
             >
               Công khai
             </button>
-
             <button
               type="button"
-              class="flex-1 py-[9px] border rounded-[8px] text-[12px]"
-              :class="form.phamVi === 'CA_NHAN'
-                ? 'bg-[#1e1510] border-[#1e1510] text-[#c8a97e]'
-                : 'border-[#e6d8c8]'"
+              class="type-btn"
+              :class="{ active: form.phamVi === 'CA_NHAN' }"
               @click="form.phamVi = 'CA_NHAN'"
             >
               Cá nhân (gán riêng)
             </button>
           </div>
-          <p class="text-[11px] text-[rgba(30,21,16,0.4)] mt-[6px]">
-            {{ form.phamVi === 'CA_NHAN'
-              ? 'Chỉ khách được gán mới dùng được. Sau khi lưu, bấm nút gán trên bảng để chuyển sang Quản lý khách hàng.'
-              : 'Mọi khách hàng đều thấy và dùng được.' }}
+          <p class="voucher-hint">
+            {{
+              form.phamVi === "CA_NHAN"
+                ? "Chỉ khách được gán mới dùng được. Sau khi lưu, bấm nút gán trên bảng để chuyển sang Quản lý khách hàng."
+                : "Mọi khách hàng đều thấy và dùng được."
+            }}
           </p>
         </div>
 
-        <!-- GRID -->
         <div class="grid grid-cols-12 gap-3">
-
-          <!-- MÃ -->
           <div :class="showGiaTri ? 'col-span-7' : 'col-span-12'">
-            <label class="text-[11px] uppercase text-[rgba(30,21,16,0.5)] block mb-[6px]">
-              Mã phiếu *
-            </label>
-
+            <label class="voucher-label">Mã phiếu *</label>
             <input
               v-model="form.ma"
               :disabled="isEdit"
               :class="inputClass('ma')"
-              style="text-transform: uppercase; font-family: monospace"
+              class="voucher-input mono"
               placeholder="VD: SUMMER25"
               @input="clearError('ma')"
             />
             <p v-if="errors.ma" class="voucher-field-error">{{ errors.ma }}</p>
           </div>
 
-          <!-- GIÁ TRỊ -->
           <div v-if="showGiaTri" class="col-span-5">
-            <label class="text-[11px] uppercase text-[rgba(30,21,16,0.5)] block mb-[6px]">
-              {{ giaTriLabel }} *
-            </label>
-
+            <label class="voucher-label">{{ giaTriLabel }} *</label>
             <input
               v-model.number="form.giaTri"
               type="number"
-              :min="form.loai === 'PHAN_TRAM' ? 1 : 1"
+              :min="1"
               :max="form.loai === 'PHAN_TRAM' ? 100 : undefined"
               :class="inputClass('giaTri')"
+              class="voucher-input"
               :placeholder="form.loai === 'PHAN_TRAM' ? 'VD: 20' : 'VD: 50000'"
               @input="clearError('giaTri')"
             />
             <p v-if="errors.giaTri" class="voucher-field-error">{{ errors.giaTri }}</p>
           </div>
 
-          <!-- TÊN -->
           <div class="col-span-12">
-            <label class="text-[11px] uppercase text-[rgba(30,21,16,0.5)] block mb-[6px]">
-              Tên chương trình *
-            </label>
-
+            <label class="voucher-label">Tên chương trình *</label>
             <input
               v-model="form.ten"
               :class="inputClass('ten')"
+              class="voucher-input"
               placeholder="VD: Ưu đãi hè"
               @input="clearError('ten')"
             />
             <p v-if="errors.ten" class="voucher-field-error">{{ errors.ten }}</p>
           </div>
 
-          <!-- NGÀY -->
           <div class="col-span-6">
-            <label class="text-[11px] uppercase text-[rgba(30,21,16,0.5)] block mb-[6px]">
-              Bắt đầu *
-            </label>
-
+            <label class="voucher-label">Bắt đầu *</label>
             <input
               v-model="form.ngayBatDau"
               type="date"
               :min="minDate"
               :class="inputClass('ngayBatDau')"
+              class="voucher-input"
               @change="clearError('ngayBatDau')"
             />
             <p v-if="errors.ngayBatDau" class="voucher-field-error">{{ errors.ngayBatDau }}</p>
           </div>
 
           <div class="col-span-6">
-            <label class="text-[11px] uppercase text-[rgba(30,21,16,0.5)] block mb-[6px]">
-              Kết thúc *
-            </label>
-
+            <label class="voucher-label">Kết thúc *</label>
             <input
               v-model="form.ngayKetThuc"
               type="date"
               :min="form.ngayBatDau || minDate"
               :class="inputClass('ngayKetThuc')"
+              class="voucher-input"
               @change="clearError('ngayKetThuc')"
             />
             <p v-if="errors.ngayKetThuc" class="voucher-field-error">{{ errors.ngayKetThuc }}</p>
           </div>
 
-          <!-- SỐ LƯỢNG -->
           <div class="col-span-6">
-            <label class="text-[11px] uppercase text-[rgba(30,21,16,0.5)] block mb-[6px]">
-              Số lượng *
-            </label>
+            <label class="voucher-label">Số lượng *</label>
             <input
               v-model.number="form.soLuong"
               type="number"
               min="1"
               step="1"
               :class="inputClass('soLuong')"
+              class="voucher-input"
               placeholder="VD: 100"
               @input="clearError('soLuong')"
             />
             <p v-if="errors.soLuong" class="voucher-field-error">{{ errors.soLuong }}</p>
           </div>
 
-          <!-- ĐƠN TỐI THIỂU -->
           <div class="col-span-6">
-            <label class="text-[11px] uppercase text-[rgba(30,21,16,0.5)] block mb-[6px]">
-              Đơn tối thiểu
-            </label>
+            <label class="voucher-label">Đơn tối thiểu</label>
             <input
               v-model.number="form.giaTriDonToiThieu"
               type="number"
               min="0"
               :class="inputClass('giaTriDonToiThieu')"
+              class="voucher-input"
               placeholder="0 = không yêu cầu"
               @input="clearError('giaTriDonToiThieu')"
             />
-            <p v-if="errors.giaTriDonToiThieu" class="voucher-field-error">{{ errors.giaTriDonToiThieu }}</p>
+            <p v-if="errors.giaTriDonToiThieu" class="voucher-field-error">
+              {{ errors.giaTriDonToiThieu }}
+            </p>
           </div>
 
-          <!-- GIẢM TỐI ĐA (áp dụng khi giảm theo % hoặc miễn ship) -->
           <div v-if="showGiamToiDa" class="col-span-6">
-            <label class="text-[11px] uppercase text-[rgba(30,21,16,0.5)] block mb-[6px]">
-              {{ giamToiDaLabel }}
-            </label>
+            <label class="voucher-label">{{ giamToiDaLabel }}</label>
             <input
               v-model.number="form.giamToiDa"
               type="number"
               min="1"
               :class="inputClass('giamToiDa')"
+              class="voucher-input"
               :placeholder="
                 form.loai === 'FREE_SHIP'
                   ? 'Miễn toàn bộ phí ship nếu để trống'
@@ -247,13 +196,9 @@
         </div>
       </div>
 
-      <!-- FOOTER -->
-      <div class="p-[20px_32px] flex justify-end gap-2 border-t">
-        <button type="button" class="border px-4 py-2 rounded-[8px]" @click="close">
-          Huỷ
-        </button>
-
-        <button type="button" class="bg-black text-[#c8a97e] px-4 py-2 rounded-[8px]" @click="submit">
+      <div class="voucher-modal-foot">
+        <button type="button" class="btn-outline-sol" @click="close">Huỷ</button>
+        <button type="button" class="btn-primary-sol" @click="submit">
           {{ isEdit ? "Cập nhật" : "Tạo mới" }}
         </button>
       </div>
@@ -311,9 +256,9 @@ const errors = reactive({
   giamToiDa: "",
 });
 
-const INPUT_BASE = "w-full border rounded-[8px] py-[10px] px-[14px]";
-const INPUT_INVALID = "border-[#ff6b6b] bg-[#fff8f7]";
-const INPUT_NORMAL = "border-[#e6d8c8]";
+const INPUT_BASE = "voucher-input";
+const INPUT_INVALID = "is-invalid";
+const INPUT_NORMAL = "";
 
 function inputClass(field) {
   return [INPUT_BASE, errors[field] ? INPUT_INVALID : INPUT_NORMAL];
@@ -523,10 +468,197 @@ watch(
 </script>
 
 <style scoped>
+.voucher-modal {
+  font-family: 'Archivo', system-ui, sans-serif;
+}
+
+.voucher-modal-box {
+  background: #fff;
+  border-radius: 3px;
+  width: 540px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
+  border: 1.5px solid #14181c;
+  box-shadow: 0 16px 48px rgba(20, 24, 28, 0.18);
+  animation: voucherSlideUp 0.25s ease;
+}
+
+@keyframes voucherSlideUp {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.voucher-modal-head {
+  padding: 24px 28px 18px;
+  border-bottom: 1.5px solid #14181c;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.voucher-modal-title {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #14181c;
+  line-height: 1.15;
+}
+
+.voucher-modal-sub {
+  font-size: 12.5px;
+  color: #6b6f76;
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+.voucher-modal-close {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #d7d4cb;
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #3c4147;
+  flex-shrink: 0;
+}
+
+.voucher-modal-close:hover {
+  border-color: #ac3527;
+  color: #ac3527;
+}
+
+.voucher-modal-body {
+  padding: 22px 28px;
+}
+
+.voucher-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #3c4147;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.voucher-hint {
+  font-size: 11.5px;
+  color: #6b6f76;
+  margin: 6px 0 0;
+  font-weight: 500;
+}
+
+.type-btn {
+  flex: 1;
+  padding: 9px;
+  border: 1px solid #d7d4cb;
+  border-radius: 3px;
+  background: #f3f1eb;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  color: #3c4147;
+  text-align: center;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.type-btn.active {
+  background: #14181c;
+  border-color: #14181c;
+  color: #f3f1eb;
+}
+
+.voucher-input {
+  width: 100%;
+  border: 1px solid #d7d4cb;
+  border-radius: 3px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #14181c;
+  background: #fff;
+  outline: none;
+  font-family: inherit;
+}
+
+.voucher-input:focus {
+  border-color: #14181c;
+}
+
+.voucher-input.mono {
+  text-transform: uppercase;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-weight: 600;
+}
+
+.voucher-input.is-invalid {
+  border-color: #ac3527;
+  background: #f3e4e1;
+}
+
+.voucher-input:disabled {
+  opacity: 0.65;
+  background: #f3f1eb;
+}
+
+.voucher-modal-foot {
+  padding: 16px 28px 22px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  border-top: 1.5px solid #14181c;
+  background: #edebe3;
+}
+
+.voucher-modal-foot .btn-primary-sol {
+  background: #14181c;
+  color: #f3f1eb;
+  border: 1px solid #14181c;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.voucher-modal-foot .btn-primary-sol:hover {
+  background: #262b31;
+}
+
+.voucher-modal-foot .btn-outline-sol {
+  height: auto;
+  background: #fff;
+  color: #14181c;
+  border: 1px solid #14181c;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.voucher-modal-foot .btn-outline-sol:hover {
+  background: #14181c;
+  color: #f3f1eb;
+}
+
 .voucher-field-error {
   margin: 4px 0 0;
   font-size: 11px;
   line-height: 1.35;
-  color: #ff6b6b;
+  color: #ac3527;
+  font-weight: 600;
 }
 </style>

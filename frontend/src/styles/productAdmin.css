@@ -1,0 +1,443 @@
+/* Product admin — layout concept (khác phiếu/đợt) */
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
+
+.product-admin {
+  --pa-ink: #1c1917;
+  --pa-muted: #78716c;
+  --pa-line: #e7e5e4;
+  --pa-line-strong: #d6d3d1;
+  --pa-warn: #c2410c;
+  --pa-warn-bg: #fff7ed;
+  --pa-ok: #15803d;
+  --pa-cream: #b8976a;
+  --pa-cream-hover: #a68458;
+  --pa-cream-ink: #fffef9;
+  --pa-head: #b8976a;
+  --pa-radius: 6px;
+  --tbl-row-h: 56px;
+
+  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+  color: var(--pa-ink);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.product-admin .soleil-page-header {
+  margin-bottom: 0;
+  align-items: flex-end;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--pa-line);
+}
+
+.product-admin .soleil-page-header__title {
+  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  font-style: normal;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--pa-ink);
+}
+
+.product-admin .soleil-page-header__desc {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--pa-muted);
+}
+
+.product-admin .soleil-btn-primary {
+  background: var(--pa-cream);
+  color: var(--pa-cream-ink);
+  border: 1px solid var(--pa-cream);
+  border-radius: var(--pa-radius);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0;
+  padding: 9px 14px;
+  gap: 6px;
+}
+
+.product-admin .soleil-btn-primary:hover {
+  background: var(--pa-cream-hover);
+  border-color: var(--pa-cream-hover);
+  color: var(--pa-cream-ink);
+}
+
+.product-admin .soleil-btn-outline {
+  background: #fff;
+  color: var(--pa-ink);
+  border: 1px solid var(--pa-line-strong);
+  border-radius: var(--pa-radius);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 12.5px;
+  padding: 0 11px;
+  height: 34px;
+  gap: 6px;
+}
+
+.product-admin .soleil-btn-outline:hover {
+  border-color: var(--pa-ink);
+  color: var(--pa-ink);
+  background: #fafaf9;
+}
+
+/* Strip nổi */
+.product-admin .pa-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 16px 0 18px;
+}
+
+.product-admin .pa-strip__item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  flex: 1 1 140px;
+  min-width: 120px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px rgba(28, 25, 23, 0.06),
+    0 1px 2px rgba(28, 25, 23, 0.04),
+    0 6px 14px rgba(28, 25, 23, 0.06),
+    0 16px 32px rgba(28, 25, 23, 0.08);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.product-admin .pa-strip__item:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px rgba(28, 25, 23, 0.07),
+    0 2px 4px rgba(28, 25, 23, 0.05),
+    0 10px 20px rgba(28, 25, 23, 0.08),
+    0 22px 40px rgba(28, 25, 23, 0.1);
+}
+
+.product-admin .pa-strip__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pa-muted);
+}
+
+.product-admin .pa-strip__n {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--pa-ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.product-admin .pa-strip__item--warn .pa-strip__n {
+  color: var(--pa-warn);
+}
+
+/* Alert chips */
+.product-admin .pa-alerts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.product-admin .pa-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--pa-line-strong);
+  border-radius: var(--pa-radius);
+  background: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--pa-ink);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.product-admin .pa-chip--active {
+  border-color: var(--pa-warn);
+  color: var(--pa-warn);
+  background: var(--pa-warn-bg);
+}
+
+.product-admin .pa-chip__badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--pa-warn);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Panel + filter in head */
+.product-admin .soleil-table-card {
+  background: #fff;
+  border: 1px solid var(--pa-line-strong);
+  border-radius: var(--pa-radius);
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.product-admin .soleil-table-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--pa-line);
+  background: #fafaf9;
+}
+
+.product-admin .pa-panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pa-ink);
+  flex-shrink: 0;
+  min-width: 72px;
+}
+
+.product-admin .pa-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.product-admin .pa-filter .soleil-toolbar__label {
+  display: none;
+}
+
+.product-admin .pa-filter .soleil-toolbar__field {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.product-admin .pa-filter .soleil-toolbar__field--wide {
+  flex: 1 1 160px;
+  min-width: 150px;
+}
+
+.product-admin .pa-filter .soleil-toolbar__field:not(.soleil-toolbar__field--wide) {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 110px;
+}
+
+.product-admin .pa-filter .pa-field--short {
+  min-width: 0;
+  width: auto;
+}
+
+.product-admin .pa-filter .pa-field--short .soleil-toolbar__select {
+  min-width: 0;
+  padding: 0 22px 0 8px;
+  text-overflow: ellipsis;
+}
+
+.product-admin .pa-filter .pa-field--dm .soleil-toolbar__select {
+  width: 7.6rem;
+}
+
+.product-admin .pa-filter .pa-field--th .soleil-toolbar__select {
+  width: 8.2rem;
+}
+
+.product-admin .pa-filter .pa-field--tt .soleil-toolbar__select {
+  width: 7.4rem;
+}
+
+.product-admin .pa-filter .soleil-toolbar__search {
+  position: relative;
+}
+
+.product-admin .pa-filter .soleil-toolbar__input,
+.product-admin .pa-filter .soleil-toolbar__select {
+  height: 34px;
+  border: 1px solid var(--pa-line-strong);
+  border-radius: var(--pa-radius);
+  background: #fff;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--pa-ink);
+  padding: 0 10px;
+}
+
+.product-admin .pa-filter .soleil-toolbar__input {
+  padding-left: 32px;
+  width: 100%;
+}
+
+.product-admin .pa-filter .soleil-toolbar__search-icon {
+  color: var(--pa-muted);
+  left: 10px;
+}
+
+.product-admin .pa-filter .soleil-toolbar__input:focus,
+.product-admin .pa-filter .soleil-toolbar__select:focus {
+  border-color: var(--pa-ink);
+  box-shadow: none;
+  outline: none;
+}
+
+.product-admin .pa-filter .soleil-btn-outline {
+  align-self: center;
+}
+
+/* Table */
+.product-admin .table-scroll {
+  overflow: auto;
+  min-height: calc(var(--tbl-row-h) * 5 + 40px);
+  max-height: calc(var(--tbl-row-h) * 12 + 40px);
+}
+
+.product-admin .soleil-table.admin-table--soleil thead th,
+.product-admin .soleil-table--product thead th {
+  background: var(--pa-head) !important;
+  color: var(--pa-cream-ink) !important;
+  border-bottom: none !important;
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  padding: 10px 12px !important;
+}
+
+.product-admin .soleil-table.admin-table--soleil tbody td {
+  padding: 10px 12px !important;
+  border-bottom: 1px solid var(--pa-line) !important;
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.product-admin .soleil-table.admin-table--soleil tbody tr:hover,
+.product-admin .soleil-table--product tbody tr:hover {
+  background: #fafaf9 !important;
+}
+
+.product-admin .soleil-sp-code {
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--pa-ink);
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.product-admin .soleil-pill--brand,
+.product-admin .soleil-pill--category,
+.product-admin .soleil-pill--form,
+.product-admin .soleil-pill--spf {
+  display: inline;
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent !important;
+  color: var(--pa-ink) !important;
+}
+
+.product-admin .soleil-pill--spf {
+  color: var(--pa-muted) !important;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.product-admin .product-thumb--table {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  border: 1px solid var(--pa-line);
+  object-fit: cover;
+}
+
+.product-admin .product-thumb--table-empty {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  border: 1px dashed var(--pa-line-strong);
+  font-size: 9px;
+  color: var(--pa-muted);
+}
+
+.product-admin .soleil-act-btn-round {
+  width: 30px;
+  height: 30px;
+  border-radius: 5px;
+  border: 1px solid var(--pa-line-strong);
+  background: #fff;
+  color: #57534e;
+}
+
+.product-admin .soleil-act-btn-round:hover {
+  border-color: var(--pa-ink);
+  color: var(--pa-ink);
+  background: #fafaf9;
+}
+
+.product-admin tr.table-pad-row td {
+  height: var(--tbl-row-h);
+  padding: 0 !important;
+  border-bottom: 1px solid var(--pa-line) !important;
+  pointer-events: none;
+}
+
+.product-admin tr.table-pad-row:hover {
+  background: transparent !important;
+}
+
+.product-admin .soleil-pagination {
+  padding: 10px 12px;
+  border-top: 1px solid var(--pa-line);
+  background: #fafaf9;
+}
+
+.product-admin .soleil-pagination__info {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--pa-muted);
+}
+
+.product-admin .soleil-page-btn {
+  border-radius: var(--pa-radius);
+  border-color: var(--pa-line-strong);
+  font-weight: 600;
+}
+
+.product-admin .soleil-page-btn--active {
+  background: var(--pa-cream);
+  border-color: var(--pa-cream);
+  color: var(--pa-cream-ink);
+}
+
+.product-admin .admin-alert {
+  border-radius: var(--pa-radius);
+  margin-top: 14px;
+}

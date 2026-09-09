@@ -6,7 +6,7 @@ import ProductFilter from '@/components/products/ProductFilter.vue'
 import ProductTable from '@/components/products/ProductTable.vue'
 import ProductFormModal from '@/components/products/ProductFormModal.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
-import StatCard from '@/components/ui/StatCard.vue'
+import '@/styles/productAdmin.css'
 import {
   addProduct,
   getProductDetail,
@@ -54,7 +54,7 @@ const filters = ref({
 const LOW_STOCK_THRESHOLD = 10
 
 const page = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(12)
 
 const danhMucOptions = ref([])
 const thuongHieuOptions = ref([])
@@ -146,17 +146,6 @@ const statActive = computed(
 const statInactive = computed(
   () => allProducts.value.filter((p) => p.trangThai === false).length,
 )
-
-const statAddedThisMonth = computed(() => {
-  const now = new Date()
-  const month = now.getMonth()
-  const year = now.getFullYear()
-  return allProducts.value.filter((p) => {
-    if (!p.ngayTao) return false
-    const d = new Date(p.ngayTao)
-    return d.getMonth() === month && d.getFullYear() === year
-  }).length
-})
 
 function showMessage(text, type = 'success') {
   message.value = text
@@ -328,10 +317,10 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="product-admin">
     <PageHeader
-      title="Quản lý sản phẩm"
-      :description="`SUNOVA — sản phẩm chống nắng (${filteredProducts.length} sản phẩm)`"
+      title="Sản phẩm"
+      :description="`${filteredProducts.length} kết quả · chống nắng & chăm sóc da`"
     >
       <template v-if="canWriteProduct" #actions>
         <button type="button" class="soleil-btn-primary" @click="openCreateModal">
@@ -349,78 +338,57 @@ onMounted(async () => {
       {{ message }}
     </div>
 
-    <div class="soleil-stat-grid">
-      <StatCard
-        label="Tổng sản phẩm"
-        :value="statTotal"
-        :trend="`${filteredProducts.length} đang hiển thị`"
-        trend-type="neutral"
-        icon="icon-park-outline:box"
-        icon-tone="gold"
-      />
-      <StatCard
-        label="Đang hoạt động"
-        :value="statActive"
-        trend="Hiển thị trên cửa hàng"
-        trend-type="up"
-        icon="icon-park-outline:check-one"
-        icon-tone="sage"
-      />
-      <StatCard
-        label="Ngưng hoạt động"
-        :value="statInactive"
-        trend="Ẩn khỏi danh sách"
-        trend-type="down"
-        icon="icon-park-outline:close-one"
-        icon-tone="coral"
-      />
-      <StatCard
-        label="Thêm tháng này"
-        :value="statAddedThisMonth"
-        trend="Theo ngày tạo"
-        trend-type="neutral"
-        icon="icon-park-outline:add-one"
-        icon-tone="sky"
-      />
+    <div class="pa-strip">
+      <div class="pa-strip__item">
+        <span class="pa-strip__label">Tổng SP</span>
+        <span class="pa-strip__n">{{ statTotal }}</span>
+      </div>
+      <div class="pa-strip__item">
+        <span class="pa-strip__label">Đang bán</span>
+        <span class="pa-strip__n">{{ statActive }}</span>
+      </div>
+      <div class="pa-strip__item">
+        <span class="pa-strip__label">Ngưng</span>
+        <span class="pa-strip__n">{{ statInactive }}</span>
+      </div>
+      <div class="pa-strip__item pa-strip__item--warn">
+        <span class="pa-strip__label">Cảnh báo kho</span>
+        <span class="pa-strip__n">{{ countSapHetHang + countCanHan }}</span>
+      </div>
     </div>
 
-    <ProductFilter
-      v-model="filters"
-      :danh-muc-options="danhMucOptions"
-      :thuong-hieu-options="thuongHieuOptions"
-      :spf-options="spfOptions"
-      :pa-options="paOptions"
-      @reset="resetFilters"
-    />
+    <div class="pa-alerts">
+      <button
+        type="button"
+        class="pa-chip"
+        :class="{ 'pa-chip--active': filters.canhBao === 'sapHetHang' }"
+        @click="toggleCanhBao('sapHetHang')"
+      >
+        Sắp hết hàng
+        <span class="pa-chip__badge">{{ formatWarnBadge(countSapHetHang) }}</span>
+      </button>
+      <button
+        type="button"
+        class="pa-chip"
+        :class="{ 'pa-chip--active': filters.canhBao === 'canHan' }"
+        @click="toggleCanhBao('canHan')"
+      >
+        Cận hạn
+        <span class="pa-chip__badge">{{ formatWarnBadge(countCanHan) }}</span>
+      </button>
+    </div>
 
     <div class="soleil-table-card">
       <div class="soleil-table-card__head">
-        <span class="soleil-label" style="margin: 0">Danh sách sản phẩm</span>
-        <div class="product-warn-actions">
-          <button
-            type="button"
-            class="soleil-btn-outline product-warn-btn"
-            :class="{ 'product-warn-btn--active': filters.canhBao === 'sapHetHang' }"
-            @click="toggleCanhBao('sapHetHang')"
-          >
-            Sắp hết hàng
-            <span class="product-warn-badge">{{ formatWarnBadge(countSapHetHang) }}</span>
-          </button>
-          <button
-            type="button"
-            class="soleil-btn-outline product-warn-btn"
-            :class="{ 'product-warn-btn--active': filters.canhBao === 'canHan' }"
-            @click="toggleCanhBao('canHan')"
-          >
-            Cận hạn
-            <span class="product-warn-badge">{{ formatWarnBadge(countCanHan) }}</span>
-          </button>
-          <button type="button" class="soleil-btn-outline" @click="loadProducts">
-            <Icon icon="icon-park-outline:refresh" />
-            Tải lại
-          </button>
-        </div>
-        <span class="text-xs text-[rgba(30,21,16,0.45)]">Trang {{ page }} / {{ totalPages }}</span>
+        <ProductFilter
+          compact
+          v-model="filters"
+          :danh-muc-options="danhMucOptions"
+          :thuong-hieu-options="thuongHieuOptions"
+          :spf-options="spfOptions"
+          :pa-options="paOptions"
+          @reset="resetFilters"
+        />
       </div>
 
       <ProductTable
@@ -438,6 +406,7 @@ onMounted(async () => {
       <div class="soleil-pagination">
         <span class="soleil-pagination__info">
           Hiển thị {{ pagedProducts.length }} / {{ filteredProducts.length }} sản phẩm
+          · trang {{ page }} / {{ totalPages }}
         </span>
         <div class="soleil-pagination__btns">
           <button
@@ -478,37 +447,3 @@ onMounted(async () => {
     />
   </div>
 </template>
-
-<style scoped>
-.product-warn-actions {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
-.product-warn-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.product-warn-btn--active {
-  border-color: var(--coral, #d4624a) !important;
-  color: var(--coral, #d4624a) !important;
-  background: rgba(212, 98, 74, 0.08);
-}
-.product-warn-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.25rem;
-  height: 1.25rem;
-  padding: 0 0.35rem;
-  border-radius: 999px;
-  background: var(--coral, #d4624a);
-  color: #fff;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  line-height: 1;
-}
-</style>

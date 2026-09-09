@@ -23,7 +23,7 @@ const { startPolling, stopPolling, refreshBadges } = useAdminBadges()
 
 const menuOptions = computed(() => {
   const filtered = filterMenuByRole(ADMIN_MENU, vaiTro.value)
-  return buildAdminMenuOptions(filtered, props.collapsed)
+  return buildAdminMenuOptions(filtered, false)
 })
 const activeKey = computed(() => route.path)
 const expandedKeys = ref([])
@@ -77,12 +77,10 @@ onBeforeUnmount(() => {
     <aside
       class="admin-sidebar-naive"
       :class="{ 'admin-sidebar-naive--collapsed': collapsed }"
+      :aria-hidden="collapsed ? 'true' : undefined"
     >
-      <div
-        class="admin-sidebar-naive__brand"
-        :class="{ 'admin-sidebar-naive__brand--collapsed': collapsed }"
-      >
-        <AppLogo variant="dark" :size="40" :collapsed="collapsed" class="max-w-full" />
+      <div class="admin-sidebar-naive__brand">
+        <AppLogo variant="dark" :size="40" class="max-w-full" />
       </div>
 
       <div class="admin-sidebar-naive__menu">
@@ -90,9 +88,7 @@ onBeforeUnmount(() => {
           v-model:expanded-keys="expandedKeys"
           :value="activeKey"
           @update:value="onMenuSelect"
-          :collapsed="collapsed"
-          :collapsed-width="64"
-          :collapsed-icon-size="20"
+          :collapsed="false"
           :icon-size="18"
           :indent="20"
           :root-indent="28"

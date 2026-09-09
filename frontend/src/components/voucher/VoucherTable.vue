@@ -3,144 +3,142 @@
     <table class="coupon-table">
       <thead>
         <tr>
-          <th>
-            <input
-              type="checkbox"
-              style="accent-color: var(--bronze)"
-              @change="chonTatCa"
-            />
+          <th style="width: 36px">
+            <input type="checkbox" class="cb" @change="chonTatCa" />
           </th>
-          <th style="width: 48px; text-align: center">STT</th>
+          <th style="width: 44px">STT</th>
           <th>Mã phiếu</th>
           <th>Tên chương trình</th>
           <th>Loại giảm giá</th>
-          <th>Mức giảm</th>
+          <th class="num">Mức giảm</th>
           <th>Hiệu lực</th>
-          <th>Đã dùng / Tổng</th>
+          <th class="num">Đã dùng / tổng</th>
           <th>Trạng thái</th>
-          <th></th>
+          <th style="width: 120px">Thao tác</th>
         </tr>
       </thead>
       <tbody>
         <tr v-if="items.length === 0">
           <td colspan="10" class="trang-thai-trong">
-            <i class="bi bi-inbox"></i>
-            <span>Không có phiếu nào</span>
+            Không tìm thấy phiếu giảm giá phù hợp với bộ lọc hiện tại.
           </td>
         </tr>
-        <tr v-for="(phieu, idx) in items" :key="phieu.id">
-          <td>
-            <input
-              type="checkbox"
-              style="accent-color: var(--bronze)"
-              :value="phieu.id"
-              :checked="selected.includes(phieu.id)"
-              @change="toggleSelect(phieu.id, $event)"
-            />
-          </td>
-          <td style="text-align: center; color: rgba(30, 21, 16, 0.55)">
-            {{ startIndex + idx + 1 }}
-          </td>
-          <td>
-            <span class="coupon-code">{{ phieu.ma }}</span>
-          </td>
-          <td>
-            <div style="font-weight: 400">
-              {{ phieu.ten }}
-              <span
-                v-if="phieu.phamVi === 'CA_NHAN'"
-                style="font-size: 10px; color: var(--bronze, #c9a96e); border: 1px solid var(--bronze, #c9a96e); border-radius: 999px; padding: 1px 6px; margin-left: 4px;"
-              >
-                Dành riêng
+        <template v-else>
+          <tr v-for="(phieu, idx) in items" :key="phieu.id">
+            <td>
+              <input
+                type="checkbox"
+                class="cb"
+                :value="phieu.id"
+                :checked="selected.includes(phieu.id)"
+                @change="toggleSelect(phieu.id, $event)"
+              />
+            </td>
+            <td class="stt-cell">{{ startIndex + idx + 1 }}</td>
+            <td>
+              <span class="code-chip">{{ phieu.ma }}</span>
+            </td>
+            <td>
+              <div class="campaign-name">
+                {{ phieu.ten }}
+                <span v-if="phieu.phamVi === 'CA_NHAN'" class="private-tag">
+                  Dành riêng
+                </span>
+              </div>
+              <div class="campaign-min">
+                Tối thiểu {{ formatTien(phieu.giaTriDonToiThieu) }}
+              </div>
+            </td>
+            <td>
+              <span class="type-tag" :class="typeClass(phieu.loai)">
+                {{ tenLoai(phieu.loai) }}
               </span>
-            </div>
-            <div style="font-size: 11px; color: rgba(30, 21, 16, 0.4)">
-              Tối thiểu {{ formatTien(phieu.giaTriDonToiThieu) }}
-            </div>
-          </td>
-          <td>
-            <span class="discount-pill" :class="pillLoai(phieu.loai)">
-              <i class="bi" :class="iconLoai(phieu.loai)"></i>
-              {{ tenLoai(phieu.loai) }}
-            </span>
-          </td>
-          <td
-            style="font-weight: 500"
-            :style="{ color: mauGiaTri(phieu.loai) }"
+            </td>
+            <td class="value-cell num">{{ hienThiGiaTri(phieu) }}</td>
+            <td>
+              <div class="date-primary">{{ formatNgay(phieu.ngayKetThuc) }}</div>
+              <div
+                class="date-secondary"
+                :class="{ warn: isExpiringSoon(phieu) }"
+              >
+                {{ tinhHanCon(phieu) }}
+              </div>
+            </td>
+            <td class="num">
+              <div class="usage-cell">
+                {{ soLuongDaDung(phieu).toLocaleString("vi") }} /
+                {{ hienThiTong(phieu) }}
+              </div>
+              <div class="usage-bar">
+                <div
+                  class="usage-bar-fill"
+                  :style="{ width: usagePercent(phieu) + '%' }"
+                />
+              </div>
+              <div class="usage-remain">Còn lại {{ hienThiConLai(phieu) }}</div>
+            </td>
+            <td>
+              <span class="status-dot" :class="classStatusDot(phieu)">
+                {{ tenTrangThai(phieu) }}
+              </span>
+            </td>
+            <td>
+              <div class="row-actions">
+                <button class="act-btn" title="Sửa" @click="$emit('sua', phieu)">
+                  <Icon icon="mdi:pencil" />
+                </button>
+                <button
+                  v-if="phieu.phamVi === 'CA_NHAN'"
+                  class="act-btn"
+                  title="Gán khách hàng"
+                  @click="$emit('gan-khach', phieu)"
+                >
+                  <Icon icon="mdi:account-multiple-plus" />
+                </button>
+                <button
+                  v-if="dangHoatDong(phieu)"
+                  class="act-btn warn"
+                  title="Tạm dừng"
+                  :disabled="processingId === phieu.id"
+                  @click="$emit('dung', phieu)"
+                >
+                  <Icon icon="mdi:pause" />
+                </button>
+                <button
+                  v-else
+                  class="act-btn success"
+                  title="Kích hoạt lại"
+                  :disabled="processingId === phieu.id"
+                  @click="$emit('kich-hoat', phieu)"
+                >
+                  <Icon icon="mdi:play" />
+                </button>
+                <button
+                  class="act-btn danger"
+                  title="Xóa"
+                  :disabled="processingId === phieu.id"
+                  @click="$emit('xoa', phieu)"
+                >
+                  <Icon icon="mdi:trash-can-outline" />
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr
+            v-for="n in Math.max(0, 5 - items.length)"
+            :key="`pad-${n}`"
+            class="table-pad-row"
+            aria-hidden="true"
           >
-            {{ hienThiGiaTri(phieu) }}
-          </td>
-          <td>
-            <div style="font-size: 12px">
-              {{ formatNgay(phieu.ngayKetThuc) }}
-            </div>
-            <div style="font-size: 11px" :style="{ color: mauHanCon(phieu) }">
-              {{ tinhHanCon(phieu) }}
-            </div>
-          </td>
-          <td>
-            <div style="font-size: 13px; font-weight: 500">
-              {{ soLuongDaDung(phieu).toLocaleString("vi") }} /
-              {{ hienThiTong(phieu) }}
-            </div>
-            <div style="font-size: 11px; color: rgba(30, 21, 16, 0.4)">
-              Còn lại {{ hienThiConLai(phieu) }}
-            </div>
-          </td>
-          <td>
-            <span class="status-dot" :class="classStatusDot(phieu)">
-              {{ tenTrangThai(phieu) }}
-            </span>
-          </td>
-          <td>
-            <div class="actions-cell">
-              <button class="act-btn" title="Sửa" @click="$emit('sua', phieu)">
-                <Icon icon="mdi:pencil"></Icon>
-              </button>
-              <button
-                v-if="phieu.phamVi === 'CA_NHAN'"
-                class="act-btn"
-                title="Gán khách hàng"
-                @click="$emit('gan-khach', phieu)"
-              >
-                <Icon icon="mdi:account-multiple-plus"></Icon>
-              </button>
-              <button
-                v-if="dangHoatDong(phieu)"
-                class="act-btn warn"
-                title="Dừng chương trình"
-                :disabled="processingId === phieu.id"
-                @click="$emit('dung', phieu)"
-              >
-                <Icon icon="mdi:pause-circle"></Icon>
-              </button>
-              <button
-                v-else
-                class="act-btn success"
-                title="Kích hoạt lại"
-                :disabled="processingId === phieu.id"
-                @click="$emit('kich-hoat', phieu)"
-              >
-                <Icon icon="mdi:play-circle"></Icon>
-              </button>
-              <button
-                class="act-btn danger"
-                title="Xóa"
-                :disabled="processingId === phieu.id"
-                @click="$emit('xoa', phieu)"
-              >
-                <Icon icon="mdi:trash"></Icon>
-              </button>
-            </div>
-          </td>
-        </tr>
+            <td colspan="10" />
+          </tr>
+        </template>
       </tbody>
     </table>
   </div>
 </template>
 
 <script setup>
-import { defineProps, defineEmits } from "vue";
 import { Icon } from "@iconify/vue";
 
 const props = defineProps({
@@ -150,7 +148,15 @@ const props = defineProps({
   startIndex: { type: Number, default: 0 },
 });
 
-const emit = defineEmits(["sua", "dung", "kich-hoat", "xoa", "chon-tat-ca", "gan-khach"]);
+const emit = defineEmits([
+  "sua",
+  "dung",
+  "kich-hoat",
+  "xoa",
+  "chon-tat-ca",
+  "gan-khach",
+  "update:selected",
+]);
 
 const toggleSelect = (id, e) => {
   if (e.target.checked) {
@@ -163,7 +169,6 @@ const toggleSelect = (id, e) => {
   }
 };
 
-// ====================== HELPER FUNCTIONS ======================
 const soLuongDaDung = (phieu) => Number(phieu.daDung ?? 0);
 
 const soLuongConLai = (phieu) =>
@@ -180,12 +185,18 @@ const hienThiTong = (phieu) => {
   return (soLuongDaDung(phieu) + con).toLocaleString("vi");
 };
 
+const usagePercent = (phieu) => {
+  const used = soLuongDaDung(phieu);
+  const remain = soLuongConLai(phieu);
+  if (remain == null) return 0;
+  const total = used + remain;
+  if (total <= 0) return 0;
+  return Math.min(100, Math.round((used / total) * 100));
+};
+
 const formatTien = (so) => {
-  if (!so && so !== 0) return "—";
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-  }).format(so);
+  if (!so && so !== 0) return "0 đ";
+  return `${new Intl.NumberFormat("vi-VN").format(so)} đ`;
 };
 
 const formatNgay = (chuoi) => {
@@ -198,6 +209,12 @@ const formatNgay = (chuoi) => {
   });
 };
 
+const daysLeft = (phieu) => {
+  const now = new Date();
+  const ketThuc = new Date(phieu.ngayKetThuc || "");
+  return Math.ceil((ketThuc - now) / (1000 * 60 * 60 * 24));
+};
+
 const tinhTrangThai = (phieu) => {
   if (phieu.isActive === false || phieu.timeStatus === "INACTIVE") {
     return "paused";
@@ -207,23 +224,28 @@ const tinhTrangThai = (phieu) => {
   const ketThuc = new Date(phieu.ngayKetThuc || "");
   if (now < batDau) return "upcoming";
   if (now > ketThuc) return "expired";
+  if (daysLeft(phieu) <= 7) return "expiring";
   return "active";
 };
 
 const tenTrangThai = (phieu) => {
-  if (phieu.timeStatusLabel) return phieu.timeStatusLabel;
   const map = {
     active: "Đang hoạt động",
+    expiring: "Sắp hết hạn",
     upcoming: "Sắp diễn ra",
     expired: "Đã hết hạn",
     paused: "Ngừng áp dụng",
   };
-  return map[tinhTrangThai(phieu)] || "Không xác định";
+  const key = tinhTrangThai(phieu);
+  if (key === "expiring") return map.expiring;
+  if (phieu.timeStatusLabel && key !== "expiring") return phieu.timeStatusLabel;
+  return map[key] || "Không xác định";
 };
 
 const classStatusDot = (phieu) => {
   const map = {
     active: "status-active",
+    expiring: "status-expiring",
     paused: "status-paused",
     upcoming: "status-upcoming",
     expired: "status-expired",
@@ -242,37 +264,24 @@ const tenLoai = (loai) => {
   return map[loai] ?? loai;
 };
 
-const pillLoai = (loai) => {
+const typeClass = (loai) => {
   const map = {
-    PHAN_TRAM: "dp-percent",
-    TIEN_MAT: "dp-fixed",
-    FREE_SHIP: "dp-ship",
+    PHAN_TRAM: "percent",
+    TIEN_MAT: "amount",
+    FREE_SHIP: "ship",
   };
   return map[loai] ?? "";
-};
-
-const iconLoai = (loai) => {
-  const map = {
-    PHAN_TRAM: "bi-percent",
-    TIEN_MAT: "bi-cash",
-    FREE_SHIP: "bi-truck",
-  };
-  return map[loai] ?? "";
-};
-
-const mauGiaTri = (loai) => {
-  const map = {
-    PHAN_TRAM: "var(--bronze)",
-    TIEN_MAT: "var(--sky)",
-    FREE_SHIP: "var(--sage)",
-  };
-  return map[loai] ?? "var(--ink)";
 };
 
 const hienThiGiaTri = (phieu) => {
   if (phieu.loai === "PHAN_TRAM") return phieu.giaTri + "%";
   if (phieu.loai === "FREE_SHIP") return "Miễn phí";
   return formatTien(phieu.giaTri);
+};
+
+const isExpiringSoon = (phieu) => {
+  const ts = tinhTrangThai(phieu);
+  return ts === "expiring" || (ts === "active" && daysLeft(phieu) <= 7);
 };
 
 const tinhHanCon = (phieu) => {
@@ -288,17 +297,6 @@ const tinhHanCon = (phieu) => {
   if (now > ketThuc) return "Đã kết thúc";
   const con = Math.ceil((ketThuc - now) / ms);
   return `Còn ${con} ngày`;
-};
-
-const mauHanCon = (phieu) => {
-  const ts = tinhTrangThai(phieu);
-  if (ts === "expired") return "rgba(30,21,16,.35)";
-  if (ts === "upcoming") return "var(--sky)";
-  const now = new Date();
-  const con = Math.ceil(
-    (new Date(phieu.ngayKetThuc || "") - now) / (1000 * 60 * 60 * 24),
-  );
-  return con <= 7 ? "var(--coral)" : "rgba(30,21,16,.35)";
 };
 
 const chonTatCa = (e) => emit("chon-tat-ca", e.target.checked);

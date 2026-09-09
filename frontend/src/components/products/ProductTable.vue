@@ -27,7 +27,7 @@ function formatLoaiChongNang(value) {
 </script>
 
 <template>
-  <div class="overflow-x-auto">
+  <div class="table-scroll overflow-x-auto">
     <table class="soleil-table soleil-table--product admin-table--soleil">
       <thead>
         <tr>
@@ -56,126 +56,136 @@ function formatLoaiChongNang(value) {
             Không có sản phẩm phù hợp
           </td>
         </tr>
-        <tr
-          v-for="(item, index) in products"
-          :key="item.id"
-          class="soleil-table-row--clickable cursor-pointer"
-          @click="emit('manage', item)"
-        >
-          <td class="text-[rgba(30,21,16,0.45)]">{{ (page - 1) * pageSize + index + 1 }}</td>
-          <td>
-            <span class="soleil-sp-code">{{ item.maSanPham }}</span>
-          </td>
-          <td>
-            <NPopover
-              v-if="item.anhChinhUrl"
-              trigger="hover"
-              placement="right"
-              :show-arrow="false"
-              :delay="120"
-              :duration="100"
-            >
-              <template #trigger>
+        <template v-else>
+          <tr
+            v-for="(item, index) in products"
+            :key="item.id"
+            class="soleil-table-row--clickable cursor-pointer"
+            @click="emit('manage', item)"
+          >
+            <td class="text-[rgba(30,21,16,0.45)]">{{ (page - 1) * pageSize + index + 1 }}</td>
+            <td>
+              <span class="soleil-sp-code">{{ item.maSanPham }}</span>
+            </td>
+            <td>
+              <NPopover
+                v-if="item.anhChinhUrl"
+                trigger="hover"
+                placement="right"
+                :show-arrow="false"
+                :delay="120"
+                :duration="100"
+              >
+                <template #trigger>
+                  <img
+                    :src="resolveProductImageUrl(item.anhChinhUrl)"
+                    :alt="item.ten"
+                    class="product-thumb--table cursor-zoom-in"
+                  />
+                </template>
                 <img
                   :src="resolveProductImageUrl(item.anhChinhUrl)"
                   :alt="item.ten"
-                  class="product-thumb--table cursor-zoom-in"
+                  class="product-thumb-popover"
                 />
-              </template>
-              <img
-                :src="resolveProductImageUrl(item.anhChinhUrl)"
-                :alt="item.ten"
-                class="product-thumb-popover"
-              />
-            </NPopover>
-            <div v-else class="product-thumb--table-empty">Chưa có ảnh</div>
-          </td>
-          <td class="max-w-[260px]">
-            <div class="font-medium text-[var(--ink)]">{{ item.ten }}</div>
-            <div v-if="item.loaiChongNang" class="text-xs text-[rgba(30,21,16,0.45)] mt-0.5">
-              {{ formatLoaiChongNang(item.loaiChongNang) }}
-            </div>
-          </td>
-          <td>
-            <span v-if="item.tenThuongHieu" class="soleil-pill--brand">{{ item.tenThuongHieu }}</span>
-            <span v-else class="text-[rgba(30,21,16,0.35)]">—</span>
-          </td>
-          <td>
-            <span v-if="item.tenDanhMuc" class="soleil-pill--category">{{ item.tenDanhMuc }}</span>
-            <span v-else class="text-[rgba(30,21,16,0.35)]">—</span>
-          </td>
-          <td>
-            <span v-if="item.tenDangSanPham" class="soleil-pill--form">{{ item.tenDangSanPham }}</span>
-            <span v-else class="text-[rgba(30,21,16,0.35)]">—</span>
-          </td>
-          <td>
-            <div class="flex flex-wrap gap-1">
-              <span v-if="item.chiSoSpf" class="soleil-pill--spf">{{ item.chiSoSpf }}</span>
-              <span v-if="item.chiSoPa" class="soleil-pill--spf">{{ item.chiSoPa }}</span>
-              <span v-if="!item.chiSoSpf && !item.chiSoPa" class="text-[rgba(30,21,16,0.35)]">—</span>
-            </div>
-          </td>
-          <td class="text-xs text-[rgba(30,21,16,0.55)]">{{ formatDate(item.ngayTao) }}</td>
-          <td @click.stop>
-            <button
-              v-if="canWrite"
-              type="button"
-              class="soleil-status-toggle"
-              :title="item.trangThai !== false ? 'Nhấn để ngưng hoạt động' : 'Nhấn để kích hoạt'"
-              @click="emit('toggle-status', item)"
-            >
-              <StatusDot
-                :status="item.trangThai !== false ? 'active' : 'expired'"
-                :label="item.trangThai !== false ? 'Đang hoạt động' : 'Ngưng hoạt động'"
-              />
-            </button>
-            <StatusDot
-              v-else
-              :status="item.trangThai !== false ? 'active' : 'expired'"
-              :label="item.trangThai !== false ? 'Đang hoạt động' : 'Ngưng hoạt động'"
-            />
-          </td>
-          <td @click.stop>
-            <button
-              v-if="canWrite"
-              type="button"
-              class="soleil-status-toggle"
-              :title="item.noiBat ? 'Nhấn để bỏ nổi bật' : 'Nhấn để đánh dấu nổi bật'"
-              @click="emit('toggle-noi-bat', item)"
-            >
-              <StatusDot
-                :status="item.noiBat ? 'upcoming' : 'paused'"
-                :label="item.noiBat ? 'Nổi bật' : 'Thường'"
-              />
-            </button>
-            <StatusDot
-              v-else
-              :status="item.noiBat ? 'upcoming' : 'paused'"
-              :label="item.noiBat ? 'Nổi bật' : 'Thường'"
-            />
-          </td>
-          <td @click.stop>
-            <div class="soleil-actions-cell">
-              <button
-                type="button"
-                class="soleil-act-btn-round"
-                title="Quản lý biến thể"
-                @click="emit('manage', item)"
-              >
-                <Icon icon="icon-park-outline:box" />
-              </button>
+              </NPopover>
+              <div v-else class="product-thumb--table-empty">Chưa có ảnh</div>
+            </td>
+            <td class="max-w-[260px]">
+              <div class="font-medium text-[var(--ink)]">{{ item.ten }}</div>
+              <div v-if="item.loaiChongNang" class="text-xs text-[rgba(30,21,16,0.45)] mt-0.5">
+                {{ formatLoaiChongNang(item.loaiChongNang) }}
+              </div>
+            </td>
+            <td>
+              <span v-if="item.tenThuongHieu" class="soleil-pill--brand">{{ item.tenThuongHieu }}</span>
+              <span v-else class="text-[rgba(30,21,16,0.35)]">—</span>
+            </td>
+            <td>
+              <span v-if="item.tenDanhMuc" class="soleil-pill--category">{{ item.tenDanhMuc }}</span>
+              <span v-else class="text-[rgba(30,21,16,0.35)]">—</span>
+            </td>
+            <td>
+              <span v-if="item.tenDangSanPham" class="soleil-pill--form">{{ item.tenDangSanPham }}</span>
+              <span v-else class="text-[rgba(30,21,16,0.35)]">—</span>
+            </td>
+            <td>
+              <div class="flex flex-wrap gap-1">
+                <span v-if="item.chiSoSpf" class="soleil-pill--spf">{{ item.chiSoSpf }}</span>
+                <span v-if="item.chiSoPa" class="soleil-pill--spf">{{ item.chiSoPa }}</span>
+                <span v-if="!item.chiSoSpf && !item.chiSoPa" class="text-[rgba(30,21,16,0.35)]">—</span>
+              </div>
+            </td>
+            <td class="text-xs text-[rgba(30,21,16,0.55)]">{{ formatDate(item.ngayTao) }}</td>
+            <td @click.stop>
               <button
                 v-if="canWrite"
                 type="button"
-                class="soleil-act-btn-round"
-                title="Sửa"
-                @click="emit('edit', item)"
+                class="soleil-status-toggle"
+                :title="item.trangThai !== false ? 'Nhấn để ngưng hoạt động' : 'Nhấn để kích hoạt'"
+                @click="emit('toggle-status', item)"
               >
-                <Icon icon="icon-park-outline:edit" />
+                <StatusDot
+                  :status="item.trangThai !== false ? 'active' : 'expired'"
+                  :label="item.trangThai !== false ? 'Đang hoạt động' : 'Ngưng hoạt động'"
+                />
               </button>
-            </div>
-          </td>
-        </tr>
+              <StatusDot
+                v-else
+                :status="item.trangThai !== false ? 'active' : 'expired'"
+                :label="item.trangThai !== false ? 'Đang hoạt động' : 'Ngưng hoạt động'"
+              />
+            </td>
+            <td @click.stop>
+              <button
+                v-if="canWrite"
+                type="button"
+                class="soleil-status-toggle"
+                :title="item.noiBat ? 'Nhấn để bỏ nổi bật' : 'Nhấn để đánh dấu nổi bật'"
+                @click="emit('toggle-noi-bat', item)"
+              >
+                <StatusDot
+                  :status="item.noiBat ? 'upcoming' : 'paused'"
+                  :label="item.noiBat ? 'Nổi bật' : 'Thường'"
+                />
+              </button>
+              <StatusDot
+                v-else
+                :status="item.noiBat ? 'upcoming' : 'paused'"
+                :label="item.noiBat ? 'Nổi bật' : 'Thường'"
+              />
+            </td>
+            <td @click.stop>
+              <div class="soleil-actions-cell">
+                <button
+                  type="button"
+                  class="soleil-act-btn-round"
+                  title="Quản lý biến thể"
+                  @click="emit('manage', item)"
+                >
+                  <Icon icon="icon-park-outline:box" />
+                </button>
+                <button
+                  v-if="canWrite"
+                  type="button"
+                  class="soleil-act-btn-round"
+                  title="Sửa"
+                  @click="emit('edit', item)"
+                >
+                  <Icon icon="icon-park-outline:edit" />
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr
+            v-for="n in Math.max(0, 5 - products.length)"
+            :key="`pad-${n}`"
+            class="table-pad-row"
+            aria-hidden="true"
+          >
+            <td colspan="12" />
+          </tr>
+        </template>
       </tbody>
     </table>
   </div>
