@@ -30,12 +30,13 @@ export const tinhGiaTaiQuay = (payload) =>
   request.post('/ban-hang/tinh-gia', payload)
 
 /** Mã giảm giá khả dụng tại quầy (đã loại FREE_SHIP). */
-export const fetchPosVouchers = (keyword = '', page = 1, size = 20) =>
+export const fetchPosVouchers = (keyword = '', page = 1, size = 20, idKhachHang = null) =>
   request.get('/ban-hang/vouchers', {
     params: {
       keyword: keyword || undefined,
       page,
       size,
+      idKhachHang: idKhachHang || undefined,
     },
   })
 

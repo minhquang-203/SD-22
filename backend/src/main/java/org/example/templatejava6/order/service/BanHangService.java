@@ -188,9 +188,10 @@ public class BanHangService {
             PhieuGiamGia phieu = phieuGiamGiaRepository.findByMa(maPhieuTrimmed)
                     .orElseThrow(() -> new ApiException(
                             "Mã giảm giá \"" + maPhieuTrimmed + "\" không tồn tại.", "INVALID_VOUCHER"));
-            if (!voucherKhachHangService.khachDuocDungVoucher(null, phieu)) {
+            if (!voucherKhachHangService.khachDuocDungVoucher(req.getIdKhachHang(), phieu)) {
                 throw new ApiException(
-                        "Mã giảm giá này chỉ dành cho khách hàng được chỉ định.", "INVALID_VOUCHER");
+                        "Mã giảm giá này chỉ dành cho khách hàng được chỉ định. Hãy chọn khách trên POS rồi áp lại.",
+                        "INVALID_VOUCHER");
             }
             tienGiamGia = checkoutPricingService.tinhTienGiamPhieu(phieu, tongTien);
         }

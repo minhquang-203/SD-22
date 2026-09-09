@@ -8,6 +8,7 @@ const props = defineProps({
   visible: { type: Boolean, default: false },
   selectedCode: { type: String, default: '' },
   subtotal: { type: Number, default: 0 },
+  customerId: { type: [Number, String], default: null },
 })
 
 const emit = defineEmits(['update:visible', 'select'])
@@ -33,6 +34,9 @@ function formatDiscount(voucher) {
     const suffix = voucher.giamToiDa ? ` (tối đa ${formatCurrency(voucher.giamToiDa)})` : ''
     return `Giảm ${voucher.giaTri}%${suffix}`
   }
+  if (voucher.loai === 'FREE_SHIP') {
+    return 'Miễn phí vận chuyển (không dùng tại quầy)'
+  }
   return `Giảm ${formatCurrency(voucher.giaTri)}`
 }
 
@@ -45,12 +49,20 @@ function formatExpiry(value) {
   })
 }
 
+function needsCustomer(voucher) {
+  return voucher.phamVi === 'CA_NHAN' && !props.customerId
+}
+
 function isEligible(voucher) {
+  if (needsCustomer(voucher)) return false
   const min = Number(voucher.giaTriDonToiThieu) || 0
   return props.subtotal >= min
 }
 
 function eligibilityMessage(voucher) {
+  if (needsCustomer(voucher)) {
+    return 'Chọn khách hàng để dùng mã cá nhân'
+  }
   const min = Number(voucher.giaTriDonToiThieu) || 0
   if (props.subtotal < min) {
     return `Đơn tối thiểu ${formatCurrency(min)}`
@@ -73,7 +85,7 @@ async function loadVouchers() {
   loading.value = true
   loadError.value = ''
   try {
-    const res = await fetchPosVouchers(search.value.trim())
+    const res = await fetchPosVouchers(search.value.trim(), 1, 50, props.customerId)
     vouchers.value = (res.data?.content || []).filter((v) => v.loai !== 'FREE_SHIP')
   } catch (error) {
     vouchers.value = []
@@ -109,6 +121,13 @@ watch(
   },
 )
 
+watch(
+  () => props.customerId,
+  () => {
+    if (props.visible) void loadVouchers()
+  },
+)
+
 watch(search, () => {
   if (props.visible) scheduleSearch()
 })
@@ -133,7 +152,7 @@ onUnmounted(() => {
         <header class="pos-voucher-modal__head">
           <div>
             <h2 id="pos-voucher-title">Chọn mã giảm giá</h2>
-            <p>Mã đang hiệu lực tại quầy (không gồm freeship)</p>
+            <p>Mã đang hiệu lực tại quầy (không gồm freeship). Mã cá nhân hiện khi đã chọn khách.</p>
           </div>
           <button type="button" class="admin-icon-btn" aria-label="Đóng" @click="closeModal">
             <Icon icon="mdi:close" width="20" />

@@ -277,15 +277,14 @@ public class PhieuGiamGiaService {
                 .map(PhieuGiamGiaResponse::new);
     }
 
-    /** Danh sách mã giảm giá khả dụng tại quầy (loại trừ FREE_SHIP trên service). */
-    public Page<PhieuGiamGiaResponse> listAvailableForPos(String keyword, Pageable pageable) {
+    /** Danh sách mã giảm giá khả dụng tại quầy (không FREE_SHIP; mã cá nhân theo khách đã chọn). */
+    @Transactional(readOnly = true)
+    public Page<PhieuGiamGiaResponse> listAvailableForPos(
+            String keyword, Integer idKhachHang, Pageable pageable) {
         String normalizedKeyword = keyword == null ? null : keyword.trim();
-        Page<PhieuGiamGia> page = phieuGiamGiaRepository.findAvailableForCustomer(normalizedKeyword, pageable);
-        var content = page.getContent().stream()
-                .filter(v -> v.getLoai() != LoaiPhieuGiamGia.FREE_SHIP)
-                .map(PhieuGiamGiaResponse::new)
-                .toList();
-        return new org.springframework.data.domain.PageImpl<>(content, pageable, page.getTotalElements());
+        return phieuGiamGiaRepository
+                .findAvailableForPos(normalizedKeyword, idKhachHang, pageable)
+                .map(PhieuGiamGiaResponse::new);
     }
 
 //    public Page<PhieuGiamGiaResponse> paginition(return null)

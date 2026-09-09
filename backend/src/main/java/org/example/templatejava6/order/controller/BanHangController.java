@@ -50,14 +50,15 @@ public class BanHangController {
         return banHangService.tinhGiaTaiQuay(request);
     }
 
-    /** Mã giảm giá khả dụng tại quầy (không gồm FREE_SHIP). */
+    /** Mã giảm giá khả dụng tại quầy (không gồm FREE_SHIP; mã cá nhân theo idKhachHang). */
     @GetMapping("vouchers")
     public ResponseEntity<Page<PhieuGiamGiaResponse>> vouchers(
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer idKhachHang,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         Pageable pageable = PaginationUtil.create(page, size);
-        return ResponseEntity.ok(phieuGiamGiaService.listAvailableForPos(keyword, pageable));
+        return ResponseEntity.ok(phieuGiamGiaService.listAvailableForPos(keyword, idKhachHang, pageable));
     }
 
     @PostMapping("tai-quay")

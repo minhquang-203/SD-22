@@ -11,4 +11,6 @@ public class PosTinhGiaRequest {
 
     private List<TaoDonTaiQuayRequest.ItemRequest> items;
     private String maPhieuGiamGia;
+    /** Khách đang chọn trên POS — cần để áp voucher cá nhân (CA_NHAN). */
+    private Integer idKhachHang;
 }

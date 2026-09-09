@@ -75,7 +75,15 @@ const voucherDiscount = ref(0)
 const voucherLoading = ref(false)
 const showVoucherModal = ref(false)
 
-const paymentMethods = ref([])
+/** Toàn bộ PTTT từ API — cần CHUYEN_KHOAN nội bộ cho thanh toán kết hợp. */
+const allPaymentMethods = ref([])
+/** Nút POS: chỉ Tiền mặt + VNPay. CK không hiện riêng, dùng trong Kết hợp. */
+const paymentMethods = computed(() =>
+  allPaymentMethods.value.filter((p) => {
+    const ma = String(p.ma || '').toUpperCase()
+    return ma === 'TIEN_MAT' || ma === 'VNPAY'
+  }),
+)
 const selectedPaymentId = ref(null)
 const cashGiven = ref('')
 const transferRef = ref('')
@@ -134,8 +142,9 @@ const isNonCash = computed(() => isManualTransfer.value)
 
 const paymentByMa = computed(() => {
   const map = {}
-  for (const p of paymentMethods.value) {
-    map[p.ma] = p
+  for (const p of allPaymentMethods.value) {
+    const ma = String(p.ma || '').toUpperCase()
+    if (ma) map[ma] = p
   }
   return map
 })
@@ -568,10 +577,8 @@ function onSearchEnter() {
 async function loadMeta() {
   try {
     const ptRes = await getPhuongThuc()
-    // POS tại quầy: chỉ Tiền mặt + VNPay (bỏ COD, CK, MoMo…)
-    const allow = new Set(['TIEN_MAT', 'VNPAY'])
-    paymentMethods.value = (ptRes.data || []).filter((p) => allow.has(String(p.ma || '').toUpperCase()))
-    const cash = paymentMethods.value.find((p) => p.ma === 'TIEN_MAT')
+    allPaymentMethods.value = ptRes.data || []
+    const cash = paymentByMa.value.TIEN_MAT
     if (cash) selectedPaymentId.value = cash.id
   } catch (err) {
     notify(String(err), 'error')
@@ -707,7 +714,7 @@ function toggleSplitMode() {
   resetSplitFields()
   cashGiven.value = ''
   transferRef.value = ''
-  const cash = paymentMethods.value.find((p) => p.ma === 'TIEN_MAT')
+  const cash = paymentByMa.value.TIEN_MAT
   if (cash) selectedPaymentId.value = cash.id
 }
 
@@ -739,10 +746,14 @@ function openVietQrModal() {
   showVietQrModal.value = true
 }
 
-function confirmVietQrReceived() {
+async function confirmVietQrReceived() {
   splitTransferConfirmed.value = true
   showVietQrModal.value = false
-  notify('Đã ghi nhận nhận chuyển khoản')
+  if (!canCheckout.value) {
+    notify('Đã ghi nhận chuyển khoản. Nhập tiền mặt (nhỏ hơn tổng) rồi bấm Tạo hóa đơn.')
+    return
+  }
+  await checkout({ skipConfirm: true })
 }
 
 function cancelVietQrModal() {
@@ -756,6 +767,13 @@ watch(splitCashAmount, () => {
 watch(thanhTien, () => {
   if (isSplitMode.value) splitTransferConfirmed.value = false
 })
+
+watch(
+  () => selectedCustomer.value?.id ?? null,
+  () => {
+    if (appliedVoucher.value) void recalculateVoucher()
+  },
+)
 
 function clearVoucher() {
   voucherCode.value = ''
@@ -773,6 +791,7 @@ async function recalculateVoucher() {
     const res = await tinhGiaTaiQuay({
       items: mapCartItems(),
       maPhieuGiamGia: appliedVoucher.value,
+      idKhachHang: selectedCustomer.value?.id ?? null,
     })
     voucherDiscount.value = Number(res.data?.tienGiamGia) || 0
   } catch (err) {
@@ -825,6 +844,7 @@ async function applyVoucher(codeOverride, { skipConfirm = false } = {}) {
     const res = await tinhGiaTaiQuay({
       items: mapCartItems(),
       maPhieuGiamGia: code,
+      idKhachHang: selectedCustomer.value?.id ?? null,
     })
     voucherCode.value = code
     appliedVoucher.value = code
@@ -1033,9 +1053,9 @@ async function cancelHeldOrder(order) {
   }
 }
 
-async function checkout() {
+async function checkout(options = {}) {
   if (!canCheckout.value) return
-  if (!isVnpay.value) {
+  if (!options.skipConfirm && !isVnpay.value) {
     const ok = await confirm({
       title: 'Tạo hóa đơn',
       message: 'Bạn có chắc muốn tạo hóa đơn này?',
@@ -1246,7 +1266,7 @@ function resetSale() {
   receipt.value = null
   showReceipt.value = false
   activeHeldOrderId.value = null
-  const cash = paymentMethods.value.find((p) => p.ma === 'TIEN_MAT')
+  const cash = paymentByMa.value.TIEN_MAT
   if (cash) selectedPaymentId.value = cash.id
   void loadProducts()
   void loadHeldOrders()
@@ -1869,6 +1889,7 @@ onBeforeUnmount(() => {
       v-model:visible="showVoucherModal"
       :selected-code="appliedVoucher"
       :subtotal="tongTienHang"
+      :customer-id="selectedCustomer?.id ?? null"
       @select="onVoucherModalSelect"
     />
 
@@ -1988,7 +2009,7 @@ onBeforeUnmount(() => {
 
             <p class="pos-qr-modal__hint">
               Số tiền QR = phần chuyển khoản còn thiếu.
-              Khi đã thấy tiền vào tài khoản, bấm <strong>Đã nhận chuyển khoản</strong>.
+              Bấm <strong>Đã nhận chuyển khoản</strong> sẽ tạo hóa đơn (tiền mặt + CK).
             </p>
           </div>
 

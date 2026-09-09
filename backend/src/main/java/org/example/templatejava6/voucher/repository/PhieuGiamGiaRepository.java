@@ -102,6 +102,41 @@ public interface PhieuGiamGiaRepository extends JpaRepository<PhieuGiamGia, Inte
             @Param("keyword") String keyword,
             Pageable pageable);
 
+    /**
+     * Mã tại quầy: không FREE_SHIP. Công khai luôn hiện;
+     * mã cá nhân chỉ khi đã gán cho khách đang chọn trên POS.
+     */
+    @Query("""
+        SELECT v FROM PhieuGiamGia v
+        WHERE v.trangThai = true
+          AND v.isActive = true
+          AND v.soLuong > 0
+          AND v.ngayBatDau <= CURRENT_TIMESTAMP
+          AND v.ngayKetThuc >= CURRENT_TIMESTAMP
+          AND v.loai <> org.example.templatejava6.common.enums.LoaiPhieuGiamGia.FREE_SHIP
+          AND (:keyword IS NULL OR :keyword = ''
+              OR LOWER(v.ma) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              OR LOWER(v.ten) LIKE LOWER(CONCAT('%', :keyword, '%')))
+          AND (
+                v.phamVi IS NULL
+                OR v.phamVi = org.example.templatejava6.common.enums.PhamViPhieuGiamGia.CONG_KHAI
+                OR (
+                    v.phamVi = org.example.templatejava6.common.enums.PhamViPhieuGiamGia.CA_NHAN
+                    AND :idKhachHang IS NOT NULL
+                    AND EXISTS (
+                        SELECT 1 FROM KhachHangPhieuGiamGia k
+                        WHERE k.phieuGiamGia.id = v.id
+                          AND k.khachHang.id = :idKhachHang
+                    )
+                )
+              )
+        ORDER BY v.ngayKetThuc ASC
+        """)
+    Page<PhieuGiamGia> findAvailableForPos(
+            @Param("keyword") String keyword,
+            @Param("idKhachHang") Integer idKhachHang,
+            Pageable pageable);
+
     /** Voucher công khai đang hiệu lực - dùng cho tab "Tất cả voucher" ở tài khoản. */
     @Query("""
         SELECT v FROM PhieuGiamGia v
