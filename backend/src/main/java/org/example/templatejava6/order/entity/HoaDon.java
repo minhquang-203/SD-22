@@ -121,6 +121,11 @@ public class HoaDon {
     @Column(name = "sdt_nguoi_nhan")
     private String sdtNguoiNhan;
 
+    /** Email người nhận — dùng gửi hóa đơn cho khách chưa đăng nhập (id_khach_hang NULL). */
+    @Size(max = 100)
+    @Column(name = "email_nguoi_nhan", length = 100)
+    private String emailNguoiNhan;
+
     /** Khóa chống tạo trùng đơn (double-submit) — do client sinh cho mỗi lần đặt hàng online. */
     @Size(max = 64)
     @Column(name = "idempotency_key", length = 64)

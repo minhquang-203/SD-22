@@ -17,9 +17,22 @@ public class StorefrontOrderSummaryResponse {
     private String trangThaiLabel;
     private BigDecimal thanhTien;
 
+    /** Mã vận đơn GHN (nếu đã tạo) — để FE vẫn hiện VC khi chi tiết lỗi/timeout. */
+    private String maVanDon;
+    private String donViVanChuyen;
+
     /** Preview sản phẩm đầu tiên — dùng cho thẻ danh sách phía khách. */
     private String anhUrl;
     private String tenSanPham;
     private Integer soLuong;
     private Integer soDongHang;
+
+    /** Phương thức thanh toán — cần để mở modal trả hàng từ danh sách. */
+    private String maPhuongThucThanhToan;
+
+    /** Yêu cầu trả hàng mới nhất (nếu có) — để lọc tab / điều hướng không cần hydrate chi tiết. */
+    private Integer idYeuCauTraHang;
+    private String trangThaiTraHang;
+    private String trangThaiTraHangLabel;
+    private String maVanDonTra;
 }

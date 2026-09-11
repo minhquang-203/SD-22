@@ -366,7 +366,9 @@ public class PaymentService {
     private void thongBaoDonMoi(HoaDon hoaDon) {
         String tenKhach = hoaDon.getIdKhachHang() != null && hoaDon.getIdKhachHang().getHoTen() != null
                 ? hoaDon.getIdKhachHang().getHoTen()
-                : "Khách hàng";
+                : (hoaDon.getTenNguoiNhan() != null && !hoaDon.getTenNguoiNhan().isBlank()
+                        ? hoaDon.getTenNguoiNhan()
+                        : "Khách vãng lai");
         String noiDung = tenKhach + " vừa thanh toán online thành công cho đơn " + hoaDon.getMaHoaDon() + ".";
         thongBaoService.taoThongBao(
                 LoaiThongBao.DON_HANG_MOI,

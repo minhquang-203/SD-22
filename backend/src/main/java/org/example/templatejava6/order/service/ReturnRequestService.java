@@ -77,6 +77,8 @@ public class ReturnRequestService {
     private static final String LOAI_DON_ONLINE = "ONLINE";
     private static final String MA_VNPAY = "VNPAY";
     private static final int MIN_RETURN_IMAGES = 2;
+    /** Số ngày cho phép yêu cầu trả hàng kể từ lúc đơn chuyển sang HOAN_THANH. */
+    private static final int SO_NGAY_CHO_PHEP_TRA_HANG = 7;
 
     /** Trang thai GHN cho biet kien hang hoan da ve tay shop. */
     private static final List<String> GHN_TRANG_THAI_DA_VE_SHOP = List.of("delivered", "returned");
@@ -148,6 +150,7 @@ public class ReturnRequestService {
             throw new ApiException(
                     "Chỉ có thể yêu cầu trả hàng cho đơn đã giao thành công.", "ORDER_NOT_DELIVERED");
         }
+        assertTrongHanTraHang(hoaDon);
         if (yeuCauTraHangRepository.existsByIdHoaDon_Id(idHoaDon)) {
             throw new ApiException(
                     "Đơn hàng đã có yêu cầu trả hàng. Không thể gửi yêu cầu mới.",
@@ -217,7 +220,15 @@ public class ReturnRequestService {
     public List<YeuCauTraHangResponse> danhSachCuaToi(Integer idKhachHang) {
         return yeuCauTraHangRepository
                 .findByIdHoaDon_IdKhachHang_IdOrderByNgayTaoDesc(idKhachHang)
-                .stream().map(this::toResponse).toList();
+                .stream()
+                .map(yc -> {
+                    YeuCauTraHangResponse r = toResponse(yc);
+                    if (yc.getTrangThai() != null) {
+                        r.setTrangThaiLabel(yc.getTrangThai().getLabelChoKhach());
+                    }
+                    return r;
+                })
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -642,6 +653,9 @@ public class ReturnRequestService {
                 .map(AnhYeuCauTraHang::getDuongDan)
                 .toList();
         StorefrontReturnDetailResponse detail = new StorefrontReturnDetailResponse(yc, anhUrls);
+        if (yc.getTrangThai() != null) {
+            detail.setTrangThaiLabel(yc.getTrangThai().getLabelChoKhach());
+        }
         HoaDon hoaDon = yc.getIdHoaDon();
         if (hoaDon != null) {
             detail.setDiaChiGiao(hoaDon.getDiaChiGiao());
@@ -729,7 +743,7 @@ public class ReturnRequestService {
         HoaDon hoaDon = yc.getIdHoaDon();
         List<LichSuDonHang> logs = hoaDon == null
                 ? List.of()
-                : lichSuDonHangRepository.findByIdHoaDon_IdOrderByThoiGianDesc(hoaDon.getId());
+                : lichSuDonHangRepository.findByIdHoaDon_IdOrderByThoiGianDescIdDesc(hoaDon.getId());
         Map<String, LocalDateTime> firstTimeByStep = new LinkedHashMap<>();
         for (int i = logs.size() - 1; i >= 0; i--) {
             LichSuDonHang ls = logs.get(i);
@@ -824,6 +838,29 @@ public class ReturnRequestService {
             urls.add(path);
         }
         return urls;
+    }
+
+    private void assertTrongHanTraHang(HoaDon hoaDon) {
+        LocalDateTime ngayGiao = resolveNgayHoanThanh(hoaDon);
+        if (ngayGiao == null
+                || LocalDateTime.now().isAfter(ngayGiao.plusDays(SO_NGAY_CHO_PHEP_TRA_HANG))) {
+            throw new ApiException(
+                    "Đã quá hạn " + SO_NGAY_CHO_PHEP_TRA_HANG
+                            + " ngày trả hàng kể từ khi đơn được giao.",
+                    "RETURN_WINDOW_EXPIRED");
+        }
+    }
+
+    /** Thời điểm đơn chuyển sang HOAN_THANH (từ lịch sử), fallback ngày tạo đơn. */
+    private LocalDateTime resolveNgayHoanThanh(HoaDon hoaDon) {
+        List<LichSuDonHang> lichSu = lichSuDonHangRepository
+                .findByIdHoaDon_IdOrderByThoiGianDescIdDesc(hoaDon.getId());
+        for (LichSuDonHang ls : lichSu) {
+            if (TrangThaiDonHang.HOAN_THANH.name().equals(ls.getTrangThai()) && ls.getThoiGian() != null) {
+                return ls.getThoiGian();
+            }
+        }
+        return hoaDon.getNgayTao();
     }
 
     private boolean laVnpay(HoaDon hoaDon) {

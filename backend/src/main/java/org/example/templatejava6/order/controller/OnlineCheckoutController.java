@@ -2,7 +2,10 @@ package org.example.templatejava6.order.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.example.templatejava6.common.security.SecurityUtils;
 import org.example.templatejava6.common.util.PaginationUtil;
+import org.example.templatejava6.order.model.request.GuestCheckoutRequest;
+import org.example.templatejava6.order.model.request.GuestTinhGiaRequest;
 import org.example.templatejava6.order.model.request.HuyDonOnlineRequest;
 import org.example.templatejava6.order.model.request.OnlineCheckoutRequest;
 import org.example.templatejava6.order.model.request.OnlineTinhGiaRequest;
@@ -47,7 +50,9 @@ public class OnlineCheckoutController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         Pageable pageable = PaginationUtil.create(page, size);
-        return ResponseEntity.ok(phieuGiamGiaService.listAvailableForCustomer(keyword, pageable));
+        Integer idKhachHang = SecurityUtils.currentKhachHangId();
+        return ResponseEntity.ok(
+                phieuGiamGiaService.listAvailableForCustomer(keyword, idKhachHang, pageable));
     }
 
     @PostMapping("/tinh-gia")
@@ -60,6 +65,20 @@ public class OnlineCheckoutController {
             @Valid @RequestBody OnlineCheckoutRequest request,
             HttpServletRequest servletRequest) {
         return onlineCheckoutService.checkout(request, getClientIp(servletRequest));
+    }
+
+    // ===== Khách chưa đăng nhập (guest) — công khai =====
+
+    @PostMapping("/guest/tinh-gia")
+    public OnlineTinhGiaResponse tinhGiaGuest(@Valid @RequestBody GuestTinhGiaRequest request) {
+        return onlineCheckoutService.tinhGiaGuest(request);
+    }
+
+    @PostMapping("/guest/checkout")
+    public OnlineCheckoutResponse checkoutGuest(
+            @Valid @RequestBody GuestCheckoutRequest request,
+            HttpServletRequest servletRequest) {
+        return onlineCheckoutService.checkoutGuest(request, getClientIp(servletRequest));
     }
 
     @GetMapping("/orders")

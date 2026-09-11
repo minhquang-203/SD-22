@@ -30,6 +30,8 @@ public class HoaDonDetailResponse extends HoaDonResponse {
         this.idKhachHang = hd.getIdKhachHang() != null ? hd.getIdKhachHang().getId() : null;
         if (hd.getIdKhachHang() != null) {
             this.soDienThoaiKhachHang = hd.getIdKhachHang().getSoDienThoai();
+        } else {
+            this.soDienThoaiKhachHang = hd.getSdtNguoiNhan();
         }
         this.idNhanVien = hd.getIdNhanVien() != null ? hd.getIdNhanVien().getId() : null;
         this.idPhuongThucThanhToan = hd.getIdPhuongThucThanhToan() != null

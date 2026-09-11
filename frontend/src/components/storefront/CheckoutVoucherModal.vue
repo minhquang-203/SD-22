@@ -53,12 +53,20 @@ function formatExpiry(value) {
   })
 }
 
+function isPersonalLocked(voucher) {
+  return voucher.phamVi === 'CA_NHAN' && voucher.duocSuDung === false
+}
+
 function isEligible(voucher) {
+  if (isPersonalLocked(voucher)) return false
   const min = Number(voucher.giaTriDonToiThieu) || 0
   return props.subtotal >= min
 }
 
 function eligibilityMessage(voucher) {
+  if (isPersonalLocked(voucher)) {
+    return 'Mã dành riêng cho khách được chỉ định'
+  }
   const min = Number(voucher.giaTriDonToiThieu) || 0
   if (props.subtotal < min) {
     return `Đơn tối thiểu ${formatVND(min)}`

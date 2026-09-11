@@ -2,14 +2,13 @@ package org.example.templatejava6.order.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import org.example.templatejava6.order.model.response.GhnTrangThaiOptionResponse;
-import org.springframework.beans.factory.annotation.Value;
+import org.example.templatejava6.shipping.config.GhnProperties;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
@@ -19,9 +18,6 @@ import java.util.Optional;
 
 @Service
 public class GhnTrackingService {
-
-    private static final String GHN_ORDER_DETAIL_URL =
-            "https://dev-online-gateway.ghn.vn/shiip/public-api/v2/shipping-order/detail";
 
     private static final List<String> ALL_STATUSES = List.of(
             "ready_to_pick",
@@ -49,33 +45,34 @@ public class GhnTrackingService {
     );
 
     private final RestTemplate restTemplate;
-    private final String token;
+    private final GhnProperties ghnProperties;
 
-    public GhnTrackingService(RestTemplateBuilder builder, @Value("${ghn.token:}") String token) {
+    public GhnTrackingService(RestTemplateBuilder builder, GhnProperties ghnProperties) {
         this.restTemplate = builder
                 .connectTimeout(Duration.ofSeconds(3))
                 .readTimeout(Duration.ofSeconds(5))
                 .build();
-        this.token = token;
+        this.ghnProperties = ghnProperties;
     }
 
     public Optional<TrackingInfo> track(String orderCode) {
-        if (isBlank(token) || isBlank(orderCode)) {
+        if (!ghnProperties.isConfigured() || isBlank(orderCode)) {
             return Optional.empty();
         }
 
         String code = orderCode.trim();
+        String url = resolveDetailUrl();
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("Token", token);
+        headers.set("Token", ghnProperties.getToken().trim());
 
         HttpEntity<Map<String, String>> entity = new HttpEntity<>(
-                Map.of("order_code", orderCode.trim()),
+                Map.of("order_code", code),
                 headers);
 
         try {
-            ResponseEntity<JsonNode> response = restTemplate.postForEntity(GHN_ORDER_DETAIL_URL, entity, JsonNode.class);
+            ResponseEntity<JsonNode> response = restTemplate.postForEntity(url, entity, JsonNode.class);
             JsonNode data = response.getBody() != null ? response.getBody().path("data") : null;
             if (data == null || data.isMissingNode() || data.isNull()) {
                 return Optional.empty();
@@ -83,14 +80,24 @@ public class GhnTrackingService {
 
             String status = text(data, "status");
             return Optional.of(new TrackingInfo(
-                    textOrDefault(data, "order_code", orderCode.trim()),
+                    textOrDefault(data, "order_code", code),
                     status,
                     labelOf(status),
                     firstNonBlank(text(data, "leadtime"), text(data, "leadtime_order"))
             ));
-        } catch (RestClientException ignored) {
+        } catch (Exception ignored) {
+            // Không để lỗi GHN (timeout/env sai/rate-limit) phá API đơn hàng phía khách.
             return Optional.empty();
         }
+    }
+
+    private String resolveDetailUrl() {
+        String base = ghnProperties.getBaseUrl();
+        if (isBlank(base)) {
+            base = "https://dev-online-gateway.ghn.vn/shiip/public-api";
+        }
+        String normalized = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
+        return normalized + "/v2/shipping-order/detail";
     }
 
     private static String text(JsonNode node, String field) {

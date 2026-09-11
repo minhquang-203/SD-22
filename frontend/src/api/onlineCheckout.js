@@ -8,6 +8,15 @@ export function tinhGiaOnline(payload) {
   return request.post('/online/tinh-gia', payload)
 }
 
+// Khách chưa đăng nhập: giỏ hàng gửi trực tiếp danh sách biến thể, không voucher.
+export function createGuestCheckout(payload) {
+  return request.post('/online/guest/checkout', payload)
+}
+
+export function tinhGiaGuest(payload) {
+  return request.post('/online/guest/tinh-gia', payload)
+}
+
 export function fetchOnlineOrders() {
   return request.get('/online/orders')
 }

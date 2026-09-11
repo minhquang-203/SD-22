@@ -70,13 +70,36 @@ const filteredOrders = computed(() => {
   })
 })
 
+/** Xóa mã đơn dính từ "Xem đơn gốc" (?ma=) để bộ lọc hoạt động lại. */
+function clearStickyMaQuery() {
+  if (typeof route.query.ma !== 'string') return
+  search.value = ''
+  router.replace({ path: route.path, query: {} })
+}
+
+function applyFilter(filterValue) {
+  currentFilter.value = filterValue
+  // Chỉ lọc client-side — không reload API (trước đây "Tất cả" gọi lại loadOrders → 1+N request + GHN).
+  if (filterValue === 'all') {
+    search.value = ''
+    if (route.query.ma != null) {
+      router.replace({ path: route.path, query: {} })
+    }
+    return
+  }
+  clearStickyMaQuery()
+}
+
 async function loadOrders() {
   loading.value = true
   error.value = ''
   try {
     const res = await fetchDonCuaToi()
-    const summaries = res.data || []
-    orders.value = await Promise.all(summaries.map(loadDetailOrSummary))
+    // Dùng summary cho danh sách; chi tiết (+ GHN) chỉ tải khi mở thẻ.
+    orders.value = (res.data || []).map((summary) => ({
+      ...summary,
+      chiTiets: summary.chiTiets || [],
+    }))
   } catch {
     error.value = 'Không tải được danh sách đơn hàng.'
   } finally {
@@ -84,12 +107,35 @@ async function loadOrders() {
   }
 }
 
-async function loadDetailOrSummary(summary) {
+const detailLoadingIds = ref(new Set())
+
+async function ensureOrderDetail(order) {
+  if (!order?.id || order.__detailLoaded) return
+  if (detailLoadingIds.value.has(order.id)) return
+
+  const next = new Set(detailLoadingIds.value)
+  next.add(order.id)
+  detailLoadingIds.value = next
   try {
-    const res = await fetchChiTietDonCuaToi(summary.id)
-    return res.data || summary
+    const res = await fetchChiTietDonCuaToi(order.id)
+    const detail = res.data
+    if (!detail) return
+    const idx = orders.value.findIndex((item) => item.id === order.id)
+    if (idx < 0) return
+    const summary = orders.value[idx]
+    orders.value[idx] = {
+      ...summary,
+      ...detail,
+      maVanDon: detail.maVanDon || summary.maVanDon || '',
+      donViVanChuyen: detail.donViVanChuyen || summary.donViVanChuyen || '',
+      __detailLoaded: true,
+    }
   } catch {
-    return { ...summary, chiTiets: [] }
+    // Giữ summary; body sẽ hiện thiếu chi tiết nhẹ.
+  } finally {
+    const done = new Set(detailLoadingIds.value)
+    done.delete(order.id)
+    detailLoadingIds.value = done
   }
 }
 
@@ -101,9 +147,9 @@ async function applyRealtimeOrder(event) {
     const res = await fetchChiTietDonCuaToi(orderId)
     if (res.data) {
       if (idx >= 0) {
-        orders.value[idx] = res.data
+        orders.value[idx] = { ...res.data, __detailLoaded: true }
       } else if (event.type === 'ORDER_CREATED') {
-        orders.value = [res.data, ...orders.value]
+        orders.value = [{ ...res.data, __detailLoaded: true }, ...orders.value]
       }
     } else if (idx >= 0 && event.trangThai) {
       orders.value[idx] = {
@@ -125,7 +171,7 @@ async function applyRealtimeOrder(event) {
   if (event.type === 'ORDER_STATUS_CHANGED') {
     toast(
       event.message || `Đơn ${event.maHoaDon || ''} đã cập nhật: ${event.trangThaiLabel || event.trangThai || ''}`,
-      'info',
+      event.trangThai === 'DA_HUY' ? 'warning' : 'info',
     )
   } else if (event.type === 'ORDER_CREATED') {
     toast(event.message || `Đơn mới: ${event.maHoaDon || ''}`, 'info')
@@ -158,12 +204,12 @@ function closeReview() {
 }
 
 function onReviewSubmitted({ lineId }) {
-  reviewNotice.value = 'Cảm ơn bạn đã đánh giá! Vui lòng chờ admin duyệt.'
+  reviewNotice.value = 'Cảm ơn bạn đã đánh giá! Đánh giá của bạn đã được hiển thị.'
   for (const order of orders.value) {
     const line = (order.chiTiets || []).find((item) => item.id === lineId)
     if (line) {
       line.daDanhGia = true
-      line.trangThaiDanhGia = 'CHO_DUYET'
+      line.trangThaiDanhGia = 'DA_DUYET'
       break
     }
   }
@@ -208,7 +254,7 @@ async function handleCancelOrder(order) {
     const updated = res.data || order
     const idx = orders.value.findIndex((item) => item.id === order.id)
     if (idx >= 0) {
-      orders.value[idx] = updated
+      orders.value[idx] = { ...updated, __detailLoaded: true }
     }
     cancelNotice.value = `Đã hủy đơn ${order.maHoaDon}.`
   } catch (err) {
@@ -255,7 +301,7 @@ async function handleCancelOrder(order) {
                 type="button"
                 class="sf-order-chip"
                 :class="{ 'sf-order-chip--active': currentFilter === filter.value }"
-                @click="currentFilter = filter.value"
+                @click="applyFilter(filter.value)"
               >
                 {{ filter.label }}
               </button>
@@ -277,6 +323,8 @@ async function handleCancelOrder(order) {
               :order="order"
               :default-open="false"
               :cancel-loading="cancelLoadingId === order.id"
+              :detail-loading="detailLoadingIds.has(order.id)"
+              @expand="ensureOrderDetail"
               @review="openReview"
               @cancel-order="handleCancelOrder"
               @request-return="openReturn"

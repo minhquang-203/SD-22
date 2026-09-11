@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class DotGiamGiaRequest {
 
-    @NotBlank(message = "Mã đợt giảm giá không được để trống")
+    /** Tạo mới: backend tự sinh SALE-YYYYMM-XXX. Cập nhật: giữ mã cũ. */
     private String ma;
 
     @NotBlank(message = "Tên đợt giảm giá không được để trống")

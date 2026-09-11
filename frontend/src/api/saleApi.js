@@ -14,6 +14,10 @@ export function createSale(data) {
   return request.post('/sale', data)
 }
 
+export function fetchNextSaleMa() {
+  return request.get('/sale/next-ma')
+}
+
 export function updateSale(id, data) {
   return request.put(`/sale/${id}`, data)
 }

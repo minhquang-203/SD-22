@@ -2,11 +2,14 @@ package org.example.templatejava6.voucher.service;
 
 import org.example.templatejava6.common.entity.PhieuGiamGia;
 import org.example.templatejava6.common.enums.LoaiPhieuGiamGia;
+import org.example.templatejava6.common.enums.PhamViPhieuGiamGia;
 import org.example.templatejava6.common.exception.ApiException;
+import org.example.templatejava6.common.util.MaGenerator;
 import org.example.templatejava6.common.util.MapperUtil;
 import org.example.templatejava6.voucher.model.request.PhieuGiamGiaRequest;
 import org.example.templatejava6.voucher.model.response.PhieuGiamGiaResponse;
 import org.example.templatejava6.voucher.model.response.PhieuGiamGiaStatsResponse;
+import org.example.templatejava6.voucher.repository.KhachHangPhieuGiamGiaRepository;
 import org.example.templatejava6.voucher.repository.PhieuGiamGiaRepository;
 import org.example.templatejava6.order.repository.HoaDonRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +19,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 
 @Service
@@ -29,6 +35,9 @@ public class PhieuGiamGiaService {
 
     @Autowired
     private HoaDonRepository hoaDonRepository;
+
+    @Autowired
+    private KhachHangPhieuGiamGiaRepository khachHangPhieuGiamGiaRepository;
 
     @Transactional(readOnly = true)
     public Page<PhieuGiamGiaResponse> getAll(Pageable pageable) {
@@ -66,13 +75,21 @@ public class PhieuGiamGiaService {
         return new PhieuGiamGiaResponse(getPhieuGiamGiaOrThrow(id));
     }
 
+    @Transactional(readOnly = true)
+    public String previewNextMa() {
+        try {
+            return MaGenerator.randomVoucherCode(6, phieuGiamGiaRepository::existsByMa);
+        } catch (IllegalStateException ex) {
+            throw new ApiException("Không sinh được mã phiếu giảm giá duy nhất", "CODE_GENERATE_FAILED");
+        }
+    }
+
     @Transactional
     public void add(PhieuGiamGiaRequest request) {
         normalizeRequest(request);
         validateRequest(request, true);
-        if (phieuGiamGiaRepository.existsByMa(request.getMa())) {
-            throw new ApiException("Mã phiếu giảm giá đã tồn tại", "DUPLICATE");
-        }
+        String ma = resolveCreateMa(request.getMa());
+        request.setMa(ma);
         PhieuGiamGia pgg = MapperUtil.map(request, PhieuGiamGia.class);
         if (pgg.getGiaTriDonToiThieu() == null) {
             pgg.setGiaTriDonToiThieu(java.math.BigDecimal.ZERO);
@@ -80,9 +97,24 @@ public class PhieuGiamGiaService {
         if (pgg.getPhamVi() == null) {
             pgg.setPhamVi(org.example.templatejava6.common.enums.PhamViPhieuGiamGia.CONG_KHAI);
         }
+        pgg.setMa(ma);
         pgg.setTrangThai(true);
         pgg.setIsActive(true);
         phieuGiamGiaRepository.save(pgg);
+    }
+
+    /** Dùng mã đã xem trước nếu còn hợp lệ; không thì sinh mới. */
+    private String resolveCreateMa(String requested) {
+        if (requested != null
+                && requested.matches("^SNO-[A-Z0-9]{6}$")
+                && !phieuGiamGiaRepository.existsByMa(requested)) {
+            return requested;
+        }
+        try {
+            return MaGenerator.randomVoucherCode(6, phieuGiamGiaRepository::existsByMa);
+        } catch (IllegalStateException ex) {
+            throw new ApiException("Không sinh được mã phiếu giảm giá duy nhất", "CODE_GENERATE_FAILED");
+        }
     }
 
     @Transactional
@@ -101,11 +133,10 @@ public class PhieuGiamGiaService {
         }
         normalizeRequest(request);
         validateRequest(request, false);
-        if (phieuGiamGiaRepository.existsByMaAndIdNot(request.getMa(), id)) {
-            throw new ApiException("Mã phiếu giảm giá đã tồn tại", "DUPLICATE");
-        }
+        String maCu = pgg.getMa();
         MapperUtil.mapToExisting(request, pgg);
         pgg.setId(id);
+        pgg.setMa(maCu);
         if (pgg.getGiaTriDonToiThieu() == null) {
             pgg.setGiaTriDonToiThieu(java.math.BigDecimal.ZERO);
         }
@@ -270,11 +301,41 @@ public class PhieuGiamGiaService {
         );
     }
 
+    /**
+     * Danh sách mã đang hiệu lực khi checkout: hiện tất cả (kể cả mã cá nhân của khách khác),
+     * gắn {@code duocSuDung} để FE khóa chọn nếu khách hiện tại không được phép dùng.
+     */
     @Transactional(readOnly = true)
-    public Page<PhieuGiamGiaResponse> listAvailableForCustomer(String keyword, Pageable pageable) {
+    public Page<PhieuGiamGiaResponse> listAvailableForCustomer(
+            String keyword, Integer idKhachHang, Pageable pageable) {
         String normalizedKeyword = keyword == null ? null : keyword.trim();
-        return phieuGiamGiaRepository.findAvailableForCustomer(normalizedKeyword, pageable)
-                .map(PhieuGiamGiaResponse::new);
+        Set<Integer> assignedIds = loadAssignedVoucherIds(idKhachHang);
+        return phieuGiamGiaRepository
+                .findAvailableForCustomer(normalizedKeyword, pageable)
+                .map(v -> {
+                    PhieuGiamGiaResponse res = new PhieuGiamGiaResponse(v);
+                    res.setDuocSuDung(isDuocSuDung(v, assignedIds));
+                    return res;
+                });
+    }
+
+    private Set<Integer> loadAssignedVoucherIds(Integer idKhachHang) {
+        if (idKhachHang == null) {
+            return Set.of();
+        }
+        return khachHangPhieuGiamGiaRepository.findVoucherByKhachHangId(idKhachHang).stream()
+                .map(PhieuGiamGia::getId)
+                .collect(Collectors.toCollection(HashSet::new));
+    }
+
+    private boolean isDuocSuDung(PhieuGiamGia voucher, Set<Integer> assignedIds) {
+        if (voucher.getPhamVi() == null || voucher.getPhamVi() == PhamViPhieuGiamGia.CONG_KHAI) {
+            return true;
+        }
+        if (voucher.getPhamVi() != PhamViPhieuGiamGia.CA_NHAN) {
+            return true;
+        }
+        return assignedIds.contains(voucher.getId());
     }
 
     /** Danh sách mã giảm giá khả dụng tại quầy (không FREE_SHIP; mã cá nhân theo khách đã chọn). */

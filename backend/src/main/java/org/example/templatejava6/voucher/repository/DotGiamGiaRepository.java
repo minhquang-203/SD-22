@@ -19,6 +19,9 @@ public interface DotGiamGiaRepository extends JpaRepository<DotGiamGia, Integer>
 
     boolean existsByMaAndIdNot(String ma, Integer id);
 
+    @Query("SELECT d.ma FROM DotGiamGia d WHERE d.ma LIKE CONCAT(:prefix, '%')")
+    List<String> findAllMaByPrefix(@Param("prefix") String prefix);
+
     @Query("""
             SELECT d FROM DotGiamGia d
             WHERE d.trangThai = true

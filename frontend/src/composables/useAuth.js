@@ -68,6 +68,12 @@ function applyAuth(data) {
   hoTen.value = data.hoTen || ''
   vaiTro.value = data.vaiTro || 'KHACH_HANG'
   persist()
+  // Không giữ trạng thái checkout guest trên thiết bị sau khi đăng nhập.
+  try {
+    sessionStorage.removeItem('sunova_guest_pending')
+  } catch {
+    // ignore
+  }
   notifyAuthChanged(true)
 }
 

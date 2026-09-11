@@ -52,7 +52,7 @@ public class OrderMailService {
             if (hoaDon == null) {
                 return;
             }
-            String toEmail = hoaDon.getIdKhachHang() != null ? hoaDon.getIdKhachHang().getEmail() : null;
+            String toEmail = resolveToEmail(hoaDon);
             if (toEmail == null || toEmail.isBlank()) {
                 log.warn("[MAIL] Hóa đơn {} không có email khách, bỏ qua gửi hóa đơn điện tử.", hoaDon.getMaHoaDon());
                 return;
@@ -158,7 +158,7 @@ public class OrderMailService {
             if (hoaDon == null) {
                 return;
             }
-            String toEmail = hoaDon.getIdKhachHang() != null ? hoaDon.getIdKhachHang().getEmail() : null;
+            String toEmail = resolveToEmail(hoaDon);
             if (toEmail == null || toEmail.isBlank()) {
                 log.warn("[MAIL] Đơn {} không có email khách, bỏ qua gửi thông báo '{}'.",
                         hoaDon.getMaHoaDon(), subject);
@@ -215,6 +215,18 @@ public class OrderMailService {
                 esc(greeting.isBlank() ? "bạn" : greeting),
                 noiDungHtml,
                 trackingUrl);
+    }
+
+    /**
+     * Email nhận hóa đơn: ưu tiên email người nhận lưu trên hóa đơn (khách chưa đăng nhập),
+     * nếu trống thì lấy email tài khoản khách hàng.
+     */
+    private String resolveToEmail(HoaDon hoaDon) {
+        String emailNguoiNhan = hoaDon.getEmailNguoiNhan();
+        if (emailNguoiNhan != null && !emailNguoiNhan.isBlank()) {
+            return emailNguoiNhan.trim();
+        }
+        return hoaDon.getIdKhachHang() != null ? hoaDon.getIdKhachHang().getEmail() : null;
     }
 
     private String buildInvoiceHtml(HoaDon hoaDon, List<HoaDonChiTietResponse> lines) {

@@ -808,6 +808,21 @@
   background: #fff;
 }
 
+.sale-page .form-group input.sale-ma-readonly:disabled {
+  opacity: 0.65;
+  background: #f3f1eb;
+  color: #3c4147;
+  cursor: not-allowed;
+}
+
+.sale-page .form-group .form-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #6b6f76;
+}
+
 .sale-page .form-group textarea {
   resize: vertical;
   min-height: 72px;

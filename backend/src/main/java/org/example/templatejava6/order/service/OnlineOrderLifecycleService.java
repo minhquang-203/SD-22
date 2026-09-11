@@ -97,14 +97,55 @@ public class OnlineOrderLifecycleService {
         hoanLuotVoucher(hoaDon);
         hoaDon.setTrangThai(TrangThaiDonHang.DA_HUY);
         hoaDonRepository.save(hoaDon);
-        ghiNhatKy(hoaDon, "DA_HUY", ghiChu != null && !ghiChu.isBlank() ? ghiChu : "Hủy đơn online");
-        orderRealtimeService.publishStatusChanged(hoaDon, trangThaiCu);
+        String note = chuanHoaGhiChuHuy(ghiChu);
+        ghiNhatKy(hoaDon, "DA_HUY", note);
+        orderRealtimeService.publishStatusChanged(
+                hoaDon,
+                trangThaiCu,
+                thongBaoHuyChoKhach(hoaDon, note));
 
         if (daThanhToan) {
             refundService.taoHoanTienChoXuLy(
                     hoaDon, LoaiHoanTien.HUY_DON, hoaDon.getThanhTien(), null, null, null, null);
         }
         return true;
+    }
+
+    /** Ghi chú hủy chuẩn hóa để khách/admin phân biệt nguồn hủy. */
+    public static String chuanHoaGhiChuHuy(String ghiChu) {
+        if (ghiChu == null || ghiChu.isBlank()) {
+            return "Cửa hàng hủy đơn hàng";
+        }
+        String note = ghiChu.trim();
+        String lower = note.toLowerCase();
+        if (lower.contains("khách") || lower.contains("khach")) {
+            return note.startsWith("Khách hàng hủy") ? note : "Khách hàng hủy đơn hàng";
+        }
+        if (lower.contains("admin") || lower.contains("cửa hàng") || lower.contains("cua hang")
+                || lower.contains("từ chối") || lower.contains("tu choi") || lower.contains("hủy đơn")) {
+            if (lower.contains("từ chối") || lower.contains("tu choi")) {
+                return "Cửa hàng từ chối đơn hàng";
+            }
+            return "Cửa hàng hủy đơn hàng";
+        }
+        return note;
+    }
+
+    public static boolean laHuyBoiCuaHang(String ghiChu) {
+        if (ghiChu == null || ghiChu.isBlank()) {
+            return true;
+        }
+        String lower = ghiChu.toLowerCase();
+        // Chỉ coi là khách hủy khi ghi chú nói rõ khách.
+        return !(lower.contains("khách") || lower.contains("khach"));
+    }
+
+    private static String thongBaoHuyChoKhach(HoaDon hoaDon, String note) {
+        String ma = hoaDon.getMaHoaDon() != null ? hoaDon.getMaHoaDon() : ("#" + hoaDon.getId());
+        if (laHuyBoiCuaHang(note)) {
+            return "Đơn " + ma + " đã bị cửa hàng hủy.";
+        }
+        return "Đơn " + ma + " đã được hủy.";
     }
 
     /**

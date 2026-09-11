@@ -29,6 +29,8 @@ public class PhieuGiamGiaResponse {
     private Boolean isActive;
     private String timeStatus;
     private String timeStatusLabel;
+    /** Khách đang xem có được phép chọn/áp dụng mã này không (mã cá nhân phải được gán). */
+    private Boolean duocSuDung;
 
     public PhieuGiamGiaResponse(PhieuGiamGia pgg) {
         this.id = pgg.getId();

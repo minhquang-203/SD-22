@@ -51,7 +51,8 @@ const filters = ref({
   canhBao: null,
 })
 
-const LOW_STOCK_THRESHOLD = 10
+/** Sắp hết hàng: tồn < 50 */
+const LOW_STOCK_THRESHOLD = 50
 
 const page = ref(1)
 const pageSize = ref(12)
@@ -102,7 +103,7 @@ const filteredProducts = computed(() => {
     list = list.filter((p) => (p.trangThai !== false) === filters.value.trangThai)
   }
   if (filters.value.canhBao === 'sapHetHang') {
-    list = list.filter((p) => Number(p.tongTon ?? 0) <= LOW_STOCK_THRESHOLD)
+    list = list.filter((p) => Number(p.tongTon ?? 0) < LOW_STOCK_THRESHOLD)
   } else if (filters.value.canhBao === 'canHan') {
     list = list.filter((p) => p.coLoCanHan === true)
   }
@@ -111,7 +112,7 @@ const filteredProducts = computed(() => {
 })
 
 const countSapHetHang = computed(
-  () => allProducts.value.filter((p) => Number(p.tongTon ?? 0) <= LOW_STOCK_THRESHOLD).length,
+  () => allProducts.value.filter((p) => Number(p.tongTon ?? 0) < LOW_STOCK_THRESHOLD).length,
 )
 
 const countCanHan = computed(

@@ -148,7 +148,7 @@
             <h2 class="sg-result__hero-label">SẢN PHẨM CHÂN ÁI CỦA BẠN</h2>
             <div class="sg-hero-card" @click="goToProduct(recommendedProducts[0].id)">
               <div class="sg-hero-card__img">
-                <img v-if="recommendedProducts[0].anhChinhUrl" :src="getImageUrl(recommendedProducts[0].anhChinhUrl)" :alt="recommendedProducts[0].ten" />
+                <img v-if="recommendedProducts[0].anhChinhUrl" :src="productImageUrl(recommendedProducts[0].anhChinhUrl)" :alt="recommendedProducts[0].ten" />
                 <div v-else class="sg-hero-card__placeholder">SUNOVA</div>
               </div>
               <div class="sg-hero-card__info">
@@ -197,7 +197,7 @@
               >
                 <div class="sg-routine-step">BƯỚC {{ ct.thuTu }}</div>
                 <div class="sg-routine-card__img">
-                  <img v-if="ct.anhChinhUrl" :src="getImageUrl(ct.anhChinhUrl)" :alt="ct.tenSanPham" />
+                  <img v-if="ct.anhChinhUrl" :src="productImageUrl(ct.anhChinhUrl)" :alt="ct.tenSanPham" />
                   <div v-else class="sg-routine-card__placeholder">SUNOVA</div>
                 </div>
                 <h4 class="sg-routine-card__name">{{ ct.tenSanPham }}</h4>
@@ -220,7 +220,7 @@
               >
                 <div class="sg-routine-step">LỰA CHỌN {{ index + 2 }}</div>
                 <div class="sg-routine-card__img">
-                  <img v-if="product.anhChinhUrl" :src="getImageUrl(product.anhChinhUrl)" :alt="product.ten" />
+                  <img v-if="product.anhChinhUrl" :src="productImageUrl(product.anhChinhUrl)" :alt="product.ten" />
                   <div v-else class="sg-routine-card__placeholder">SUNOVA</div>
                 </div>
                 <h4 class="sg-routine-card__name">{{ product.ten }}</h4>
@@ -251,6 +251,7 @@ import { getProducts } from '@/api/sanPhamApi';
 import { getQuizQuestions, saveQuizResult } from '@/api/quizApi';
 import { getRoutinesByLoaiDa } from '@/api/routineApi';
 import { rankProductsByQuiz, saveQuizProfile } from '@/utils/quizRecommend';
+import { productImageUrl } from '@/utils/productImage';
 
 const router = useRouter();
 
@@ -529,7 +530,17 @@ const calculateResult = () => {
       }
 
       if (isRoutineValid) {
-        routineCombo.value = fetchedRoutine;
+        // API routine trả anhChinhUrl = null — lấy ảnh từ danh sách sản phẩm đã tải.
+        routineCombo.value = {
+          ...fetchedRoutine,
+          chiTiets: (fetchedRoutine.chiTiets || []).map((ct) => {
+            const p = allProducts.value.find((x) => x.id === ct.idSanPham);
+            return {
+              ...ct,
+              anhChinhUrl: ct.anhChinhUrl || p?.anhChinhUrl || null,
+            };
+          }),
+        };
       } else {
         console.warn("Routine bị từ chối do vi phạm bộ lọc y khoa của khách hàng.");
         routineCombo.value = null; // Lùi về gợi ý tự động
@@ -561,7 +572,6 @@ const recommendProducts = (filters = []) => {
 // NAVIGATION HELPERS
 // ============================================
 const formatPrice = (p) => p ? Math.round(p).toLocaleString('vi-VN') + ' đ' : '0 đ';
-const getImageUrl = (path) => { if (!path) return ''; return path.startsWith('http') ? path : `/uploads/${path}`; };
 
 const goToProducts = () => {
   allowLeave.value = true;

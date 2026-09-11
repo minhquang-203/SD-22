@@ -54,8 +54,8 @@ public interface LoHangRepository extends JpaRepository<LoHang, Integer> {
     int sumSoLuongCon(@Param("idCts") Integer idChiTietSanPham);
 
     /**
-     * ID sản phẩm có ít nhất 1 lô active, còn hàng, HSD trong [today, today+30).
-     * Khớp LoHangResponse.isSapHetHan (còn ≥ 0 và &lt; 30 ngày).
+     * ID sản phẩm có ít nhất 1 lô active, còn hàng, HSD trong [today, limitExclusive).
+     * Khớp LoHangResponse.isSapHetHan khi limitExclusive = today+6 tháng.
      */
     @Query("""
             SELECT DISTINCT cts.sanPham.id FROM LoHang l

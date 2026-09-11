@@ -112,7 +112,7 @@ async function loadProducts() {
         allProducts.value = []
         return
       }
-      const res = await fetchAllProducts({ excludeKhuyenMai: true })
+      const res = await fetchAllProducts()
       allProducts.value = rankProductsByQuiz(activeProducts(res.data || []), {
         scoreMap: profile.scoreMap,
         filters: profile.filters,
@@ -127,10 +127,10 @@ async function loadProducts() {
       const res = await fetchSaleProducts()
       allProducts.value = activeProducts(res.data || [])
     } else if (searchQuery.value.trim()) {
-      const res = await searchProducts(searchQuery.value.trim(), { excludeKhuyenMai: true })
+      const res = await searchProducts(searchQuery.value.trim())
       allProducts.value = activeProducts(res.data || [])
     } else {
-      const res = await fetchAllProducts({ excludeKhuyenMai: true })
+      const res = await fetchAllProducts()
       allProducts.value = activeProducts(res.data || [])
     }
   } catch (e) {
@@ -666,7 +666,20 @@ onMounted(async () => {
       <div class="sf-plp__main">
         <div class="sf-plp__toolbar">
           <div class="sf-sort-tabs">
-            <span class="sf-sort-tabs__label">Sắp xếp</span>
+            <RouterLink
+              to="/san-pham"
+              class="sf-sort-tabs__link"
+              :class="{ active: !isKhuyenMaiPage && !isGoiYPage }"
+            >
+              Tất cả
+            </RouterLink>
+            <RouterLink
+              to="/san-pham/khuyen-mai"
+              class="sf-sort-tabs__link"
+              :class="{ active: isKhuyenMaiPage }"
+            >
+              Khuyến mãi
+            </RouterLink>
             <button
               v-if="isGoiYPage"
               type="button"

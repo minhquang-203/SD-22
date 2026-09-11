@@ -31,6 +31,10 @@ export function createVoucher(data) {
   return request.post("/vouchers", data);
 }
 
+export function fetchNextVoucherMa() {
+  return request.get("/vouchers/next-ma");
+}
+
 export function updateVoucher(id, data) {
   return request.put(`/vouchers/${id}`, data);
 }

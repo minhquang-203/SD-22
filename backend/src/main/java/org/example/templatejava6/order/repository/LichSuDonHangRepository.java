@@ -9,9 +9,9 @@ import java.util.List;
 @Repository
 public interface LichSuDonHangRepository extends JpaRepository<LichSuDonHang, Integer> {
 
-    List<LichSuDonHang> findAllByOrderByThoiGianDesc();
+    List<LichSuDonHang> findAllByOrderByThoiGianDescIdDesc();
 
-    List<LichSuDonHang> findByIdHoaDon_IdOrderByThoiGianDesc(Integer idHoaDon);
+    List<LichSuDonHang> findByIdHoaDon_IdOrderByThoiGianDescIdDesc(Integer idHoaDon);
 
     void deleteByIdHoaDon_Id(Integer idHoaDon);
 }

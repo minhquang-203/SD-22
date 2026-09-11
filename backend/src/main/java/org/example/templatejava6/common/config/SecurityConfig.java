@@ -84,8 +84,12 @@ public class SecurityConfig {
                     .requestMatchers("/api/khach-hang/toi", "/api/khach-hang/toi/**").hasRole("KHACH_HANG")
                     .requestMatchers("/api/yeu-thich/**").hasRole("KHACH_HANG")
                     .requestMatchers("/api/gio-hang", "/api/gio-hang/**").hasRole("KHACH_HANG")
+                    // Checkout khách chưa đăng nhập: công khai, phải đặt TRƯỚC rule /api/online/**
+                    .requestMatchers(HttpMethod.POST, "/api/online/guest/tinh-gia", "/api/online/guest/checkout").permitAll()
                     .requestMatchers("/api/online", "/api/online/**").hasRole("KHACH_HANG")
                     .requestMatchers("/api/hoa-don/cua-toi", "/api/hoa-don/cua-toi/**").hasRole("KHACH_HANG")
+                    .requestMatchers(HttpMethod.POST, "/api/danh-gia/add").hasRole("KHACH_HANG")
+                    .requestMatchers(HttpMethod.PUT, "/api/danh-gia/like/**").hasRole("KHACH_HANG")
                     .requestMatchers("/api/nhan-vien", "/api/nhan-vien/**").hasAnyRole("QUAN_LY", "CHU")
                     .requestMatchers("/api/nhap-hang", "/api/nhap-hang/**").hasAnyRole("QUAN_LY", "CHU")
                     .requestMatchers("/api/nha-cung-cap", "/api/nha-cung-cap/**").hasAnyRole("QUAN_LY", "CHU")
@@ -103,7 +107,8 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.DELETE,
                             "/api/san-pham/**",
                             "/api/chi-tiet-san-pham/**",
-                            "/api/lo-hang/**"
+                            "/api/lo-hang/**",
+                            "/api/danh-gia/**"
                     ).hasAnyRole("QUAN_LY", "CHU")
                     .requestMatchers("/api/**").hasAnyRole("NHAN_VIEN", "QUAN_LY", "CHU")
                     .anyRequest().permitAll()

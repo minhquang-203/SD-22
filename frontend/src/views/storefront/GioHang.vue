@@ -3,8 +3,6 @@ import { onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { confirm } from '@/composables/useConfirm'
-import { useAuth } from '@/composables/useAuth'
-import { useAuthModal } from '@/composables/useAuthModal'
 import {
   maxQtyFor,
   useCart,
@@ -15,8 +13,6 @@ import { formatDiscountPercent, formatVND } from '@/utils/formatVND'
 import { productImageUrl } from '@/utils/productImage'
 
 const router = useRouter()
-const { isLoggedIn } = useAuth()
-const { openAuthModal } = useAuthModal()
 const {
   items,
   selectedCount,
@@ -137,10 +133,7 @@ function toggleAll() {
 
 function buySelected() {
   if (!selectedCount.value) return
-  if (!isLoggedIn.value) {
-    openAuthModal('login', '/dat-hang')
-    return
-  }
+  // Khách chưa đăng nhập vẫn đặt được: sang trang đặt hàng để nhập địa chỉ + email.
   router.push('/dat-hang')
 }
 

@@ -5,16 +5,17 @@ import { Icon } from '@iconify/vue'
 import { formatVND } from '@/utils/formatVND'
 import { productImageUrl } from '@/utils/productImage'
 import { formatOrderDate, orderStatusLabel, orderStatusClass, coTheHuyDon } from '@/utils/orderStatus'
-import { traHangStatusLabel, traHangStatusClass } from '@/utils/returnStatus'
+import { traHangStatusLabelKhach, traHangStatusClass } from '@/utils/returnStatus'
 
 const props = defineProps({
   order: { type: Object, required: true },
   defaultOpen: { type: Boolean, default: false },
   cancelLoading: { type: Boolean, default: false },
   returnActionLoading: { type: Boolean, default: false },
+  detailLoading: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['review', 'cancelOrder', 'requestReturn'])
+const emit = defineEmits(['review', 'cancelOrder', 'requestReturn', 'expand'])
 
 const router = useRouter()
 const hasReturnRequest = computed(() => Boolean(props.order?.idYeuCauTraHang))
@@ -46,7 +47,8 @@ const canRequestReturn = computed(() => props.order?.coTheYeuCauTraHang === true
 
 const headerStatus = computed(() => {
   if (props.order?.trangThaiTraHang) {
-    return props.order.trangThaiTraHangLabel || traHangStatusLabel(props.order.trangThaiTraHang)
+    // Ưu tiên nhãn phía khách theo mã trạng thái (không phụ thuộc label API/admin).
+    return traHangStatusLabelKhach(props.order.trangThaiTraHang, props.order.trangThaiTraHangLabel)
   }
   return orderStatusLabel(props.order?.trangThai)
 })
@@ -91,19 +93,39 @@ const productPreview = computed(() => {
 
 const shippingInfo = computed(() => {
   const order = props.order || {}
+  const trackingCode = order.maVanDon || order.maVanDonGhn || ''
+  const cancelled = order.trangThai === 'DA_HUY'
   let statusLabel = order.ghnTrangThaiLabel
-  if (order.trangThai === 'HOAN_THANH' || order.trangThai === 'TRA_HANG') {
+  if (cancelled) {
+    statusLabel = 'Đã hủy'
+  } else if (order.trangThai === 'HOAN_THANH' || order.trangThai === 'TRA_HANG') {
     statusLabel = 'Đã giao'
+  } else if (!statusLabel && order.trangThai === 'DANG_GIAO') {
+    statusLabel = 'Đang vận chuyển'
+  } else if (!statusLabel && order.trangThai === 'DANG_CHUAN_BI' && trackingCode) {
+    statusLabel = 'Đang chuẩn bị giao'
   }
+  // Đơn hủy / đã giao / trả hàng: không hiện dự kiến giao.
   const showEta = Boolean(
-    order.ghnHenGiao && order.trangThai !== 'HOAN_THANH' && order.trangThai !== 'TRA_HANG',
+    order.ghnHenGiao
+      && !cancelled
+      && order.trangThai !== 'HOAN_THANH'
+      && order.trangThai !== 'TRA_HANG',
   )
   return {
-    carrier: order.donViVanChuyen || (order.maVanDon ? 'Giao hàng nhanh' : ''),
-    trackingCode: order.maVanDon || '',
+    carrier: order.donViVanChuyen || (trackingCode ? 'Giao hàng nhanh' : ''),
+    trackingCode,
     statusLabel: statusLabel || '',
     eta: showEta ? formatOrderDate(order.ghnHenGiao) : '',
   }
+})
+
+const cancelNotice = computed(() => {
+  if (props.order?.trangThai !== 'DA_HUY') return ''
+  if (props.order?.huyBoiCuaHang === false) {
+    return props.order?.lyDoHuy || 'Bạn đã hủy đơn hàng này.'
+  }
+  return props.order?.lyDoHuy || 'Đơn hàng đã bị cửa hàng hủy.'
 })
 
 function onHeadClick() {
@@ -111,7 +133,11 @@ function onHeadClick() {
     router.push(`/tra-cuu-don/tra-hang/${props.order.idYeuCauTraHang}`)
     return
   }
-  isOpen.value = !isOpen.value
+  const opening = !isOpen.value
+  isOpen.value = opening
+  if (opening) {
+    emit('expand', props.order)
+  }
 }
 
 function canReview(line) {
@@ -163,6 +189,14 @@ function canReview(line) {
     </button>
 
     <div v-if="!hasReturnRequest" class="sf-order-card__body">
+      <p v-if="detailLoading && !order.__detailLoaded" class="sf-order-card__detail-loading">
+        Đang tải chi tiết đơn...
+      </p>
+
+      <p v-if="cancelNotice" class="sf-order-card__cancel-notice">
+        {{ cancelNotice }}
+      </p>
+
       <div v-if="order.ngayTao || paymentLabel" class="sf-detail-meta">
         <span v-if="order.ngayTao" class="sf-info-chip">
           <Icon icon="mdi:calendar-blank-outline" width="14" />
@@ -256,9 +290,6 @@ function canReview(line) {
             >
               Đánh giá
             </button>
-            <span v-else-if="line.daDanhGia && line.trangThaiDanhGia === 'CHO_DUYET'" class="sf-review-status sf-review-status--pending">
-              Đang chờ duyệt
-            </span>
             <span v-else-if="line.daDanhGia" class="sf-review-status sf-review-status--done">
               Đã đánh giá
             </span>
@@ -287,12 +318,12 @@ function canReview(line) {
       </div>
 
       <p
-        v-if="order.capNhatGanNhatLuc"
+        v-if="order.capNhatGanNhatLuc || order.trangThai || order.ngayTao"
         class="sf-order-card__latest"
       >
         Cập nhật gần nhất:
-        {{ order.capNhatGanNhatLabel || order.capNhatGanNhatTrangThai }}
-        · {{ formatOrderDate(order.capNhatGanNhatLuc) }}
+        {{ order.capNhatGanNhatLabel || order.trangThaiLabel || orderStatusLabel(order.trangThai) || order.capNhatGanNhatTrangThai }}
+        · {{ formatOrderDate(order.capNhatGanNhatLuc || order.ngayTao) }}
       </p>
 
       <div v-if="canCancel || canRequestReturn" class="sf-order-card__actions">
@@ -347,10 +378,6 @@ function canReview(line) {
   margin-top: 8px;
   font-size: 12px;
   font-weight: 600;
-}
-
-.sf-review-status--pending {
-  color: #d97706;
 }
 
 .sf-review-status--done {
@@ -415,6 +442,12 @@ function canReview(line) {
   margin: 0;
   flex-basis: 100%;
   font-size: 12px;
+  color: rgba(30, 21, 16, 0.55);
+}
+
+.sf-order-card__detail-loading {
+  margin: 0 0 12px;
+  font-size: 13px;
   color: rgba(30, 21, 16, 0.55);
 }
 </style>

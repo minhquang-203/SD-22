@@ -11,7 +11,7 @@ import {
   maskBankAccount,
   refundMethodLabel,
   traHangStatusClass,
-  traHangStatusLabel,
+  traHangStatusLabelKhach,
 } from '@/utils/returnStatus'
 
 const props = defineProps({
@@ -33,7 +33,7 @@ const timeline = computed(() => props.detail?.timeline || [])
 const proofImages = computed(() => (props.detail?.anhUrls || []).filter(Boolean))
 
 const statusLabel = computed(() =>
-  props.detail?.trangThaiLabel || traHangStatusLabel(props.detail?.trangThai),
+  traHangStatusLabelKhach(props.detail?.trangThai, props.detail?.trangThaiLabel),
 )
 
 const productSubtotal = computed(() =>

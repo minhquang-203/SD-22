@@ -5,7 +5,6 @@ import lombok.Setter;
 import org.example.templatejava6.product.entity.LoHang;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 
 @Getter
 @Setter
@@ -41,7 +40,7 @@ public class LoHangResponse {
         if (hanSuDung == null) {
             return false;
         }
-        long days = ChronoUnit.DAYS.between(LocalDate.now(), hanSuDung);
-        return days >= 0 && days < 30;
+        LocalDate today = LocalDate.now();
+        return !hanSuDung.isBefore(today) && hanSuDung.isBefore(today.plusMonths(6));
     }
 }

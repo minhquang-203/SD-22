@@ -44,6 +44,11 @@ public class PhieuGiamGiaController {
         return ResponseEntity.ok(phieuGiamGiaService.getStats());
     }
 
+    /** Xem trước mã SNO-XXXXXX khi mở form tạo (chưa lưu). */
+    @GetMapping("/next-ma")
+    public ResponseEntity<Map<String, String>> nextMa() {
+        return ResponseEntity.ok(Map.of("ma", phieuGiamGiaService.previewNextMa()));
+    }
 
     // 2. GET BY ID
     @GetMapping("/{id}")

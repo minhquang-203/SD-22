@@ -41,14 +41,21 @@ public class CustomerNotificationListener {
         }
 
         String ma = payload.getMaHoaDon() != null ? payload.getMaHoaDon() : ("#" + payload.getIdHoaDon());
-        String noiDung = TrangThaiDonHang.DA_HUY.name().equals(payload.getTrangThai())
-                ? "Đơn " + ma + " đã bị hủy."
-                : "Đơn " + ma + " đã chuyển sang: " + nhan(payload) + ".";
+        String noiDung;
+        if (TrangThaiDonHang.DA_HUY.name().equals(payload.getTrangThai())) {
+            noiDung = payload.getMessage() != null && !payload.getMessage().isBlank()
+                    ? payload.getMessage()
+                    : ("Đơn " + ma + " đã bị hủy.");
+        } else {
+            noiDung = "Đơn " + ma + " đã chuyển sang: " + nhan(payload) + ".";
+        }
 
         thongBaoService.taoThongBaoKhach(
                 payload.getIdKhachHang(),
                 LoaiThongBao.DON_HANG_CAP_NHAT,
-                "Cập nhật đơn hàng",
+                TrangThaiDonHang.DA_HUY.name().equals(payload.getTrangThai())
+                        ? "Đơn hàng đã hủy"
+                        : "Cập nhật đơn hàng",
                 noiDung,
                 LINK_DON_HANG,
                 payload.getIdHoaDon(),

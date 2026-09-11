@@ -46,7 +46,7 @@ public class LichSuDonHangService {
 
     public List<LichSuDonHangResponse> getAll() {
 
-        return lichSuDonHangRepository.findAllByOrderByThoiGianDesc()
+        return lichSuDonHangRepository.findAllByOrderByThoiGianDescIdDesc()
 
                 .stream().map(LichSuDonHangResponse::new).toList();
 
@@ -59,7 +59,7 @@ public class LichSuDonHangService {
 
         hoaDonService.getHoaDonOrThrow(idHoaDon);
 
-        return lichSuDonHangRepository.findByIdHoaDon_IdOrderByThoiGianDesc(idHoaDon)
+        return lichSuDonHangRepository.findByIdHoaDon_IdOrderByThoiGianDescIdDesc(idHoaDon)
 
                 .stream().map(LichSuDonHangResponse::new).toList();
 

@@ -34,6 +34,11 @@ public class StorefrontOrderDetailResponse {
     private String capNhatGanNhatLabel;
     private LocalDateTime capNhatGanNhatLuc;
 
+    /** Ghi chú hủy đơn (từ lịch sử DA_HUY). */
+    private String lyDoHuy;
+    /** true nếu cửa hàng/admin hủy; false nếu khách tự hủy. */
+    private Boolean huyBoiCuaHang;
+
     private Boolean coTheYeuCauTraHang;
     private Integer idYeuCauTraHang;
     private String trangThaiTraHang;

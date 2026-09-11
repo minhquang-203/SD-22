@@ -90,7 +90,7 @@ const router = createRouter({
           path: 'dat-hang',
           name: 'DatHang',
           component: () => import('@/views/storefront/DatHang.vue'),
-          meta: { title: 'Đặt hàng — SUNOVA', requiresAuth: true },
+          meta: { title: 'Đặt hàng — SUNOVA' },
         },
         {
           path: 'tai-khoan',

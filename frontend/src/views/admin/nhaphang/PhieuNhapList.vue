@@ -1,6 +1,8 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { Icon } from '@iconify/vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
 import {
   getNhaCungCapList,
   getPhieuNhapList,
@@ -28,10 +30,10 @@ const STATUS_LABEL = {
   DA_HUY: 'Đã hủy',
 }
 
-function statusClass(st) {
-  if (st === 'DA_NHAP') return 'pn-badge--ok'
-  if (st === 'DA_HUY') return 'pn-badge--muted'
-  return 'pn-badge--draft'
+function statusTone(st) {
+  if (st === 'DA_NHAP') return 'ok'
+  if (st === 'DA_HUY') return 'muted'
+  return 'draft'
 }
 
 function formatMoney(v) {
@@ -72,6 +74,11 @@ async function load() {
   }
 }
 
+function resetFilters() {
+  filters.value = { trangThai: '', idNcc: '', from: '', to: '' }
+  load()
+}
+
 function openCreate() {
   router.push('/admin/nhap-hang/tao')
 }
@@ -106,222 +113,352 @@ onMounted(async () => {
 
 <template>
   <div class="pn-page">
-    <div class="pn-page__head">
-      <div>
-        <h1 class="pn-page__title">Nhập hàng</h1>
-        <p class="pn-page__sub">Phiếu nhập kho từ nhà cung cấp — mỗi dòng sinh một lô khi hoàn thành.</p>
+    <PageHeader
+      title="Nhập hàng"
+      description="Phiếu nhập kho từ nhà cung cấp"
+    >
+      <template #actions>
+        <button type="button" class="soleil-btn-primary" @click="openCreate">
+          <Icon icon="icon-park-outline:plus" width="16" />
+          Nhập hàng
+        </button>
+      </template>
+    </PageHeader>
+
+    <div class="soleil-toolbar soleil-toolbar--filter pn-filters">
+      <div class="soleil-toolbar__field">
+        <label class="soleil-toolbar__label">Trạng thái</label>
+        <select v-model="filters.trangThai" class="soleil-toolbar__select">
+          <option value="">Tất cả</option>
+          <option value="PHIEU_TAM">Phiếu tạm</option>
+          <option value="DA_NHAP">Đã nhập</option>
+          <option value="DA_HUY">Đã hủy</option>
+        </select>
       </div>
-      <button type="button" class="admin-btn admin-btn-primary" @click="openCreate">
-        ＋ Nhập hàng
+      <div class="soleil-toolbar__field soleil-toolbar__field--wide">
+        <label class="soleil-toolbar__label">Nhà cung cấp</label>
+        <select v-model="filters.idNcc" class="soleil-toolbar__select">
+          <option value="">Tất cả</option>
+          <option v-for="n in nccOptions" :key="n.id" :value="n.id">{{ n.ten }}</option>
+        </select>
+      </div>
+      <div class="soleil-toolbar__field">
+        <label class="soleil-toolbar__label">Từ ngày</label>
+        <input v-model="filters.from" type="date" class="soleil-toolbar__input pn-date" />
+      </div>
+      <div class="soleil-toolbar__field">
+        <label class="soleil-toolbar__label">Đến ngày</label>
+        <input v-model="filters.to" type="date" class="soleil-toolbar__input pn-date" />
+      </div>
+      <button type="button" class="soleil-btn-outline" @click="load">
+        <Icon icon="icon-park-outline:filter" width="15" />
+        Lọc
+      </button>
+      <button type="button" class="soleil-btn-outline" title="Xóa bộ lọc" @click="resetFilters">
+        <Icon icon="icon-park-outline:refresh" width="15" />
       </button>
     </div>
 
-    <div class="pn-filters admin-card">
-      <div class="pn-filters__grid">
-        <label>
-          <span>Trạng thái</span>
-          <select v-model="filters.trangThai" class="admin-select">
-            <option value="">Tất cả</option>
-            <option value="PHIEU_TAM">Phiếu tạm</option>
-            <option value="DA_NHAP">Đã nhập</option>
-            <option value="DA_HUY">Đã hủy</option>
-          </select>
-        </label>
-        <label>
-          <span>Nhà cung cấp</span>
-          <select v-model="filters.idNcc" class="admin-select">
-            <option value="">Tất cả</option>
-            <option v-for="n in nccOptions" :key="n.id" :value="n.id">{{ n.ten }}</option>
-          </select>
-        </label>
-        <label>
-          <span>Từ ngày</span>
-          <input v-model="filters.from" type="date" class="admin-input" />
-        </label>
-        <label>
-          <span>Đến ngày</span>
-          <input v-model="filters.to" type="date" class="admin-input" />
-        </label>
-        <div class="pn-filters__actions">
-          <button type="button" class="admin-btn admin-btn-default" @click="load">Lọc</button>
-        </div>
+    <div class="soleil-table-card pn-table-card">
+      <div class="soleil-table-card__head">
+        <span class="pn-table-title">Danh sách phiếu nhập</span>
+        <span class="pn-table-meta">{{ rows.length }} phiếu</span>
       </div>
-    </div>
 
-    <div class="admin-card pn-table-wrap">
-      <div v-if="loading" class="pn-empty">Đang tải…</div>
-      <div v-else-if="!rows.length" class="pn-empty">
-        Chưa có phiếu nhập. Bấm «＋ Nhập hàng» để tạo phiếu đầu tiên.
-      </div>
-      <table v-else class="pn-table">
-        <thead>
-          <tr>
-            <th>Mã phiếu</th>
-            <th>Ngày nhập</th>
-            <th>Nhà cung cấp</th>
-            <th>Tổng tiền</th>
-            <th>Trạng thái</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="row in rows" :key="row.id">
-            <td class="pn-mono">{{ row.maPhieuNhap }}</td>
-            <td>{{ formatDate(row.ngayTao) }}</td>
-            <td>{{ row.tenNhaCungCap || '—' }}</td>
-            <td class="pn-money">{{ formatMoney(row.tongTien) }}</td>
-            <td>
-              <span class="pn-badge" :class="statusClass(row.trangThai)">
-                {{ STATUS_LABEL[row.trangThai] || row.trangThai }}
-              </span>
-            </td>
-            <td class="pn-actions">
-              <button type="button" class="admin-btn admin-btn-default" @click="openDetail(row)">
-                {{ row.trangThai === 'PHIEU_TAM' ? 'Sửa' : 'Xem' }}
-              </button>
-              <button
-                v-if="row.trangThai === 'PHIEU_TAM'"
-                type="button"
-                class="admin-btn admin-btn-danger"
-                @click="onHuy(row)"
+      <div class="overflow-x-auto">
+        <table class="soleil-table admin-table--soleil pn-table">
+          <thead>
+            <tr>
+              <th class="soleil-col-text">Mã phiếu</th>
+              <th class="soleil-col-text">Ngày nhập</th>
+              <th class="soleil-col-text">Nhà cung cấp</th>
+              <th class="soleil-col-num">Tổng tiền</th>
+              <th class="soleil-col-center">Trạng thái</th>
+              <th class="soleil-col-center">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="loading">
+              <td colspan="6" class="pn-empty-cell">Đang tải…</td>
+            </tr>
+            <tr v-else-if="!rows.length">
+              <td colspan="6" class="pn-empty-cell">
+                Chưa có phiếu nhập. Bấm «Nhập hàng» để tạo phiếu đầu tiên.
+              </td>
+            </tr>
+            <template v-else>
+              <tr
+                v-for="row in rows"
+                :key="row.id"
+                class="pn-row"
+                :class="{ 'pn-row--draft': row.trangThai === 'PHIEU_TAM' }"
               >
-                Hủy
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+                <td class="soleil-col-text">
+                  <button type="button" class="pn-code" @click="openDetail(row)">
+                    {{ row.maPhieuNhap }}
+                  </button>
+                </td>
+                <td class="soleil-col-text">
+                  <span class="pn-date-text">{{ formatDate(row.ngayTao) }}</span>
+                </td>
+                <td class="soleil-col-text">
+                  <span class="pn-ncc">{{ row.tenNhaCungCap || '—' }}</span>
+                </td>
+                <td class="soleil-col-num">
+                  <span class="pn-money">{{ formatMoney(row.tongTien) }}</span>
+                </td>
+                <td class="soleil-col-center">
+                  <span class="pn-badge" :class="`pn-badge--${statusTone(row.trangThai)}`">
+                    {{ STATUS_LABEL[row.trangThai] || row.trangThai }}
+                  </span>
+                </td>
+                <td class="soleil-col-center">
+                  <div class="soleil-actions-cell pn-actions">
+                    <button
+                      type="button"
+                      class="soleil-act-btn"
+                      :title="row.trangThai === 'PHIEU_TAM' ? 'Sửa phiếu' : 'Xem phiếu'"
+                      @click="openDetail(row)"
+                    >
+                      <Icon
+                        :icon="row.trangThai === 'PHIEU_TAM' ? 'icon-park-outline:edit' : 'icon-park-outline:eyes'"
+                        width="16"
+                      />
+                    </button>
+                    <button
+                      v-if="row.trangThai === 'PHIEU_TAM'"
+                      type="button"
+                      class="soleil-act-btn soleil-act-btn--danger"
+                      title="Hủy phiếu"
+                      @click="onHuy(row)"
+                    >
+                      <Icon icon="icon-park-outline:close-one" width="16" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .pn-page {
+  --pn-ink: #1a120c;
+  --pn-muted: #5c4f42;
+  --pn-line: #c9b8a4;
+  --pn-line-strong: #a89278;
+  --pn-surface: #ffffff;
+  --pn-ok: #14532d;
+  --pn-ok-bg: #dcfce7;
+  --pn-draft: #9a3412;
+  --pn-draft-bg: #ffedd5;
+  --pn-cancel: #3f3f46;
+  --pn-cancel-bg: #e4e4e7;
+
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.85rem;
+  color: var(--pn-ink);
 }
 
-.pn-page__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.pn-page__title {
+.pn-page :deep(.soleil-page-header) {
   margin: 0;
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: var(--admin-text, #1a1814);
 }
 
-.pn-page__sub {
-  margin: 0.35rem 0 0;
-  font-size: 0.875rem;
-  color: var(--admin-muted, #8a7b6a);
+.pn-page :deep(.soleil-page-header__title) {
+  font-family: inherit;
+  font-size: 1.35rem;
+  font-weight: 800;
+  font-style: normal;
+  letter-spacing: 0.02em;
+  color: var(--pn-ink);
+}
+
+.pn-page :deep(.soleil-page-header__desc) {
+  margin: 0.25rem 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pn-muted);
 }
 
 .pn-filters {
-  padding: 1rem 1.15rem;
+  border-color: var(--pn-line) !important;
+  box-shadow: 0 1px 0 rgba(26, 18, 12, 0.04);
 }
 
-.pn-filters__grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.75rem;
-  align-items: end;
+.pn-filters :deep(.soleil-toolbar__label) {
+  color: var(--pn-ink);
+  font-weight: 700;
 }
 
-.pn-filters label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.75rem;
+.pn-filters :deep(.soleil-toolbar__input),
+.pn-filters :deep(.soleil-toolbar__select) {
+  border-color: var(--pn-line-strong);
+  background: #fff;
+  color: var(--pn-ink);
+  font-weight: 500;
+}
+
+.pn-filters :deep(.soleil-toolbar__input:focus),
+.pn-filters :deep(.soleil-toolbar__select:focus) {
+  border-color: #8b6914;
+  background: #fff;
+}
+
+.pn-date {
+  padding-left: 14px !important;
+}
+
+.pn-table-card {
+  border-color: var(--pn-line-strong) !important;
+}
+
+.pn-table-card :deep(.soleil-table-card__head) {
+  border-bottom-color: var(--pn-line);
+  background: #fff;
+}
+
+.pn-table-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--pn-ink);
+}
+
+.pn-table-meta {
+  margin-left: auto;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--admin-muted, #8a7b6a);
+  color: var(--pn-muted);
 }
 
-.pn-filters__actions {
-  display: flex;
-  align-items: flex-end;
+.pn-table-card :deep(table.pn-table thead th) {
+  background: #8f7349 !important;
+  color: #fffef9 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+  border-bottom: none !important;
 }
 
-.pn-table-wrap {
+.pn-table-card :deep(table.pn-table tbody td) {
+  color: var(--pn-ink);
+  border-bottom: 1px solid var(--pn-line);
+  font-size: 13.5px;
+}
+
+.pn-table-card :deep(table.pn-table tbody tr:hover) {
+  background: #f7f1e8 !important;
+}
+
+.pn-empty-cell {
+  text-align: center;
+  padding: 2.5rem 1rem !important;
+  color: var(--pn-muted);
+  font-weight: 500;
+}
+
+.pn-row--draft {
+  background: #fff7ed;
+}
+
+.pn-code {
+  border: none;
+  background: none;
   padding: 0;
-  overflow: hidden;
+  font-family: ui-monospace, 'Cascadia Mono', monospace;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #0f4c52;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
-.pn-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
+.pn-code:hover {
+  color: #062f33;
 }
 
-.pn-table th,
-.pn-table td {
-  padding: 0.85rem 1rem;
-  text-align: left;
-  border-bottom: 1px solid var(--admin-border, #e8dcc8);
+.pn-date-text,
+.pn-ncc {
+  color: var(--pn-ink);
 }
 
-.pn-table th {
-  background: rgba(201, 169, 110, 0.12);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--admin-muted, #8a7b6a);
-}
-
-.pn-mono {
-  font-family: ui-monospace, monospace;
+.pn-ncc {
   font-weight: 600;
 }
 
 .pn-money {
-  font-weight: 600;
-  color: var(--admin-text, #1a1814);
+  font-family: ui-monospace, 'Cascadia Mono', monospace;
+  font-weight: 800;
+  color: var(--pn-ink);
+  white-space: nowrap;
 }
 
 .pn-badge {
   display: inline-flex;
-  padding: 0.25rem 0.65rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 700;
+  align-items: center;
+  padding: 0.3rem 0.7rem;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .pn-badge--draft {
-  background: rgba(201, 169, 110, 0.25);
-  color: #7a5a28;
+  background: var(--pn-draft-bg);
+  border-color: #fdba74;
+  color: var(--pn-draft);
 }
 
 .pn-badge--ok {
-  background: rgba(122, 140, 110, 0.25);
-  color: #3d5a34;
+  background: var(--pn-ok-bg);
+  border-color: #86efac;
+  color: var(--pn-ok);
 }
 
 .pn-badge--muted {
-  background: rgba(138, 123, 106, 0.18);
-  color: #6a5c4e;
+  background: var(--pn-cancel-bg);
+  border-color: #a1a1aa;
+  color: var(--pn-cancel);
 }
 
 .pn-actions {
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
+  justify-content: center;
 }
 
-.pn-empty {
-  padding: 2.5rem 1rem;
+.pn-actions :deep(.soleil-act-btn) {
+  border-color: var(--pn-line-strong);
+  color: var(--pn-ink);
+  background: #fff;
+}
+
+.pn-actions :deep(.soleil-act-btn:hover) {
+  border-color: #8f7349;
+  color: #6b542f;
+  background: #f7f1e8;
+}
+
+:deep(.soleil-col-center) {
   text-align: center;
-  color: var(--admin-muted, #8a7b6a);
 }
 
-@media (max-width: 960px) {
-  .pn-filters__grid {
-    grid-template-columns: 1fr 1fr;
-  }
+:deep(.soleil-col-num) {
+  text-align: right;
+}
+
+.soleil-act-btn--danger {
+  color: #991b1b !important;
+}
+
+.soleil-act-btn--danger:hover {
+  background: #fee2e2 !important;
+  border-color: #f87171 !important;
+  color: #7f1d1d !important;
 }
 </style>

@@ -327,7 +327,7 @@ public class HoaDonService {
 
         if (trangThaiMoi == TrangThaiDonHang.DA_HUY) {
 
-            String note = ghiChu != null && !ghiChu.isBlank() ? ghiChu : "Hủy đơn hàng";
+            String note = ghiChu != null && !ghiChu.isBlank() ? ghiChu : "Cửa hàng hủy đơn hàng";
 
             if ("ONLINE".equalsIgnoreCase(hd.getLoaiDon()) && trangThaiCu.coTheHuyTruocKhiGiao()) {
 
@@ -373,7 +373,13 @@ public class HoaDonService {
 
         }
 
-        orderRealtimeService.publishStatusChanged(hd, trangThaiCu);
+        if (trangThaiMoi == TrangThaiDonHang.DA_HUY) {
+            String ma = hd.getMaHoaDon() != null ? hd.getMaHoaDon() : ("#" + hd.getId());
+            orderRealtimeService.publishStatusChanged(
+                    hd, trangThaiCu, "Đơn " + ma + " đã bị cửa hàng hủy.");
+        } else {
+            orderRealtimeService.publishStatusChanged(hd, trangThaiCu);
+        }
 
     }
 
@@ -620,7 +626,7 @@ public class HoaDonService {
 
         HoaDon hd = getHoaDonOrThrow(id);
 
-        String note = ghiChu != null && !ghiChu.isBlank() ? ghiChu : "Admin từ chối đơn hàng";
+        String note = ghiChu != null && !ghiChu.isBlank() ? ghiChu : "Cửa hàng hủy đơn hàng";
 
         if ("ONLINE".equalsIgnoreCase(hd.getLoaiDon())) {
 

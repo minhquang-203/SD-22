@@ -13,23 +13,13 @@ import java.util.Optional;
 @Repository
 public interface DanhGiaRepository extends JpaRepository<DanhGia, Integer> {
 
-    List<DanhGia> findBySanPhamAndTrangThai(SanPham sanPham, String trangThai);
+    List<DanhGia> findBySanPhamOrderByNgayTaoDesc(SanPham sanPham);
 
     Optional<DanhGia> findFirstByHoaDonChiTiet_Id(Integer idHoaDonChiTiet);
 
-    List<DanhGia> findByTrangThai(String trangThai);
+    @Query("SELECT AVG(d.soSao) FROM DanhGia d WHERE d.sanPham.id = :idSanPham")
+    Double findAverageRatingBySanPham(@Param("idSanPham") Integer idSanPham);
 
-    @Query("SELECT AVG(d.soSao) FROM DanhGia d WHERE d.sanPham.id = :idSanPham AND d.trangThai = :trangThai")
-    Double findAverageRatingBySanPham(@Param("idSanPham") Integer idSanPham, @Param("trangThai") String trangThai);
-
-    @Query("SELECT COUNT(d) FROM DanhGia d WHERE d.sanPham.id = :idSanPham AND d.trangThai = :trangThai")
-    Long countApprovedBySanPham(@Param("idSanPham") Integer idSanPham, @Param("trangThai") String trangThai);
-
-    default Double findAverageRatingBySanPham(Integer idSanPham) {
-        return findAverageRatingBySanPham(idSanPham, "DA_DUYET");
-    }
-
-    default Long countApprovedBySanPham(Integer idSanPham) {
-        return countApprovedBySanPham(idSanPham, "DA_DUYET");
-    }
+    @Query("SELECT COUNT(d) FROM DanhGia d WHERE d.sanPham.id = :idSanPham")
+    Long countBySanPhamId(@Param("idSanPham") Integer idSanPham);
 }

@@ -152,7 +152,13 @@ public class GhnOrderSyncService {
         if (hoaDon.getIdKhachHang() != null) {
             hoaDon.getIdKhachHang().getId();
         }
-        orderRealtimeService.publishStatusChanged(hoaDon, trangThaiHienTai);
+        if (trangThaiMoi == TrangThaiDonHang.DA_HUY) {
+            String ma = hoaDon.getMaHoaDon() != null ? hoaDon.getMaHoaDon() : ("#" + hoaDon.getId());
+            orderRealtimeService.publishStatusChanged(
+                    hoaDon, trangThaiHienTai, "Đơn " + ma + " đã bị hủy.");
+        } else {
+            orderRealtimeService.publishStatusChanged(hoaDon, trangThaiHienTai);
+        }
 
         log.info("Cap nhat tu GHN: don {} {} -> {} (GHN status={})",
                 hoaDon.getMaHoaDon(), trangThaiHienTai, trangThaiMoi, status);

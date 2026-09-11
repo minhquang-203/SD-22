@@ -43,7 +43,7 @@ public class SanPhamController {
         return sanPhamService.previewMaTiepTheo();
     }
 
-    /** Đếm SP sắp hết hàng (tồn ≤ 10) và cận hạn (lô ≤ 30 ngày) — cho badge sidebar. */
+    /** Đếm SP sắp hết hàng (tồn &lt; 50) và cận hạn (lô &lt; 6 tháng) — cho badge sidebar. */
     @GetMapping("canh-bao-count")
     public SanPhamCanhBaoCountResponse canhBaoCount() {
         return sanPhamService.canhBaoCount();

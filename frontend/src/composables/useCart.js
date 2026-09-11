@@ -150,30 +150,18 @@ async function refreshCart(options = {}) {
   return currentLoadPromise
 }
 
+/**
+ * Đăng nhập: không gộp giỏ/local guest vào tài khoản.
+ * Bỏ giỏ localStorage, chỉ tải giỏ server của khách đang đăng nhập.
+ */
 async function syncCartAfterLogin() {
   const idKhachHang = customerIdOrNull()
   if (!idKhachHang) return null
 
-  const localItems = [...items.value]
-  loading.value = true
-  try {
-    for (const line of localItems) {
-      if (!line.idChiTietSanPham || !line.soLuong) continue
-      const res = await addGioHangItem({
-        idKhachHang,
-        idChiTietSanPham: line.idChiTietSanPham,
-        soLuong: line.soLuong,
-      })
-      applyCartResponse(res.data)
-    }
-    if (!localItems.length) {
-      await refreshCart()
-    }
-    clearLocal()
-    return items.value
-  } finally {
-    loading.value = false
-  }
+  clearLocal()
+  items.value = []
+  loadedCustomerId = null
+  return refreshCart({ force: true })
 }
 
 if (typeof window !== 'undefined') {
@@ -366,6 +354,20 @@ export function useCart() {
     return refreshCart({ force: true })
   }
 
+  /**
+   * Khách chưa đăng nhập: giỏ nằm ở localStorage nên xóa theo idChiTietSanPham (biến thể) đã mua.
+   */
+  async function syncAfterGuestCheckout(idsChiTietSanPham = []) {
+    const idSet = new Set(
+      (idsChiTietSanPham || []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0),
+    )
+    if (idSet.size) {
+      items.value = items.value.filter((line) => !idSet.has(Number(line.idChiTietSanPham)))
+      saveLocal()
+    }
+    return refreshCart({ force: true })
+  }
+
   return {
     items,
     loading,
@@ -387,6 +389,7 @@ export function useCart() {
     clearCart,
     refreshCart,
     syncAfterCheckout,
+    syncAfterGuestCheckout,
     syncCartAfterLogin,
   }
 }

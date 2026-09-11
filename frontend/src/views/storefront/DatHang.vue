@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
-import { createOnlineCheckout, tinhGiaOnline } from '@/api/onlineCheckout'
+import { createGuestCheckout, createOnlineCheckout, tinhGiaOnline } from '@/api/onlineCheckout'
 import { fetchDiaChiToi, fetchKhachToi } from '@/api/khachHangApi'
 import { calcShippingFee, fetchProvinces, fetchWards, isNewWardCode } from '@/api/shipping'
 import { useAuth } from '@/composables/useAuth'
@@ -15,6 +15,8 @@ import { getPhoneValidationError, normalizePhoneDigits } from '@/utils/phone'
 import { productImageUrl } from '@/utils/productImage'
 import CheckoutRecipientModal from '@/components/storefront/CheckoutRecipientModal.vue'
 import CheckoutVoucherModal from '@/components/storefront/CheckoutVoucherModal.vue'
+import codLogo from '@/assets/payment/cod.svg'
+import vnpayLogo from '@/assets/payment/vnpay.svg'
 
 const SHIPPING_FEE = 30000
 
@@ -30,6 +32,7 @@ const {
   selectedSavings,
   refreshCart,
   syncAfterCheckout,
+  syncAfterGuestCheckout,
 } = useCart()
 
 const profileLoading = ref(false)
@@ -38,6 +41,23 @@ const submitting = ref(false)
 const selectedPayment = ref('COD')
 const orderResult = ref(null)
 const paymentCallback = ref(null)
+
+// Khách chưa đăng nhập: nhớ email để hiển thị màn thành công + sync giỏ sau khi VNPay redirect về.
+const GUEST_PENDING_KEY = 'sunova_guest_pending'
+const guestCheckoutEmail = ref('')
+
+function readGuestPending() {
+  try {
+    const raw = sessionStorage.getItem(GUEST_PENDING_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function clearGuestPending() {
+  sessionStorage.removeItem(GUEST_PENDING_KEY)
+}
 
 function newIdempotencyKey() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -75,7 +95,7 @@ const addressLoading = reactive({ provinces: false, wards: false })
 const ghnFee = ref(null)
 const feeLoading = ref(false)
 const feeNotice = ref('')
-const fieldErrors = reactive({ soDienThoai: '', diaChiCuThe: '' })
+const fieldErrors = reactive({ soDienThoai: '', diaChiCuThe: '', email: '' })
 const showVoucherModal = ref(false)
 const voucherDiscount = ref(0)
 const voucherPricingLoading = ref(false)
@@ -83,17 +103,21 @@ const voucherPricingLoading = ref(false)
 const paymentMethods = [
   {
     code: 'COD',
-    name: 'Thanh toán khi nhận',
-    icon: 'solar:wallet-money-linear',
+    name: 'Thanh toán khi nhận hàng (COD)',
+    logo: codLogo,
     description: 'Thanh toán tiền mặt khi nhận hàng. Đơn chờ shop xác nhận trước khi giao.',
   },
   {
     code: 'VNPAY',
-    name: 'VNPay',
-    icon: 'solar:card-transfer-linear',
-    description: 'Chuyển đến VNPay để thanh toán. Đơn được giữ tạm và chỉ xác nhận sau khi thanh toán thành công; nếu thất bại hoặc quá hạn, đơn sẽ tự hủy và hoàn tồn kho.',
+    name: 'Thanh toán qua VNPay',
+    logo: vnpayLogo,
+    description: 'Thanh toán online qua VNPay. Đơn chỉ xác nhận khi thành công; thất bại hoặc quá hạn sẽ tự hủy.',
   },
 ]
+
+const selectedPaymentMethod = computed(
+  () => paymentMethods.find((method) => method.code === selectedPayment.value) || paymentMethods[0],
+)
 
 const shippingFee = computed(() => {
   if (ghnFee.value != null) return ghnFee.value
@@ -359,6 +383,18 @@ function validateCheckout() {
     fieldErrors.soDienThoai = phoneError
     return phoneError
   }
+  if (!isLoggedIn.value) {
+    const email = form.email.trim()
+    if (!email) {
+      fieldErrors.email = 'Vui lòng nhập email để nhận thông tin đơn hàng'
+      return fieldErrors.email
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      fieldErrors.email = 'Email không hợp lệ'
+      return fieldErrors.email
+    }
+    fieldErrors.email = ''
+  }
   if (!form.provinceId) return 'Vui lòng chọn tỉnh / thành phố'
   if (!form.wardCode) return 'Vui lòng chọn phường / xã'
   if (!form.diaChiCuThe.trim()) {
@@ -366,7 +402,8 @@ function validateCheckout() {
     return fieldErrors.diaChiCuThe
   }
   if (!buildAddress()) return 'Vui lòng nhập địa chỉ giao hàng'
-  if (!selectedItems.value.every((line) => line.idChiTietGioHang)) {
+  // Khách vãng lai không có giỏ server nên không cần idChiTietGioHang.
+  if (isLoggedIn.value && !selectedItems.value.every((line) => line.idChiTietGioHang)) {
     return 'Giỏ hàng chưa đồng bộ. Vui lòng tải lại giỏ hàng rồi thử lại'
   }
   return ''
@@ -462,12 +499,21 @@ function parsePaymentCallback() {
   router.replace({ path: route.path })
 
   if (paymentCallback.value.success) {
-    void syncAfterCheckout().catch(() => {})
+    const pending = readGuestPending()
+    if (pending) {
+      // Khách vãng lai vừa thanh toán VNPay xong: xóa biến thể đã mua khỏi giỏ localStorage.
+      guestCheckoutEmail.value = pending.email || ''
+      void syncAfterGuestCheckout(pending.ids || []).catch(() => {})
+      clearGuestPending()
+    } else {
+      void syncAfterCheckout().catch(() => {})
+    }
     // Thanh toán VNPAY xong -> xoay key cho lần đặt kế tiếp.
     idempotencyKey.value = newIdempotencyKey()
     toast('Thanh toán thành công')
   } else {
     // Thanh toán hủy/thất bại: đơn đã xóa phía server, giỏ vẫn nguyên — sync lại UI.
+    clearGuestPending()
     void refreshCart({ force: true }).catch(() => {})
     toast(paymentCallback.value.message || 'Thanh toán thất bại')
   }
@@ -493,6 +539,52 @@ async function submitCheckout() {
   orderResult.value = null
   try {
     const diaChiGiao = compactText(`${form.hoTen.trim()} - ${form.soDienThoai.trim()}, ${buildAddress()}`)
+
+    // ===== Khách chưa đăng nhập: gửi thẳng danh sách biến thể + email nhận hóa đơn =====
+    if (!isLoggedIn.value) {
+      const guestItems = selectedItems.value.map((line) => ({
+        idChiTietSanPham: line.idChiTietSanPham,
+        soLuong: line.soLuong,
+      }))
+      const purchasedVariantIds = guestItems.map((item) => item.idChiTietSanPham)
+      guestCheckoutEmail.value = form.email.trim()
+      if (selectedPayment.value === 'VNPAY') {
+        // VNPay redirect full-page: lưu tạm để sync giỏ + hiển thị email khi quay lại.
+        sessionStorage.setItem(
+          GUEST_PENDING_KEY,
+          JSON.stringify({ email: form.email.trim(), ids: purchasedVariantIds }),
+        )
+      }
+      const guestRes = await createGuestCheckout({
+        items: guestItems,
+        maPhuongThucThanhToan: selectedPayment.value,
+        idempotencyKey: idempotencyKey.value,
+        email: form.email.trim(),
+        diaChiGiao,
+        ghiChu: compactText(form.ghiChu.trim()) || null,
+        tenNguoiNhan: form.hoTen.trim(),
+        sdtNguoiNhan: form.soDienThoai.trim(),
+        toAddressV2: form.diaChiCuThe.trim(),
+        toProvinceName: form.tinhThanh.trim(),
+        toWardName: form.phuongXa.trim(),
+        toProvinceId: form.provinceId || undefined,
+        toWardCode: form.wardCode,
+      })
+
+      orderResult.value = guestRes.data
+
+      if (guestRes.data?.paymentUrl) {
+        toast('Đang chuyển sang cổng thanh toán VNPay...')
+        window.location.assign(guestRes.data.paymentUrl)
+        return
+      }
+
+      await syncAfterGuestCheckout(purchasedVariantIds)
+      idempotencyKey.value = newIdempotencyKey()
+      toast('Đặt hàng thành công')
+      return
+    }
+
     const noteParts = []
     if (form.email.trim()) noteParts.push(`Email: ${form.email.trim()}`)
     if (form.ghiChu.trim()) noteParts.push(form.ghiChu.trim())
@@ -619,9 +711,15 @@ onMounted(() => {
             {{ paymentCallback.message }}
           </template>
         </p>
+        <p v-if="!isLoggedIn && guestCheckoutEmail" class="sf-checkout-success__note">
+          Chúng tôi đã gửi thông tin đơn hàng tới email <strong>{{ guestCheckoutEmail }}</strong>.
+          Vui lòng kiểm tra hộp thư (kể cả mục spam).
+        </p>
         <div class="sf-checkout-success__actions">
-          <RouterLink to="/tra-cuu-don" class="btn-soleil"><span>Xem đơn hàng</span></RouterLink>
-          <RouterLink to="/san-pham" class="sf-checkout-link">Tiếp tục mua sắm</RouterLink>
+          <RouterLink v-if="isLoggedIn" to="/tra-cuu-don" class="btn-soleil"><span>Xem đơn hàng</span></RouterLink>
+          <RouterLink v-else to="/san-pham" class="btn-soleil"><span>Tiếp tục mua sắm</span></RouterLink>
+          <RouterLink v-if="isLoggedIn" to="/san-pham" class="sf-checkout-link">Tiếp tục mua sắm</RouterLink>
+          <RouterLink v-else to="/" class="sf-checkout-link">Về trang chủ</RouterLink>
         </div>
       </section>
 
@@ -638,8 +736,10 @@ onMounted(() => {
           {{ paymentCallback?.message || 'Giao dịch không hợp lệ hoặc đã bị hủy. Vui lòng thử lại.' }}
         </p>
         <div class="sf-checkout-success__actions">
-          <RouterLink to="/tra-cuu-don" class="btn-soleil"><span>Xem đơn hàng</span></RouterLink>
-          <RouterLink to="/gio-hang" class="sf-checkout-link">Quay lại giỏ hàng</RouterLink>
+          <RouterLink v-if="isLoggedIn" to="/tra-cuu-don" class="btn-soleil"><span>Xem đơn hàng</span></RouterLink>
+          <RouterLink to="/gio-hang" :class="isLoggedIn ? 'sf-checkout-link' : 'btn-soleil'">
+            <span>Quay lại giỏ hàng</span>
+          </RouterLink>
         </div>
       </section>
 
@@ -705,11 +805,11 @@ onMounted(() => {
             <template v-else>
               <div class="sf-checkout-form-row">
                 <div class="sf-checkout-field">
-                  <label for="checkout-name">Họ và tên</label>
+                  <label for="checkout-name">Họ và tên <span class="sf-required">*</span></label>
                   <input id="checkout-name" v-model="form.hoTen" type="text" autocomplete="name" />
                 </div>
                 <div class="sf-checkout-field">
-                  <label for="checkout-phone">Số điện thoại</label>
+                  <label for="checkout-phone">Số điện thoại <span class="sf-required">*</span></label>
                   <input
                     id="checkout-phone"
                     :value="form.soDienThoai"
@@ -728,8 +828,17 @@ onMounted(() => {
               </div>
 
               <div class="sf-checkout-field">
-                <label for="checkout-email">Email</label>
-                <input id="checkout-email" v-model="form.email" type="email" autocomplete="email" />
+                <label for="checkout-email">Email <span class="sf-required">*</span></label>
+                <input
+                  id="checkout-email"
+                  v-model="form.email"
+                  type="email"
+                  autocomplete="email"
+                  placeholder="email@example.com"
+                  :class="{ 'is-invalid': fieldErrors.email }"
+                  @input="fieldErrors.email = ''"
+                />
+                <span v-if="fieldErrors.email" class="sf-field-error">{{ fieldErrors.email }}</span>
               </div>
 
               <div class="sf-checkout-form-row">
@@ -805,7 +914,11 @@ onMounted(() => {
             @saved="onRecipientSaved"
           />
 
-          <section class="sf-checkout-card">
+          <section v-if="isLoggedIn" class="sf-checkout-card">
+            <h2 class="sf-checkout-card__title">
+              <span><Icon icon="solar:ticket-linear" width="18" /></span>
+              Mã giảm giá
+            </h2>
             <div
               role="button"
               tabindex="0"
@@ -814,7 +927,6 @@ onMounted(() => {
               @keydown.enter.prevent="openVoucherModal"
               @keydown.space.prevent="openVoucherModal"
             >
-              <Icon icon="solar:ticket-linear" width="18" />
               <span
                 class="sf-checkout-voucher__value"
                 :class="{ 'sf-checkout-voucher__value--empty': !form.maPhieuGiamGia }"
@@ -832,12 +944,10 @@ onMounted(() => {
               </button>
               <Icon icon="solar:alt-arrow-right-linear" width="16" class="sf-checkout-voucher__arrow" />
             </div>
-            <p class="sf-checkout-hint">
-              Chọn voucher theo giá trị đơn hàng. Thành tiền sẽ cập nhật ngay khi áp mã.
-            </p>
           </section>
 
           <CheckoutVoucherModal
+            v-if="isLoggedIn"
             v-model:visible="showVoucherModal"
             :selected-code="form.maPhieuGiamGia"
             :subtotal="selectedSubtotal"
@@ -849,31 +959,33 @@ onMounted(() => {
               <span><Icon icon="solar:card-linear" width="18" /></span>
               Phương thức thanh toán
             </h2>
-            <div class="sf-checkout-payments">
+            <div class="sf-checkout-payments" role="radiogroup" aria-label="Phương thức thanh toán">
               <button
                 v-for="method in paymentMethods"
                 :key="method.code"
                 type="button"
+                role="radio"
+                :aria-checked="selectedPayment === method.code"
                 class="sf-checkout-pay-card"
                 :class="{ active: selectedPayment === method.code }"
                 @click="selectedPayment = method.code"
               >
-                <span class="sf-checkout-pay-card__dot"></span>
-                <span class="sf-checkout-pay-card__icon">
-                  <Icon :icon="method.icon" width="24" />
+                <span class="sf-checkout-pay-card__radio" aria-hidden="true"></span>
+                <span class="sf-checkout-pay-card__logo">
+                  <img :src="method.logo" :alt="method.name" />
                 </span>
                 <span class="sf-checkout-pay-card__name">{{ method.name }}</span>
               </button>
             </div>
-            <div class="sf-checkout-payment-detail">
-              <Icon :icon="paymentMethods.find((m) => m.code === selectedPayment)?.icon" width="28" />
-              <p>{{ paymentMethods.find((m) => m.code === selectedPayment)?.description }}</p>
-            </div>
+            <p class="sf-checkout-payment-detail">{{ selectedPaymentMethod.description }}</p>
           </section>
         </div>
 
         <aside class="sf-checkout-summary">
-          <h2>Đơn hàng của bạn</h2>
+          <h2 class="sf-checkout-card__title">
+            <span><Icon icon="solar:bag-4-linear" width="18" /></span>
+            Đơn hàng của bạn
+          </h2>
 
           <div class="sf-checkout-items">
             <article
@@ -928,7 +1040,7 @@ onMounted(() => {
           </button>
           <p class="sf-checkout-safety">
             <Icon icon="solar:lock-keyhole-linear" width="13" />
-            Thông tin được bảo vệ trong phiên thanh toán
+            Bằng việc đặt hàng, bạn đồng ý với điều khoản mua hàng và chính sách của SUNOVA.
           </p>
         </aside>
       </form>

@@ -32,6 +32,12 @@ public class DotGiamGiaController {
         return dotGiamGiaService.getAll();
     }
 
+    /** Xem trước mã SALE-YYYYMM-XXX khi mở form tạo (chưa lưu). */
+    @GetMapping("/next-ma")
+    public ResponseEntity<java.util.Map<String, String>> nextMa() {
+        return ResponseEntity.ok(java.util.Map.of("ma", dotGiamGiaService.previewNextMa()));
+    }
+
     @GetMapping("/{id}")
     public DotGiamGiaResponse detail(@PathVariable("id") Integer id) {
         return dotGiamGiaService.detail(id);

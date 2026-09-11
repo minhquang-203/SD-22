@@ -189,8 +189,14 @@
         <div class="modal-body">
           <div class="form-grid">
             <div class="form-group">
-              <label>Mã đợt giảm giá *</label>
-              <input type="text" v-model="form.code" placeholder="VD: SUMMER26" />
+              <label>Mã đợt giảm giá</label>
+              <input
+                type="text"
+                class="sale-ma-readonly"
+                :value="maLoading ? 'Đang sinh mã...' : form.code"
+                disabled
+              />
+              <small class="form-hint">Định dạng SALE-YYYYMM-XXX</small>
             </div>
             <div class="form-group">
               <label>Phần trăm giảm (%) *</label>
@@ -232,7 +238,7 @@ import '@/styles/saleCss.css'
 
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { createSale, deleteSale, searchSale, stopSale, activateSale, updateSale } from '@/api/saleApi.js'
+import { createSale, deleteSale, searchSale, stopSale, activateSale, updateSale, fetchNextSaleMa } from '@/api/saleApi.js'
 import { confirm } from '@/composables/useConfirm'
 import { toast } from '@/composables/useToast'
 import SortDropdown from '@/components/common/SortDropdown.vue'
@@ -534,6 +540,7 @@ async function deleteRow(id) {
 
 const modalOpen = ref(false)
 const editingId = ref(null)
+const maLoading = ref(false)
 
 const emptyForm = () => ({
   code: '',
@@ -545,10 +552,22 @@ const emptyForm = () => ({
 
 const form = ref(emptyForm())
 
-function openModal() {
+async function openModal() {
   editingId.value = null
   form.value = emptyForm()
   modalOpen.value = true
+  maLoading.value = true
+  try {
+    const res = await fetchNextSaleMa()
+    form.value.code = res.data?.ma || ''
+    if (!form.value.code) {
+      toast('Không sinh được mã đợt giảm giá', 'warn')
+    }
+  } catch {
+    toast('Không sinh được mã đợt giảm giá', 'warn')
+  } finally {
+    maLoading.value = false
+  }
 }
 
 function openEdit(campaign) {
@@ -580,6 +599,10 @@ const minDate = todayISO()
 async function handleSubmit() {
   const payload = buildPayload()
   if (!payload) return
+  if (!editingId.value && (maLoading.value || !form.value.code)) {
+    toast('Đang sinh mã đợt giảm giá, vui lòng đợi giây lát', 'warn')
+    return
+  }
 
   const ok = await confirm({
     title: editingId.value ? 'Cập nhật đợt giảm giá' : 'Tạo đợt giảm giá',
@@ -612,18 +635,12 @@ async function handleSubmit() {
 }
 
 function buildPayload() {
-  const code = form.value.code?.trim()
   const name = form.value.name?.trim()
   const value = Number(form.value.value)
   const today = todayISO()
 
-  if (!code || !name || !form.value.start || !form.value.end || !value) {
+  if (!name || !form.value.start || !form.value.end || !value) {
     toast('Vui lòng nhập đầy đủ thông tin bắt buộc', 'warn')
-    return null
-  }
-
-  if (!/^[A-Z0-9_-]{2,30}$/i.test(code)) {
-    toast('Mã chỉ gồm chữ, số, gạch ngang (2–30 ký tự)', 'warn')
     return null
   }
 
@@ -648,7 +665,7 @@ function buildPayload() {
   }
 
   return {
-    ma: code.toUpperCase(),
+    ma: form.value.code || undefined,
     ten: name,
     phanTramGiam: value,
     ngayBatDau: `${form.value.start}T00:00:00`,

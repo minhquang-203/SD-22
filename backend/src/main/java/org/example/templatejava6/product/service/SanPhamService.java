@@ -70,12 +70,13 @@ public class SanPhamService {
     public List<SanPhamResponse> getAll(Boolean excludeKhuyenMai) {
         Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
         Set<Integer> canHanIds = loadCoLoCanHanProductIds();
+        Map<Integer, SalePriceAgg> salePriceMap = loadActiveSalePriceMap();
         Set<Integer> saleProductIds = Boolean.TRUE.equals(excludeKhuyenMai)
-                ? loadActiveSaleProductIds()
+                ? salePriceMap.keySet()
                 : Set.of();
         return sanPhamRepository.findAll(SP_NEWEST_FIRST).stream()
                 .filter(sp -> !saleProductIds.contains(sp.getId()))
-                .map(sp -> toListResponse(sp, variantAggMap, canHanIds))
+                .map(sp -> toSaleListResponse(sp, variantAggMap, canHanIds, salePriceMap.get(sp.getId())))
                 .toList();
     }
 
@@ -96,13 +97,14 @@ public class SanPhamService {
     public List<SanPhamResponse> timKiem(String keyword, Boolean excludeKhuyenMai) {
         Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
         Set<Integer> canHanIds = loadCoLoCanHanProductIds();
+        Map<Integer, SalePriceAgg> salePriceMap = loadActiveSalePriceMap();
         Set<Integer> saleProductIds = Boolean.TRUE.equals(excludeKhuyenMai)
-                ? loadActiveSaleProductIds()
+                ? salePriceMap.keySet()
                 : Set.of();
         return sanPhamRepository.findByTenContainingIgnoreCase(keyword, SP_NEWEST_FIRST)
                 .stream()
                 .filter(sp -> !saleProductIds.contains(sp.getId()))
-                .map(sp -> toListResponse(sp, variantAggMap, canHanIds))
+                .map(sp -> toSaleListResponse(sp, variantAggMap, canHanIds, salePriceMap.get(sp.getId())))
                 .toList();
     }
 
@@ -129,7 +131,7 @@ public class SanPhamService {
                 .map(sp -> toListResponse(sp, variantAggMap, canHanIds));
     }
 
-    /** Đếm SP sắp hết hàng (tồn ≤ 10) và có lô cận hạn — badge sidebar. */
+    /** Đếm SP sắp hết hàng (tồn &lt; 50) và có lô cận hạn — badge sidebar. */
     @Transactional(readOnly = true)
     public SanPhamCanhBaoCountResponse canhBaoCount() {
         Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
@@ -138,7 +140,7 @@ public class SanPhamService {
         for (SanPham sp : sanPhamRepository.findAll()) {
             VariantAgg agg = variantAggMap.get(sp.getId());
             long ton = agg != null && agg.getTongTon() != null ? agg.getTongTon() : 0L;
-            if (ton <= 10) {
+            if (ton < 50) {
                 sapHetHang++;
             }
         }
@@ -262,7 +264,7 @@ public class SanPhamService {
         response.setIdThanhPhans(sanPhamThanhPhanRepository.findBySanPham(sp).stream()
                 .map(s -> s.getThanhPhan().getId()).toList());
         response.setDiemTrungBinh(danhGiaRepository.findAverageRatingBySanPham(sp.getId()));
-        response.setSoLuongDanhGia(danhGiaRepository.countApprovedBySanPham(sp.getId()));
+        response.setSoLuongDanhGia(danhGiaRepository.countBySanPhamId(sp.getId()));
         return response;
     }
 
@@ -280,10 +282,6 @@ public class SanPhamService {
             map.put(agg.getSanPhamId(), agg);
         }
         return map;
-    }
-
-    private Set<Integer> loadActiveSaleProductIds() {
-        return new HashSet<>(chiTietDotGiamGiaRepository.findSanPhamIdsInActiveSales());
     }
 
     private SanPhamResponse toSaleListResponse(
@@ -363,7 +361,7 @@ public class SanPhamService {
 
     private Set<Integer> loadCoLoCanHanProductIds() {
         LocalDate today = LocalDate.now();
-        return new HashSet<>(loHangRepository.findSanPhamIdsCoLoCanHan(today, today.plusDays(30)));
+        return new HashSet<>(loHangRepository.findSanPhamIdsCoLoCanHan(today, today.plusMonths(6)));
     }
 
     private SanPhamResponse toListResponse(SanPham sp, Map<Integer, VariantAgg> variantAggMap) {

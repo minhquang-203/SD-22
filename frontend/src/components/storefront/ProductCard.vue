@@ -18,7 +18,17 @@ const hasSale = computed(() => {
   return p.giaSauGiamMin != null || p.phanTramGiam != null
 })
 
-const saleLabel = computed(() => formatDiscountPercent(props.product.phanTramGiam))
+const saleLabel = computed(() => {
+  const fromPercent = formatDiscountPercent(props.product.phanTramGiam)
+  if (fromPercent) return fromPercent
+  if (!hasSale.value) return ''
+  const goc = Number(props.product.giaGocMin ?? props.product.giaMin)
+  const sau = Number(props.product.giaSauGiamMin)
+  if (!Number.isNaN(goc) && !Number.isNaN(sau) && goc > sau && goc > 0) {
+    return formatDiscountPercent(((goc - sau) / goc) * 100)
+  }
+  return 'KM'
+})
 
 const originalPrice = computed(() =>
   formatPriceRange(

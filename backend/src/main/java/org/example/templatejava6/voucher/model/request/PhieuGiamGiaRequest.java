@@ -1,6 +1,5 @@
 package org.example.templatejava6.voucher.model.request;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
@@ -19,7 +18,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class PhieuGiamGiaRequest {
 
-    @NotBlank(message = "Mã phiếu giảm giá không được để trống")
+    /** Tạo mới: backend tự sinh SNO-XXXXXX. Cập nhật: giữ mã cũ. */
     private String ma;
 
     private String ten;

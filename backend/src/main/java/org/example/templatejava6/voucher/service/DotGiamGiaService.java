@@ -2,6 +2,7 @@ package org.example.templatejava6.voucher.service;
 
 import org.example.templatejava6.chat.event.CatalogCacheInvalidateEvent;
 import org.example.templatejava6.common.exception.ApiException;
+import org.example.templatejava6.common.util.MaGenerator;
 import org.example.templatejava6.common.util.MapperUtil;
 import org.example.templatejava6.voucher.entity.DotGiamGia;
 import org.example.templatejava6.voucher.model.request.DotGiamGiaRequest;
@@ -55,18 +56,33 @@ public class DotGiamGiaService {
                 .map(DotGiamGiaResponse::new);
     }
 
+    @Transactional(readOnly = true)
+    public String previewNextMa() {
+        return nextSaleMa();
+    }
+
     @Transactional
     public void add(DotGiamGiaRequest request) {
         normalizeRequest(request);
         validateRequest(request, true);
-        if (dotGiamGiaRepository.existsByMa(request.getMa())) {
-            throw new ApiException("Mã đợt giảm giá đã tồn tại", "DUPLICATE");
-        }
+        String ma = resolveCreateMa(request.getMa());
+        request.setMa(ma);
         DotGiamGia dgg = MapperUtil.map(request, DotGiamGia.class);
+        dgg.setMa(ma);
         dgg.setTrangThai(true);
         dgg.setIsActive(true);
         dotGiamGiaRepository.save(dgg);
         invalidateChatCatalog();
+    }
+
+    /** Dùng mã đã xem trước nếu còn trống; trùng thì lấy số tiếp theo trong tháng. */
+    private String resolveCreateMa(String requested) {
+        if (requested != null
+                && requested.matches("^SALE-\\d{6}-\\d{3}$")
+                && !dotGiamGiaRepository.existsByMa(requested)) {
+            return requested;
+        }
+        return nextSaleMa();
     }
 
     @Transactional
@@ -84,12 +100,11 @@ public class DotGiamGiaService {
         }
         normalizeRequest(request);
         validateRequest(request, false);
-        if (dotGiamGiaRepository.existsByMaAndIdNot(request.getMa(), id)) {
-            throw new ApiException("Mã đợt giảm giá đã tồn tại", "DUPLICATE");
-        }
+        String maCu = dgg.getMa();
         BigDecimal oldPhanTram = dgg.getPhanTramGiam();
         MapperUtil.mapToExisting(request, dgg);
         dgg.setId(id);
+        dgg.setMa(maCu);
         dotGiamGiaRepository.save(dgg);
 
         if (request.getPhanTramGiam() != null && oldPhanTram != null
@@ -97,6 +112,13 @@ public class DotGiamGiaService {
             recalculateChiTietGiaSauGiam(dgg);
         }
         invalidateChatCatalog();
+    }
+
+    private String nextSaleMa() {
+        java.time.YearMonth ym = java.time.YearMonth.now();
+        String prefix = "SALE-" + ym.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMM")) + "-";
+        return MaGenerator.nextMonthlySaleCode(
+                dotGiamGiaRepository.findAllMaByPrefix(prefix), 3);
     }
 
     @Transactional

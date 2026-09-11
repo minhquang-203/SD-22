@@ -27,6 +27,15 @@ public class OrderRealtimeService {
                 "Đơn " + safeMa(hoaDon) + " cập nhật: " + moi);
     }
 
+    public void publishStatusChanged(HoaDon hoaDon, TrangThaiDonHang trangThaiCu, String message) {
+        String cu = trangThaiCu != null ? trangThaiCu.name() : null;
+        String msg = message != null && !message.isBlank()
+                ? message.trim()
+                : ("Đơn " + safeMa(hoaDon) + " cập nhật: "
+                + (hoaDon.getTrangThai() != null ? mapTrangThaiLabel(hoaDon.getTrangThai()) : ""));
+        publish(hoaDon, OrderRealtimeEvent.TYPE_STATUS_CHANGED, cu, msg);
+    }
+
     private void publish(HoaDon hoaDon, String type, String trangThaiCu, String message) {
         if (hoaDon == null || hoaDon.getId() == null) {
             return;

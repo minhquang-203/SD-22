@@ -11,8 +11,8 @@ import lombok.Setter;
 @AllArgsConstructor
 public class SanPhamCanhBaoCountResponse {
 
-    /** Số SP có tổng tồn ≤ 10. */
+    /** Số SP có tổng tồn &lt; 50. */
     private long sapHetHang;
-    /** Số SP có ít nhất 1 lô cận hạn (≤ 30 ngày). */
+    /** Số SP có ít nhất 1 lô cận hạn (&lt; 6 tháng). */
     private long canHan;
 }

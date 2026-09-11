@@ -3,6 +3,7 @@ package org.example.templatejava6.quiz.service;
 import org.example.templatejava6.common.entity.LoaiDa;
 import org.example.templatejava6.common.repository.LoaiDaRepository;
 import org.example.templatejava6.product.entity.SanPham;
+import org.example.templatejava6.product.repository.AnhSanPhamRepository;
 import org.example.templatejava6.product.repository.SanPhamRepository;
 import org.example.templatejava6.quiz.entity.RoutineCombo;
 import org.example.templatejava6.quiz.entity.RoutineComboChiTiet;
@@ -28,6 +29,9 @@ public class RoutineComboService {
 
     @Autowired
     private SanPhamRepository sanPhamRepository;
+
+    @Autowired
+    private AnhSanPhamRepository anhSanPhamRepository;
 
     public List<RoutineComboResponse> getAllRoutines() {
         return routineComboRepository.findAll().stream()
@@ -138,7 +142,7 @@ public class RoutineComboService {
                 if (ct.getSanPham() != null) {
                     ctResp.setIdSanPham(ct.getSanPham().getId());
                     ctResp.setTenSanPham(ct.getSanPham().getTen());
-                    ctResp.setAnhChinhUrl(null); // Frontend will handle
+                    ctResp.setAnhChinhUrl(resolveMainImageUrl(ct.getSanPham().getId()));
                 }
                 ctResp.setGhiChu(ct.getGhiChu());
                 ctResp.setThuTu(ct.getThuTu());
@@ -148,5 +152,16 @@ public class RoutineComboService {
         }
         
         return response;
+    }
+
+    private String resolveMainImageUrl(Integer sanPhamId) {
+        if (sanPhamId == null) {
+            return null;
+        }
+        return anhSanPhamRepository.findFirstBySanPham_IdAndLaAnhChinhTrue(sanPhamId)
+                .map(a -> a.getUrl())
+                .or(() -> anhSanPhamRepository.findFirstBySanPham_IdOrderByThuTuAsc(sanPhamId)
+                        .map(a -> a.getUrl()))
+                .orElse(null);
     }
 }

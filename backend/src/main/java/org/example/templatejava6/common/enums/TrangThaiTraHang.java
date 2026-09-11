@@ -18,6 +18,17 @@ public enum TrangThaiTraHang {
         this.label = label;
     }
 
+    /**
+     * Nhãn hiển thị phía khách — tránh nhầm “đã nhận hàng” (khách) / “hoàn tất” (đơn).
+     */
+    public String getLabelChoKhach() {
+        return switch (this) {
+            case DA_NHAN_HANG -> "Shop đã nhận";
+            case HOAN_TAT -> "Trả hàng";
+            default -> label;
+        };
+    }
+
     public boolean laTrangThaiKetThuc() {
         return this == TU_CHOI || this == HOAN_TAT;
     }

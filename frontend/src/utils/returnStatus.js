@@ -1,5 +1,6 @@
 /** Nhãn / class trạng thái trả hàng & hoàn tiền */
 
+/** Nhãn admin / nội bộ */
 export function traHangStatusLabel(trangThai, fallback = '') {
   const map = {
     CHO_DUYET: 'Chờ duyệt',
@@ -8,6 +9,19 @@ export function traHangStatusLabel(trangThai, fallback = '') {
     DANG_HOAN_HANG: 'Đang hoàn hàng',
     DA_NHAN_HANG: 'Đã nhận hàng',
     HOAN_TAT: 'Hoàn tất',
+  }
+  return map[trangThai] || fallback || trangThai || '—'
+}
+
+/** Nhãn phía khách — tránh nhầm với trạng thái đơn / nhận hàng của khách */
+export function traHangStatusLabelKhach(trangThai, fallback = '') {
+  const map = {
+    CHO_DUYET: 'Chờ duyệt',
+    DA_DUYET: 'Đã duyệt',
+    TU_CHOI: 'Từ chối',
+    DANG_HOAN_HANG: 'Đang hoàn hàng',
+    DA_NHAN_HANG: 'Shop đã nhận',
+    HOAN_TAT: 'Trả hàng',
   }
   return map[trangThai] || fallback || trangThai || '—'
 }

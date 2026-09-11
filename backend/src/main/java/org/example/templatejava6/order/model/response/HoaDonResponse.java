@@ -44,7 +44,9 @@ public class HoaDonResponse {
         this.thanhTien = hd.getThanhTien();
         this.ghiChu = hd.getGhiChu();
         this.ngayTao = hd.getNgayTao();
-        this.tenKhachHang = hd.getIdKhachHang() != null ? hd.getIdKhachHang().getHoTen() : null;
+        this.tenKhachHang = hd.getIdKhachHang() != null
+                ? hd.getIdKhachHang().getHoTen()
+                : hd.getTenNguoiNhan();
         this.tenNhanVien = hd.getIdNhanVien() != null ? hd.getIdNhanVien().getHoTen() : null;
         this.tenPhuongThucThanhToan = hd.getIdPhuongThucThanhToan() != null
                 ? hd.getIdPhuongThucThanhToan().getTen()

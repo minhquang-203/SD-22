@@ -129,7 +129,7 @@ async function handleTuChoiDon() {
 
   actionLoading.value = true
   try {
-    await tuChoiDon(orderId.value, { ghiChu: 'Admin từ chối đơn hàng' })
+    await tuChoiDon(orderId.value, { ghiChu: 'Cửa hàng từ chối đơn hàng' })
     notifyAction('Đã từ chối đơn hàng', 'success')
     await loadDetail()
   } catch (err) {
@@ -152,7 +152,7 @@ async function handleHuyDonDaXacNhan() {
 
   actionLoading.value = true
   try {
-    await tuChoiDon(orderId.value, { ghiChu: 'Admin hủy đơn hàng' })
+    await tuChoiDon(orderId.value, { ghiChu: 'Cửa hàng hủy đơn hàng' })
     notifyAction('Đã hủy đơn hàng', 'success')
     await loadDetail()
   } catch (err) {
@@ -745,6 +745,12 @@ onUnmounted(() => {
   color: var(--hd-ink);
 }
 
+.hoa-don-print-area {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
 .hd-panel {
   background: var(--hd-surface) !important;
   border: 1px solid var(--hd-line) !important;
@@ -1050,7 +1056,7 @@ onUnmounted(() => {
   background: var(--hd-accent-deep);
   color: #fff;
   border-radius: var(--hd-radius);
-  margin-bottom: 1.15rem;
+  margin-bottom: 0;
 }
 
 .hoa-don-strip__title {
@@ -1208,7 +1214,7 @@ onUnmounted(() => {
 .hoa-don-detail-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 0.85rem;
+  gap: 1.15rem;
 }
 
 @media (min-width: 1024px) {

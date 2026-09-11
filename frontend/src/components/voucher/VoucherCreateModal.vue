@@ -80,16 +80,13 @@
 
         <div class="grid grid-cols-12 gap-3">
           <div :class="showGiaTri ? 'col-span-7' : 'col-span-12'">
-            <label class="voucher-label">Mã phiếu *</label>
+            <label class="voucher-label">Mã phiếu</label>
             <input
-              v-model="form.ma"
-              :disabled="isEdit"
-              :class="inputClass('ma')"
+              :value="maLoading ? 'Đang sinh mã...' : form.ma"
+              disabled
               class="voucher-input mono"
-              placeholder="VD: SUMMER25"
-              @input="clearError('ma')"
             />
-            <p v-if="errors.ma" class="voucher-field-error">{{ errors.ma }}</p>
+            <p class="voucher-hint">Định dạng SNO-XXXXXX</p>
           </div>
 
           <div v-if="showGiaTri" class="col-span-5">
@@ -207,9 +204,10 @@
 </template>
 
 <script setup>
-import { reactive, watch, computed } from "vue";
+import { reactive, watch, computed, ref } from "vue";
 import { Icon } from "@iconify/vue";
 import { toast } from "@/composables/useToast";
+import { fetchNextVoucherMa } from "@/api/voucherApi";
 
 const props = defineProps({
   modelValue: Boolean,
@@ -218,6 +216,7 @@ const props = defineProps({
 
 const emit = defineEmits(["update:modelValue", "create", "update"]);
 
+const maLoading = ref(false);
 const isEdit = computed(() => !!props.voucher);
 const showGiamToiDa = computed(() => form.loai !== "TIEN_MAT");
 const showGiaTri = computed(() => form.loai !== "FREE_SHIP");
@@ -321,15 +320,6 @@ function validateForm() {
   const next = {};
   const today = todayISO();
 
-  if (!isEdit.value) {
-    const ma = form.ma?.trim();
-    if (!ma) {
-      next.ma = "Mã phiếu không được để trống";
-    } else if (!/^[A-Z0-9_-]{2,30}$/i.test(ma)) {
-      next.ma = "Mã chỉ gồm chữ, số, gạch ngang (2–30 ký tự)";
-    }
-  }
-
   const ten = form.ten?.trim();
   if (!ten) {
     next.ten = "Tên chương trình không được để trống";
@@ -409,7 +399,7 @@ function validateForm() {
 function buildPayload() {
   return {
     ...form,
-    ma: form.ma.trim().toUpperCase(),
+    ma: form.ma?.trim()?.toUpperCase() || undefined,
     ten: form.ten.trim(),
     giaTri: form.loai === "FREE_SHIP" ? 1 : Number(form.giaTri),
     giaTriDonToiThieu: isEmptyNumber(form.giaTriDonToiThieu)
@@ -428,6 +418,10 @@ function buildPayload() {
 
 const submit = () => {
   if (!validateForm()) return;
+  if (!isEdit.value && (!form.ma || maLoading.value)) {
+    toast("Đang sinh mã phiếu, vui lòng đợi giây lát", "warn");
+    return;
+  }
 
   const payload = buildPayload();
 
@@ -437,7 +431,7 @@ const submit = () => {
 
 watch(
   () => props.modelValue,
-  (open) => {
+  async (open) => {
     if (!open) return;
 
     resetErrors();
@@ -449,19 +443,33 @@ watch(
         ngayBatDau: props.voucher.ngayBatDau?.slice(0, 10),
         ngayKetThuc: props.voucher.ngayKetThuc?.slice(0, 10),
       });
-    } else {
-      Object.assign(form, {
-        ma: "",
-        ten: "",
-        loai: "PHAN_TRAM",
-        phamVi: "CONG_KHAI",
-        giaTri: null,
-        giaTriDonToiThieu: null,
-        giamToiDa: null,
-        soLuong: null,
-        ngayBatDau: null,
-        ngayKetThuc: null,
-      });
+      return;
+    }
+
+    Object.assign(form, {
+      ma: "",
+      ten: "",
+      loai: "PHAN_TRAM",
+      phamVi: "CONG_KHAI",
+      giaTri: null,
+      giaTriDonToiThieu: null,
+      giamToiDa: null,
+      soLuong: null,
+      ngayBatDau: null,
+      ngayKetThuc: null,
+    });
+
+    maLoading.value = true;
+    try {
+      const res = await fetchNextVoucherMa();
+      form.ma = res.data?.ma || "";
+      if (!form.ma) {
+        toast("Không sinh được mã phiếu", "warn");
+      }
+    } catch {
+      toast("Không sinh được mã phiếu", "warn");
+    } finally {
+      maLoading.value = false;
     }
   },
 );

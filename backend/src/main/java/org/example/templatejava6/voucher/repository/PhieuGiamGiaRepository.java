@@ -86,6 +86,7 @@ public interface PhieuGiamGiaRepository extends JpaRepository<PhieuGiamGia, Inte
     """)
     long countExpiringSoon(@Param("deadline") LocalDateTime deadline);
 
+    /** Voucher đang hiệu lực cho modal checkout — hiện tất cả; quyền chọn xử lý ở service. */
     @Query("""
         SELECT v FROM PhieuGiamGia v
         WHERE v.trangThai = true
@@ -137,13 +138,19 @@ public interface PhieuGiamGiaRepository extends JpaRepository<PhieuGiamGia, Inte
             @Param("idKhachHang") Integer idKhachHang,
             Pageable pageable);
 
-    /** Voucher công khai đang hiệu lực - dùng cho tab "Tất cả voucher" ở tài khoản. */
+    /**
+     * Voucher công khai đang hiệu lực - dùng cho tab "Tất cả voucher" ở tài khoản.
+     * phamVi NULL coi như CONG_KHAI (dữ liệu seed cũ trước khi có cột phạm vi).
+     */
     @Query("""
         SELECT v FROM PhieuGiamGia v
         WHERE v.trangThai = true
           AND v.isActive = true
           AND v.soLuong > 0
-          AND v.phamVi = org.example.templatejava6.common.enums.PhamViPhieuGiamGia.CONG_KHAI
+          AND (
+                v.phamVi IS NULL
+                OR v.phamVi = org.example.templatejava6.common.enums.PhamViPhieuGiamGia.CONG_KHAI
+              )
           AND v.ngayBatDau <= CURRENT_TIMESTAMP
           AND v.ngayKetThuc >= CURRENT_TIMESTAMP
           AND (:keyword IS NULL OR :keyword = ''

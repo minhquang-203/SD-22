@@ -15,6 +15,9 @@ import org.example.templatejava6.order.entity.HoaDon;
 import org.example.templatejava6.order.entity.HoaDonChiTiet;
 import org.example.templatejava6.order.entity.LichSuDonHang;
 import org.example.templatejava6.order.entity.ThanhToanHoaDon;
+import org.example.templatejava6.order.model.request.GuestCheckoutItemRequest;
+import org.example.templatejava6.order.model.request.GuestCheckoutRequest;
+import org.example.templatejava6.order.model.request.GuestTinhGiaRequest;
 import org.example.templatejava6.order.model.request.HuyDonOnlineRequest;
 import org.example.templatejava6.order.model.request.OnlineCheckoutRequest;
 import org.example.templatejava6.order.model.request.OnlineTinhGiaRequest;
@@ -35,6 +38,7 @@ import org.example.templatejava6.payment.model.request.TaoThanhToanRequest;
 import org.example.templatejava6.payment.model.response.TaoThanhToanResponse;
 import org.example.templatejava6.payment.service.PaymentService;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
+import org.example.templatejava6.product.repository.ChiTietSanPhamRepository;
 import org.example.templatejava6.product.service.LoHangService;
 import org.example.templatejava6.realtime.service.OrderRealtimeService;
 import org.example.templatejava6.shipping.model.request.ShippingFeeRequest;
@@ -88,6 +92,7 @@ public class OnlineCheckoutService {
     private final ThongBaoService thongBaoService;
     private final OrderRealtimeService orderRealtimeService;
     private final ShippingService shippingService;
+    private final ChiTietSanPhamRepository chiTietSanPhamRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public OnlineCheckoutService(
@@ -109,6 +114,7 @@ public class OnlineCheckoutService {
             ThongBaoService thongBaoService,
             OrderRealtimeService orderRealtimeService,
             ShippingService shippingService,
+            ChiTietSanPhamRepository chiTietSanPhamRepository,
             ApplicationEventPublisher eventPublisher) {
         this.gioHangRepository = gioHangRepository;
         this.chiTietGioHangRepository = chiTietGioHangRepository;
@@ -128,6 +134,7 @@ public class OnlineCheckoutService {
         this.thongBaoService = thongBaoService;
         this.orderRealtimeService = orderRealtimeService;
         this.shippingService = shippingService;
+        this.chiTietSanPhamRepository = chiTietSanPhamRepository;
         this.eventPublisher = eventPublisher;
     }
 
@@ -255,6 +262,129 @@ public class OnlineCheckoutService {
         return OnlineCheckoutResponse.from(hoaDon, payment);
     }
 
+    /**
+     * Đặt hàng online cho khách CHƯA đăng nhập. Đơn tạo ra có id_khach_hang = NULL, email nhận
+     * hóa đơn lưu trực tiếp trên hóa đơn. Không dùng giỏ hàng server, không áp dụng voucher.
+     */
+    @Transactional
+    public OnlineCheckoutResponse checkoutGuest(GuestCheckoutRequest request, String clientIp) {
+        // Idempotency cho khách vãng lai: khóa là duy nhất toàn cục nên tra theo key + id_khach_hang NULL.
+        String idempotencyKey = chuanHoaIdempotencyKey(request.getIdempotencyKey());
+        if (idempotencyKey != null) {
+            Optional<HoaDon> daTao = hoaDonRepository.findByIdempotencyKeyAndIdKhachHangIsNull(idempotencyKey);
+            if (daTao.isPresent()) {
+                return taoLaiPhanHoiCheckout(daTao.get(), clientIp);
+            }
+        }
+
+        String maPhuongThuc = normalize(request.getMaPhuongThucThanhToan());
+        if (!MA_COD.equals(maPhuongThuc) && !MA_VNPAY.equals(maPhuongThuc)) {
+            throw new ApiException("Chỉ hỗ trợ COD hoặc VNPAY cho bán hàng online.", "UNSUPPORTED_PAYMENT_METHOD");
+        }
+        PhuongThucThanhToan phuongThuc = resolvePhuongThuc(maPhuongThuc);
+
+        Map<Integer, VariantSaleInfo> saleMap = checkoutPricingService.loadActiveSales();
+        List<LineCalc> lines = buildLinesFromItems(request.getItems(), saleMap);
+        BigDecimal tongTien = sumTongTien(lines);
+
+        BigDecimal phiVanChuyen = resolvePhiVanChuyen(
+                request.getToProvinceName(), request.getToWardName(), request.getToAddressV2(),
+                request.getToProvinceId(), request.getToDistrictId(), request.getToWardCode(), tongTien);
+        BigDecimal tienGiamGia = BigDecimal.ZERO;
+        BigDecimal thanhTien = tongTien.add(phiVanChuyen);
+        if (thanhTien.compareTo(BigDecimal.ZERO) < 0) {
+            thanhTien = BigDecimal.ZERO;
+        }
+        boolean isVnpay = MA_VNPAY.equals(maPhuongThuc);
+        if (isVnpay && thanhTien.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ApiException(
+                    "Đơn miễn phí không thể thanh toán qua VNPAY. Vui lòng chọn COD.",
+                    "INVALID_PAYMENT_AMOUNT");
+        }
+
+        String wardCode = coGiaTri(request.getToWardCode()) ? request.getToWardCode().trim() : null;
+
+        LocalDateTime now = LocalDateTime.now();
+        HoaDon hoaDon = new HoaDon();
+        hoaDon.setMaHoaDon(sinhMaHoaDon(now));
+        hoaDon.setIdKhachHang(null);
+        hoaDon.setIdPhuongThucThanhToan(phuongThuc);
+        hoaDon.setIdPhieuGiamGia(null);
+        hoaDon.setLoaiDon(LOAI_DON_ONLINE);
+        hoaDon.setTrangThai(TrangThaiDonHang.CHO_XAC_NHAN);
+        hoaDon.setDiaChiGiao(request.getDiaChiGiao().trim());
+        hoaDon.setTenNguoiNhan(request.getTenNguoiNhan().trim());
+        hoaDon.setSdtNguoiNhan(request.getSdtNguoiNhan().trim());
+        hoaDon.setEmailNguoiNhan(cat(normalizeEmail(request.getEmail()), 100));
+        hoaDon.setGhnDistrictId(request.getToDistrictId());
+        hoaDon.setGhnWardCode(wardCode);
+        hoaDon.setGhnProvinceName(cat(request.getToProvinceName(), 100));
+        hoaDon.setGhnWardName(cat(request.getToWardName(), 100));
+        hoaDon.setTongTien(tongTien);
+        hoaDon.setTienGiamGia(tienGiamGia);
+        hoaDon.setPhiVanChuyen(phiVanChuyen);
+        hoaDon.setThanhTien(thanhTien);
+        hoaDon.setGhiChu(request.getGhiChu());
+        hoaDon.setNgayTao(now);
+        hoaDon.setIdempotencyKey(idempotencyKey);
+        try {
+            hoaDon = hoaDonRepository.saveAndFlush(hoaDon);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ApiException("Đơn đang được xử lý, vui lòng thử lại.", "DUPLICATE_CHECKOUT");
+        }
+
+        for (LineCalc line : lines) {
+            HoaDonChiTiet chiTiet = new HoaDonChiTiet();
+            chiTiet.setIdHoaDon(hoaDon);
+            chiTiet.setIdChiTietSanPham(line.chiTietSanPham());
+            chiTiet.setSoLuong(line.soLuong());
+            chiTiet.setDonGia(line.donGia());
+            chiTiet.setThanhTien(line.thanhTien());
+            hoaDonChiTietRepository.save(chiTiet);
+            loHangService.truTonVaGhiNhan(chiTiet, line.soLuong());
+        }
+
+        ghiNhatKy(hoaDon, "TAO_DON", "Khách vãng lai tạo đơn online với " + lines.size() + " sản phẩm");
+        ghiNhatKy(hoaDon, "TRU_TON", "Đã giữ hàng cho đơn online");
+
+        TaoThanhToanResponse payment = null;
+        if (MA_COD.equals(maPhuongThuc)) {
+            taoThanhToanCod(hoaDon, phuongThuc, now);
+            ghiNhatKy(hoaDon, "CHO_XAC_NHAN", "Đơn COD chờ nhân viên xác nhận");
+            thongBaoDonMoi(hoaDon);
+            eventPublisher.publishEvent(new DatHangThanhCongMailEvent(this, hoaDon.getId()));
+            orderRealtimeService.publishCreated(hoaDon);
+        } else {
+            TaoThanhToanRequest paymentRequest = new TaoThanhToanRequest();
+            paymentRequest.setIdHoaDon(hoaDon.getId());
+            payment = paymentService.taoThanhToan(MA_VNPAY, paymentRequest, clientIp);
+        }
+        return OnlineCheckoutResponse.from(hoaDon, payment);
+    }
+
+    /** Tính tạm giá + phí vận chuyển cho khách chưa đăng nhập (không voucher). */
+    @Transactional(readOnly = true)
+    public OnlineTinhGiaResponse tinhGiaGuest(GuestTinhGiaRequest request) {
+        Map<Integer, VariantSaleInfo> saleMap = checkoutPricingService.loadActiveSales();
+        List<LineCalc> lines = buildLinesFromItems(request.getItems(), saleMap);
+        BigDecimal tongTien = sumTongTien(lines);
+        BigDecimal phiVanChuyen = resolvePhiVanChuyen(
+                request.getToProvinceName(), request.getToWardName(), request.getToAddressV2(),
+                request.getToProvinceId(), request.getToDistrictId(), request.getToWardCode(), tongTien);
+        BigDecimal thanhTien = tongTien.add(phiVanChuyen);
+        if (thanhTien.compareTo(BigDecimal.ZERO) < 0) {
+            thanhTien = BigDecimal.ZERO;
+        }
+
+        OnlineTinhGiaResponse res = new OnlineTinhGiaResponse();
+        res.setTongTien(tongTien);
+        res.setTienGiamGia(BigDecimal.ZERO);
+        res.setPhiVanChuyen(phiVanChuyen);
+        res.setThanhTien(thanhTien);
+        res.setMaPhieuGiamGia(null);
+        return res;
+    }
+
     @Transactional(readOnly = true)
     public OnlineTinhGiaResponse tinhGia(OnlineTinhGiaRequest request) {
         KhachHang khachHang = getKhachDangNhap();
@@ -341,6 +471,48 @@ public class OnlineCheckoutService {
                     "INVALID_CART_ITEMS");
         }
         return selected;
+    }
+
+    /**
+     * Dựng dòng đơn từ danh sách biến thể gửi trực tiếp (khách vãng lai — giỏ ở localStorage),
+     * gộp trùng biến thể và kiểm tra tồn/giá y như luồng giỏ hàng server.
+     */
+    private List<LineCalc> buildLinesFromItems(List<GuestCheckoutItemRequest> items,
+                                               Map<Integer, VariantSaleInfo> saleMap) {
+        if (items == null || items.isEmpty()) {
+            throw new ApiException("Vui lòng chọn ít nhất một sản phẩm để thanh toán.", "EMPTY_SELECTION");
+        }
+        Map<Integer, LineCalc> lines = new LinkedHashMap<>();
+        for (GuestCheckoutItemRequest item : items) {
+            if (item == null || item.getIdChiTietSanPham() == null) {
+                throw new ApiException("Sản phẩm không hợp lệ.", "INVALID_CART_ITEMS");
+            }
+            ChiTietSanPham chiTietSanPham = chiTietSanPhamRepository.findById(item.getIdChiTietSanPham())
+                    .orElseThrow(() -> new ApiException(
+                            "Một hoặc nhiều sản phẩm đã chọn không còn tồn tại.", "INVALID_CART_ITEMS"));
+            validateChiTietSanPham(chiTietSanPham, item.getSoLuong());
+            int soLuong = item.getSoLuong();
+            BigDecimal donGia = checkoutPricingService.resolveDonGia(chiTietSanPham, saleMap);
+            if (donGia == null || donGia.compareTo(BigDecimal.ZERO) < 0) {
+                throw new ApiException("Giá bán SKU " + chiTietSanPham.getSku() + " không hợp lệ.", "INVALID_PRICE");
+            }
+            LineCalc existing = lines.get(chiTietSanPham.getId());
+            if (existing != null) {
+                soLuong += existing.soLuong();
+            }
+            int ton = chiTietSanPham.getSoLuongTon() != null ? chiTietSanPham.getSoLuongTon() : 0;
+            if (ton < soLuong) {
+                throw new ApiException(
+                        "Không đủ tồn cho SKU " + chiTietSanPham.getSku() + " (còn " + ton + ").",
+                        "OUT_OF_STOCK");
+            }
+            lines.put(chiTietSanPham.getId(), new LineCalc(
+                    chiTietSanPham,
+                    soLuong,
+                    donGia,
+                    donGia.multiply(BigDecimal.valueOf(soLuong))));
+        }
+        return List.copyOf(lines.values());
     }
 
     private List<LineCalc> buildLines(List<ChiTietGioHang> cartItems, Map<Integer, VariantSaleInfo> saleMap) {
@@ -493,6 +665,10 @@ public class OnlineCheckoutService {
         return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
     }
 
+    private static String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+    }
+
     private static boolean coGiaTri(String value) {
         return value != null && !value.isBlank();
     }
@@ -545,7 +721,9 @@ public class OnlineCheckoutService {
     private void thongBaoDonMoi(HoaDon hoaDon) {
         String tenKhach = hoaDon.getIdKhachHang() != null && hoaDon.getIdKhachHang().getHoTen() != null
                 ? hoaDon.getIdKhachHang().getHoTen()
-                : "Khách hàng";
+                : (hoaDon.getTenNguoiNhan() != null && !hoaDon.getTenNguoiNhan().isBlank()
+                        ? hoaDon.getTenNguoiNhan()
+                        : "Khách vãng lai");
         String noiDung = tenKhach + " vừa đặt đơn " + hoaDon.getMaHoaDon()
                 + " trị giá " + dinhDangTien(hoaDon.getThanhTien()) + ".";
         thongBaoService.taoThongBao(
