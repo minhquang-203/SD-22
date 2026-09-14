@@ -63,4 +63,15 @@ public interface KhachHangRepository extends JpaRepository<KhachHang, Integer> {
             @Param("thangSinhNhat") Integer thangSinhNhat,
             @Param("gioiTinh") String gioiTinh,
             @Param("idLoaiDa") Integer idLoaiDa);
+
+    /** Khách đang hoạt động có điểm tích lũy nằm trong khoảng (các đầu khoảng optional). */
+    @Query("""
+        SELECT k FROM KhachHang k
+        WHERE k.trangThai = true
+          AND (:diemTu IS NULL OR COALESCE(k.diemTichLuy, 0) >= :diemTu)
+          AND (:diemDen IS NULL OR COALESCE(k.diemTichLuy, 0) <= :diemDen)
+        """)
+    List<KhachHang> locTheoKhoangDiem(
+            @Param("diemTu") Integer diemTu,
+            @Param("diemDen") Integer diemDen);
 }

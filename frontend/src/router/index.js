@@ -106,7 +106,7 @@ const router = createRouter({
           path: 'tra-cuu-don',
           name: 'TraCuuDon',
           component: () => import('@/views/storefront/TraCuuDon.vue'),
-          meta: { title: 'Tra cứu đơn hàng — SUNOVA', requiresAuth: true },
+          meta: { title: 'Tra cứu đơn hàng — SUNOVA' },
         },
         {
           path: 'tra-cuu-don/tra-hang/:id',

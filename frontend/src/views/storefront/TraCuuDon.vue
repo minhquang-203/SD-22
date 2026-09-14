@@ -9,11 +9,16 @@ import ReturnRequestWalletModal from '@/components/storefront/ReturnRequestWalle
 import { confirm } from '@/composables/useConfirm'
 import { toast } from '@/composables/useToast'
 import { subscribeCustomerOrders } from '@/composables/useRealtime'
-import { fetchChiTietDonCuaToi, fetchDonCuaToi, huyDonCuaToi } from '@/api/donHangApi'
+import { useAuth } from '@/composables/useAuth'
+import { fetchChiTietDonCuaToi, fetchDonCuaToi, huyDonCuaToi, traCuuDonBangToken, traCuuDonCongKhai } from '@/api/donHangApi'
 
 const route = useRoute()
 const router = useRouter()
+const { isLoggedIn } = useAuth()
+
 const search = ref(typeof route.query.ma === 'string' ? route.query.ma : '')
+const guestMa = ref(typeof route.query.ma === 'string' ? route.query.ma : '')
+const guestEmail = ref('')
 const currentFilter = ref('all')
 const loading = ref(true)
 const orders = ref([])
@@ -27,6 +32,9 @@ const cancelError = ref('')
 const showReturnModal = ref(false)
 const returnOrder = ref(null)
 const returnNotice = ref('')
+const guestLookupLoading = ref(false)
+const guestOrder = ref(null)
+const guestError = ref('')
 
 let unsubscribeRealtime = null
 
@@ -40,11 +48,19 @@ const filters = [
 ]
 
 onMounted(() => {
-  loadOrders()
-  unsubscribeRealtime = subscribeCustomerOrders(async (event) => {
-    if (!event?.idHoaDon) return
-    await applyRealtimeOrder(event)
-  })
+  if (isLoggedIn.value) {
+    loadOrders()
+    unsubscribeRealtime = subscribeCustomerOrders(async (event) => {
+      if (!event?.idHoaDon) return
+      await applyRealtimeOrder(event)
+    })
+  } else {
+    loading.value = false
+    const token = typeof route.query.token === 'string' ? route.query.token.trim() : ''
+    if (token) {
+      lookupGuestByToken(token)
+    }
+  }
 })
 
 onUnmounted(() => {
@@ -52,10 +68,39 @@ onUnmounted(() => {
   unsubscribeRealtime = null
 })
 
+watch(isLoggedIn, (loggedIn) => {
+  unsubscribeRealtime?.()
+  unsubscribeRealtime = null
+  guestOrder.value = null
+  guestError.value = ''
+  if (loggedIn) {
+    loadOrders()
+    unsubscribeRealtime = subscribeCustomerOrders(async (event) => {
+      if (!event?.idHoaDon) return
+      await applyRealtimeOrder(event)
+    })
+  } else {
+    loading.value = false
+    orders.value = []
+  }
+})
+
 watch(
   () => route.query.ma,
   (ma) => {
-    if (typeof ma === 'string') search.value = ma
+    if (typeof ma === 'string') {
+      search.value = ma
+      guestMa.value = ma
+    }
+  },
+)
+
+watch(
+  () => route.query.token,
+  (token) => {
+    if (!isLoggedIn.value && typeof token === 'string' && token.trim()) {
+      lookupGuestByToken(token.trim())
+    }
   },
 )
 
@@ -72,17 +117,23 @@ const filteredOrders = computed(() => {
 
 /** Xóa mã đơn dính từ "Xem đơn gốc" (?ma=) để bộ lọc hoạt động lại. */
 function clearStickyMaQuery() {
-  if (typeof route.query.ma !== 'string') return
+  if (typeof route.query.ma !== 'string' && typeof route.query.token !== 'string') return
   search.value = ''
   router.replace({ path: route.path, query: {} })
 }
 
+/** Mở sẵn thẻ đơn khi vào từ thông báo / email (?ma=). */
+function shouldAutoOpenOrder(order) {
+  const ma = typeof route.query.ma === 'string' ? route.query.ma.trim().toLowerCase() : ''
+  if (!ma || !order?.maHoaDon) return false
+  return String(order.maHoaDon).toLowerCase() === ma
+}
+
 function applyFilter(filterValue) {
   currentFilter.value = filterValue
-  // Chỉ lọc client-side — không reload API (trước đây "Tất cả" gọi lại loadOrders → 1+N request + GHN).
   if (filterValue === 'all') {
     search.value = ''
-    if (route.query.ma != null) {
+    if (route.query.ma != null || route.query.token != null) {
       router.replace({ path: route.path, query: {} })
     }
     return
@@ -95,7 +146,6 @@ async function loadOrders() {
   error.value = ''
   try {
     const res = await fetchDonCuaToi()
-    // Dùng summary cho danh sách; chi tiết (+ GHN) chỉ tải khi mở thẻ.
     orders.value = (res.data || []).map((summary) => ({
       ...summary,
       chiTiets: summary.chiTiets || [],
@@ -104,6 +154,66 @@ async function loadOrders() {
     error.value = 'Không tải được danh sách đơn hàng.'
   } finally {
     loading.value = false
+  }
+}
+
+async function lookupGuestByToken(token) {
+  guestError.value = ''
+  guestOrder.value = null
+  if (!token || token.length < 32) {
+    guestError.value = 'Link tra cứu không hợp lệ.'
+    return
+  }
+  guestLookupLoading.value = true
+  try {
+    const res = await traCuuDonBangToken(token)
+    if (!res.data) {
+      guestError.value = 'Không tìm thấy đơn hàng với thông tin đã nhập.'
+      return
+    }
+    guestOrder.value = { ...res.data, __detailLoaded: true }
+    // Giữ token trên URL để refresh vẫn xem được; không gắn email/mã.
+    router.replace({ path: route.path, query: { token } })
+  } catch (err) {
+    guestError.value = typeof err === 'string'
+      ? err
+      : 'Không tìm thấy đơn hàng với thông tin đã nhập.'
+  } finally {
+    guestLookupLoading.value = false
+  }
+}
+
+async function lookupGuestOrder() {
+  const ma = guestMa.value.trim()
+  const email = guestEmail.value.trim()
+  guestError.value = ''
+  guestOrder.value = null
+
+  if (!ma || !email) {
+    guestError.value = 'Vui lòng nhập mã đơn hàng và email đã dùng khi đặt hàng.'
+    return
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    guestError.value = 'Email không hợp lệ.'
+    return
+  }
+
+  guestLookupLoading.value = true
+  try {
+    const res = await traCuuDonCongKhai(ma, email)
+    if (!res.data) {
+      guestError.value = 'Không tìm thấy đơn hàng với thông tin đã nhập.'
+      return
+    }
+    guestOrder.value = { ...res.data, __detailLoaded: true }
+    // Không đẩy email lên URL sau khi tra cứu thành công.
+    router.replace({ path: route.path, query: {} })
+  } catch (err) {
+    guestError.value = typeof err === 'string'
+      ? err
+      : 'Không tìm thấy đơn hàng với thông tin đã nhập.'
+  } finally {
+    guestLookupLoading.value = false
   }
 }
 
@@ -266,7 +376,58 @@ async function handleCancelOrder(order) {
 </script>
 
 <template>
-  <div class="sf-account-page">
+  <!-- Khách vãng lai: form mã + email -->
+  <div v-if="!isLoggedIn" class="sf-order-page">
+    <div class="sf-container">
+      <nav class="sf-breadcrumb">
+        <RouterLink to="/">Trang chủ</RouterLink>
+        <span>/</span>
+        <span>Tra cứu đơn</span>
+      </nav>
+
+      <h1 class="sf-order-page__title">Tra cứu đơn hàng</h1>
+      <p class="sf-order-page__desc">
+        Nhập mã đơn hàng và email đã dùng khi đặt hàng để theo dõi trạng thái.
+        Nếu bạn nhận được email xác nhận, bấm nút trong mail để theo dõi đơn hàng
+      </p>
+
+      <form class="sf-order-lookup" @submit.prevent="lookupGuestOrder">
+        <label>
+          Mã đơn hàng
+          <input
+            v-model="guestMa"
+            type="text"
+            placeholder="VD: HD20260322..."
+            autocomplete="off"
+            required
+          />
+        </label>
+        <label>
+          Email đặt hàng
+          <input
+            v-model="guestEmail"
+            type="email"
+            placeholder="email@example.com"
+            autocomplete="email"
+            required
+          />
+        </label>
+        <button type="submit" class="sf-order-lookup__btn" :disabled="guestLookupLoading">
+          {{ guestLookupLoading ? 'Đang tìm...' : 'Tra cứu' }}
+        </button>
+      </form>
+
+      <p v-if="guestLookupLoading && route.query.token" class="sf-order-msg">Đang tải đơn hàng...</p>
+      <p v-if="guestError" class="sf-order-msg sf-order-msg--err">{{ guestError }}</p>
+
+      <div v-if="guestOrder" class="sf-order-list">
+        <OrderCard :order="guestOrder" :default-open="true" read-only />
+      </div>
+    </div>
+  </div>
+
+  <!-- Khách đã đăng nhập: danh sách đơn trong tài khoản -->
+  <div v-else class="sf-account-page">
     <div class="sf-container">
       <nav class="sf-breadcrumb">
         <RouterLink to="/">Trang chủ</RouterLink>
@@ -321,7 +482,7 @@ async function handleCancelOrder(order) {
               v-for="order in filteredOrders"
               :key="order.id"
               :order="order"
-              :default-open="false"
+              :default-open="shouldAutoOpenOrder(order)"
               :cancel-loading="cancelLoadingId === order.id"
               :detail-loading="detailLoadingIds.has(order.id)"
               @expand="ensureOrderDetail"

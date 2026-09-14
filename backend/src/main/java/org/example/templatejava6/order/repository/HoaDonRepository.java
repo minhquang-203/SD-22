@@ -21,6 +21,10 @@ public interface HoaDonRepository extends JpaRepository<HoaDon, Integer> {
 
     boolean existsByMaHoaDonAndIdNot(String maHoaDon, Integer id);
 
+    Optional<HoaDon> findByMaHoaDonIgnoreCase(String maHoaDon);
+
+    Optional<HoaDon> findByTrackingToken(String trackingToken);
+
     List<HoaDon> findByMaHoaDonContainingIgnoreCase(String keyword);
 
     Page<HoaDon> findAllByOrderByNgayTaoDesc(Pageable pageable);

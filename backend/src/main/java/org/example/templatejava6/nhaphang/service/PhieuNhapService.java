@@ -10,13 +10,18 @@ import org.example.templatejava6.nhaphang.entity.PhieuNhap;
 import org.example.templatejava6.nhaphang.model.request.PhieuNhapRequest;
 import org.example.templatejava6.nhaphang.model.response.BienTheNhapHangResponse;
 import org.example.templatejava6.nhaphang.model.response.PhieuNhapResponse;
+import org.example.templatejava6.nhaphang.model.response.SanPhamNhapHangResponse;
 import org.example.templatejava6.nhaphang.repository.PhieuNhapRepository;
+import org.example.templatejava6.product.entity.AnhSanPham;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
+import org.example.templatejava6.product.entity.SanPham;
 import org.example.templatejava6.product.model.request.LoHangRequest;
 import org.example.templatejava6.product.model.response.LoHangResponse;
 import org.example.templatejava6.order.repository.NhanVienRepository;
+import org.example.templatejava6.product.repository.AnhSanPhamRepository;
 import org.example.templatejava6.product.repository.ChiTietSanPhamRepository;
 import org.example.templatejava6.product.repository.LoHangRepository;
+import org.example.templatejava6.product.repository.SanPhamRepository;
 import org.example.templatejava6.product.service.LoHangService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
@@ -27,9 +32,15 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class PhieuNhapService {
@@ -41,6 +52,8 @@ public class PhieuNhapService {
     @Autowired private PhieuNhapRepository phieuNhapRepository;
     @Autowired private NhaCungCapService nhaCungCapService;
     @Autowired private ChiTietSanPhamRepository chiTietSanPhamRepository;
+    @Autowired private SanPhamRepository sanPhamRepository;
+    @Autowired private AnhSanPhamRepository anhSanPhamRepository;
     @Autowired private NhanVienRepository nhanVienRepository;
     @Autowired private LoHangService loHangService;
     @Autowired private LoHangRepository loHangRepository;
@@ -216,11 +229,82 @@ public class PhieuNhapService {
         String q = keyword == null ? "" : keyword.trim();
         int pageNo = Math.max(0, page);
         int pageSize = size <= 0 ? 20 : Math.min(size, 50);
-        return chiTietSanPhamRepository
-                .danhSachBienTheBan(q, PageRequest.of(pageNo, pageSize))
-                .stream()
-                .map(BienTheNhapHangResponse::new)
+        List<ChiTietSanPham> variants = chiTietSanPhamRepository
+                .danhSachBienTheBan(q, PageRequest.of(pageNo, pageSize));
+        Map<Integer, String> imageMap = loadMainImageUrls(
+                variants.stream()
+                        .map(ChiTietSanPham::getSanPham)
+                        .filter(Objects::nonNull)
+                        .map(SanPham::getId)
+                        .collect(Collectors.toSet()));
+        return variants.stream()
+                .map(ct -> {
+                    BienTheNhapHangResponse res = new BienTheNhapHangResponse(ct);
+                    if (ct.getSanPham() != null) {
+                        res.setAnhUrl(imageMap.get(ct.getSanPham().getId()));
+                    }
+                    return res;
+                })
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SanPhamNhapHangResponse> timSanPham(String keyword, int page, int size) {
+        String q = keyword == null ? "" : keyword.trim();
+        int pageNo = Math.max(0, page);
+        int pageSize = size <= 0 ? 20 : Math.min(size, 50);
+        List<SanPham> products = sanPhamRepository.timChoNhapHang(q, PageRequest.of(pageNo, pageSize));
+        if (products.isEmpty()) {
+            return List.of();
+        }
+
+        Set<Integer> productIds = products.stream().map(SanPham::getId).collect(Collectors.toSet());
+        Map<Integer, String> imageMap = loadMainImageUrls(productIds);
+        Map<Integer, List<ChiTietSanPham>> variantsByProduct = chiTietSanPhamRepository
+                .findActiveBySanPhamIds(productIds)
+                .stream()
+                .collect(Collectors.groupingBy(ct -> ct.getSanPham().getId()));
+
+        List<SanPhamNhapHangResponse> result = new ArrayList<>();
+        for (SanPham sp : products) {
+            List<ChiTietSanPham> variants = variantsByProduct.getOrDefault(sp.getId(), List.of());
+            if (variants.isEmpty()) {
+                continue;
+            }
+            SanPhamNhapHangResponse item = new SanPhamNhapHangResponse(sp);
+            item.setAnhUrl(imageMap.get(sp.getId()));
+            List<BienTheNhapHangResponse> bienThes = variants.stream()
+                    .map(ct -> {
+                        BienTheNhapHangResponse bt = new BienTheNhapHangResponse(ct);
+                        bt.setAnhUrl(imageMap.get(sp.getId()));
+                        return bt;
+                    })
+                    .toList();
+            item.setBienThes(bienThes);
+            item.setSoBienThe(bienThes.size());
+            result.add(item);
+        }
+        return result;
+    }
+
+    private Map<Integer, String> loadMainImageUrls(Set<Integer> sanPhamIds) {
+        if (sanPhamIds == null || sanPhamIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Integer, List<AnhSanPham>> byProduct = anhSanPhamRepository.findBySanPham_IdIn(sanPhamIds).stream()
+                .collect(Collectors.groupingBy(a -> a.getSanPham().getId()));
+        Map<Integer, String> result = new HashMap<>();
+        for (Map.Entry<Integer, List<AnhSanPham>> entry : byProduct.entrySet()) {
+            entry.getValue().stream()
+                    .sorted(Comparator
+                            .comparing((AnhSanPham a) -> !Boolean.TRUE.equals(a.getLaAnhChinh()))
+                            .thenComparing(a -> a.getThuTu() != null ? a.getThuTu() : 0))
+                    .map(AnhSanPham::getUrl)
+                    .filter(url -> url != null && !url.isBlank())
+                    .findFirst()
+                    .ifPresent(url -> result.put(entry.getKey(), url));
+        }
+        return result;
     }
 
     private PhieuNhap getOrThrow(Integer id) {

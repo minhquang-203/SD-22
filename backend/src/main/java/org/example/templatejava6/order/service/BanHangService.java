@@ -538,6 +538,7 @@ public class BanHangService {
                 int diemHien = khachHang.getDiemTichLuy() != null ? khachHang.getDiemTichLuy() : 0;
                 khachHang.setDiemTichLuy(diemHien + diemThem);
                 khachHangRepository.save(khachHang);
+                voucherKhachHangService.tuDongGanKhiCapNhatDiem(khachHang);
             }
 
             return BanHangHoaDonResponse.from(hoaDon, ttDaiDien, lineResponses, cacDongThanhToan);
@@ -582,6 +583,7 @@ public class BanHangService {
             int diemHien = khachHang.getDiemTichLuy() != null ? khachHang.getDiemTichLuy() : 0;
             khachHang.setDiemTichLuy(diemHien + diemThem);
             khachHangRepository.save(khachHang);
+            voucherKhachHangService.tuDongGanKhiCapNhatDiem(khachHang);
         }
 
         return BanHangHoaDonResponse.from(hoaDon, tt, lineResponses);

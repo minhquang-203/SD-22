@@ -52,6 +52,7 @@ public class HoaDonStorefrontService {
     private final YeuCauTraHangRepository yeuCauTraHangRepository;
     private final HoanTienRepository hoanTienRepository;
     private final TransactionTemplate readOnlyTx;
+    private final PublicOrderLookupRateLimiter publicLookupRateLimiter;
 
     public HoaDonStorefrontService(
             HoaDonRepository hoaDonRepository,
@@ -64,7 +65,8 @@ public class HoaDonStorefrontService {
             OnlineOrderLifecycleService onlineOrderLifecycleService,
             YeuCauTraHangRepository yeuCauTraHangRepository,
             HoanTienRepository hoanTienRepository,
-            PlatformTransactionManager transactionManager) {
+            PlatformTransactionManager transactionManager,
+            PublicOrderLookupRateLimiter publicLookupRateLimiter) {
         this.hoaDonRepository = hoaDonRepository;
         this.hoaDonChiTietRepository = hoaDonChiTietRepository;
         this.lichSuDonHangRepository = lichSuDonHangRepository;
@@ -77,6 +79,7 @@ public class HoaDonStorefrontService {
         this.hoanTienRepository = hoanTienRepository;
         this.readOnlyTx = new TransactionTemplate(transactionManager);
         this.readOnlyTx.setReadOnly(true);
+        this.publicLookupRateLimiter = publicLookupRateLimiter;
     }
 
     @Transactional(readOnly = true)
@@ -97,6 +100,87 @@ public class HoaDonStorefrontService {
         StorefrontOrderDetailResponse detail = readOnlyTx.execute(status -> loadChiTietCuaToi(id));
         enrichLiveGhnTracking(detail);
         return detail;
+    }
+
+    /**
+     * Tra cứu công khai bằng token bí mật (link trong email). Rate-limit theo clientKey (IP).
+     */
+    public StorefrontOrderDetailResponse traCuuBangToken(String token, String clientKey) {
+        publicLookupRateLimiter.checkOrThrow(clientKey);
+        StorefrontOrderDetailResponse detail = readOnlyTx.execute(status -> loadTraCuuBangToken(token));
+        enrichLiveGhnTracking(detail);
+        return detail;
+    }
+
+    /**
+     * Tra cứu công khai bằng mã + email (form thủ công). Dùng POST để email không nằm trên URL.
+     */
+    public StorefrontOrderDetailResponse traCuuCongKhai(String maHoaDon, String email, String clientKey) {
+        publicLookupRateLimiter.checkOrThrow(clientKey);
+        StorefrontOrderDetailResponse detail = readOnlyTx.execute(status -> loadTraCuuCongKhai(maHoaDon, email));
+        enrichLiveGhnTracking(detail);
+        return detail;
+    }
+
+    private StorefrontOrderDetailResponse loadTraCuuBangToken(String token) {
+        String normalized = token != null ? token.trim() : "";
+        if (normalized.length() < 32) {
+            throw new ApiException("Không tìm thấy đơn hàng với thông tin đã nhập", "NOT_FOUND");
+        }
+        HoaDon hd = hoaDonRepository.findByTrackingToken(normalized)
+                .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng với thông tin đã nhập", "NOT_FOUND"));
+        if (onlineOrderLifecycleService.laVnpayChuaThanhToan(hd)) {
+            throw new ApiException("Không tìm thấy đơn hàng với thông tin đã nhập", "NOT_FOUND");
+        }
+        return toPublicDetail(hd);
+    }
+
+    private StorefrontOrderDetailResponse loadTraCuuCongKhai(String maHoaDon, String email) {
+        String ma = maHoaDon != null ? maHoaDon.trim() : "";
+        String emailNorm = email != null ? email.trim() : "";
+        if (ma.isBlank() || emailNorm.isBlank()) {
+            throw new ApiException("Vui lòng nhập mã đơn hàng và email", "BAD_REQUEST");
+        }
+        HoaDon hd = hoaDonRepository.findByMaHoaDonIgnoreCase(ma)
+                .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng với thông tin đã nhập", "NOT_FOUND"));
+        if (!emailKhopDon(hd, emailNorm)) {
+            throw new ApiException("Không tìm thấy đơn hàng với thông tin đã nhập", "NOT_FOUND");
+        }
+        if (onlineOrderLifecycleService.laVnpayChuaThanhToan(hd)) {
+            throw new ApiException("Không tìm thấy đơn hàng với thông tin đã nhập", "NOT_FOUND");
+        }
+        return toPublicDetail(hd);
+    }
+
+    private StorefrontOrderDetailResponse toPublicDetail(HoaDon hd) {
+        StorefrontOrderDetailResponse detail = buildDetail(hd);
+        detail.setCoTheYeuCauTraHang(false);
+        // Che một phần SĐT khi xem công khai (giảm rủi ro nếu token bị lộ).
+        detail.setSdtNguoiNhan(maskPhone(detail.getSdtNguoiNhan()));
+        return detail;
+    }
+
+    /** Email khớp — so sánh không phân biệt hoa thường, không tiết lộ trường nào sai. */
+    private static boolean emailKhopDon(HoaDon hd, String email) {
+        String emailNguoiNhan = hd.getEmailNguoiNhan();
+        if (emailNguoiNhan != null && email.equalsIgnoreCase(emailNguoiNhan.trim())) {
+            return true;
+        }
+        if (hd.getIdKhachHang() != null && hd.getIdKhachHang().getEmail() != null) {
+            return email.equalsIgnoreCase(hd.getIdKhachHang().getEmail().trim());
+        }
+        return false;
+    }
+
+    static String maskPhone(String phone) {
+        if (phone == null) {
+            return null;
+        }
+        String digits = phone.replaceAll("\\s+", "");
+        if (digits.length() < 7) {
+            return "***";
+        }
+        return digits.substring(0, 3) + "****" + digits.substring(digits.length() - 3);
     }
 
     private StorefrontOrderDetailResponse loadChiTietCuaToi(Integer id) {

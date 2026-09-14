@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -46,7 +47,80 @@ public class VoucherKhachHangService {
             return 0;
         }
         List<KhachHang> khachHangs = khachHangRepository.findAllById(idKhachHangs);
+        if (coKhoangDiem(voucher)) {
+            List<KhachHang> hopLe = new ArrayList<>();
+            for (KhachHang kh : khachHangs) {
+                if (kh == null) {
+                    continue;
+                }
+                if (!diemKhopVoucher(kh, voucher)) {
+                    throw new ApiException(
+                            "Khách \"" + (kh.getHoTen() != null ? kh.getHoTen() : kh.getId())
+                                    + "\" không đủ điểm theo khoảng của voucher.",
+                            "DIEM_KHONG_KHOP");
+                }
+                hopLe.add(kh);
+            }
+            return luuGan(voucher, hopLe);
+        }
         return luuGan(voucher, khachHangs);
+    }
+
+    /**
+     * Tự gán voucher cá nhân cho mọi khách đang đủ điểm (khi tạo/cập nhật phiếu có khoảng điểm).
+     * Không làm gì nếu phiếu không phải CA_NHAN hoặc không cấu hình điểm.
+     */
+    @Transactional
+    public int ganTuDongTheoKhoangDiem(PhieuGiamGia voucher) {
+        if (voucher == null || voucher.getId() == null) {
+            return 0;
+        }
+        if (voucher.getPhamVi() != PhamViPhieuGiamGia.CA_NHAN || !coKhoangDiem(voucher)) {
+            return 0;
+        }
+        List<KhachHang> khachHangs = khachHangRepository.locTheoKhoangDiem(
+                voucher.getDiemToiThieu(),
+                voucher.getDiemToiDa());
+        if (khachHangs.isEmpty()) {
+            return 0;
+        }
+        return luuGan(voucher, khachHangs);
+    }
+
+    /**
+     * Khi khách được cộng điểm: tự nhận các voucher cá nhân còn hiệu lực khớp khoảng điểm.
+     */
+    @Transactional
+    public int tuDongGanKhiCapNhatDiem(KhachHang khachHang) {
+        if (khachHang == null || khachHang.getId() == null) {
+            return 0;
+        }
+        int diem = khachHang.getDiemTichLuy() != null ? khachHang.getDiemTichLuy() : 0;
+        List<PhieuGiamGia> vouchers = phieuGiamGiaRepository.findCaNhanAutoTheoDiem(diem);
+        int total = 0;
+        for (PhieuGiamGia voucher : vouchers) {
+            total += luuGan(voucher, List.of(khachHang));
+        }
+        return total;
+    }
+
+    public static boolean coKhoangDiem(PhieuGiamGia voucher) {
+        return voucher != null
+                && (voucher.getDiemToiThieu() != null || voucher.getDiemToiDa() != null);
+    }
+
+    public static boolean diemKhopVoucher(KhachHang kh, PhieuGiamGia voucher) {
+        if (kh == null || voucher == null || !coKhoangDiem(voucher)) {
+            return true;
+        }
+        int diem = kh.getDiemTichLuy() != null ? kh.getDiemTichLuy() : 0;
+        if (voucher.getDiemToiThieu() != null && diem < voucher.getDiemToiThieu()) {
+            return false;
+        }
+        if (voucher.getDiemToiDa() != null && diem > voucher.getDiemToiDa()) {
+            return false;
+        }
+        return true;
     }
 
     /** Gán voucher theo bộ lọc nhóm. Trả về số khách được gán mới. */

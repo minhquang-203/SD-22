@@ -22,6 +22,8 @@ public class PhieuGiamGiaResponse {
     private BigDecimal giaTriDonToiThieu;
     private BigDecimal giamToiDa;
     private Integer soLuong;
+    private Integer diemToiThieu;
+    private Integer diemToiDa;
     private Long daDung = 0L;
     private LocalDateTime ngayBatDau;
     private LocalDateTime ngayKetThuc;
@@ -31,6 +33,8 @@ public class PhieuGiamGiaResponse {
     private String timeStatusLabel;
     /** Khách đang xem có được phép chọn/áp dụng mã này không (mã cá nhân phải được gán). */
     private Boolean duocSuDung;
+    /** Số khách được auto-gán khi tạo/cập nhật (chỉ set khi cần). */
+    private Integer soKhachGanMoi;
 
     public PhieuGiamGiaResponse(PhieuGiamGia pgg) {
         this.id = pgg.getId();
@@ -42,6 +46,8 @@ public class PhieuGiamGiaResponse {
         this.giaTriDonToiThieu = pgg.getGiaTriDonToiThieu();
         this.giamToiDa = pgg.getGiamToiDa();
         this.soLuong = pgg.getSoLuong();
+        this.diemToiThieu = pgg.getDiemToiThieu();
+        this.diemToiDa = pgg.getDiemToiDa();
         this.ngayBatDau = pgg.getNgayBatDau();
         this.ngayKetThuc = pgg.getNgayKetThuc();
         this.trangThai = pgg.getTrangThai();

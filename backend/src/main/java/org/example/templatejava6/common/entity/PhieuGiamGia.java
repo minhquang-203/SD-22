@@ -57,6 +57,14 @@ public class PhieuGiamGia {
     @Column(name = "so_luong")
     private Integer soLuong;
 
+    /** Điểm tích lũy tối thiểu để tự động/thủ công gán voucher cá nhân (optional). */
+    @Column(name = "diem_toi_thieu")
+    private Integer diemToiThieu;
+
+    /** Điểm tích lũy tối đa để tự động/thủ công gán voucher cá nhân (optional). */
+    @Column(name = "diem_toi_da")
+    private Integer diemToiDa;
+
     @Column(name = "ngay_bat_dau")
     private LocalDateTime ngayBatDau;
 

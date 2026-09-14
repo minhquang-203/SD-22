@@ -22,8 +22,9 @@ function attachBearer(config, token) {
 }
 
 function isCustomerApiUrl(url) {
-  // Checkout khách vãng lai là công khai: không gắn token, không coi 401/403 là hết phiên.
+  // Checkout / tra cứu khách vãng lai là công khai: không gắn token, không coi 401/403 là hết phiên.
   if (url.includes('/online/guest')) return false
+  if (url.includes('/hoa-don/tra-cuu')) return false
   return CUSTOMER_API_PREFIXES.some((prefix) => url.includes(prefix))
 }
 

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { formatVND } from '@/utils/formatVND'
@@ -13,13 +13,21 @@ const props = defineProps({
   cancelLoading: { type: Boolean, default: false },
   returnActionLoading: { type: Boolean, default: false },
   detailLoading: { type: Boolean, default: false },
+  /** Chỉ xem (khách vãng lai): ẩn hủy / trả hàng / đánh giá. */
+  readOnly: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['review', 'cancelOrder', 'requestReturn', 'expand'])
 
 const router = useRouter()
 const hasReturnRequest = computed(() => Boolean(props.order?.idYeuCauTraHang))
-const isOpen = ref(Boolean(props.defaultOpen) && !hasReturnRequest.value)
+const isOpen = ref(Boolean(props.defaultOpen) && (props.readOnly || !hasReturnRequest.value))
+
+onMounted(() => {
+  if (isOpen.value) {
+    emit('expand', props.order)
+  }
+})
 
 const steps = ['Đặt hàng', 'Chờ Xác nhận', 'Đã xác nhận', 'Vận chuyển', 'Đã nhận']
 
@@ -41,9 +49,9 @@ const isCancelled = computed(() => props.order?.trangThai === 'DA_HUY')
 
 const isReturned = computed(() => props.order?.trangThai === 'TRA_HANG')
 
-const canCancel = computed(() => coTheHuyDon(props.order?.trangThai))
+const canCancel = computed(() => !props.readOnly && coTheHuyDon(props.order?.trangThai))
 
-const canRequestReturn = computed(() => props.order?.coTheYeuCauTraHang === true)
+const canRequestReturn = computed(() => !props.readOnly && props.order?.coTheYeuCauTraHang === true)
 
 const headerStatus = computed(() => {
   if (props.order?.trangThaiTraHang) {
@@ -129,7 +137,7 @@ const cancelNotice = computed(() => {
 })
 
 function onHeadClick() {
-  if (hasReturnRequest.value && props.order?.idYeuCauTraHang) {
+  if (!props.readOnly && hasReturnRequest.value && props.order?.idYeuCauTraHang) {
     router.push(`/tra-cuu-don/tra-hang/${props.order.idYeuCauTraHang}`)
     return
   }
@@ -141,13 +149,14 @@ function onHeadClick() {
 }
 
 function canReview(line) {
+  if (props.readOnly) return false
   const delivered = props.order?.trangThai === 'HOAN_THANH' || props.order?.trangThai === 'GIAO_THANH_CONG'
   return delivered && !line?.daDanhGia && line?.idSanPham
 }
 </script>
 
 <template>
-  <article v-if="order" class="sf-order-card" :class="{ open: isOpen && !hasReturnRequest }">
+  <article v-if="order" class="sf-order-card" :class="{ open: isOpen && (readOnly || !hasReturnRequest) }">
     <button type="button" class="sf-order-card__head" @click="onHeadClick">
       <div class="sf-order-card__head-main">
         <div v-if="order.maHoaDon || order.maVanDonTra" class="sf-order-card__codes">

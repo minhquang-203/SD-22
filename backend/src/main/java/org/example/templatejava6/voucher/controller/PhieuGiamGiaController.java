@@ -58,8 +58,8 @@ public class PhieuGiamGiaController {
 
     // 3. CREATE
     @PostMapping
-    public void create(@Valid @RequestBody PhieuGiamGiaRequest request) {
-        phieuGiamGiaService.add(request);
+    public ResponseEntity<PhieuGiamGiaResponse> create(@Valid @RequestBody PhieuGiamGiaRequest request) {
+        return ResponseEntity.ok(phieuGiamGiaService.add(request));
     }
 
     // 4. UPDATE

@@ -260,10 +260,15 @@ const handleCreate = async (payload) => {
   });
   if (!ok) return;
   try {
-    await createVoucher(payload);
+    const res = await createVoucher(payload);
     showModal.value = false;
     editingVoucher.value = null;
-    toast("Tạo phiếu giảm giá thành công", "info");
+    const soKhach = res.data?.soKhachGanMoi;
+    if (payload.phamVi === "CA_NHAN" && soKhach != null && soKhach > 0) {
+      toast(`Tạo phiếu thành công — đã tự gán cho ${soKhach} khách đủ điểm`, "info");
+    } else {
+      toast("Tạo phiếu giảm giá thành công", "info");
+    }
     await loadData(1);
     refreshStats();
   } catch (e) {

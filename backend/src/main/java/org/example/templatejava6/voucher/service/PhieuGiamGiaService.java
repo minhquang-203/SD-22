@@ -39,6 +39,9 @@ public class PhieuGiamGiaService {
     @Autowired
     private KhachHangPhieuGiamGiaRepository khachHangPhieuGiamGiaRepository;
 
+    @Autowired
+    private VoucherKhachHangService voucherKhachHangService;
+
     @Transactional(readOnly = true)
     public Page<PhieuGiamGiaResponse> getAll(Pageable pageable) {
         Page<PhieuGiamGia> phieuGiamGiaPage = phieuGiamGiaRepository.findByTrangThaiTrue(pageable);
@@ -85,7 +88,7 @@ public class PhieuGiamGiaService {
     }
 
     @Transactional
-    public void add(PhieuGiamGiaRequest request) {
+    public PhieuGiamGiaResponse add(PhieuGiamGiaRequest request) {
         normalizeRequest(request);
         validateRequest(request, true);
         String ma = resolveCreateMa(request.getMa());
@@ -97,10 +100,19 @@ public class PhieuGiamGiaService {
         if (pgg.getPhamVi() == null) {
             pgg.setPhamVi(org.example.templatejava6.common.enums.PhamViPhieuGiamGia.CONG_KHAI);
         }
+        // Khoảng điểm chỉ áp dụng cho voucher cá nhân.
+        if (pgg.getPhamVi() != PhamViPhieuGiamGia.CA_NHAN) {
+            pgg.setDiemToiThieu(null);
+            pgg.setDiemToiDa(null);
+        }
         pgg.setMa(ma);
         pgg.setTrangThai(true);
         pgg.setIsActive(true);
-        phieuGiamGiaRepository.save(pgg);
+        PhieuGiamGia saved = phieuGiamGiaRepository.save(pgg);
+        int soKhachGanMoi = voucherKhachHangService.ganTuDongTheoKhoangDiem(saved);
+        PhieuGiamGiaResponse res = new PhieuGiamGiaResponse(saved);
+        res.setSoKhachGanMoi(soKhachGanMoi);
+        return res;
     }
 
     /** Dùng mã đã xem trước nếu còn hợp lệ; không thì sinh mới. */
@@ -143,7 +155,12 @@ public class PhieuGiamGiaService {
         if (pgg.getPhamVi() == null) {
             pgg.setPhamVi(org.example.templatejava6.common.enums.PhamViPhieuGiamGia.CONG_KHAI);
         }
-        phieuGiamGiaRepository.save(pgg);
+        if (pgg.getPhamVi() != PhamViPhieuGiamGia.CA_NHAN) {
+            pgg.setDiemToiThieu(null);
+            pgg.setDiemToiDa(null);
+        }
+        PhieuGiamGia saved = phieuGiamGiaRepository.save(pgg);
+        voucherKhachHangService.ganTuDongTheoKhoangDiem(saved);
     }
 
     /**
@@ -203,6 +220,24 @@ public class PhieuGiamGiaService {
         if (request.getGiaTriDonToiThieu() != null
                 && request.getGiaTriDonToiThieu().signum() < 0) {
             throw new ApiException("Đơn tối thiểu không hợp lệ", "VALIDATION_ERROR");
+        }
+        Integer diemTu = request.getDiemToiThieu();
+        Integer diemDen = request.getDiemToiDa();
+        if (diemTu != null && diemTu < 0) {
+            throw new ApiException("Điểm tối thiểu không hợp lệ", "VALIDATION_ERROR");
+        }
+        if (diemDen != null && diemDen < 0) {
+            throw new ApiException("Điểm tối đa không hợp lệ", "VALIDATION_ERROR");
+        }
+        if (diemTu != null && diemDen != null && diemTu > diemDen) {
+            throw new ApiException("Điểm tối thiểu không được lớn hơn điểm tối đa", "VALIDATION_ERROR");
+        }
+        if ((diemTu != null || diemDen != null)
+                && request.getPhamVi() != null
+                && request.getPhamVi() != PhamViPhieuGiamGia.CA_NHAN) {
+            throw new ApiException(
+                    "Khoảng điểm chỉ dùng cho phiếu giảm giá cá nhân",
+                    "VALIDATION_ERROR");
         }
         java.math.BigDecimal giaTri = request.getGiaTri();
         java.math.BigDecimal giamToiDa = request.getGiamToiDa();

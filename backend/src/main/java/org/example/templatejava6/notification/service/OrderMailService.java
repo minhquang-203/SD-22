@@ -4,6 +4,8 @@ import jakarta.mail.internet.MimeMessage;
 import org.example.templatejava6.order.entity.HoaDon;
 import org.example.templatejava6.order.model.response.HoaDonChiTietResponse;
 import org.example.templatejava6.order.repository.HoaDonChiTietRepository;
+import org.example.templatejava6.order.repository.HoaDonRepository;
+import org.example.templatejava6.order.service.OrderTrackingTokenGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +31,8 @@ public class OrderMailService {
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     private final HoaDonChiTietRepository hoaDonChiTietRepository;
+    private final HoaDonRepository hoaDonRepository;
+    private final OrderTrackingTokenGenerator trackingTokenGenerator;
 
     private final JavaMailSender mailSender;
 
@@ -42,8 +46,12 @@ public class OrderMailService {
     private String frontendBaseUrl;
 
     public OrderMailService(HoaDonChiTietRepository hoaDonChiTietRepository,
+                            HoaDonRepository hoaDonRepository,
+                            OrderTrackingTokenGenerator trackingTokenGenerator,
                             org.springframework.beans.factory.ObjectProvider<JavaMailSender> mailSenderProvider) {
         this.hoaDonChiTietRepository = hoaDonChiTietRepository;
+        this.hoaDonRepository = hoaDonRepository;
+        this.trackingTokenGenerator = trackingTokenGenerator;
         this.mailSender = mailSenderProvider.getIfAvailable();
     }
 
@@ -188,7 +196,7 @@ public class OrderMailService {
         String greeting = tenNguoiNhan.isBlank()
                 ? (hoaDon.getIdKhachHang() != null ? safe(hoaDon.getIdKhachHang().getHoTen()) : "")
                 : tenNguoiNhan;
-        String trackingUrl = buildTrackingUrl(safe(hoaDon.getMaHoaDon()));
+        String trackingUrl = buildTrackingUrl(hoaDon);
         return """
                 <div style="background:#f4f5f7;padding:24px 0;font-family:Segoe UI,Roboto,Arial,sans-serif;">
                   <div style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e6e8ec;">
@@ -240,7 +248,7 @@ public class OrderMailService {
         String phuongThuc = hoaDon.getIdPhuongThucThanhToan() != null
                 ? safe(hoaDon.getIdPhuongThucThanhToan().getTen())
                 : "—";
-        String trackingUrl = buildTrackingUrl(maHoaDon);
+        String trackingUrl = buildTrackingUrl(hoaDon);
 
         StringBuilder rows = new StringBuilder();
         for (HoaDonChiTietResponse line : lines) {
@@ -339,7 +347,7 @@ public class OrderMailService {
                         </a>
                       </div>
                       <p style="text-align:center;color:#8a8f98;font-size:12px;margin:6px 0 0;">
-                        Hoặc tra cứu với mã đơn <strong>%s</strong> tại website SUNOVA.
+                        Link theo dõi dùng mã bảo mật riêng cho đơn của bạn. Không chia sẻ link này.
                       </p>
                     </div>
 
@@ -361,15 +369,40 @@ public class OrderMailService {
                 vnd(hoaDon.getTienGiamGia()),
                 vnd(hoaDon.getPhiVanChuyen()),
                 vnd(hoaDon.getThanhTien()),
-                trackingUrl,
-                esc(maHoaDon));
+                trackingUrl);
     }
 
-    private String buildTrackingUrl(String maHoaDon) {
+    /**
+     * Link tra cứu chỉ chứa token bí mật (256-bit) — không đưa mã đơn/email lên URL
+     * (tránh lộ qua lịch sử trình duyệt / Referer).
+     */
+    private String buildTrackingUrl(HoaDon hoaDon) {
         String base = frontendBaseUrl != null && !frontendBaseUrl.isBlank()
                 ? frontendBaseUrl.trim().replaceAll("/+$", "")
                 : "http://localhost:5173";
-        return base + "/tra-cuu-don?ma=" + URLEncoder.encode(maHoaDon, StandardCharsets.UTF_8);
+        String token = ensureTrackingToken(hoaDon);
+        if (token == null || token.isBlank()) {
+            // Fallback cực hiếm: chỉ mã đơn (form sẽ yêu cầu email).
+            String maHoaDon = safe(hoaDon != null ? hoaDon.getMaHoaDon() : null);
+            return base + "/tra-cuu-don?ma=" + URLEncoder.encode(maHoaDon, StandardCharsets.UTF_8);
+        }
+        return base + "/tra-cuu-don?token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
+    }
+
+    private String ensureTrackingToken(HoaDon hoaDon) {
+        if (hoaDon == null) {
+            return null;
+        }
+        if (hoaDon.getTrackingToken() != null && !hoaDon.getTrackingToken().isBlank()) {
+            return hoaDon.getTrackingToken();
+        }
+        if (hoaDon.getId() == null) {
+            return null;
+        }
+        String token = trackingTokenGenerator.generate();
+        hoaDon.setTrackingToken(token);
+        hoaDonRepository.save(hoaDon);
+        return token;
     }
 
     private String vnd(BigDecimal value) {

@@ -8,12 +8,13 @@ import {
   getPhieuNhapDetail,
   hoanThanhPhieuNhap,
   luuTamPhieuNhap,
-  timBienTheNhapHang,
+  timSanPhamNhapHang,
   updatePhieuNhap,
 } from '@/api/nhapHangApi'
 import { toast } from '@/composables/useToast'
 import { confirm } from '@/composables/useConfirm'
 import { formatApiError } from '@/utils/apiError'
+import { productImageUrl } from '@/utils/productImage'
 
 const route = useRoute()
 const router = useRouter()
@@ -45,11 +46,16 @@ const ghiChu = ref('')
 const ngayNhap = ref(todayLocal())
 const nccOptions = ref([])
 
-const showSkuModal = ref(false)
-const skuQuery = ref('')
-const skuLoading = ref(false)
-const skuResults = ref([])
-let skuSearchTimer = null
+const showAddModal = ref(false)
+const modalStep = ref(1)
+const productQuery = ref('')
+const productLoading = ref(false)
+const productResults = ref([])
+/** @type {import('vue').Ref<Record<number, any>>} */
+const selectedProductsMap = ref({})
+/** @type {import('vue').Ref<Record<number, { soLuong: number, donGia: number }>>} */
+const variantDraft = ref({})
+let productSearchTimer = null
 
 const showNccModal = ref(false)
 const nccForm = ref({ ten: '', soDienThoai: '', email: '', diaChi: '', ghiChu: '' })
@@ -137,49 +143,230 @@ function removeLine(index) {
   lines.value.splice(index, 1)
 }
 
-async function searchSku(keyword = skuQuery.value) {
-  skuLoading.value = true
+const selectedProductCount = computed(() => Object.keys(selectedProductsMap.value).length)
+
+const selectedProducts = computed(() =>
+  Object.values(selectedProductsMap.value).sort((a, b) =>
+    String(a.tenSanPham || '').localeCompare(String(b.tenSanPham || ''), 'vi'),
+  ),
+)
+
+const step2Summary = computed(() => {
+  const entries = Object.entries(variantDraft.value)
+  let variantCount = 0
+  let qtySum = 0
+  let amountSum = 0
+  for (const [, draft] of entries) {
+    const qty = Number(draft.soLuong || 0)
+    const price = Number(draft.donGia || 0)
+    if (qty <= 0) continue
+    variantCount += 1
+    qtySum += qty
+    amountSum += qty * price
+  }
+  return { variantCount, qtySum, amountSum }
+})
+
+const canGoStep2 = computed(() => selectedProductCount.value > 0)
+const canAddToPhieu = computed(
+  () => step2Summary.value.variantCount > 0 && step2Summary.value.qtySum > 0,
+)
+
+function isProductSelected(id) {
+  return Boolean(selectedProductsMap.value[id])
+}
+
+function variantLabel(v) {
+  const parts = []
+  if (v.tenMauSac) parts.push(v.tenMauSac)
+  if (v.dungTichMl) parts.push(`${v.dungTichMl}ml`)
+  return parts.join(' / ') || 'Mặc định'
+}
+
+function isVariantSelected(idChiTietSanPham) {
+  return Boolean(variantDraft.value[idChiTietSanPham])
+}
+
+function allVariantsSelected(product) {
+  const list = product?.bienThes || []
+  return list.length > 0 && list.every((v) => isVariantSelected(v.idChiTietSanPham))
+}
+
+async function searchProducts(keyword = productQuery.value) {
+  productLoading.value = true
   try {
-    const res = await timBienTheNhapHang(String(keyword || '').trim(), 0, 20)
-    skuResults.value = res.data || []
+    const res = await timSanPhamNhapHang(String(keyword || '').trim(), 0, 40)
+    productResults.value = res.data || []
   } catch (e) {
-    toast(formatApiError(e, 'Không tìm được hàng'), 'error')
+    toast(formatApiError(e, 'Không tìm được sản phẩm'), 'error')
   } finally {
-    skuLoading.value = false
+    productLoading.value = false
   }
 }
 
-function scheduleSkuSearch() {
-  if (skuSearchTimer) clearTimeout(skuSearchTimer)
-  skuSearchTimer = setTimeout(() => searchSku(skuQuery.value), 350)
+function scheduleProductSearch() {
+  if (productSearchTimer) clearTimeout(productSearchTimer)
+  productSearchTimer = setTimeout(() => searchProducts(productQuery.value), 350)
 }
 
-async function openSkuModal() {
+function resetAddModalState() {
+  modalStep.value = 1
+  selectedProductsMap.value = {}
+  variantDraft.value = {}
+  productResults.value = []
+}
+
+async function openAddModal() {
   if (readonly.value) return
-  showSkuModal.value = true
-  await searchSku(skuQuery.value)
+  resetAddModalState()
+  showAddModal.value = true
+  await searchProducts(productQuery.value)
 }
 
-function addVariant(v) {
-  if (lines.value.some((l) => l.idChiTietSanPham === v.idChiTietSanPham)) {
-    toast('SKU đã có trên phiếu', 'warn')
+function closeAddModal() {
+  showAddModal.value = false
+  resetAddModalState()
+}
+
+function toggleProduct(product) {
+  const id = product.idSanPham
+  if (selectedProductsMap.value[id]) {
+    const next = { ...selectedProductsMap.value }
+    delete next[id]
+    selectedProductsMap.value = next
+    const nextDraft = { ...variantDraft.value }
+    for (const v of product.bienThes || []) {
+      delete nextDraft[v.idChiTietSanPham]
+    }
+    variantDraft.value = nextDraft
+  } else {
+    selectedProductsMap.value = { ...selectedProductsMap.value, [id]: product }
+  }
+}
+
+function selectAllVisibleProducts() {
+  const next = { ...selectedProductsMap.value }
+  for (const p of productResults.value) {
+    next[p.idSanPham] = p
+  }
+  selectedProductsMap.value = next
+}
+
+function goToStep2() {
+  if (!canGoStep2.value) return
+  // bỏ draft thuộc sản phẩm đã bỏ chọn
+  const keepIds = new Set(
+    selectedProducts.value.flatMap((p) => (p.bienThes || []).map((v) => v.idChiTietSanPham)),
+  )
+  const nextDraft = {}
+  for (const [id, draft] of Object.entries(variantDraft.value)) {
+    if (keepIds.has(Number(id))) nextDraft[id] = draft
+  }
+  variantDraft.value = nextDraft
+  modalStep.value = 2
+}
+
+function backToStep1() {
+  modalStep.value = 1
+}
+
+function setVariantSelected(product, variant, on) {
+  const id = variant.idChiTietSanPham
+  if (on) {
+    if (variantDraft.value[id]) return
+    variantDraft.value = {
+      ...variantDraft.value,
+      [id]: {
+        soLuong: 1,
+        donGia: 0,
+        idChiTietSanPham: id,
+        sku: variant.sku,
+        tenSanPham: product.tenSanPham,
+        tenMauSac: variant.tenMauSac,
+        dungTichMl: variant.dungTichMl,
+        giaBan: Number(variant.giaBan || 0),
+      },
+    }
+  } else {
+    const next = { ...variantDraft.value }
+    delete next[id]
+    variantDraft.value = next
+  }
+}
+
+function toggleVariant(product, variant) {
+  setVariantSelected(product, variant, !isVariantSelected(variant.idChiTietSanPham))
+}
+
+function toggleAllVariants(product, on) {
+  for (const v of product.bienThes || []) {
+    setVariantSelected(product, v, on)
+  }
+}
+
+function updateVariantQty(idChiTietSanPham, value) {
+  const draft = variantDraft.value[idChiTietSanPham]
+  if (!draft) return
+  const qty = Math.max(0, Number(value) || 0)
+  variantDraft.value = {
+    ...variantDraft.value,
+    [idChiTietSanPham]: { ...draft, soLuong: qty },
+  }
+}
+
+function updateVariantPrice(idChiTietSanPham, value) {
+  const draft = variantDraft.value[idChiTietSanPham]
+  if (!draft) return
+  const price = Math.max(0, Number(value) || 0)
+  variantDraft.value = {
+    ...variantDraft.value,
+    [idChiTietSanPham]: { ...draft, donGia: price },
+  }
+}
+
+function onVariantQtyInput(product, variant, value) {
+  const qty = Math.max(0, Number(value) || 0)
+  if (qty > 0 && !isVariantSelected(variant.idChiTietSanPham)) {
+    setVariantSelected(product, variant, true)
+  }
+  if (isVariantSelected(variant.idChiTietSanPham)) {
+    updateVariantQty(variant.idChiTietSanPham, qty)
+  }
+}
+
+function addSelectedToPhieu() {
+  if (!canAddToPhieu.value) return
+  let added = 0
+  let skipped = 0
+  for (const draft of Object.values(variantDraft.value)) {
+    const qty = Number(draft.soLuong || 0)
+    if (qty <= 0) continue
+    if (lines.value.some((l) => l.idChiTietSanPham === draft.idChiTietSanPham)) {
+      skipped += 1
+      continue
+    }
+    lines.value.push({
+      idChiTietSanPham: draft.idChiTietSanPham,
+      sku: draft.sku,
+      tenSanPham: draft.tenSanPham,
+      tenMauSac: draft.tenMauSac,
+      dungTichMl: draft.dungTichMl,
+      soLuong: qty,
+      donGia: Number(draft.donGia || 0),
+      giaBan: Number(draft.giaBan || 0),
+      hanSuDung: '',
+      soLo: '',
+    })
+    added += 1
+  }
+  if (added === 0) {
+    toast(skipped ? 'Các SKU đã có trên phiếu' : 'Chọn ít nhất 1 biến thể có số lượng', 'warn')
     return
   }
-  lines.value.push({
-    idChiTietSanPham: v.idChiTietSanPham,
-    sku: v.sku,
-    tenSanPham: v.tenSanPham,
-    tenMauSac: v.tenMauSac,
-    dungTichMl: v.dungTichMl,
-    soLuong: 1,
-    donGia: 0,
-    giaBan: Number(v.giaBan || 0),
-    hanSuDung: '',
-    soLo: '',
-  })
-  showSkuModal.value = false
-  skuQuery.value = ''
-  skuResults.value = []
+  if (skipped) toast(`Đã thêm ${added} dòng, bỏ qua ${skipped} SKU trùng`, 'warn')
+  else toast(`Đã thêm ${added} dòng vào phiếu`, 'success')
+  closeAddModal()
+  productQuery.value = ''
 }
 
 async function saveNcc() {
@@ -287,9 +474,9 @@ function applySaved(p) {
   trangThai.value = p.trangThai
 }
 
-watch(skuQuery, () => {
-  if (!showSkuModal.value) return
-  scheduleSkuSearch()
+watch(productQuery, () => {
+  if (!showAddModal.value || modalStep.value !== 1) return
+  scheduleProductSearch()
 })
 
 onMounted(async () => {
@@ -342,7 +529,7 @@ onMounted(async () => {
             type="button"
             class="soleil-btn-primary"
             :disabled="readonly"
-            @click="openSkuModal"
+            @click="openAddModal"
           >
             <Icon icon="icon-park-outline:plus" width="15" />
             Thêm hàng
@@ -353,13 +540,13 @@ onMounted(async () => {
           <div class="pn-search">
             <Icon icon="icon-park-outline:search" class="pn-search__icon" />
             <input
-              v-model="skuQuery"
+              v-model="productQuery"
               class="pn-search__input"
-              placeholder="Tìm theo mã SKU hoặc tên sản phẩm…"
-              @keyup.enter="openSkuModal"
+              placeholder="Tìm theo tên sản phẩm hoặc mã SKU…"
+              @keyup.enter="openAddModal"
             />
           </div>
-          <button type="button" class="soleil-btn-outline" @click="openSkuModal">
+          <button type="button" class="soleil-btn-outline" @click="openAddModal">
             Tìm
           </button>
         </div>
@@ -367,7 +554,7 @@ onMounted(async () => {
         <div v-if="!lines.length" class="pn-empty-lines">
           <Icon icon="icon-park-outline:inbox" width="28" class="pn-empty-lines__icon" />
           <p>Chưa có dòng hàng</p>
-          <span>Tìm SKU rồi thêm vào phiếu để bắt đầu nhập kho.</span>
+          <span>Tìm và chọn sản phẩm để bắt đầu nhập kho.</span>
         </div>
 
         <div v-else class="pn-lines">
@@ -547,51 +734,226 @@ onMounted(async () => {
       </aside>
     </div>
 
-    <!-- SKU modal -->
-    <div v-if="showSkuModal" class="pn-modal" @click.self="showSkuModal = false">
-      <div class="pn-modal__panel">
-        <div class="pn-modal__head">
-          <div>
-            <h3>Thêm hàng vào phiếu</h3>
-            <p>Chọn biến thể (SKU) để thêm dòng nhập</p>
-          </div>
-          <button type="button" class="soleil-btn-outline pn-icon-btn" @click="showSkuModal = false">
-            <Icon icon="icon-park-outline:close" width="15" />
-          </button>
-        </div>
-        <div class="pn-search">
-          <Icon icon="icon-park-outline:search" class="pn-search__icon" />
-          <input
-            v-model="skuQuery"
-            class="pn-search__input"
-            placeholder="Nhập mã hoặc tên sản phẩm…"
-            autofocus
-            @input="scheduleSkuSearch"
-          />
-        </div>
-        <div class="pn-modal__list">
-          <p v-if="skuLoading" class="pn-modal__empty">Đang tìm…</p>
-          <p v-else-if="!skuResults.length" class="pn-modal__empty">Không có biến thể phù hợp.</p>
-          <button
-            v-for="v in skuResults"
-            :key="v.idChiTietSanPham"
-            type="button"
-            class="pn-sku-item"
-            @click="addVariant(v)"
-          >
-            <div class="pn-sku-item__body">
-              <strong class="pn-sku-item__sku">{{ v.sku }}</strong>
-              <div class="pn-sku-item__name">{{ v.tenSanPham }}</div>
-              <div class="pn-sku-item__meta">
-                <span v-if="v.tenMauSac">{{ v.tenMauSac }}</span>
-                <span v-if="v.dungTichMl">{{ v.dungTichMl }}ml</span>
-                <span>Tồn {{ v.soLuongTon ?? 0 }}</span>
-                <span>Giá bán {{ formatMoney(v.giaBan) }}</span>
-              </div>
+    <!-- Thêm hàng: modal 2 bước -->
+    <div v-if="showAddModal" class="pn-modal" @click.self="closeAddModal">
+      <div class="pn-add-modal">
+        <!-- Bước 1: chọn sản phẩm -->
+        <template v-if="modalStep === 1">
+          <div class="pn-add-modal__head">
+            <div class="pn-add-modal__title-block">
+              <span class="pn-step-tag">Bước 1/2</span>
+              <h3>Chọn sản phẩm</h3>
+              <p>Tìm và chọn một hoặc nhiều sản phẩm muốn nhập trong lô này</p>
             </div>
-            <span class="pn-sku-item__add">Thêm</span>
-          </button>
-        </div>
+            <button type="button" class="pn-add-modal__icon-btn" @click="closeAddModal">
+              <Icon icon="icon-park-outline:close" width="16" />
+            </button>
+          </div>
+
+          <div class="pn-add-modal__search">
+            <div class="pn-search">
+              <Icon icon="icon-park-outline:search" class="pn-search__icon" />
+              <input
+                v-model="productQuery"
+                class="pn-search__input"
+                placeholder="Tìm theo tên sản phẩm hoặc mã SKU…"
+                autofocus
+              />
+            </div>
+            <div class="pn-add-modal__search-meta">
+              <span>{{ productResults.length }} sản phẩm</span>
+              <button
+                type="button"
+                class="pn-link-btn"
+                :disabled="!productResults.length"
+                @click="selectAllVisibleProducts"
+              >
+                Chọn tất cả kết quả
+              </button>
+            </div>
+          </div>
+
+          <div class="pn-add-modal__body">
+            <p v-if="productLoading" class="pn-modal__empty">Đang tìm…</p>
+            <p v-else-if="!productResults.length" class="pn-modal__empty">Không tìm thấy sản phẩm.</p>
+            <button
+              v-for="p in productResults"
+              :key="p.idSanPham"
+              type="button"
+              class="pn-prod-row"
+              :class="{ 'pn-prod-row--checked': isProductSelected(p.idSanPham) }"
+              @click="toggleProduct(p)"
+            >
+              <input
+                type="checkbox"
+                :checked="isProductSelected(p.idSanPham)"
+                tabindex="-1"
+                @click.stop
+                @change="toggleProduct(p)"
+              />
+              <div class="pn-prod-row__thumb">
+                <img :src="productImageUrl(p.anhUrl)" :alt="p.tenSanPham" loading="lazy" />
+              </div>
+              <div class="pn-prod-row__info">
+                <div class="pn-prod-row__name">{{ p.tenSanPham }}</div>
+                <div class="pn-prod-row__sub">
+                  {{ p.soBienThe || (p.bienThes || []).length }} biến thể
+                  <template v-if="p.maSanPham"> · {{ p.maSanPham }}</template>
+                </div>
+              </div>
+            </button>
+          </div>
+
+          <div class="pn-add-modal__foot">
+            <div class="pn-add-modal__summary">
+              Đã chọn <b>{{ selectedProductCount }}</b> sản phẩm
+            </div>
+            <div class="pn-add-modal__actions">
+              <button type="button" class="soleil-btn-outline" @click="closeAddModal">Hủy</button>
+              <button
+                type="button"
+                class="soleil-btn-primary"
+                :disabled="!canGoStep2"
+                @click="goToStep2"
+              >
+                Tiếp tục
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <!-- Bước 2: chọn biến thể + SL + giá nhập -->
+        <template v-else>
+          <div class="pn-add-modal__head">
+            <button type="button" class="pn-add-modal__icon-btn" @click="backToStep1">
+              <Icon icon="icon-park-outline:left" width="16" />
+            </button>
+            <div class="pn-add-modal__title-block">
+              <span class="pn-step-tag">Bước 2/2</span>
+              <h3>Nhập số lượng biến thể</h3>
+              <p>Chọn biến thể và nhập số lượng, giá nhập cho từng sản phẩm đã chọn</p>
+            </div>
+            <button type="button" class="pn-add-modal__icon-btn" @click="closeAddModal">
+              <Icon icon="icon-park-outline:close" width="16" />
+            </button>
+          </div>
+
+          <div class="pn-add-modal__body pn-add-modal__body--qty">
+            <div
+              v-for="p in selectedProducts"
+              :key="p.idSanPham"
+              class="pn-qty-group"
+            >
+              <div class="pn-qty-group__head">
+                <div class="pn-qty-group__thumb">
+                  <img :src="productImageUrl(p.anhUrl)" :alt="p.tenSanPham" loading="lazy" />
+                </div>
+                <div class="pn-qty-group__name">{{ p.tenSanPham }}</div>
+                <div v-if="p.maSanPham" class="pn-qty-group__code">{{ p.maSanPham }}</div>
+              </div>
+              <table class="pn-qty-table">
+                <thead>
+                  <tr>
+                    <th class="pn-qty-table__check">
+                      <input
+                        type="checkbox"
+                        :checked="allVariantsSelected(p)"
+                        @change="toggleAllVariants(p, $event.target.checked)"
+                      />
+                    </th>
+                    <th>Biến thể</th>
+                    <th class="num">Tồn kho</th>
+                    <th class="num pn-qty-table__price">Giá nhập</th>
+                    <th class="num pn-qty-table__qty">Số lượng</th>
+                    <th class="num pn-qty-table__amount">Thành tiền</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="v in p.bienThes || []"
+                    :key="v.idChiTietSanPham"
+                    :class="{ 'is-selected': isVariantSelected(v.idChiTietSanPham) }"
+                  >
+                    <td class="pn-qty-table__check">
+                      <input
+                        type="checkbox"
+                        :checked="isVariantSelected(v.idChiTietSanPham)"
+                        @change="toggleVariant(p, v)"
+                      />
+                    </td>
+                    <td>
+                      <div class="pn-variant-cell">
+                        <div class="pn-variant-cell__thumb">
+                          <img :src="productImageUrl(p.anhUrl)" :alt="variantLabel(v)" loading="lazy" />
+                        </div>
+                        <div>
+                          <div class="pn-variant-cell__name">{{ variantLabel(v) }}</div>
+                          <div class="pn-variant-cell__sku">{{ v.sku }}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td
+                      class="num"
+                      :class="{ 'stock-low': (v.soLuongTon ?? 0) <= 2 }"
+                    >
+                      {{ v.soLuongTon ?? 0 }}
+                    </td>
+                    <td class="num pn-qty-table__price">
+                      <input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        class="pn-qty-input"
+                        :disabled="!isVariantSelected(v.idChiTietSanPham)"
+                        :value="variantDraft[v.idChiTietSanPham]?.donGia ?? 0"
+                        @input="updateVariantPrice(v.idChiTietSanPham, $event.target.value)"
+                      />
+                    </td>
+                    <td class="num pn-qty-table__qty">
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        class="pn-qty-input"
+                        placeholder="0"
+                        :disabled="!isVariantSelected(v.idChiTietSanPham)"
+                        :value="variantDraft[v.idChiTietSanPham]?.soLuong || ''"
+                        @input="onVariantQtyInput(p, v, $event.target.value)"
+                      />
+                    </td>
+                    <td class="num pn-qty-table__amount">
+                      {{
+                        formatMoney(
+                          Number(variantDraft[v.idChiTietSanPham]?.soLuong || 0) *
+                            Number(variantDraft[v.idChiTietSanPham]?.donGia || 0),
+                        )
+                      }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="pn-add-modal__foot">
+            <div class="pn-add-modal__summary pn-add-modal__summary--multi">
+              <span>Đã chọn: <b>{{ step2Summary.variantCount }}</b> biến thể</span>
+              <span>Tổng SL: <b>{{ step2Summary.qtySum }}</b></span>
+              <span>Tạm tính: <b>{{ formatMoney(step2Summary.amountSum) }}</b></span>
+            </div>
+            <div class="pn-add-modal__actions">
+              <button type="button" class="soleil-btn-outline" @click="closeAddModal">Hủy</button>
+              <button
+                type="button"
+                class="soleil-btn-primary"
+                :disabled="!canAddToPhieu"
+                @click="addSelectedToPhieu"
+              >
+                Thêm vào phiếu nhập
+              </button>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
 
@@ -1114,12 +1476,12 @@ onMounted(async () => {
 .pn-modal {
   position: fixed;
   inset: 0;
-  background: rgba(15, 26, 28, 0.45);
+  background: rgba(15, 26, 28, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 80;
-  padding: 1rem;
+  padding: 1.25rem;
 }
 
 .pn-modal__panel {
@@ -1159,14 +1521,6 @@ onMounted(async () => {
   color: var(--pn-muted);
 }
 
-.pn-modal__list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  max-height: 380px;
-  overflow: auto;
-}
-
 .pn-modal__empty {
   text-align: center;
   color: var(--pn-muted);
@@ -1174,52 +1528,394 @@ onMounted(async () => {
   margin: 0;
 }
 
-.pn-sku-item {
+/* ---- Modal thêm hàng 2 bước (rộng) ---- */
+.pn-add-modal {
+  width: min(920px, 100%);
+  height: min(720px, 100%);
+  background: var(--pn-surface);
+  border-radius: 14px;
+  border: 1px solid var(--pn-line);
+  box-shadow: 0 24px 60px -20px rgba(15, 30, 51, 0.35), 0 4px 12px rgba(15, 30, 51, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pn-add-modal__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1.1rem 1.35rem;
+  border-bottom: 1px solid var(--pn-line);
+  flex-shrink: 0;
+}
+
+.pn-add-modal__title-block {
+  flex: 1;
+  min-width: 0;
+}
+
+.pn-step-tag {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #9a3412;
+  background: #ffedd5;
+  padding: 2px 8px;
+  border-radius: 5px;
+  margin-bottom: 0.4rem;
+}
+
+.pn-add-modal__title-block h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--pn-ink);
+}
+
+.pn-add-modal__title-block p {
+  margin: 0.2rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--pn-muted);
+}
+
+.pn-add-modal__icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--pn-line-strong);
+  background: transparent;
+  color: var(--pn-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pn-add-modal__icon-btn:hover {
+  background: var(--pn-mist);
+  color: var(--pn-ink);
+}
+
+.pn-add-modal__search {
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--pn-line);
+  flex-shrink: 0;
+}
+
+.pn-add-modal__search-meta {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 0.75rem;
-  text-align: left;
-  padding: 0.85rem 0.95rem;
-  border-radius: 10px;
-  border: 1px solid var(--pn-line-strong);
-  background: #fff;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-}
-
-.pn-sku-item:hover {
-  border-color: #8f7349;
-  background: #fff7ed;
-}
-
-.pn-sku-item__sku {
-  font-family: ui-monospace, 'Cascadia Mono', monospace;
+  margin-top: 0.5rem;
   font-size: 12px;
-  color: var(--pn-accent);
+  color: var(--pn-muted);
+  font-weight: 600;
 }
 
-.pn-sku-item__name {
-  margin-top: 0.2rem;
+.pn-link-btn {
+  background: none;
+  border: none;
+  color: var(--pn-accent);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.pn-link-btn:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.pn-link-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pn-add-modal__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem 0.85rem;
+  min-height: 0;
+}
+
+.pn-add-modal__body--qty {
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pn-prod-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.7rem 0.65rem;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+.pn-prod-row:hover {
+  background: var(--pn-mist);
+}
+
+.pn-prod-row--checked {
+  background: #ffedd5;
+  border-color: #fdba74;
+}
+
+.pn-prod-row input[type='checkbox'] {
+  width: 17px;
+  height: 17px;
+  accent-color: #c2660c;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pn-prod-row__thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #efe4d4;
+  border: 1px solid var(--pn-line);
+  flex-shrink: 0;
+}
+
+.pn-prod-row__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pn-prod-row__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pn-prod-row__name {
+  font-size: 0.9rem;
   font-weight: 700;
   color: var(--pn-ink);
 }
 
-.pn-sku-item__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem 0.65rem;
-  margin-top: 0.3rem;
-  font-size: 12px;
+.pn-prod-row__sub {
+  margin-top: 0.1rem;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--pn-muted);
 }
 
-.pn-sku-item__add {
+.pn-add-modal__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.9rem 1.35rem;
+  border-top: 1px solid var(--pn-line);
+  background: var(--pn-mist);
   flex-shrink: 0;
-  font-size: 0.75rem;
+}
+
+.pn-add-modal__summary {
+  font-size: 0.85rem;
+  color: var(--pn-muted);
+  font-weight: 600;
+}
+
+.pn-add-modal__summary b {
+  color: var(--pn-ink);
+}
+
+.pn-add-modal__summary--multi {
+  display: flex;
+  gap: 1.1rem;
+  flex-wrap: wrap;
+}
+
+.pn-add-modal__actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.pn-qty-group {
+  flex-shrink: 0;
+}
+
+.pn-qty-group__head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--pn-mist);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.pn-qty-group__thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #efe4d4;
+  flex-shrink: 0;
+}
+
+.pn-qty-group__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pn-qty-group__name {
+  font-size: 0.85rem;
   font-weight: 800;
-  color: #6b4520;
+  flex: 1;
+  min-width: 0;
+  color: var(--pn-ink);
+}
+
+.pn-qty-group__code {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pn-muted);
+  font-family: ui-monospace, 'Cascadia Mono', monospace;
+}
+
+.pn-qty-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.pn-qty-table thead th {
+  text-align: left;
+  font-size: 12px;
+  color: var(--pn-muted);
+  font-weight: 700;
+  padding: 0.6rem 0.85rem;
+  background: #faf6f0;
+  border-bottom: 1px solid var(--pn-line);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.pn-qty-table thead th.num,
+.pn-qty-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.pn-qty-table tbody td {
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--pn-line);
+  vertical-align: middle;
+}
+
+.pn-qty-table tbody tr.is-selected {
+  background: #fff7ed;
+}
+
+.pn-qty-table__check {
+  width: 40px;
+  text-align: center !important;
+}
+
+.pn-qty-table__check input {
+  width: 17px;
+  height: 17px;
+  accent-color: #c2660c;
+  cursor: pointer;
+}
+
+.pn-qty-table__price {
+  width: 130px;
+}
+
+.pn-qty-table__qty {
+  width: 100px;
+}
+
+.pn-qty-table__amount {
+  width: 130px;
+  font-weight: 700;
+}
+
+.pn-variant-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.pn-variant-cell__thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #efe4d4;
+  flex-shrink: 0;
+}
+
+.pn-variant-cell__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pn-variant-cell__name {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--pn-ink);
+}
+
+.pn-variant-cell__sku {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--pn-muted);
+  font-family: ui-monospace, 'Cascadia Mono', monospace;
+}
+
+.stock-low {
+  color: #c23a3a;
+  font-weight: 700;
+}
+
+.pn-qty-input {
+  width: 100%;
+  border: 1px solid var(--pn-line-strong);
+  border-radius: 7px;
+  padding: 0.4rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: right;
+  outline: none;
+  color: var(--pn-ink);
+  background: #fff;
+}
+
+.pn-qty-input:focus {
+  border-color: #8f7349;
+  box-shadow: 0 0 0 2px rgba(143, 115, 73, 0.18);
+}
+
+.pn-qty-input:disabled {
+  background: #faf6f0;
+  color: var(--pn-muted);
+  cursor: not-allowed;
 }
 
 @media (max-width: 1100px) {
@@ -1249,6 +1945,12 @@ onMounted(async () => {
 }
 
 @media (max-width: 640px) {
+  .pn-add-modal {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+  }
+
   .pn-line {
     grid-template-columns: 28px minmax(0, 1fr) auto;
   }
@@ -1259,6 +1961,12 @@ onMounted(async () => {
 
   .pn-field-grid {
     grid-template-columns: 1fr;
+  }
+
+  .pn-qty-table__price,
+  .pn-qty-table__qty,
+  .pn-qty-table__amount {
+    width: auto;
   }
 }
 </style>

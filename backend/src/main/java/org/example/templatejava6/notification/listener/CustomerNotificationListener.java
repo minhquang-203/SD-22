@@ -9,6 +9,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
 /**
  * Tạo bản ghi thông báo cho khách hàng mỗi khi đơn của họ đổi trạng thái.
  * Lắng nghe cùng sự kiện realtime của đơn hàng nên bao phủ mọi luồng đổi trạng thái
@@ -19,8 +22,6 @@ import org.springframework.transaction.event.TransactionalEventListener;
  */
 @Component
 public class CustomerNotificationListener {
-
-    private static final String LINK_DON_HANG = "/tra-cuu-don";
 
     private final ThongBaoService thongBaoService;
 
@@ -57,9 +58,17 @@ public class CustomerNotificationListener {
                         ? "Đơn hàng đã hủy"
                         : "Cập nhật đơn hàng",
                 noiDung,
-                LINK_DON_HANG,
+                linkDonHang(payload.getMaHoaDon()),
                 payload.getIdHoaDon(),
                 payload.getMaHoaDon());
+    }
+
+    /** Deep-link tới đúng đơn trên màn tra cứu (cùng pattern email theo dõi đơn). */
+    private static String linkDonHang(String maHoaDon) {
+        if (maHoaDon == null || maHoaDon.isBlank()) {
+            return "/tra-cuu-don";
+        }
+        return "/tra-cuu-don?ma=" + URLEncoder.encode(maHoaDon, StandardCharsets.UTF_8);
     }
 
     private static String nhan(OrderRealtimeEvent payload) {

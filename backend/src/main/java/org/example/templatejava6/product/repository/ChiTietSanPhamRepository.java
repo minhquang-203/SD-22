@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,6 +25,11 @@ public interface ChiTietSanPhamRepository extends JpaRepository<ChiTietSanPham, 
     List<ChiTietSanPham> findBySanPhamAndTrangThaiTrue(SanPham sanPham);
 
     List<ChiTietSanPham> findBySanPham(SanPham sanPham);
+
+    @Query("SELECT c FROM ChiTietSanPham c JOIN FETCH c.sanPham LEFT JOIN FETCH c.mauSac "
+            + "WHERE c.trangThai = true AND c.sanPham.id IN :sanPhamIds "
+            + "ORDER BY c.sanPham.id ASC, c.dungTichMl ASC, c.sku ASC")
+    List<ChiTietSanPham> findActiveBySanPhamIds(@Param("sanPhamIds") Collection<Integer> sanPhamIds);
 
     Optional<ChiTietSanPham> findBySku(String sku);
 

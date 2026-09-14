@@ -94,6 +94,7 @@ public class OnlineCheckoutService {
     private final ShippingService shippingService;
     private final ChiTietSanPhamRepository chiTietSanPhamRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final OrderTrackingTokenGenerator trackingTokenGenerator;
 
     public OnlineCheckoutService(
             GioHangRepository gioHangRepository,
@@ -115,7 +116,8 @@ public class OnlineCheckoutService {
             OrderRealtimeService orderRealtimeService,
             ShippingService shippingService,
             ChiTietSanPhamRepository chiTietSanPhamRepository,
-            ApplicationEventPublisher eventPublisher) {
+            ApplicationEventPublisher eventPublisher,
+            OrderTrackingTokenGenerator trackingTokenGenerator) {
         this.gioHangRepository = gioHangRepository;
         this.chiTietGioHangRepository = chiTietGioHangRepository;
         this.khachHangRepository = khachHangRepository;
@@ -136,6 +138,7 @@ public class OnlineCheckoutService {
         this.shippingService = shippingService;
         this.chiTietSanPhamRepository = chiTietSanPhamRepository;
         this.eventPublisher = eventPublisher;
+        this.trackingTokenGenerator = trackingTokenGenerator;
     }
 
     @Transactional
@@ -216,6 +219,7 @@ public class OnlineCheckoutService {
         hoaDon.setGhiChu(request.getGhiChu());
         hoaDon.setNgayTao(now);
         hoaDon.setIdempotencyKey(idempotencyKey);
+        hoaDon.setTrackingToken(trackingTokenGenerator.generate());
         try {
             hoaDon = hoaDonRepository.saveAndFlush(hoaDon);
         } catch (DataIntegrityViolationException ex) {
@@ -327,6 +331,7 @@ public class OnlineCheckoutService {
         hoaDon.setGhiChu(request.getGhiChu());
         hoaDon.setNgayTao(now);
         hoaDon.setIdempotencyKey(idempotencyKey);
+        hoaDon.setTrackingToken(trackingTokenGenerator.generate());
         try {
             hoaDon = hoaDonRepository.saveAndFlush(hoaDon);
         } catch (DataIntegrityViolationException ex) {

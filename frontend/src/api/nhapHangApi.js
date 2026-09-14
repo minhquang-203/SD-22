@@ -19,6 +19,9 @@ export const deleteNhaCungCap = (id) => request.delete(`/nha-cung-cap/${id}`)
 export const timBienTheNhapHang = (keyword = '', page = 0, size = 20) =>
   request.get('/nhap-hang/tim-bien-the', { params: { keyword, page, size } })
 
+export const timSanPhamNhapHang = (keyword = '', page = 0, size = 30) =>
+  request.get('/nhap-hang/tim-san-pham', { params: { keyword, page, size } })
+
 export const getPhieuNhapList = (params) => request.get('/nhap-hang', { params })
 
 export const getPhieuNhapDetail = (id) => request.get(`/nhap-hang/${id}`)

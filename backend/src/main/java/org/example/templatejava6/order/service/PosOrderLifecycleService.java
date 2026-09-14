@@ -14,6 +14,7 @@ import org.example.templatejava6.order.repository.LichSuDonHangRepository;
 import org.example.templatejava6.order.repository.ThanhToanHoaDonRepository;
 import org.example.templatejava6.product.service.LoHangService;
 import org.example.templatejava6.voucher.service.PhieuGiamGiaService;
+import org.example.templatejava6.voucher.service.VoucherKhachHangService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,7 @@ public class PosOrderLifecycleService {
     private final ThanhToanHoaDonRepository thanhToanHoaDonRepository;
     private final LichSuDonHangRepository lichSuDonHangRepository;
     private final PhieuGiamGiaService phieuGiamGiaService;
+    private final VoucherKhachHangService voucherKhachHangService;
     private final KhachHangRepository khachHangRepository;
     private final LoHangService loHangService;
 
@@ -41,6 +43,7 @@ public class PosOrderLifecycleService {
             ThanhToanHoaDonRepository thanhToanHoaDonRepository,
             LichSuDonHangRepository lichSuDonHangRepository,
             PhieuGiamGiaService phieuGiamGiaService,
+            VoucherKhachHangService voucherKhachHangService,
             KhachHangRepository khachHangRepository,
             LoHangService loHangService) {
         this.hoaDonRepository = hoaDonRepository;
@@ -48,6 +51,7 @@ public class PosOrderLifecycleService {
         this.thanhToanHoaDonRepository = thanhToanHoaDonRepository;
         this.lichSuDonHangRepository = lichSuDonHangRepository;
         this.phieuGiamGiaService = phieuGiamGiaService;
+        this.voucherKhachHangService = voucherKhachHangService;
         this.khachHangRepository = khachHangRepository;
         this.loHangService = loHangService;
     }
@@ -110,6 +114,7 @@ public class PosOrderLifecycleService {
         int diemHien = khachHang.getDiemTichLuy() != null ? khachHang.getDiemTichLuy() : 0;
         khachHang.setDiemTichLuy(diemHien + diemThem);
         khachHangRepository.save(khachHang);
+        voucherKhachHangService.tuDongGanKhiCapNhatDiem(khachHang);
     }
 
     private void hoanTonKho(HoaDon hoaDon) {

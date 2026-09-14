@@ -91,9 +91,41 @@ const pagedCustomers = computed(() => {
 
 const assignableIds = computed(() =>
   filteredCustomers.value
-    .filter((c) => c.trangThai !== false)
+    .filter((c) => c.trangThai !== false && customerMatchesVoucherPoints(c))
     .map((c) => c.id),
 )
+
+const voucherHasPointRange = computed(() => {
+  const v = selectedVoucher.value
+  if (!v) return false
+  return v.diemToiThieu != null || v.diemToiDa != null
+})
+
+const voucherPointRangeLabel = computed(() => {
+  if (!voucherHasPointRange.value) return ''
+  const tu = selectedVoucher.value?.diemToiThieu
+  const den = selectedVoucher.value?.diemToiDa
+  if (tu != null && den != null) return `${tu} – ${den} điểm`
+  if (tu != null) return `từ ${tu} điểm`
+  return `tối đa ${den} điểm`
+})
+
+function customerMatchesVoucherPoints(customer) {
+  if (!voucherHasPointRange.value) return true
+  const diem = Number(customer?.diemTichLuy) || 0
+  const tu = selectedVoucher.value?.diemToiThieu
+  const den = selectedVoucher.value?.diemToiDa
+  if (tu != null && diem < Number(tu)) return false
+  if (den != null && diem > Number(den)) return false
+  return true
+}
+
+function applyVoucherPointFilters() {
+  const v = selectedVoucher.value
+  if (!v || (v.diemToiThieu == null && v.diemToiDa == null)) return
+  filterDiemTu.value = v.diemToiThieu != null ? String(v.diemToiThieu) : ''
+  filterDiemDen.value = v.diemToiDa != null ? String(v.diemToiDa) : ''
+}
 
 const selectedAssignableIds = computed(() =>
   selectedIds.value.filter((id) => assignableIds.value.includes(id)),
@@ -105,6 +137,11 @@ const allFilteredSelected = computed(() =>
 )
 
 function toggleSelect(id) {
+  const customer = allCustomers.value.find((c) => c.id === id)
+  if (customer && !customerMatchesVoucherPoints(customer)) {
+    toast('Khách này không nằm trong khoảng điểm của voucher', 'warn')
+    return
+  }
   if (selectedIds.value.includes(id)) {
     selectedIds.value = selectedIds.value.filter((x) => x !== id)
   } else {
@@ -165,6 +202,7 @@ async function loadSelectedVoucher() {
     if (res.data?.phamVi && res.data.phamVi !== 'CA_NHAN') {
       toast('Chỉ gán được voucher phạm vi Cá nhân', 'warn')
     }
+    applyVoucherPointFilters()
   } catch {
     selectedVoucher.value = null
     toast('Không tải được thông tin voucher', 'warn')
@@ -281,6 +319,7 @@ watch(filteredCustomers, () => {
 })
 
 watch(selectedVoucherId, async (id) => {
+  selectedIds.value = []
   await loadSelectedVoucher()
   const current = route.query.voucherId ? String(route.query.voucherId) : ''
   if ((id || '') === current) return
@@ -309,38 +348,43 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <PageHeader
-      title="Quản lý khách hàng"
-      :description="`SUNOVA — ${filteredCustomers.length} khách hàng`"
-    />
+  <div class="users-page">
+    <div class="users-page__head">
+      <PageHeader
+        title="Quản lý khách hàng"
+        :description="`SUNOVA — ${filteredCustomers.length} khách hàng`"
+      />
+    </div>
 
     <div
       v-if="message"
-      class="admin-alert rounded-lg px-4 py-3 text-sm"
+      class="admin-alert px-4 py-3 text-sm"
       :class="messageType === 'error' ? 'admin-alert-error' : 'admin-alert-success'"
     >
       {{ message }}
     </div>
 
-    <!-- Gán voucher context -->
-    <div v-if="selectedVoucherId" class="soleil-table-card" style="padding: 14px 18px">
-      <div class="flex flex-wrap items-center justify-between gap-3">
+    <div v-if="selectedVoucherId" class="users-assign-card">
+      <div class="users-assign-card__body">
         <div class="min-w-0">
-          <div class="text-xs uppercase tracking-wide text-[rgba(30,21,16,0.45)] mb-1">
-            Đang gán voucher
-          </div>
-          <div class="font-medium text-[var(--ink)]">
-            <span class="font-mono">{{ selectedVoucher?.ma || route.query.voucherMa || selectedVoucherId }}</span>
-            <span v-if="selectedVoucher?.ten" class="text-[rgba(30,21,16,0.55)]">
+          <div class="users-assign-card__label">Đang gán voucher</div>
+          <div class="users-assign-card__title">
+            <span class="users-mono">{{ selectedVoucher?.ma || route.query.voucherMa || selectedVoucherId }}</span>
+            <span v-if="selectedVoucher?.ten" class="users-assign-card__sub">
               — {{ selectedVoucher.ten }}
             </span>
           </div>
-          <div class="text-xs text-[rgba(30,21,16,0.45)] mt-1">
+          <div class="users-assign-card__meta">
             Đã chọn {{ selectedAssignableIds.length }} / {{ assignableIds.length }} khách hàng khả dụng
+            <template v-if="voucherHasPointRange">
+              · Auto theo điểm {{ voucherPointRangeLabel }} — vẫn có thể tick thủ công nếu điểm khớp
+            </template>
+            <template v-else>
+              · Chưa cấu hình điểm — gán thủ công
+            </template>
           </div>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="users-assign-card__actions">
           <button
             type="button"
             class="soleil-btn-outline"
@@ -351,18 +395,18 @@ onMounted(async () => {
           </button>
           <button
             type="button"
-            class="bg-black text-[#c8a97e] px-4 py-2 rounded-lg text-sm disabled:opacity-50"
+            class="soleil-btn-primary"
             :disabled="assigning || selectedAssignableIds.length === 0"
             @click="handleAssignVoucher"
           >
-            {{ assigning ? 'Đang gán...' : `Gán voucher (${selectedAssignableIds.length})` }}
+            {{ assigning ? 'Đang gán…' : `Gán voucher (${selectedAssignableIds.length})` }}
           </button>
         </div>
       </div>
     </div>
 
-    <div class="soleil-toolbar soleil-toolbar--filter">
-      <div class="soleil-toolbar__field soleil-toolbar__field--wide">
+    <div class="soleil-toolbar soleil-toolbar--filter users-toolbar">
+      <div class="soleil-toolbar__field soleil-toolbar__field--wide users-field-search">
         <label class="soleil-toolbar__label">Tìm kiếm</label>
         <div class="soleil-toolbar__search">
           <Icon icon="icon-park-outline:search" class="soleil-toolbar__search-icon" />
@@ -370,16 +414,16 @@ onMounted(async () => {
             v-model="keyword"
             class="soleil-toolbar__input"
             type="text"
-            placeholder="Họ tên, email, số điện thoại..."
+            placeholder="Họ tên, email, số điện thoại…"
           />
         </div>
       </div>
 
-      <div class="soleil-toolbar__field">
+      <div class="soleil-toolbar__field users-field-compact users-field-compact--sm">
         <label class="soleil-toolbar__label">Điểm từ</label>
         <input
           v-model="filterDiemTu"
-          class="soleil-toolbar__input"
+          class="soleil-toolbar__input users-input-plain"
           type="number"
           min="0"
           step="1"
@@ -387,32 +431,32 @@ onMounted(async () => {
         />
       </div>
 
-      <div class="soleil-toolbar__field">
+      <div class="soleil-toolbar__field users-field-compact users-field-compact--sm">
         <label class="soleil-toolbar__label">Đến</label>
         <input
           v-model="filterDiemDen"
-          class="soleil-toolbar__input"
+          class="soleil-toolbar__input users-input-plain"
           type="number"
           min="0"
           step="1"
-          placeholder="Không giới hạn"
+          placeholder="Max"
         />
       </div>
 
-      <div class="soleil-toolbar__field">
+      <div class="soleil-toolbar__field users-field-compact users-field-compact--md">
         <label class="soleil-toolbar__label">Khách mới</label>
-        <select v-model="filterKhachMoi" class="soleil-toolbar__input">
+        <select v-model="filterKhachMoi" class="soleil-toolbar__input users-input-plain">
           <option value="">Tất cả</option>
-          <option value="7">7 ngày gần đây</option>
-          <option value="30">30 ngày gần đây</option>
-          <option value="90">90 ngày gần đây</option>
+          <option value="7">7 ngày</option>
+          <option value="30">30 ngày</option>
+          <option value="90">90 ngày</option>
         </select>
       </div>
 
-      <div class="soleil-toolbar__field">
-        <label class="soleil-toolbar__label">Voucher cá nhân</label>
-        <select v-model="selectedVoucherId" class="soleil-toolbar__input">
-          <option value="">— Chọn để gán —</option>
+      <div class="soleil-toolbar__field users-field-compact users-field-compact--lg">
+        <label class="soleil-toolbar__label">Voucher</label>
+        <select v-model="selectedVoucherId" class="soleil-toolbar__input users-input-plain">
+          <option value="">Chọn gán</option>
           <option
             v-for="v in personalVouchers"
             :key="v.id"
@@ -423,33 +467,29 @@ onMounted(async () => {
         </select>
       </div>
 
-      <button type="button" class="soleil-btn-outline" style="align-self: flex-end" @click="loadCustomers">
-        <Icon icon="icon-park-outline:refresh" />
+      <button type="button" class="soleil-btn-outline users-reload" @click="loadCustomers">
+        <Icon icon="icon-park-outline:refresh" width="15" />
         Tải lại
       </button>
     </div>
 
     <div class="soleil-table-card">
       <div class="soleil-table-card__head">
-        <span class="soleil-label" style="margin: 0">Danh sách khách hàng</span>
-        <div class="flex items-center gap-3">
+        <span class="users-table-title">Danh sách khách hàng</span>
+        <div class="users-table-head-meta">
           <button
             v-if="selectedVoucherId"
             type="button"
-            class="soleil-btn-outline text-xs"
+            class="soleil-btn-outline users-select-all"
             :disabled="assignableIds.length === 0"
             @click="toggleSelectAllFiltered"
           >
             {{ allFilteredSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả' }}
           </button>
-          <span
-            v-if="selectedVoucherId"
-            class="inline-flex items-center border border-[#1e1510] bg-[#1e1510] px-3 py-2 text-[13px] font-semibold text-[#c8a97e]"
-            style="border-radius: 4px;"
-          >
+          <span v-if="selectedVoucherId" class="users-avail-pill">
             Khách hàng khả dụng ({{ assignableIds.length }})
           </span>
-          <span class="text-xs text-[rgba(30,21,16,0.45)]">Trang {{ page }} / {{ totalPages }}</span>
+          <span class="users-table-meta">Trang {{ page }} / {{ totalPages }}</span>
         </div>
       </div>
 
@@ -457,10 +497,10 @@ onMounted(async () => {
         <table class="soleil-table admin-table--soleil soleil-table--customers">
           <thead>
             <tr>
-              <th v-if="selectedVoucherId" class="soleil-col-center" style="width: 40px">
+              <th v-if="selectedVoucherId" class="soleil-col-center users-check-col">
                 <input
                   type="checkbox"
-                  style="accent-color: #c9a96e"
+                  class="users-checkbox"
                   :checked="allFilteredSelected"
                   :disabled="assignableIds.length === 0"
                   @change="toggleSelectAllFiltered"
@@ -471,7 +511,7 @@ onMounted(async () => {
               <th class="soleil-col-text">Họ tên</th>
               <th class="soleil-col-text">Email</th>
               <th class="soleil-col-text">SĐT</th>
-              <th class="soleil-col-center">Điểm tích lũy</th>
+              <th class="soleil-col-text">Điểm tích lũy</th>
               <th class="soleil-col-center">Ngày tạo</th>
               <th class="soleil-col-center">Trạng thái</th>
               <th class="soleil-col-center">Thao tác</th>
@@ -479,38 +519,45 @@ onMounted(async () => {
           </thead>
           <tbody>
             <tr v-if="loading">
-              <td :colspan="selectedVoucherId ? 10 : 9" class="text-center py-10 text-[var(--admin-muted)]">
-                Đang tải dữ liệu...
+              <td :colspan="selectedVoucherId ? 10 : 9" class="users-empty-cell">
+                Đang tải dữ liệu…
               </td>
             </tr>
             <tr v-else-if="pagedCustomers.length === 0">
-              <td :colspan="selectedVoucherId ? 10 : 9" class="text-center py-10 text-[var(--admin-muted)]">
+              <td :colspan="selectedVoucherId ? 10 : 9" class="users-empty-cell">
                 Không có khách hàng phù hợp
               </td>
             </tr>
             <tr v-for="(item, index) in pagedCustomers" :key="item.id">
               <td v-if="selectedVoucherId" class="soleil-col-center">
                 <input
-                  v-if="item.trangThai !== false"
+                  v-if="item.trangThai !== false && customerMatchesVoucherPoints(item)"
                   type="checkbox"
-                  style="accent-color: #c9a96e"
+                  class="users-checkbox"
                   :checked="isSelected(item.id)"
                   @change="toggleSelect(item.id)"
                 />
+                <span
+                  v-else-if="item.trangThai !== false && voucherHasPointRange"
+                  class="users-points-miss"
+                  title="Điểm không khớp khoảng voucher"
+                >—</span>
               </td>
-              <td class="soleil-col-num text-[rgba(30,21,16,0.45)]">
+              <td class="soleil-col-num users-stt">
                 {{ (page - 1) * pageSize + index + 1 }}
               </td>
               <td class="soleil-col-text">
-                <span class="soleil-sp-code">{{ item.maKhachHang }}</span>
+                <span class="users-mono">{{ item.maKhachHang }}</span>
               </td>
-              <td class="soleil-col-text font-medium text-[var(--ink)]">{{ item.hoTen }}</td>
-              <td class="soleil-col-text text-sm">{{ item.email || '—' }}</td>
-              <td class="soleil-col-text text-sm">{{ item.soDienThoai || '—' }}</td>
-              <td class="soleil-col-center">
-                <span class="soleil-pill--form text-xs">{{ item.diemTichLuy ?? 0 }} điểm</span>
+              <td class="soleil-col-text">
+                <span class="users-name">{{ item.hoTen }}</span>
               </td>
-              <td class="soleil-col-center text-sm text-[rgba(30,21,16,0.55)]">
+              <td class="soleil-col-text">{{ item.email || '—' }}</td>
+              <td class="soleil-col-text">{{ item.soDienThoai || '—' }}</td>
+              <td class="soleil-col-text">
+                <span class="users-points">{{ item.diemTichLuy ?? 0 }} điểm</span>
+              </td>
+              <td class="soleil-col-center users-date">
                 {{ item.ngayTao ? formatDate(item.ngayTao) : '—' }}
               </td>
               <td class="soleil-col-center">
@@ -529,11 +576,11 @@ onMounted(async () => {
               <td class="soleil-col-center">
                 <button
                   type="button"
-                  class="soleil-act-btn-round"
+                  class="soleil-act-btn"
                   title="Xem chi tiết"
                   @click="openDetail(item)"
                 >
-                  <Icon icon="icon-park-outline:eyes" />
+                  <Icon icon="icon-park-outline:eyes" width="16" />
                 </button>
               </td>
             </tr>
@@ -566,49 +613,53 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-if="showDetail" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div class="absolute inset-0 bg-black/45" @click="closeDetail" />
-      <div class="relative w-full max-w-2xl max-h-[90vh] overflow-hidden admin-card flex flex-col">
-        <div class="px-5 py-4 border-b flex items-center justify-between" style="border-color: var(--admin-border)">
-          <h2 class="text-lg font-semibold">Chi tiết khách hàng</h2>
-          <button type="button" class="admin-btn admin-btn-default !px-2.5" @click="closeDetail">✕</button>
-        </div>
-        <div class="px-5 py-4 overflow-y-auto flex-1">
-          <div v-if="detailLoading" class="text-center py-10 text-[var(--admin-muted)]">
-            Đang tải...
+    <div v-if="showDetail" class="users-modal" @click.self="closeDetail">
+      <div class="users-modal__panel">
+        <div class="users-modal__head">
+          <div>
+            <h3>Chi tiết khách hàng</h3>
+            <p v-if="detail">{{ detail.maKhachHang }} · {{ detail.hoTen }}</p>
+            <p v-else>Đang tải thông tin…</p>
           </div>
+          <button type="button" class="soleil-btn-outline users-icon-btn" aria-label="Đóng" @click="closeDetail">
+            <Icon icon="icon-park-outline:close" width="15" />
+          </button>
+        </div>
+
+        <div class="users-modal__body">
+          <div v-if="detailLoading" class="users-empty-cell">Đang tải…</div>
           <template v-else-if="detail">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-              <div>
-                <div class="text-xs text-[var(--admin-muted)] mb-1">Mã khách hàng</div>
-                <div class="font-medium">{{ detail.maKhachHang }}</div>
+            <div class="users-detail-grid">
+              <div class="users-detail-item">
+                <span class="users-detail-label">Mã khách hàng</span>
+                <span class="users-mono">{{ detail.maKhachHang }}</span>
               </div>
-              <div>
-                <div class="text-xs text-[var(--admin-muted)] mb-1">Họ tên</div>
-                <div class="font-medium">{{ detail.hoTen }}</div>
+              <div class="users-detail-item">
+                <span class="users-detail-label">Họ tên</span>
+                <span class="users-name">{{ detail.hoTen }}</span>
               </div>
-              <div>
-                <div class="text-xs text-[var(--admin-muted)] mb-1">Email</div>
-                <div>{{ detail.email || '—' }}</div>
+              <div class="users-detail-item">
+                <span class="users-detail-label">Email</span>
+                <span>{{ detail.email || '—' }}</span>
               </div>
-              <div>
-                <div class="text-xs text-[var(--admin-muted)] mb-1">Số điện thoại</div>
-                <div>{{ detail.soDienThoai || '—' }}</div>
+              <div class="users-detail-item">
+                <span class="users-detail-label">Số điện thoại</span>
+                <span>{{ detail.soDienThoai || '—' }}</span>
               </div>
-              <div>
-                <div class="text-xs text-[var(--admin-muted)] mb-1">Loại da</div>
-                <div>{{ detail.tenLoaiDa || '—' }}</div>
+              <div class="users-detail-item">
+                <span class="users-detail-label">Loại da</span>
+                <span>{{ detail.tenLoaiDa || '—' }}</span>
               </div>
-              <div>
-                <div class="text-xs text-[var(--admin-muted)] mb-1">Điểm tích lũy</div>
-                <div>{{ detail.diemTichLuy ?? 0 }}</div>
+              <div class="users-detail-item">
+                <span class="users-detail-label">Điểm tích lũy</span>
+                <span>{{ detail.diemTichLuy ?? 0 }}</span>
               </div>
-              <div>
-                <div class="text-xs text-[var(--admin-muted)] mb-1">Ngày tạo</div>
-                <div>{{ formatDate(detail.ngayTao) }}</div>
+              <div class="users-detail-item">
+                <span class="users-detail-label">Ngày tạo</span>
+                <span>{{ formatDate(detail.ngayTao) }}</span>
               </div>
-              <div>
-                <div class="text-xs text-[var(--admin-muted)] mb-1">Trạng thái</div>
+              <div class="users-detail-item">
+                <span class="users-detail-label">Trạng thái</span>
                 <StatusDot
                   :status="detail.trangThai !== false ? 'active' : 'expired'"
                   :label="detail.trangThai !== false ? 'Hoạt động' : 'Đã khóa'"
@@ -616,24 +667,21 @@ onMounted(async () => {
               </div>
             </div>
 
-            <div class="mt-6">
-              <h3 class="text-sm font-semibold mb-3">Địa chỉ giao hàng</h3>
-              <div v-if="!detail.diaChis?.length" class="text-sm text-[var(--admin-muted)]">
-                Chưa có địa chỉ
-              </div>
-              <div v-else class="space-y-3">
+            <div class="users-address-block">
+              <h4>Địa chỉ giao hàng</h4>
+              <div v-if="!detail.diaChis?.length" class="users-muted">Chưa có địa chỉ</div>
+              <div v-else class="users-address-list">
                 <div
                   v-for="(dc, idx) in detail.diaChis"
                   :key="idx"
-                  class="rounded-lg border p-3 text-sm"
-                  style="border-color: var(--admin-border)"
+                  class="users-address-card"
                 >
-                  <div class="flex items-center gap-2 mb-1">
-                    <span class="font-medium">{{ dc.hoTenNguoiNhan }}</span>
-                    <span v-if="dc.macDinh" class="soleil-pill--form text-xs">Mặc định</span>
+                  <div class="users-address-card__top">
+                    <span class="users-name">{{ dc.hoTenNguoiNhan }}</span>
+                    <span v-if="dc.macDinh" class="users-points">Mặc định</span>
                   </div>
-                  <div class="text-[var(--admin-muted)]">{{ dc.soDienThoai }}</div>
-                  <div class="mt-1">{{ formatAddress(dc) }}</div>
+                  <div class="users-muted">{{ dc.soDienThoai }}</div>
+                  <div>{{ formatAddress(dc) }}</div>
                 </div>
               </div>
             </div>
@@ -643,3 +691,399 @@ onMounted(async () => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.users-page {
+  --users-ink: #1a120c;
+  --users-muted: #5c4f42;
+  --users-line: #c9b8a4;
+  --users-line-strong: #a89278;
+  --users-mist: #f3ebe1;
+  --users-bronze: #8f7349;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  color: var(--users-ink);
+}
+
+.users-page__head :deep(.soleil-page-header) {
+  margin: 0;
+}
+
+.users-page__head :deep(.soleil-page-header__title) {
+  font-family: inherit;
+  font-size: 1.35rem;
+  font-weight: 800;
+  font-style: normal;
+  letter-spacing: 0.02em;
+  color: var(--users-ink);
+}
+
+.users-page :deep(.soleil-page-header__desc) {
+  margin: 0.25rem 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--users-muted);
+}
+
+.users-page :deep(.soleil-toolbar) {
+  border-color: var(--users-line);
+  background: #fff;
+}
+
+.users-toolbar {
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.users-field-search {
+  flex: 1 1 auto;
+  min-width: 180px;
+}
+
+.users-field-compact {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.users-field-compact--sm {
+  width: 88px;
+}
+
+.users-field-compact--md {
+  width: 108px;
+}
+
+.users-field-compact--lg {
+  width: 132px;
+}
+
+.users-page :deep(.soleil-toolbar__label) {
+  color: var(--users-ink);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.users-page :deep(.soleil-toolbar__input),
+.users-page :deep(.soleil-toolbar__select) {
+  border-color: var(--users-line-strong);
+  background: #fff;
+  color: var(--users-ink);
+  font-weight: 500;
+}
+
+.users-page :deep(.users-input-plain) {
+  padding: 8px 10px;
+  padding-left: 10px;
+  min-height: 36px;
+  font-size: 12.5px;
+}
+
+.users-reload {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  white-space: nowrap;
+  padding: 0.5rem 0.75rem !important;
+}
+
+@media (max-width: 1100px) {
+  .users-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .users-field-compact--sm,
+  .users-field-compact--md,
+  .users-field-compact--lg {
+    width: auto;
+    min-width: 100px;
+    flex: 1 1 100px;
+  }
+}
+
+.users-assign-card {
+  border: 1px solid var(--users-line-strong);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  padding: 14px 18px;
+}
+
+.users-assign-card__body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.users-assign-card__label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--users-muted);
+  margin-bottom: 0.25rem;
+}
+
+.users-assign-card__title {
+  font-weight: 700;
+  color: var(--users-ink);
+}
+
+.users-assign-card__sub {
+  font-weight: 500;
+  color: var(--users-muted);
+}
+
+.users-assign-card__meta {
+  margin-top: 0.25rem;
+  font-size: 12px;
+  color: var(--users-muted);
+}
+
+.users-assign-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.users-page :deep(.soleil-table-card) {
+  border-color: var(--users-line-strong);
+  background: #fff;
+}
+
+.users-page :deep(.soleil-table-card__head) {
+  background: #fff;
+  border-bottom-color: var(--users-line);
+}
+
+.users-page :deep(table.admin-table--soleil thead th) {
+  background: var(--users-bronze) !important;
+  color: #fffef9 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+  border-bottom: none !important;
+}
+
+.users-page :deep(table.admin-table--soleil tbody td) {
+  color: var(--users-ink);
+  border-bottom: 1px solid var(--users-line);
+  font-size: 13.5px;
+  background: #fff;
+}
+
+.users-page :deep(table.admin-table--soleil tbody tr:hover td) {
+  background: var(--users-mist);
+}
+
+.users-table-title {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.users-table-head-meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.users-table-meta {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--users-muted);
+}
+
+.users-select-all {
+  font-size: 12px !important;
+  padding: 0.4rem 0.7rem !important;
+}
+
+.users-avail-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--users-bronze);
+  background: var(--users-bronze);
+  color: #fffef9;
+  padding: 0.4rem 0.75rem;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.users-empty-cell {
+  text-align: center;
+  padding: 2.5rem 1rem !important;
+  color: var(--users-muted);
+}
+
+.users-mono {
+  font-family: ui-monospace, 'Cascadia Mono', monospace;
+  font-weight: 800;
+  color: #0f4c52;
+}
+
+.users-name {
+  font-weight: 700;
+}
+
+.users-stt,
+.users-date {
+  color: var(--users-muted);
+  font-size: 13px;
+}
+
+.users-points {
+  display: inline-flex;
+  padding: 0.25rem 0.55rem;
+  border-radius: 3px;
+  border: 1px solid var(--users-line);
+  background: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--users-ink);
+}
+
+.users-points-miss {
+  color: var(--users-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.users-checkbox {
+  accent-color: var(--users-bronze);
+}
+
+.users-check-col {
+  width: 40px;
+}
+
+.users-page :deep(.soleil-pagination) {
+  background: #fff;
+  border-top: 1px solid var(--users-line);
+}
+
+.users-modal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--admin-z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(26, 18, 12, 0.45);
+}
+
+.users-modal__panel {
+  width: min(640px, 100%);
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid var(--users-line);
+  box-shadow: 0 16px 40px rgba(26, 18, 12, 0.18);
+}
+
+.users-modal__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1.15rem 1.15rem 0.85rem;
+  border-bottom: 1px solid var(--users-line);
+  background: #fff;
+}
+
+.users-modal__head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--users-ink);
+}
+
+.users-modal__head p {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--users-muted);
+}
+
+.users-icon-btn {
+  padding: 0.55rem 0.7rem !important;
+}
+
+.users-modal__body {
+  padding: 1.15rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.users-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.9rem;
+}
+
+@media (min-width: 640px) {
+  .users-detail-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.users-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.875rem;
+}
+
+.users-detail-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #4a3f34;
+}
+
+.users-address-block {
+  margin-top: 1.35rem;
+}
+
+.users-address-block h4 {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--users-ink);
+}
+
+.users-address-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.users-address-card {
+  border: 1px solid var(--users-line);
+  border-radius: 8px;
+  padding: 0.75rem 0.85rem;
+  background: #fff;
+  font-size: 0.875rem;
+}
+
+.users-address-card__top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.users-muted {
+  color: var(--users-muted);
+  font-size: 0.875rem;
+}
+</style>

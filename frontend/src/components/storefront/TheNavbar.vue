@@ -104,7 +104,13 @@ async function toggleNotif(e) {
 async function goToNotif(item) {
   notifOpen.value = false
   await markNotifRead(item)
-  router.push(item?.link || '/tra-cuu-don')
+  const link = typeof item?.link === 'string' ? item.link.trim() : ''
+  // Thông báo cũ chỉ lưu "/tra-cuu-don" — dựng deep-link từ maThamChieu nếu có.
+  if ((!link || link === '/tra-cuu-don') && item?.maThamChieu) {
+    router.push({ path: '/tra-cuu-don', query: { ma: item.maThamChieu } })
+    return
+  }
+  router.push(link || '/tra-cuu-don')
 }
 
 async function markAllNotifications() {
@@ -247,6 +253,17 @@ function toggleUser(e) {
           :class="{ active: isLinkActive(link) }"
         >
           {{ link.label }}
+        </RouterLink>
+
+        <RouterLink
+          v-if="!isLoggedIn"
+          to="/tra-cuu-don"
+          class="sf-header__link"
+          active-class=""
+          exact-active-class=""
+          :class="{ active: route.path.startsWith('/tra-cuu-don') }"
+        >
+          Tra cứu đơn
         </RouterLink>
 
         <div

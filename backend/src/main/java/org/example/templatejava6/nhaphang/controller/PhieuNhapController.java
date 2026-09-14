@@ -3,6 +3,7 @@ package org.example.templatejava6.nhaphang.controller;
 import org.example.templatejava6.nhaphang.model.request.PhieuNhapRequest;
 import org.example.templatejava6.nhaphang.model.response.BienTheNhapHangResponse;
 import org.example.templatejava6.nhaphang.model.response.PhieuNhapResponse;
+import org.example.templatejava6.nhaphang.model.response.SanPhamNhapHangResponse;
 import org.example.templatejava6.nhaphang.service.PhieuNhapService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -25,6 +26,14 @@ public class PhieuNhapController {
         return phieuNhapService.timBienThe(keyword, page, size);
     }
 
+    @GetMapping("tim-san-pham")
+    public List<SanPhamNhapHangResponse> timSanPham(
+            @RequestParam(required = false, defaultValue = "") String keyword,
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "30") int size) {
+        return phieuNhapService.timSanPham(keyword, page, size);
+    }
+
     @GetMapping
     public List<PhieuNhapResponse> list(
             @RequestParam(required = false) String trangThai,
@@ -34,7 +43,7 @@ public class PhieuNhapController {
         return phieuNhapService.list(trangThai, idNcc, from, to);
     }
 
-    @GetMapping("{id}")
+    @GetMapping("{id:\\d+}")
     public PhieuNhapResponse detail(@PathVariable Integer id) {
         return phieuNhapService.detail(id);
     }
@@ -44,17 +53,17 @@ public class PhieuNhapController {
         return phieuNhapService.luuTam(request);
     }
 
-    @PutMapping("{id}")
+    @PutMapping("{id:\\d+}")
     public PhieuNhapResponse update(@PathVariable Integer id, @RequestBody PhieuNhapRequest request) {
         return phieuNhapService.updateTam(id, request);
     }
 
-    @PostMapping("{id}/hoan-thanh")
+    @PostMapping("{id:\\d+}/hoan-thanh")
     public PhieuNhapResponse hoanThanh(@PathVariable Integer id) {
         return phieuNhapService.hoanThanh(id);
     }
 
-    @PostMapping("{id}/huy")
+    @PostMapping("{id:\\d+}/huy")
     public PhieuNhapResponse huy(@PathVariable Integer id) {
         return phieuNhapService.huy(id);
     }

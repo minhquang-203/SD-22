@@ -38,6 +38,11 @@ public class PhieuGiamGiaRequest {
 
     private Integer soLuong;
 
+    /** Optional — khoảng điểm để auto-gán voucher cá nhân. */
+    private Integer diemToiThieu;
+
+    private Integer diemToiDa;
+
     private LocalDateTime ngayBatDau;
 
     private LocalDateTime ngayKetThuc;

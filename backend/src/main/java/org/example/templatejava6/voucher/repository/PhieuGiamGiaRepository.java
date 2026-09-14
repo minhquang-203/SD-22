@@ -161,4 +161,20 @@ public interface PhieuGiamGiaRepository extends JpaRepository<PhieuGiamGia, Inte
     Page<PhieuGiamGia> findPublicAvailableForCustomer(
             @Param("keyword") String keyword,
             Pageable pageable);
+
+    /**
+     * Voucher cá nhân còn hiệu lực có cấu hình khoảng điểm và khớp điểm khách.
+     * Chỉ lấy phiếu đã set diem_toi_thieu và/hoặc diem_toi_da.
+     */
+    @Query("""
+        SELECT v FROM PhieuGiamGia v
+        WHERE v.trangThai = true
+          AND v.isActive = true
+          AND v.phamVi = org.example.templatejava6.common.enums.PhamViPhieuGiamGia.CA_NHAN
+          AND (v.diemToiThieu IS NOT NULL OR v.diemToiDa IS NOT NULL)
+          AND (v.diemToiThieu IS NULL OR :diem >= v.diemToiThieu)
+          AND (v.diemToiDa IS NULL OR :diem <= v.diemToiDa)
+          AND (v.ngayKetThuc IS NULL OR v.ngayKetThuc >= CURRENT_TIMESTAMP)
+        """)
+    java.util.List<PhieuGiamGia> findCaNhanAutoTheoDiem(@Param("diem") int diem);
 }

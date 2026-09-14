@@ -11,18 +11,23 @@ import java.math.BigDecimal;
 public class BienTheNhapHangResponse {
 
     private Integer idChiTietSanPham;
+    private Integer idSanPham;
     private String sku;
     private String tenSanPham;
+    private String maSanPham;
     private String tenMauSac;
     private BigDecimal dungTichMl;
     private BigDecimal giaBan;
     private Integer soLuongTon;
+    private String anhUrl;
 
     public BienTheNhapHangResponse(ChiTietSanPham ct) {
         this.idChiTietSanPham = ct.getId();
         this.sku = ct.getSku();
         if (ct.getSanPham() != null) {
+            this.idSanPham = ct.getSanPham().getId();
             this.tenSanPham = ct.getSanPham().getTen();
+            this.maSanPham = ct.getSanPham().getMaSanPham();
         }
         if (ct.getMauSac() != null) {
             this.tenMauSac = ct.getMauSac().getTen();

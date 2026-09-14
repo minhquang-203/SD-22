@@ -28,6 +28,8 @@ public class OnlineCheckoutResponse {
     private String paymentUrl;
     private String transactionRef;
     private LocalDateTime ngayTao;
+    /** Token bí mật để khách vãng lai theo dõi đơn (không đưa email lên URL). */
+    private String trackingToken;
 
     public static OnlineCheckoutResponse from(HoaDon hoaDon, TaoThanhToanResponse payment) {
         return OnlineCheckoutResponse.builder()
@@ -50,6 +52,7 @@ public class OnlineCheckoutResponse {
                 .paymentUrl(payment != null ? payment.getPaymentUrl() : null)
                 .transactionRef(payment != null ? payment.getTransactionRef() : null)
                 .ngayTao(hoaDon.getNgayTao())
+                .trackingToken(hoaDon.getTrackingToken())
                 .build();
     }
 }

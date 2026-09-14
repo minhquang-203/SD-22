@@ -3230,10 +3230,11 @@ h2,
   display: inline-flex;
   align-items: center;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: 3px;
+  border: 1px solid transparent;
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
 
 .staff-role-badge--owner {

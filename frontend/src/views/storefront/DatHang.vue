@@ -45,6 +45,7 @@ const paymentCallback = ref(null)
 // Khách chưa đăng nhập: nhớ email để hiển thị màn thành công + sync giỏ sau khi VNPay redirect về.
 const GUEST_PENDING_KEY = 'sunova_guest_pending'
 const guestCheckoutEmail = ref('')
+const guestTrackingToken = ref('')
 
 function readGuestPending() {
   try {
@@ -503,6 +504,7 @@ function parsePaymentCallback() {
     if (pending) {
       // Khách vãng lai vừa thanh toán VNPay xong: xóa biến thể đã mua khỏi giỏ localStorage.
       guestCheckoutEmail.value = pending.email || ''
+      guestTrackingToken.value = pending.trackingToken || ''
       void syncAfterGuestCheckout(pending.ids || []).catch(() => {})
       clearGuestPending()
     } else {
@@ -548,13 +550,6 @@ async function submitCheckout() {
       }))
       const purchasedVariantIds = guestItems.map((item) => item.idChiTietSanPham)
       guestCheckoutEmail.value = form.email.trim()
-      if (selectedPayment.value === 'VNPAY') {
-        // VNPay redirect full-page: lưu tạm để sync giỏ + hiển thị email khi quay lại.
-        sessionStorage.setItem(
-          GUEST_PENDING_KEY,
-          JSON.stringify({ email: form.email.trim(), ids: purchasedVariantIds }),
-        )
-      }
       const guestRes = await createGuestCheckout({
         items: guestItems,
         maPhuongThucThanhToan: selectedPayment.value,
@@ -572,8 +567,18 @@ async function submitCheckout() {
       })
 
       orderResult.value = guestRes.data
+      guestTrackingToken.value = guestRes.data?.trackingToken || ''
 
       if (guestRes.data?.paymentUrl) {
+        // VNPay redirect: lưu token để nút theo dõi đơn sau khi quay lại.
+        sessionStorage.setItem(
+          GUEST_PENDING_KEY,
+          JSON.stringify({
+            email: form.email.trim(),
+            ids: purchasedVariantIds,
+            trackingToken: guestRes.data.trackingToken || '',
+          }),
+        )
         toast('Đang chuyển sang cổng thanh toán VNPay...')
         window.location.assign(guestRes.data.paymentUrl)
         return
@@ -716,9 +721,29 @@ onMounted(() => {
           Vui lòng kiểm tra hộp thư (kể cả mục spam).
         </p>
         <div class="sf-checkout-success__actions">
-          <RouterLink v-if="isLoggedIn" to="/tra-cuu-don" class="btn-soleil"><span>Xem đơn hàng</span></RouterLink>
+          <RouterLink
+            v-if="isLoggedIn"
+            to="/tra-cuu-don"
+            class="btn-soleil"
+          >
+            <span>Xem đơn hàng</span>
+          </RouterLink>
+          <RouterLink
+            v-else-if="guestTrackingToken || orderResult?.trackingToken"
+            :to="{ path: '/tra-cuu-don', query: { token: guestTrackingToken || orderResult.trackingToken } }"
+            class="btn-soleil"
+          >
+            <span>Theo dõi đơn hàng</span>
+          </RouterLink>
           <RouterLink v-else to="/san-pham" class="btn-soleil"><span>Tiếp tục mua sắm</span></RouterLink>
           <RouterLink v-if="isLoggedIn" to="/san-pham" class="sf-checkout-link">Tiếp tục mua sắm</RouterLink>
+          <RouterLink
+            v-else-if="guestTrackingToken || orderResult?.trackingToken"
+            to="/san-pham"
+            class="sf-checkout-link"
+          >
+            Tiếp tục mua sắm
+          </RouterLink>
           <RouterLink v-else to="/" class="sf-checkout-link">Về trang chủ</RouterLink>
         </div>
       </section>

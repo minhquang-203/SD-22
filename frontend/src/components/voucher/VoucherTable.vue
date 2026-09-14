@@ -47,6 +47,18 @@
               </div>
               <div class="campaign-min">
                 Tối thiểu {{ formatTien(phieu.giaTriDonToiThieu) }}
+                <template v-if="phieu.phamVi === 'CA_NHAN' && (phieu.diemToiThieu != null || phieu.diemToiDa != null)">
+                  · Điểm
+                  <template v-if="phieu.diemToiThieu != null && phieu.diemToiDa != null">
+                    {{ phieu.diemToiThieu }}–{{ phieu.diemToiDa }}
+                  </template>
+                  <template v-else-if="phieu.diemToiThieu != null">
+                    ≥{{ phieu.diemToiThieu }}
+                  </template>
+                  <template v-else>
+                    ≤{{ phieu.diemToiDa }}
+                  </template>
+                </template>
               </div>
             </td>
             <td>

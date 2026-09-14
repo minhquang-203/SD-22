@@ -190,6 +190,40 @@
             />
             <p v-if="errors.giamToiDa" class="voucher-field-error">{{ errors.giamToiDa }}</p>
           </div>
+
+          <div v-if="form.phamVi === 'CA_NHAN'" class="col-span-6">
+            <label class="voucher-label">Điểm tối thiểu</label>
+            <input
+              v-model.number="form.diemToiThieu"
+              type="number"
+              min="0"
+              step="1"
+              :class="inputClass('diemToiThieu')"
+              class="voucher-input"
+              placeholder="Không bắt buộc"
+              @input="clearError('diemToiThieu')"
+            />
+            <p v-if="errors.diemToiThieu" class="voucher-field-error">
+              {{ errors.diemToiThieu }}
+            </p>
+          </div>
+
+          <div v-if="form.phamVi === 'CA_NHAN'" class="col-span-6">
+            <label class="voucher-label">Điểm tối đa</label>
+            <input
+              v-model.number="form.diemToiDa"
+              type="number"
+              min="0"
+              step="1"
+              :class="inputClass('diemToiDa')"
+              class="voucher-input"
+              placeholder="Không bắt buộc"
+              @input="clearError('diemToiDa')"
+            />
+            <p v-if="errors.diemToiDa" class="voucher-field-error">
+              {{ errors.diemToiDa }}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -240,6 +274,8 @@ const form = reactive({
   giaTriDonToiThieu: null,
   giamToiDa: null,
   soLuong: null,
+  diemToiThieu: null,
+  diemToiDa: null,
   ngayBatDau: null,
   ngayKetThuc: null,
 });
@@ -253,6 +289,8 @@ const errors = reactive({
   soLuong: "",
   giaTriDonToiThieu: "",
   giamToiDa: "",
+  diemToiThieu: "",
+  diemToiDa: "",
 });
 
 const INPUT_BASE = "voucher-input";
@@ -386,6 +424,32 @@ function validateForm() {
     }
   }
 
+  if (form.phamVi === "CA_NHAN") {
+    let diemTu = null;
+    let diemDen = null;
+    if (!isEmptyNumber(form.diemToiThieu)) {
+      diemTu = Number(form.diemToiThieu);
+      if (!Number.isFinite(diemTu) || !Number.isInteger(diemTu) || diemTu < 0) {
+        next.diemToiThieu = "Điểm tối thiểu phải là số nguyên ≥ 0";
+      }
+    }
+    if (!isEmptyNumber(form.diemToiDa)) {
+      diemDen = Number(form.diemToiDa);
+      if (!Number.isFinite(diemDen) || !Number.isInteger(diemDen) || diemDen < 0) {
+        next.diemToiDa = "Điểm tối đa phải là số nguyên ≥ 0";
+      }
+    }
+    if (
+      diemTu != null
+      && diemDen != null
+      && Number.isFinite(diemTu)
+      && Number.isFinite(diemDen)
+      && diemTu > diemDen
+    ) {
+      next.diemToiDa = "Điểm tối đa phải ≥ điểm tối thiểu";
+    }
+  }
+
   Object.assign(errors, next);
 
   if (Object.keys(next).length > 0) {
@@ -397,6 +461,7 @@ function validateForm() {
 }
 
 function buildPayload() {
+  const isCaNhan = form.phamVi === "CA_NHAN";
   return {
     ...form,
     ma: form.ma?.trim()?.toUpperCase() || undefined,
@@ -411,6 +476,14 @@ function buildPayload() {
         ? Number(form.giamToiDa)
         : null,
     soLuong: Number(form.soLuong),
+    diemToiThieu:
+      isCaNhan && !isEmptyNumber(form.diemToiThieu)
+        ? Number(form.diemToiThieu)
+        : null,
+    diemToiDa:
+      isCaNhan && !isEmptyNumber(form.diemToiDa)
+        ? Number(form.diemToiDa)
+        : null,
     ngayBatDau: formatStartDate(form.ngayBatDau),
     ngayKetThuc: formatEndDate(form.ngayKetThuc),
   };
@@ -440,6 +513,8 @@ watch(
       Object.assign(form, {
         ...props.voucher,
         phamVi: props.voucher.phamVi || "CONG_KHAI",
+        diemToiThieu: props.voucher.diemToiThieu ?? null,
+        diemToiDa: props.voucher.diemToiDa ?? null,
         ngayBatDau: props.voucher.ngayBatDau?.slice(0, 10),
         ngayKetThuc: props.voucher.ngayKetThuc?.slice(0, 10),
       });
@@ -455,6 +530,8 @@ watch(
       giaTriDonToiThieu: null,
       giamToiDa: null,
       soLuong: null,
+      diemToiThieu: null,
+      diemToiDa: null,
       ngayBatDau: null,
       ngayKetThuc: null,
     });

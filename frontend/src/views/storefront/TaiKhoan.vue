@@ -613,7 +613,7 @@ onMounted(() => {
                 :class="{ active: voucherTab === 'personal' }"
                 @click="voucherTab = 'personal'"
               >
-                Voucher cá nhân
+                Voucher của tôi
                 <span class="sf-voucher-tab__count">{{ personalVouchers.length }}</span>
               </button>
             </div>

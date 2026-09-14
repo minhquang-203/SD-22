@@ -126,6 +126,14 @@ public class HoaDon {
     @Column(name = "email_nguoi_nhan", length = 100)
     private String emailNguoiNhan;
 
+    /**
+     * Token bí mật để tra cứu đơn qua link email / khách vãng lai.
+     * Không đoán được; không trả về trong API danh sách đơn đăng nhập.
+     */
+    @Size(max = 64)
+    @Column(name = "tracking_token", length = 64)
+    private String trackingToken;
+
     /** Khóa chống tạo trùng đơn (double-submit) — do client sinh cho mỗi lần đặt hàng online. */
     @Size(max = 64)
     @Column(name = "idempotency_key", length = 64)

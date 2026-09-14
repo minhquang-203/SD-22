@@ -37,6 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -429,6 +431,10 @@ public class RefundService {
     private static String linkKhachHoanTien(HoanTien ht) {
         if (ht != null && ht.getIdYeuCauTraHang() != null && ht.getIdYeuCauTraHang().getId() != null) {
             return "/tra-cuu-don/tra-hang/" + ht.getIdYeuCauTraHang().getId();
+        }
+        HoaDon hoaDon = ht != null ? ht.getIdHoaDon() : null;
+        if (hoaDon != null && hoaDon.getMaHoaDon() != null && !hoaDon.getMaHoaDon().isBlank()) {
+            return "/tra-cuu-don?ma=" + URLEncoder.encode(hoaDon.getMaHoaDon(), StandardCharsets.UTF_8);
         }
         return "/tra-cuu-don";
     }

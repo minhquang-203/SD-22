@@ -5,6 +5,7 @@ import org.example.templatejava6.order.model.request.HoaDonChuyenTrangThaiReques
 import org.example.templatejava6.order.model.request.HoaDonGhnWebhookRequest;
 import org.example.templatejava6.order.model.request.HoaDonRequest;
 import org.example.templatejava6.order.model.request.HoaDonTuChoiRequest;
+import org.example.templatejava6.order.model.request.TraCuuDonRequest;
 import org.example.templatejava6.order.model.request.XacNhanDonGanLoRequest;
 import org.example.templatejava6.order.model.response.GhnTrangThaiOptionResponse;
 import org.example.templatejava6.order.model.response.GoiYGanLoResponse;
@@ -23,6 +24,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +53,33 @@ public class HoaDonController {
     @GetMapping("/cua-toi/{id}")
     public StorefrontOrderDetailResponse chiTietCuaToi(@PathVariable Integer id) {
         return hoaDonStorefrontService.chiTietCuaToi(id);
+    }
+
+    /** Tra cứu bằng token bí mật (link email) — không lộ email/mã trên URL. */
+    @GetMapping("/tra-cuu")
+    public StorefrontOrderDetailResponse traCuuBangToken(
+            @RequestParam String token,
+            HttpServletRequest httpRequest) {
+        return hoaDonStorefrontService.traCuuBangToken(token, clientIp(httpRequest));
+    }
+
+    /** Tra cứu thủ công bằng mã + email (POST để email không nằm query string). */
+    @PostMapping("/tra-cuu")
+    public StorefrontOrderDetailResponse traCuuCongKhai(
+            @Valid @RequestBody TraCuuDonRequest request,
+            HttpServletRequest httpRequest) {
+        return hoaDonStorefrontService.traCuuCongKhai(
+                request.getMa(),
+                request.getEmail(),
+                clientIp(httpRequest));
+    }
+
+    private static String clientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 
     @PostMapping("/cua-toi/{id}/huy")
