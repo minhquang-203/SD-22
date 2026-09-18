@@ -40,9 +40,16 @@ function isExternalLink(url) {
   return /^https?:\/\//i.test(String(url || ''))
 }
 
-function bannerImageSrc(banner) {
+function isVideoMedia(url) {
+  if (!url) return false
+  return /\.(mp4|webm|ogg)(\?.*)?$/i.test(String(url))
+}
+
+function bannerMediaSrc(banner) {
   const url = banner?.anhUrl
-  if (!url || url === '/hero-banner.png') return '/hero-banner.png'
+  if (!url) return '/banner-video.mp4'
+  if (url === '/hero-banner.png') return '/hero-banner.png'
+  if (url.startsWith('/') || url.startsWith('http')) return url
   return productImageUrl(url)
 }
 
@@ -196,9 +203,21 @@ onMounted(async () => {
     >
       <div class="sf-home-hero__media" aria-hidden="true">
         <transition name="sf-home-hero-fade" mode="out-in">
+          <video
+            v-if="isVideoMedia(bannerMediaSrc(activeBanner))"
+            :key="activeBanner.id + '-video'"
+            autoplay
+            loop
+            muted
+            playsinline
+            class="sf-home-hero__video"
+          >
+            <source :src="bannerMediaSrc(activeBanner)" type="video/mp4" />
+          </video>
           <img
+            v-else
             :key="activeBanner.id"
-            :src="bannerImageSrc(activeBanner)"
+            :src="bannerMediaSrc(activeBanner)"
             alt=""
           />
         </transition>
@@ -378,7 +397,8 @@ onMounted(async () => {
   inset: 0;
 }
 
-.sf-home-hero__media img {
+.sf-home-hero__media img,
+.sf-home-hero__media video {
   position: absolute;
   inset: 0;
   width: 100%;
