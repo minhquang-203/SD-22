@@ -101,16 +101,44 @@ async function toggleNotif(e) {
   }
 }
 
+/** Tách path + query; không đưa '?' vào `path` (Vue Router sẽ không khớp route → màn trắng). */
+function resolveCustomerNotifLocation(item) {
+  const raw = typeof item?.link === 'string' ? item.link.trim() : ''
+  let pathname = '/tra-cuu-don'
+  const query = {}
+
+  if (raw) {
+    try {
+      const url = new URL(raw, 'http://local.invalid')
+      if (url.pathname) pathname = url.pathname
+      url.searchParams.forEach((value, key) => {
+        query[key] = value
+      })
+    } catch {
+      const qIdx = raw.indexOf('?')
+      pathname = (qIdx >= 0 ? raw.slice(0, qIdx) : raw) || pathname
+    }
+  }
+
+  if (pathname === '/don-hang') pathname = '/tra-cuu-don'
+
+  if (pathname === '/tra-cuu-don' && !query.ma && item?.maThamChieu) {
+    query.ma = String(item.maThamChieu)
+  }
+
+  return Object.keys(query).length ? { path: pathname, query } : pathname
+}
+
 async function goToNotif(item) {
   notifOpen.value = false
-  await markNotifRead(item)
-  const link = typeof item?.link === 'string' ? item.link.trim() : ''
-  // Thông báo cũ chỉ lưu "/tra-cuu-don" — dựng deep-link từ maThamChieu nếu có.
-  if ((!link || link === '/tra-cuu-don') && item?.maThamChieu) {
-    router.push({ path: '/tra-cuu-don', query: { ma: item.maThamChieu } })
-    return
+  const location = resolveCustomerNotifLocation(item)
+  // Điều hướng trước, đánh dấu đã đọc sau — tránh await API rồi push đè lên /gio-hang.
+  void markNotifRead(item)
+  try {
+    await router.push(location)
+  } catch {
+    // Bị hủy khi user bấm giỏ hàng / link khác ngay sau đó.
   }
-  router.push(link || '/tra-cuu-don')
 }
 
 async function markAllNotifications() {

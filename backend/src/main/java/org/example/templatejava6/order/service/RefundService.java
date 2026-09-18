@@ -51,6 +51,8 @@ import java.util.concurrent.ThreadLocalRandom;
  * Khi admin xac nhan: co RefundGateway (VNPAY) thi goi API tu dong, nguoc lai (CHUYEN_KHOAN)
  * admin nhap ma giao dich thu cong. Thanh cong: hoan_tien = DA_HOAN va hoa don = TRA_HANG.
  * Voi hoan tien tra hang, ca hai quyet dinh (hoan tat / tu choi) deu dong yeu cau tra hang sang HOAN_TAT.
+ * Rieng ton kho hang tra chi duoc NHAP KHO khi hoan tien thanh cong (xem {@link ReturnStockService});
+ * neu tu choi hoan tien thi hang tra ve khach nen khong nhap kho.
  */
 @Service
 public class RefundService {
@@ -74,6 +76,7 @@ public class RefundService {
     private final ThongBaoService thongBaoService;
     private final OrderMailService orderMailService;
     private final OrderRealtimeService orderRealtimeService;
+    private final ReturnStockService returnStockService;
 
     public RefundService(HoanTienRepository hoanTienRepository,
                          AnhHoanTienRepository anhHoanTienRepository,
@@ -86,7 +89,8 @@ public class RefundService {
                          ProductFileStorageService productFileStorageService,
                          ThongBaoService thongBaoService,
                          OrderMailService orderMailService,
-                         OrderRealtimeService orderRealtimeService) {
+                         OrderRealtimeService orderRealtimeService,
+                         ReturnStockService returnStockService) {
         this.hoanTienRepository = hoanTienRepository;
         this.anhHoanTienRepository = anhHoanTienRepository;
         this.hoaDonRepository = hoaDonRepository;
@@ -99,6 +103,7 @@ public class RefundService {
         this.thongBaoService = thongBaoService;
         this.orderMailService = orderMailService;
         this.orderRealtimeService = orderRealtimeService;
+        this.returnStockService = returnStockService;
     }
 
     /** Tao mot ban ghi hoan tien CHO_XU_LY cho admin xu ly. Bao admin qua chuong thong bao. */
@@ -213,6 +218,8 @@ public class RefundService {
 
         HoaDon hoaDon = saved.getIdHoaDon();
         if (saved.getLoai() == LoaiHoanTien.TRA_HANG) {
+            // Hoan tien thanh cong -> hang moi thuc su nhap kho (TOT ve ton, LOI ghi hang loi).
+            returnStockService.nhapKhoKhiHoanTien(saved.getIdYeuCauTraHang());
             capNhatHoaDonTraHang(hoaDon);
             ketThucYeuCauTraHang(saved.getIdYeuCauTraHang());
         }
@@ -269,9 +276,9 @@ public class RefundService {
         return urls;
     }
 
-    /** Admin tu choi hoan tien kem ly do. */
+    /** Admin tu choi hoan tien kem ly do va anh minh chung. */
     @Transactional
-    public HoanTienResponse tuChoi(Integer id, String lyDo, Integer idNhanVien) {
+    public HoanTienResponse tuChoi(Integer id, String lyDo, Integer idNhanVien, List<MultipartFile> files) {
         HoanTien ht = hoanTienRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Không tìm thấy yêu cầu hoàn tiền.", "NOT_FOUND"));
         if (ht.getTrangThai() != TrangThaiHoanTien.CHO_XU_LY) {
@@ -281,9 +288,12 @@ public class RefundService {
         ht.setGhiChu(lyDo);
         ht.setIdNhanVien(resolveNhanVien(idNhanVien));
         HoanTien saved = hoanTienRepository.save(ht);
+        List<String> anhUrls = luuAnhChungTu(saved, files);
         ghiNhatKy(saved.getIdHoaDon(), "HOAN_TIEN_TU_CHOI",
-                "Từ chối hoàn tiền" + (lyDo != null && !lyDo.isBlank() ? ": " + lyDo : ""));
+                "Từ chối hoàn tiền" + (lyDo != null && !lyDo.isBlank() ? ": " + lyDo : "")
+                        + " — không nhập kho, hàng trả về khách");
         if (saved.getLoai() == LoaiHoanTien.TRA_HANG) {
+            // Tu choi hoan tien -> KHONG nhap kho: hang duoc tra ve khach, tranh viec shop vua giu tien vua giu hang.
             ketThucYeuCauTraHang(saved.getIdYeuCauTraHang());
         }
         HoaDon hoaDon = saved.getIdHoaDon();
@@ -296,7 +306,7 @@ public class RefundService {
                 linkKhachHoanTien(saved),
                 hoaDon != null ? hoaDon.getId() : null,
                 hoaDon != null ? hoaDon.getMaHoaDon() : null);
-        return new HoanTienResponse(saved);
+        return new HoanTienResponse(saved, anhUrls);
     }
 
     /**

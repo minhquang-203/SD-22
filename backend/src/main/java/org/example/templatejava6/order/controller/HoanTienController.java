@@ -52,13 +52,26 @@ public class HoanTienController {
         return refundService.hoanTat(id, request, files);
     }
 
-    @PostMapping("/{id}/tu-choi")
-    public HoanTienResponse tuChoi(
+    @PostMapping(value = "/{id}/tu-choi", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public HoanTienResponse tuChoiJson(
             @PathVariable Integer id,
             @RequestBody(required = false) HoaDonTuChoiRequest request) {
         return refundService.tuChoi(
                 id,
                 request != null ? request.getGhiChu() : null,
-                request != null ? request.getIdNhanVien() : null);
+                request != null ? request.getIdNhanVien() : null,
+                null);
+    }
+
+    @PostMapping(value = "/{id}/tu-choi", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public HoanTienResponse tuChoiMultipart(
+            @PathVariable Integer id,
+            @RequestPart(value = "data", required = false) HoaDonTuChoiRequest request,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files) {
+        return refundService.tuChoi(
+                id,
+                request != null ? request.getGhiChu() : null,
+                request != null ? request.getIdNhanVien() : null,
+                files);
     }
 }

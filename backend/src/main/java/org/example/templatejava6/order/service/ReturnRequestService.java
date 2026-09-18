@@ -1,7 +1,6 @@
 package org.example.templatejava6.order.service;
 
 import org.example.templatejava6.common.entity.NhanVien;
-import org.example.templatejava6.common.enums.LoaiHangTra;
 import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.example.templatejava6.common.enums.TrangThaiTraHang;
 import org.example.templatejava6.common.exception.ApiException;
@@ -24,6 +23,8 @@ import org.example.templatejava6.order.model.response.StorefrontOrderLineRespons
 import org.example.templatejava6.order.model.response.StorefrontReturnDetailResponse;
 import org.example.templatejava6.order.model.response.StorefrontReturnTimelineStepResponse;
 import org.example.templatejava6.order.model.response.YeuCauTraHangResponse;
+import org.example.templatejava6.order.entity.AnhHoanTien;
+import org.example.templatejava6.order.repository.AnhHoanTienRepository;
 import org.example.templatejava6.order.repository.AnhYeuCauTraHangRepository;
 import org.example.templatejava6.order.repository.ChiTietTraHangLoRepository;
 import org.example.templatejava6.order.repository.HoanTienRepository;
@@ -49,6 +50,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -66,9 +69,11 @@ import java.util.Set;
  *   <li>Khach tao van don GHN hoan hang kem ca lay hang (pick_shift) -> {@code DANG_HOAN_HANG}.</li>
  *   <li>Van don hoan hoan thanh (GHN {@code delivered}) — cap nhat trang thai GHN;
  *       nhan vien bam "Da nhan hang" kem phan loai lo TOT/LOI -> {@code DA_NHAN_HANG}:
- *       TOT hoan ve dung lo, LOI tang so_luong_loi; tao ban ghi hoan tien {@code CHO_XU_LY}.</li>
- *   <li>Admin quyet dinh hoan tien hay tu choi tai trang hoan tien -> {@code HOAN_TAT}
- *       (xem {@link RefundService}).</li>
+ *       chi GHI NHAN phan bo lo vao {@code chi_tiet_tra_hang_lo} (CHUA nhap kho);
+ *       tao ban ghi hoan tien {@code CHO_XU_LY}.</li>
+ *   <li>Admin quyet dinh tai trang hoan tien -> {@code HOAN_TAT} (xem {@link RefundService}):
+ *       hoan tien thanh cong moi NHAP KHO (TOT ve ton, LOI ghi hang loi — xem
+ *       {@link ReturnStockService}); neu tu choi thi hang tra ve khach nen khong nhap kho.</li>
  * </ol>
  */
 @Service
@@ -100,6 +105,7 @@ public class ReturnRequestService {
     private final ProductFileStorageService productFileStorageService;
     private final OrderRealtimeService orderRealtimeService;
     private final HoanTienRepository hoanTienRepository;
+    private final AnhHoanTienRepository anhHoanTienRepository;
     private final AnhSanPhamRepository anhSanPhamRepository;
 
     public ReturnRequestService(YeuCauTraHangRepository yeuCauTraHangRepository,
@@ -119,6 +125,7 @@ public class ReturnRequestService {
                                 ProductFileStorageService productFileStorageService,
                                 OrderRealtimeService orderRealtimeService,
                                 HoanTienRepository hoanTienRepository,
+                                AnhHoanTienRepository anhHoanTienRepository,
                                 AnhSanPhamRepository anhSanPhamRepository) {
         this.yeuCauTraHangRepository = yeuCauTraHangRepository;
         this.anhYeuCauTraHangRepository = anhYeuCauTraHangRepository;
@@ -137,6 +144,7 @@ public class ReturnRequestService {
         this.productFileStorageService = productFileStorageService;
         this.orderRealtimeService = orderRealtimeService;
         this.hoanTienRepository = hoanTienRepository;
+        this.anhHoanTienRepository = anhHoanTienRepository;
         this.anhSanPhamRepository = anhSanPhamRepository;
     }
 
@@ -145,7 +153,24 @@ public class ReturnRequestService {
     public YeuCauTraHangResponse taoYeuCau(Integer idKhachHang, Integer idHoaDon,
                                            TaoYeuCauTraHangRequest request,
                                            List<MultipartFile> files) {
-        HoaDon hoaDon = loadOwnedOnlineOrder(idKhachHang, idHoaDon);
+        return taoYeuCauChoDon(loadOwnedOnlineOrder(idKhachHang, idHoaDon), request, files);
+    }
+
+    /** Khach vang lai gui yeu cau tra hang — chung minh so huu bang tracking token. */
+    @Transactional
+    public YeuCauTraHangResponse taoYeuCauBangToken(String token, Integer idHoaDon,
+                                                    TaoYeuCauTraHangRequest request,
+                                                    List<MultipartFile> files) {
+        HoaDon hoaDon = loadOnlineOrderByTrackingToken(token);
+        if (idHoaDon == null || !idHoaDon.equals(hoaDon.getId())) {
+            throw new ApiException("Không tìm thấy đơn hàng online.", "NOT_FOUND");
+        }
+        return taoYeuCauChoDon(hoaDon, request, files);
+    }
+
+    private YeuCauTraHangResponse taoYeuCauChoDon(HoaDon hoaDon, TaoYeuCauTraHangRequest request,
+                                                  List<MultipartFile> files) {
+        Integer idHoaDon = hoaDon.getId();
         if (hoaDon.getTrangThai() != TrangThaiDonHang.HOAN_THANH) {
             throw new ApiException(
                     "Chỉ có thể yêu cầu trả hàng cho đơn đã giao thành công.", "ORDER_NOT_DELIVERED");
@@ -245,6 +270,17 @@ public class ReturnRequestService {
     }
 
     @Transactional(readOnly = true)
+    public StorefrontReturnDetailResponse chiTietBangToken(String token, Integer id) {
+        return toDetailResponse(loadOwnedReturnByToken(token, id));
+    }
+
+    /** Xác token tra cứu còn gắn với một đơn online — dùng cho API phụ (ca lấy hàng). */
+    @Transactional(readOnly = true)
+    public void assertTrackingToken(String token) {
+        loadOnlineOrderByTrackingToken(token);
+    }
+
+    @Transactional(readOnly = true)
     public List<YeuCauTraHangResponse> danhSach(TrangThaiTraHang trangThai) {
         List<YeuCauTraHang> list = trangThai != null
                 ? yeuCauTraHangRepository.findByTrangThaiOrderByNgayTaoDesc(trangThai)
@@ -291,9 +327,9 @@ public class ReturnRequestService {
         return toResponse(saved);
     }
 
-    /** Admin tu choi yeu cau tra hang. */
+    /** Admin tu choi yeu cau tra hang, co the kem anh minh chung. */
     @Transactional
-    public YeuCauTraHangResponse tuChoi(Integer id, String lyDo, Integer idNhanVien) {
+    public YeuCauTraHangResponse tuChoi(Integer id, String lyDo, Integer idNhanVien, List<MultipartFile> files) {
         YeuCauTraHang yc = load(id);
         if (yc.getTrangThai() != TrangThaiTraHang.CHO_DUYET) {
             throw new ApiException("Yêu cầu trả hàng không ở trạng thái chờ duyệt.", "INVALID_RETURN_STATUS");
@@ -303,6 +339,7 @@ public class ReturnRequestService {
         yc.setGhiChuAdmin(lyDo);
         yc.setNgayCapNhat(LocalDateTime.now());
         YeuCauTraHang saved = yeuCauTraHangRepository.save(yc);
+        luuAnhTraHang(saved, filterValidFiles(files), AnhYeuCauTraHang.LOAI_TU_CHOI);
         ghiNhatKy(yc.getIdHoaDon(), "TRA_HANG_TU_CHOI",
                 "Từ chối yêu cầu trả hàng" + (lyDo != null && !lyDo.isBlank() ? ": " + lyDo : ""));
         orderMailService.guiYeuCauTraHangBiTuChoi(yc.getIdHoaDon(), lyDo);
@@ -336,6 +373,16 @@ public class ReturnRequestService {
         if (hoaDon.getIdKhachHang() == null || !hoaDon.getIdKhachHang().getId().equals(idKhachHang)) {
             throw new ApiException("Không tìm thấy yêu cầu trả hàng.", "NOT_FOUND");
         }
+        return taoVanDonTraChoDon(yc, pickShiftId);
+    }
+
+    @Transactional
+    public YeuCauTraHangResponse taoVanDonTraBangToken(String token, Integer idYeuCau, Integer pickShiftId) {
+        return taoVanDonTraChoDon(loadOwnedReturnByToken(token, idYeuCau), pickShiftId);
+    }
+
+    private YeuCauTraHangResponse taoVanDonTraChoDon(YeuCauTraHang yc, Integer pickShiftId) {
+        HoaDon hoaDon = yc.getIdHoaDon();
         if (yc.getTrangThai() != TrangThaiTraHang.DA_DUYET) {
             throw new ApiException(
                     "Yêu cầu trả hàng chưa được duyệt hoặc đã tạo vận đơn.", "INVALID_RETURN_STATUS");
@@ -501,7 +548,7 @@ public class ReturnRequestService {
         HoaDon hoaDon = yc.getIdHoaDon();
         TrangThaiDonHang trangThaiCu = hoaDon.getTrangThai();
 
-        hoanTonTheoPhanBoTra(yc, hoaDon, chiTietLo);
+        ghiNhanPhanBoTra(yc, hoaDon, chiTietLo);
         if (trangThaiCu != TrangThaiDonHang.TRA_HANG) {
             hoaDon.setTrangThai(TrangThaiDonHang.TRA_HANG);
             hoaDonRepository.save(hoaDon);
@@ -521,7 +568,8 @@ public class ReturnRequestService {
         // từ lúc duyệt — để storefront reload trạng thái trả hàng (DA_NHAN_HANG) và vận đơn.
         orderRealtimeService.publishStatusChanged(hoaDon, trangThaiCu);
 
-        ghiNhatKy(hoaDon, "TRA_HANG_DA_NHAN_HANG", ghiChu + " — hoàn tồn theo lô, chờ quyết định hoàn tiền");
+        ghiNhatKy(hoaDon, "TRA_HANG_DA_NHAN_HANG",
+                ghiChu + " — ghi nhận phân loại lô TỐT/LỖI (chưa nhập kho), chờ quyết định hoàn tiền");
         refundService.taoHoanTienTraHangNeuChua(
                 hoaDon, refundService.resolveSoTienHoan(hoaDon), saved,
                 yc.getTenNganHang(), yc.getSoTaiKhoan(), yc.getChuTaiKhoan());
@@ -530,16 +578,16 @@ public class ReturnRequestService {
     }
 
     /**
-     * Hoàn tồn theo phân bổ TỐT/LỖI nhân viên chọn.
-     * Đơn cũ không có hoa_don_chi_tiet_lo: fallback hoàn tất cả như hàng tốt.
+     * Ghi nhận phân loại lô TỐT/LỖI nhân viên chọn khi nhận lại hàng — CHƯA nhập kho.
+     * Việc nhập kho được trì hoãn tới khi hoàn tiền thành công (xem {@link ReturnStockService});
+     * nếu admin từ chối hoàn tiền thì hàng được trả về khách nên không nhập kho.
+     * Đơn cũ không có hoa_don_chi_tiet_lo: không cần phân bổ, sẽ fallback khi nhập kho.
      */
-    private void hoanTonTheoPhanBoTra(YeuCauTraHang yc, HoaDon hoaDon,
-                                      List<NhanHangTraRequest.ChiTietLoRequest> chiTietLo) {
+    private void ghiNhanPhanBoTra(YeuCauTraHang yc, HoaDon hoaDon,
+                                  List<NhanHangTraRequest.ChiTietLoRequest> chiTietLo) {
         List<HoaDonChiTietLo> soldLots = hoaDonChiTietLoRepository.findByHoaDonFetchLo(hoaDon);
         if (soldLots.isEmpty()) {
-            for (HoaDonChiTiet chiTiet : hoaDonChiTietRepository.findByIdHoaDon(hoaDon)) {
-                loHangService.hoanTonTheoChiTiet(chiTiet);
-            }
+            // Đơn cũ: không có phân bổ lô để ghi nhận. Nhập kho (fallback) xử lý khi hoàn tiền.
             return;
         }
 
@@ -599,13 +647,9 @@ public class ReturnRequestService {
             }
         }
 
+        // Chỉ LƯU phân bổ TỐT/LỖI, KHÔNG nhập kho ở bước này. Kho được nhập khi hoàn tiền
+        // thành công (ReturnStockService); giữ liên kết lô của đơn gốc cho tới lúc đó.
         for (NhanHangTraRequest.ChiTietLoRequest item : chiTietLo) {
-            if (item.getLoaiHang() == LoaiHangTra.TOT) {
-                loHangService.hoanTonVaoLo(item.getIdLoHang(), item.getSoLuong());
-            } else {
-                loHangService.ghiNhanHangLoi(item.getIdLoHang(), item.getSoLuong());
-            }
-
             ChiTietTraHangLo detail = new ChiTietTraHangLo();
             detail.setYeuCauTraHang(yc);
             LoHang loRef = loHangService.getLoHangRef(item.getIdLoHang());
@@ -613,15 +657,6 @@ public class ReturnRequestService {
             detail.setSoLuong(item.getSoLuong());
             detail.setLoai(item.getLoaiHang());
             chiTietTraHangLoRepository.save(detail);
-        }
-
-        Set<Integer> clearedHdct = new HashSet<>();
-        for (HoaDonChiTietLo row : soldLots) {
-            HoaDonChiTiet ct = row.getHoaDonChiTiet();
-            if (ct == null || ct.getId() == null || !clearedHdct.add(ct.getId())) {
-                continue;
-            }
-            hoaDonChiTietLoRepository.deleteByHoaDonChiTiet(ct);
         }
     }
 
@@ -638,21 +673,14 @@ public class ReturnRequestService {
     }
 
     private YeuCauTraHangResponse toResponse(YeuCauTraHang yc) {
-        List<String> anhUrls = anhYeuCauTraHangRepository
-                .findByIdYeuCauTraHang_IdOrderByIdAsc(yc.getId())
-                .stream()
-                .map(AnhYeuCauTraHang::getDuongDan)
-                .toList();
-        return new YeuCauTraHangResponse(yc, anhUrls);
+        AnhTraHangGrouped grouped = groupAnhTraHang(yc.getId());
+        return new YeuCauTraHangResponse(yc, grouped.anhKhach(), grouped.anhTuChoi());
     }
 
     private StorefrontReturnDetailResponse toDetailResponse(YeuCauTraHang yc) {
-        List<String> anhUrls = anhYeuCauTraHangRepository
-                .findByIdYeuCauTraHang_IdOrderByIdAsc(yc.getId())
-                .stream()
-                .map(AnhYeuCauTraHang::getDuongDan)
-                .toList();
-        StorefrontReturnDetailResponse detail = new StorefrontReturnDetailResponse(yc, anhUrls);
+        AnhTraHangGrouped grouped = groupAnhTraHang(yc.getId());
+        StorefrontReturnDetailResponse detail = new StorefrontReturnDetailResponse(
+                yc, grouped.anhKhach(), grouped.anhTuChoi());
         if (yc.getTrangThai() != null) {
             detail.setTrangThaiLabel(yc.getTrangThai().getLabelChoKhach());
         }
@@ -691,6 +719,14 @@ public class ReturnRequestService {
         detail.setMaGiaoDichHoan(matched.getMaGiaoDichHoan());
         detail.setPhuongThucHoan(matched.getPhuongThuc());
         detail.setNgayHoan(matched.getNgayHoan());
+        detail.setGhiChuHoanTien(matched.getGhiChu());
+        if (matched.getId() != null) {
+            detail.setAnhHoanTienUrls(anhHoanTienRepository
+                    .findByIdHoanTien_IdOrderByIdAsc(matched.getId())
+                    .stream()
+                    .map(AnhHoanTien::getDuongDan)
+                    .toList());
+        }
     }
 
     private StorefrontOrderLineResponse toReturnLine(HoaDonChiTiet ct) {
@@ -826,18 +862,49 @@ public class ReturnRequestService {
     }
 
     private List<String> luuAnhTraHang(YeuCauTraHang yeuCau, List<MultipartFile> files) {
+        return luuAnhTraHang(yeuCau, files, AnhYeuCauTraHang.LOAI_KHACH);
+    }
+
+    private List<String> luuAnhTraHang(YeuCauTraHang yeuCau, List<MultipartFile> files, String loai) {
         List<String> urls = new ArrayList<>();
+        if (files == null || files.isEmpty()) {
+            return urls;
+        }
         LocalDateTime now = LocalDateTime.now();
+        String loaiAnh = loai != null && !loai.isBlank() ? loai : AnhYeuCauTraHang.LOAI_KHACH;
         for (MultipartFile file : files) {
+            if (file == null || file.isEmpty()) {
+                continue;
+            }
             String path = productFileStorageService.store(file);
             AnhYeuCauTraHang anh = new AnhYeuCauTraHang();
             anh.setIdYeuCauTraHang(yeuCau);
             anh.setDuongDan(path);
+            anh.setLoai(loaiAnh);
             anh.setNgayTao(now);
             anhYeuCauTraHangRepository.save(anh);
             urls.add(path);
         }
         return urls;
+    }
+
+    private AnhTraHangGrouped groupAnhTraHang(Integer idYeuCau) {
+        List<String> anhKhach = new ArrayList<>();
+        List<String> anhTuChoi = new ArrayList<>();
+        if (idYeuCau == null) {
+            return new AnhTraHangGrouped(anhKhach, anhTuChoi);
+        }
+        for (AnhYeuCauTraHang anh : anhYeuCauTraHangRepository.findByIdYeuCauTraHang_IdOrderByIdAsc(idYeuCau)) {
+            if (anh.laAnhTuChoi()) {
+                anhTuChoi.add(anh.getDuongDan());
+            } else {
+                anhKhach.add(anh.getDuongDan());
+            }
+        }
+        return new AnhTraHangGrouped(anhKhach, anhTuChoi);
+    }
+
+    private record AnhTraHangGrouped(List<String> anhKhach, List<String> anhTuChoi) {
     }
 
     private void assertTrongHanTraHang(HoaDon hoaDon) {
@@ -896,6 +963,39 @@ public class ReturnRequestService {
         }
         return hoaDonRepository.findByIdAndIdKhachHang_IdAndLoaiDon(idHoaDon, idKhachHang, LOAI_DON_ONLINE)
                 .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng online.", "NOT_FOUND"));
+    }
+
+    private HoaDon loadOnlineOrderByTrackingToken(String token) {
+        String normalized = token != null ? token.trim() : "";
+        if (normalized.length() < 32) {
+            throw new ApiException("Không tìm thấy đơn hàng online.", "NOT_FOUND");
+        }
+        HoaDon hoaDon = hoaDonRepository.findByTrackingToken(normalized)
+                .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng online.", "NOT_FOUND"));
+        if (hoaDon.getLoaiDon() == null || !LOAI_DON_ONLINE.equalsIgnoreCase(hoaDon.getLoaiDon())) {
+            throw new ApiException("Không tìm thấy đơn hàng online.", "NOT_FOUND");
+        }
+        return hoaDon;
+    }
+
+    private YeuCauTraHang loadOwnedReturnByToken(String token, Integer idYeuCau) {
+        YeuCauTraHang yc = load(idYeuCau);
+        HoaDon hoaDon = yc.getIdHoaDon();
+        if (hoaDon == null || !tokenKhopDon(hoaDon, token)) {
+            throw new ApiException("Không tìm thấy yêu cầu trả hàng.", "NOT_FOUND");
+        }
+        return yc;
+    }
+
+    private static boolean tokenKhopDon(HoaDon hoaDon, String token) {
+        String expected = hoaDon.getTrackingToken();
+        String given = token != null ? token.trim() : "";
+        if (expected == null || expected.isBlank() || given.length() < 32) {
+            return false;
+        }
+        byte[] a = expected.getBytes(StandardCharsets.UTF_8);
+        byte[] b = given.getBytes(StandardCharsets.UTF_8);
+        return MessageDigest.isEqual(a, b);
     }
 
     private YeuCauTraHang load(Integer id) {

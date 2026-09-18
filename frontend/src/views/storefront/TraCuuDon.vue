@@ -171,7 +171,7 @@ async function lookupGuestByToken(token) {
       guestError.value = 'Không tìm thấy đơn hàng với thông tin đã nhập.'
       return
     }
-    guestOrder.value = { ...res.data, __detailLoaded: true }
+    guestOrder.value = { ...res.data, __detailLoaded: true, trackingToken: res.data.trackingToken || token }
     // Giữ token trên URL để refresh vẫn xem được; không gắn email/mã.
     router.replace({ path: route.path, query: { token } })
   } catch (err) {
@@ -205,9 +205,10 @@ async function lookupGuestOrder() {
       guestError.value = 'Không tìm thấy đơn hàng với thông tin đã nhập.'
       return
     }
-    guestOrder.value = { ...res.data, __detailLoaded: true }
-    // Không đẩy email lên URL sau khi tra cứu thành công.
-    router.replace({ path: route.path, query: {} })
+    const token = String(res.data.trackingToken || '').trim()
+    guestOrder.value = { ...res.data, __detailLoaded: true, trackingToken: token || undefined }
+    // Đưa về link token (giống email) để trả hàng / refresh không cần nhập lại email.
+    router.replace({ path: route.path, query: token.length >= 32 ? { token } : {} })
   } catch (err) {
     guestError.value = typeof err === 'string'
       ? err
@@ -325,8 +326,16 @@ function onReviewSubmitted({ lineId }) {
   }
 }
 
+function guestTrackingToken() {
+  const fromRoute = typeof route.query.token === 'string' ? route.query.token.trim() : ''
+  if (fromRoute.length >= 32) return fromRoute
+  const fromOrder = String(guestOrder.value?.trackingToken || returnOrder.value?.trackingToken || '').trim()
+  return fromOrder.length >= 32 ? fromOrder : ''
+}
+
 function openReturn(order) {
-  returnOrder.value = order
+  const token = guestTrackingToken()
+  returnOrder.value = token && order ? { ...order, trackingToken: order.trackingToken || token } : order
   showReturnModal.value = true
 }
 
@@ -338,8 +347,20 @@ function closeReturn() {
 function onReturnSubmitted(result) {
   closeReturn()
   const returnId = result?.id
+  if (guestOrder.value && returnId) {
+    guestOrder.value = {
+      ...guestOrder.value,
+      coTheYeuCauTraHang: false,
+      idYeuCauTraHang: returnId,
+      trangThaiTraHang: result.trangThai || 'CHO_DUYET',
+      trangThaiTraHangLabel: result.trangThaiLabel,
+    }
+  }
   if (returnId) {
-    router.push(`/tra-cuu-don/tra-hang/${returnId}`)
+    const token = guestTrackingToken()
+    router.push(token
+      ? { path: `/tra-cuu-don/tra-hang/${returnId}`, query: { token } }
+      : `/tra-cuu-don/tra-hang/${returnId}`)
     return
   }
   returnNotice.value = 'Đã gửi yêu cầu trả hàng. Cửa hàng sẽ sớm phản hồi.'
@@ -419,9 +440,15 @@ async function handleCancelOrder(order) {
 
       <p v-if="guestLookupLoading && route.query.token" class="sf-order-msg">Đang tải đơn hàng...</p>
       <p v-if="guestError" class="sf-order-msg sf-order-msg--err">{{ guestError }}</p>
+      <p v-if="returnNotice" class="sf-order-msg sf-order-msg--ok">{{ returnNotice }}</p>
 
       <div v-if="guestOrder" class="sf-order-list">
-        <OrderCard :order="guestOrder" :default-open="true" read-only />
+        <OrderCard
+          :order="guestOrder"
+          :default-open="true"
+          read-only
+          @request-return="openReturn"
+        />
       </div>
     </div>
   </div>
@@ -507,20 +534,20 @@ async function handleCancelOrder(order) {
       @close="closeReview"
       @submitted="onReviewSubmitted"
     />
-
-    <ReturnRequestCodModal
-      v-if="returnOrder && String(returnOrder.maPhuongThucThanhToan || '').toUpperCase() === 'COD'"
-      :visible="showReturnModal"
-      :order="returnOrder"
-      @close="closeReturn"
-      @submitted="onReturnSubmitted"
-    />
-    <ReturnRequestWalletModal
-      v-else-if="returnOrder"
-      :visible="showReturnModal"
-      :order="returnOrder"
-      @close="closeReturn"
-      @submitted="onReturnSubmitted"
-    />
   </div>
+
+  <ReturnRequestCodModal
+    v-if="returnOrder && String(returnOrder.maPhuongThucThanhToan || '').toUpperCase() === 'COD'"
+    :visible="showReturnModal"
+    :order="returnOrder"
+    @close="closeReturn"
+    @submitted="onReturnSubmitted"
+  />
+  <ReturnRequestWalletModal
+    v-else-if="returnOrder"
+    :visible="showReturnModal"
+    :order="returnOrder"
+    @close="closeReturn"
+    @submitted="onReturnSubmitted"
+  />
 </template>

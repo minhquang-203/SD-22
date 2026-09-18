@@ -124,6 +124,11 @@ public class DotGiamGiaService {
     @Transactional
     public void delete(Integer id) {
         DotGiamGia dgg = getDotGiamGiaOrThrow(id);
+        if (isDangApDung(dgg)) {
+            throw new ApiException(
+                    "Không thể xóa đợt giảm giá đang chạy. Vui lòng ngừng đợt trước khi xóa",
+                    "SALE_IS_ACTIVE");
+        }
         dgg.setTrangThai(false);
         dotGiamGiaRepository.save(dgg);
         invalidateChatCatalog();

@@ -2,9 +2,12 @@ package org.example.templatejava6.order.service;
 
 import org.example.templatejava6.common.entity.KhachHang;
 import org.example.templatejava6.common.enums.TrangThaiDonHang;
+import org.example.templatejava6.common.enums.TrangThaiHoanTien;
 import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.customer.repository.KhachHangRepository;
 import org.example.templatejava6.common.enums.TrangThaiTraHang;
+import org.example.templatejava6.order.entity.AnhHoanTien;
+import org.example.templatejava6.order.entity.AnhYeuCauTraHang;
 import org.example.templatejava6.order.entity.HoaDon;
 import org.example.templatejava6.order.entity.HoaDonChiTiet;
 import org.example.templatejava6.order.entity.HoanTien;
@@ -13,6 +16,8 @@ import org.example.templatejava6.order.entity.YeuCauTraHang;
 import org.example.templatejava6.order.model.response.StorefrontOrderDetailResponse;
 import org.example.templatejava6.order.model.response.StorefrontOrderLineResponse;
 import org.example.templatejava6.order.model.response.StorefrontOrderSummaryResponse;
+import org.example.templatejava6.order.repository.AnhHoanTienRepository;
+import org.example.templatejava6.order.repository.AnhYeuCauTraHangRepository;
 import org.example.templatejava6.order.repository.HoaDonChiTietRepository;
 import org.example.templatejava6.order.repository.HoaDonRepository;
 import org.example.templatejava6.order.repository.HoanTienRepository;
@@ -51,6 +56,8 @@ public class HoaDonStorefrontService {
     private final OnlineOrderLifecycleService onlineOrderLifecycleService;
     private final YeuCauTraHangRepository yeuCauTraHangRepository;
     private final HoanTienRepository hoanTienRepository;
+    private final AnhYeuCauTraHangRepository anhYeuCauTraHangRepository;
+    private final AnhHoanTienRepository anhHoanTienRepository;
     private final TransactionTemplate readOnlyTx;
     private final PublicOrderLookupRateLimiter publicLookupRateLimiter;
 
@@ -65,6 +72,8 @@ public class HoaDonStorefrontService {
             OnlineOrderLifecycleService onlineOrderLifecycleService,
             YeuCauTraHangRepository yeuCauTraHangRepository,
             HoanTienRepository hoanTienRepository,
+            AnhYeuCauTraHangRepository anhYeuCauTraHangRepository,
+            AnhHoanTienRepository anhHoanTienRepository,
             PlatformTransactionManager transactionManager,
             PublicOrderLookupRateLimiter publicLookupRateLimiter) {
         this.hoaDonRepository = hoaDonRepository;
@@ -77,6 +86,8 @@ public class HoaDonStorefrontService {
         this.onlineOrderLifecycleService = onlineOrderLifecycleService;
         this.yeuCauTraHangRepository = yeuCauTraHangRepository;
         this.hoanTienRepository = hoanTienRepository;
+        this.anhYeuCauTraHangRepository = anhYeuCauTraHangRepository;
+        this.anhHoanTienRepository = anhHoanTienRepository;
         this.readOnlyTx = new TransactionTemplate(transactionManager);
         this.readOnlyTx.setReadOnly(true);
         this.publicLookupRateLimiter = publicLookupRateLimiter;
@@ -154,7 +165,11 @@ public class HoaDonStorefrontService {
 
     private StorefrontOrderDetailResponse toPublicDetail(HoaDon hd) {
         StorefrontOrderDetailResponse detail = buildDetail(hd);
-        detail.setCoTheYeuCauTraHang(false);
+        // Tra cứu đã chứng minh sở hữu (token / mã+email) — cho phép trả hàng nếu đủ điều kiện.
+        if (hd.getLoaiDon() == null || !"ONLINE".equalsIgnoreCase(hd.getLoaiDon())) {
+            detail.setCoTheYeuCauTraHang(false);
+        }
+        detail.setTrackingToken(hd.getTrackingToken());
         // Che một phần SĐT khi xem công khai (giảm rủi ro nếu token bị lộ).
         detail.setSdtNguoiNhan(maskPhone(detail.getSdtNguoiNhan()));
         return detail;
@@ -369,6 +384,14 @@ public class HoaDonStorefrontService {
             }
             if (moiNhat.getTrangThai() == TrangThaiTraHang.TU_CHOI) {
                 r.setLyDoTuChoiTraHang(moiNhat.getGhiChuAdmin());
+                if (moiNhat.getId() != null) {
+                    r.setAnhTuChoiTraHangUrls(anhYeuCauTraHangRepository
+                            .findByIdYeuCauTraHang_IdOrderByIdAsc(moiNhat.getId())
+                            .stream()
+                            .filter(AnhYeuCauTraHang::laAnhTuChoi)
+                            .map(AnhYeuCauTraHang::getDuongDan)
+                            .toList());
+                }
             }
             r.setMaVanDonTra(moiNhat.getMaVanDonTra());
             r.setPickShiftLabel(moiNhat.getPickShiftLabel());
@@ -383,6 +406,16 @@ public class HoaDonStorefrontService {
                 r.setTrangThaiHoanTienLabel(htMoiNhat.getTrangThai().getLabel());
             }
             r.setMaGiaoDichHoan(htMoiNhat.getMaGiaoDichHoan());
+            if (htMoiNhat.getTrangThai() == TrangThaiHoanTien.TU_CHOI) {
+                r.setLyDoTuChoiHoanTien(htMoiNhat.getGhiChu());
+                if (htMoiNhat.getId() != null) {
+                    r.setAnhTuChoiHoanTienUrls(anhHoanTienRepository
+                            .findByIdHoanTien_IdOrderByIdAsc(htMoiNhat.getId())
+                            .stream()
+                            .map(AnhHoanTien::getDuongDan)
+                            .toList());
+                }
+            }
         }
     }
 

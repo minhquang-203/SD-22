@@ -40,15 +40,21 @@ public class StorefrontOrderDetailResponse {
     private Boolean huyBoiCuaHang;
 
     private Boolean coTheYeuCauTraHang;
+    /** Chỉ trả về sau tra cứu công khai đã chứng minh sở hữu — dùng cho trả hàng khách vãng lai. */
+    private String trackingToken;
     private Integer idYeuCauTraHang;
     private String trangThaiTraHang;
     private String trangThaiTraHangLabel;
     /** Lý do admin từ chối yêu cầu trả hàng (ghiChuAdmin). */
     private String lyDoTuChoiTraHang;
+    private List<String> anhTuChoiTraHangUrls;
     private String maVanDonTra;
     private String pickShiftLabel;
     private String ghnTrangThaiTraLabel;
     private String trangThaiHoanTien;
     private String trangThaiHoanTienLabel;
     private String maGiaoDichHoan;
+    /** Lý do admin từ chối hoàn tiền (hoan_tien.ghiChu khi TU_CHOI). */
+    private String lyDoTuChoiHoanTien;
+    private List<String> anhTuChoiHoanTienUrls;
 }

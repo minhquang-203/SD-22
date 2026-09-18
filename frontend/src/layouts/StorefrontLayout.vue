@@ -1,4 +1,5 @@
 <script setup>
+import { useRoute } from 'vue-router'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import '@/styles/soleil-storefront.css'
 import TheNavbar from '@/components/storefront/TheNavbar.vue'
@@ -8,13 +9,15 @@ import WelcomeModal from '@/components/storefront/WelcomeModal.vue'
 import CartToast from '@/components/storefront/CartToast.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import ChatWidget from '@/components/storefront/ChatWidget.vue'
+
+const route = useRoute()
 </script>
 
 <template>
   <div class="storefront-root storefront-shell">
     <TheNavbar />
     <main class="sf-main">
-      <router-view />
+      <router-view :key="route.path" />
     </main>
     <TheFooter />
     <AuthModal />

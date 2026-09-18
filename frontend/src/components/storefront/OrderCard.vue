@@ -13,7 +13,7 @@ const props = defineProps({
   cancelLoading: { type: Boolean, default: false },
   returnActionLoading: { type: Boolean, default: false },
   detailLoading: { type: Boolean, default: false },
-  /** Chỉ xem (khách vãng lai): ẩn hủy / trả hàng / đánh giá. */
+  /** Chỉ xem (khách vãng lai): ẩn hủy / đánh giá. Trả hàng vẫn hiện nếu đơn đủ điều kiện. */
   readOnly: { type: Boolean, default: false },
 })
 
@@ -21,7 +21,7 @@ const emit = defineEmits(['review', 'cancelOrder', 'requestReturn', 'expand'])
 
 const router = useRouter()
 const hasReturnRequest = computed(() => Boolean(props.order?.idYeuCauTraHang))
-const isOpen = ref(Boolean(props.defaultOpen) && (props.readOnly || !hasReturnRequest.value))
+const isOpen = ref(Boolean(props.defaultOpen) && !hasReturnRequest.value)
 
 onMounted(() => {
   if (isOpen.value) {
@@ -51,7 +51,7 @@ const isReturned = computed(() => props.order?.trangThai === 'TRA_HANG')
 
 const canCancel = computed(() => !props.readOnly && coTheHuyDon(props.order?.trangThai))
 
-const canRequestReturn = computed(() => !props.readOnly && props.order?.coTheYeuCauTraHang === true)
+const canRequestReturn = computed(() => props.order?.coTheYeuCauTraHang === true)
 
 const headerStatus = computed(() => {
   if (props.order?.trangThaiTraHang) {
@@ -136,9 +136,28 @@ const cancelNotice = computed(() => {
   return props.order?.lyDoHuy || 'Đơn hàng đã bị cửa hàng hủy.'
 })
 
+const refundRejectNotice = computed(() => {
+  if (props.order?.trangThaiHoanTien !== 'TU_CHOI') return ''
+  return props.order?.lyDoTuChoiHoanTien || 'Yêu cầu hoàn tiền đã bị từ chối.'
+})
+
+const refundRejectImages = computed(() => {
+  if (props.order?.trangThaiHoanTien !== 'TU_CHOI') return []
+  return (props.order?.anhTuChoiHoanTienUrls || []).filter(Boolean)
+})
+
+function returnDetailLocation() {
+  const id = props.order?.idYeuCauTraHang
+  if (!id) return null
+  const token = String(props.order?.trackingToken || '').trim()
+  return token.length >= 32
+    ? { path: `/tra-cuu-don/tra-hang/${id}`, query: { token } }
+    : `/tra-cuu-don/tra-hang/${id}`
+}
+
 function onHeadClick() {
-  if (!props.readOnly && hasReturnRequest.value && props.order?.idYeuCauTraHang) {
-    router.push(`/tra-cuu-don/tra-hang/${props.order.idYeuCauTraHang}`)
+  if (hasReturnRequest.value && props.order?.idYeuCauTraHang) {
+    router.push(returnDetailLocation())
     return
   }
   const opening = !isOpen.value
@@ -156,7 +175,7 @@ function canReview(line) {
 </script>
 
 <template>
-  <article v-if="order" class="sf-order-card" :class="{ open: isOpen && (readOnly || !hasReturnRequest) }">
+  <article v-if="order" class="sf-order-card" :class="{ open: isOpen && !hasReturnRequest }">
     <button type="button" class="sf-order-card__head" @click="onHeadClick">
       <div class="sf-order-card__head-main">
         <div v-if="order.maHoaDon || order.maVanDonTra" class="sf-order-card__codes">
@@ -205,6 +224,21 @@ function canReview(line) {
       <p v-if="cancelNotice" class="sf-order-card__cancel-notice">
         {{ cancelNotice }}
       </p>
+
+      <div v-if="refundRejectNotice" class="sf-order-card__cancel-notice">
+        <p>{{ refundRejectNotice }}</p>
+        <div v-if="refundRejectImages.length" class="sf-return-detail__photos">
+          <a
+            v-for="(url, idx) in refundRejectImages"
+            :key="`refund-reject-${url}-${idx}`"
+            :href="productImageUrl(url)"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <img :src="productImageUrl(url)" :alt="`Ảnh từ chối hoàn tiền ${idx + 1}`" />
+          </a>
+        </div>
+      </div>
 
       <div v-if="order.ngayTao || paymentLabel" class="sf-detail-meta">
         <span v-if="order.ngayTao" class="sf-info-chip">

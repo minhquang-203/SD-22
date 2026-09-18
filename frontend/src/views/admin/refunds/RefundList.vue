@@ -44,7 +44,7 @@ const currentTab = ref('CHO_XU_LY')
 const FLOW_STEPS = [
   { value: 'CHO_XU_LY', title: 'Chờ xử lý', desc: 'Hoàn tất hoặc từ chối' },
   { value: 'DA_HOAN', title: 'Đã hoàn tiền', desc: 'CK: mã GD + ảnh. VNPAY: gọi API' },
-  { value: 'TU_CHOI', title: 'Từ chối', desc: 'Ghi lý do, không hoàn' },
+  { value: 'TU_CHOI', title: 'Từ chối', desc: 'Lý do + ảnh, không hoàn' },
 ]
 const expandedId = ref(null)
 
@@ -62,6 +62,10 @@ const MAX_PROOF_IMAGES = 6
 const showRejectModal = ref(false)
 const rejectTarget = ref(null)
 const rejectNote = ref('')
+const rejectFiles = ref([])
+const rejectPreviews = ref([])
+const rejectFileInputRef = ref(null)
+const MAX_REJECT_IMAGES = 6
 
 function notify(text, type = 'success') {
   message.value = text
@@ -266,12 +270,48 @@ async function confirmComplete() {
 function openReject(item) {
   rejectTarget.value = item
   rejectNote.value = ''
+  clearRejectImages()
   showRejectModal.value = true
+}
+
+function clearRejectImages() {
+  rejectPreviews.value.forEach((url) => {
+    if (url) URL.revokeObjectURL(url)
+  })
+  rejectFiles.value = []
+  rejectPreviews.value = []
+  if (rejectFileInputRef.value) rejectFileInputRef.value.value = ''
 }
 
 function closeReject() {
   showRejectModal.value = false
   rejectTarget.value = null
+  rejectNote.value = ''
+  clearRejectImages()
+}
+
+function onRejectFileChange(event) {
+  const incoming = Array.from(event.target.files || []).filter((f) => f?.type?.startsWith('image/'))
+  if (event.target) event.target.value = ''
+  if (!incoming.length) return
+  const remaining = MAX_REJECT_IMAGES - rejectFiles.value.length
+  if (remaining <= 0) {
+    notify(`Chỉ được tải tối đa ${MAX_REJECT_IMAGES} ảnh.`, 'error')
+    return
+  }
+  const toAdd = incoming.slice(0, remaining)
+  rejectFiles.value = [...rejectFiles.value, ...toAdd]
+  rejectPreviews.value = [
+    ...rejectPreviews.value,
+    ...toAdd.map((f) => URL.createObjectURL(f)),
+  ]
+}
+
+function removeRejectImage(index) {
+  const url = rejectPreviews.value[index]
+  if (url) URL.revokeObjectURL(url)
+  rejectFiles.value = rejectFiles.value.filter((_, i) => i !== index)
+  rejectPreviews.value = rejectPreviews.value.filter((_, i) => i !== index)
 }
 
 async function confirmReject() {
@@ -279,7 +319,11 @@ async function confirmReject() {
   if (!item) return
   actionLoading.value = item.id
   try {
-    await tuChoiHoanTien(item.id, staffPayload({ ghiChu: rejectNote.value.trim() || null }))
+    await tuChoiHoanTien(
+      item.id,
+      staffPayload({ ghiChu: rejectNote.value.trim() || null }),
+      rejectFiles.value,
+    )
     notify(`Đã từ chối hoàn tiền đơn ${item.maHoaDon}.`)
     closeReject()
     await loadList({ silent: true })
@@ -296,7 +340,10 @@ watch(filteredItems, () => {
 })
 
 onMounted(loadList)
-onUnmounted(clearProofImages)
+onUnmounted(() => {
+  clearProofImages()
+  clearRejectImages()
+})
 </script>
 
 <template>
@@ -449,7 +496,9 @@ onUnmounted(clearProofImages)
                     <div><strong>ID yêu cầu trả:</strong> {{ item.idYeuCauTraHang ?? '—' }}</div>
                   </div>
                   <div v-if="item.anhUrls?.length" class="proof-images">
-                    <strong class="proof-images__label">Ảnh chứng từ:</strong>
+                    <strong class="proof-images__label">
+                      {{ item.trangThai === 'TU_CHOI' ? 'Ảnh từ chối:' : 'Ảnh chứng từ:' }}
+                    </strong>
                     <div class="proof-images__grid">
                       <a
                         v-for="(url, idx) in item.anhUrls"
@@ -625,13 +674,47 @@ onUnmounted(clearProofImages)
       <div class="modal-card">
         <h3>Từ chối hoàn tiền</h3>
         <p class="modal-sub">Đơn {{ rejectTarget?.maHoaDon }}</p>
-        <label class="soleil-toolbar__label">Lý do từ chối</label>
-        <textarea
-          v-model="rejectNote"
-          class="soleil-toolbar__input modal-textarea"
-          rows="3"
-          placeholder="Nhập lý do từ chối (tùy chọn)..."
-        />
+        <label class="soleil-toolbar__label">Lý do từ chối &amp; ảnh</label>
+        <div class="proof-box">
+          <textarea
+            v-model="rejectNote"
+            class="proof-box__textarea"
+            rows="3"
+            placeholder="Nhập lý do từ chối (tùy chọn)..."
+          />
+          <div class="proof-box__footer">
+            <input
+              ref="rejectFileInputRef"
+              type="file"
+              class="proof-box__file"
+              accept="image/*"
+              multiple
+              @change="onRejectFileChange"
+            />
+            <button
+              type="button"
+              class="proof-box__upload"
+              :disabled="rejectPreviews.length >= MAX_REJECT_IMAGES"
+              @click="rejectFileInputRef?.click()"
+            >
+              <Icon icon="icon-park-outline:upload-picture" width="16" />
+              Thêm ảnh
+            </button>
+            <span class="proof-box__count">
+              {{ rejectPreviews.length }}/{{ MAX_REJECT_IMAGES }} ảnh
+            </span>
+          </div>
+          <div v-if="rejectPreviews.length" class="proof-previews">
+            <div
+              v-for="(url, index) in rejectPreviews"
+              :key="`${url}-${index}`"
+              class="proof-preview"
+            >
+              <img :src="url" alt="Ảnh từ chối" />
+              <button type="button" class="proof-preview__remove" @click="removeRejectImage(index)">×</button>
+            </div>
+          </div>
+        </div>
         <div class="modal-actions">
           <button type="button" class="hd-btn hd-btn--ghost" @click="closeReject">Hủy</button>
           <button

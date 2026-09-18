@@ -36,6 +36,8 @@ public class YeuCauTraHangResponse {
     private String ghiChuAdmin;
     private String phuongThucThanhToan;
     private List<String> anhUrls = new ArrayList<>();
+    /** Ảnh admin đính kèm khi từ chối yêu cầu trả hàng. */
+    private List<String> anhTuChoiUrls = new ArrayList<>();
     private LocalDateTime ngayTao;
     private LocalDateTime ngayCapNhat;
 
@@ -75,7 +77,12 @@ public class YeuCauTraHangResponse {
     }
 
     public YeuCauTraHangResponse(YeuCauTraHang yc, List<String> anhUrls) {
+        this(yc, anhUrls, null);
+    }
+
+    public YeuCauTraHangResponse(YeuCauTraHang yc, List<String> anhUrls, List<String> anhTuChoiUrls) {
         this(yc);
         this.anhUrls = anhUrls != null ? new ArrayList<>(anhUrls) : new ArrayList<>();
+        this.anhTuChoiUrls = anhTuChoiUrls != null ? new ArrayList<>(anhTuChoiUrls) : new ArrayList<>();
     }
 }
