@@ -18,6 +18,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.example.templatejava6.product.repository.AnhSanPhamRepository;
+import org.example.templatejava6.product.entity.AnhSanPham;
+
 @Service
 public class RoutineComboService {
 
