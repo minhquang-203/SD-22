@@ -3,7 +3,7 @@
  * Scope under .storefront-root để không ảnh hưởng admin (Tailwind).
  */
 .storefront-root {
-  --sf-cream: #f9f5f0;
+  --sf-cream: #fff9e6;
   --sf-warm-white: #fff9e6; /* Màu vàng nhạt nhẹ nhàng */
   --sf-sand: #e8dcc8;
   --sf-hairline: #ede5d8;
@@ -674,7 +674,7 @@
 }
 
 .sf-section--muted {
-  background: var(--sf-cream);
+  background: var(--sf-warm-white);
 }
 
 .sf-section-head {

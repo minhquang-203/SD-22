@@ -253,6 +253,14 @@ onMounted(async () => {
         </div>
       </div>
 
+      <!-- Khối che logo góc dưới sang trọng, đồng bộ thương hiệu -->
+      <div class="sf-hero-corner-cover" aria-hidden="true">
+        <span class="sf-hero-corner-cover__pill">
+          <Icon icon="solar:shield-star-bold" width="13" />
+          SUNOVA Pure Care
+        </span>
+      </div>
+
       <template v-if="hasMultipleBanners">
         <button type="button" class="sf-home-hero__nav sf-home-hero__nav--prev" aria-label="Banner trước" @click="prevBanner">
           <Icon icon="solar:alt-arrow-left-linear" width="22" />
@@ -348,7 +356,7 @@ onMounted(async () => {
       </div>
     </section>
 
-    <section class="sf-section sf-section--muted">
+    <section class="sf-section">
       <div class="sf-container">
         <div class="sf-section-head sf-section-head--row">
           <div>
@@ -385,7 +393,7 @@ onMounted(async () => {
 
 .sf-home-hero {
   position: relative;
-  min-height: min(72vh, 620px);
+  min-height: min(78vh, 670px);
   display: grid;
   align-items: end;
   overflow: hidden;
@@ -405,6 +413,31 @@ onMounted(async () => {
   height: 100%;
   object-fit: cover;
   object-position: center 45%;
+}
+
+.sf-hero-corner-cover {
+  position: absolute;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.sf-hero-corner-cover__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(201, 169, 110, 0.45);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--home-teal-deep, #08545a);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
 }
 
 .sf-home-hero-fade-enter-active,
@@ -695,8 +728,8 @@ onMounted(async () => {
 }
 
 .sf-trust {
-  background: #fff;
-  border-block: 1px solid var(--home-line);
+  background: transparent;
+  border-block: 1px solid rgba(0, 0, 0, 0.06);
   padding: 1.75rem 0;
 }
 
