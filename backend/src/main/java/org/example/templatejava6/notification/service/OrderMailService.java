@@ -98,8 +98,8 @@ public class OrderMailService {
                   Yêu cầu trả hàng cho đơn <strong>%s</strong> đã được <strong>duyệt</strong>.
                 </p>
                 <p style="margin:0 0 14px;color:#4b5563;line-height:1.6;">
-                  Bước tiếp theo: vào <strong>Đơn hàng của tôi</strong> và bấm
-                  <strong>Tạo vận đơn hoàn hàng</strong>, sau đó chọn <strong>ca lấy hàng</strong>
+                  Bước tiếp theo: bấm <strong>Xem đơn hàng</strong> bên dưới, mở yêu cầu trả hàng
+                  rồi bấm <strong>Tạo vận đơn hoàn hàng</strong> và chọn <strong>ca lấy hàng</strong>
                   bạn muốn Giao Hàng Nhanh đến lấy sản phẩm.
                 </p>
                 <div style="background:#f9fafb;border:1px solid #eef0f3;border-radius:10px;padding:12px 16px;color:#4b5563;">

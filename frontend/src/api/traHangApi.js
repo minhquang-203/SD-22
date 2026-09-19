@@ -1,7 +1,6 @@
 import request from './request'
 
-/** Khách: tạo yêu cầu trả hàng (multipart: data JSON + files ảnh) */
-export function taoYeuCauTraHang(idHoaDon, idKhachHang, payload, files = []) {
+function appendReturnFormData(payload, files = []) {
   const formData = new FormData()
   formData.append(
     'data',
@@ -11,9 +10,26 @@ export function taoYeuCauTraHang(idHoaDon, idKhachHang, payload, files = []) {
   ;(files || []).forEach((file) => {
     if (file) formData.append('files', file)
   })
-  return request.post(`/online/orders/${idHoaDon}/tra-hang`, formData, {
+  return formData
+}
+
+function guestReturnPath(token) {
+  return `/hoa-don/tra-cuu/${encodeURIComponent(token)}`
+}
+
+/** Khách: tạo yêu cầu trả hàng (multipart: data JSON + files ảnh) */
+export function taoYeuCauTraHang(idHoaDon, idKhachHang, payload, files = []) {
+  return request.post(`/online/orders/${idHoaDon}/tra-hang`, appendReturnFormData(payload, files), {
     params: { idKhachHang },
   })
+}
+
+/** Khách vãng lai: tạo yêu cầu trả hàng bằng tracking token */
+export function taoYeuCauTraHangCongKhai(token, idHoaDon, payload, files = []) {
+  return request.post(
+    `${guestReturnPath(token)}/orders/${idHoaDon}/tra-hang`,
+    appendReturnFormData(payload, files),
+  )
 }
 
 /** Khách: danh sách yêu cầu trả hàng của tôi */
@@ -26,8 +42,16 @@ export function fetchChiTietTraHangCuaToi(id, idKhachHang) {
   return request.get(`/online/tra-hang/${id}`, { params: { idKhachHang } })
 }
 
+/** Khách vãng lai: chi tiết yêu cầu trả hàng bằng tracking token */
+export function fetchChiTietTraHangCongKhai(token, id) {
+  return request.get(`${guestReturnPath(token)}/tra-hang/${id}`)
+}
+
 /** Khách: danh sách ca lấy hàng GHN để chọn thời điểm shipper đến lấy hàng trả */
-export function fetchCaLayHang() {
+export function fetchCaLayHang(trackingToken) {
+  if (trackingToken) {
+    return request.get(`${guestReturnPath(trackingToken)}/tra-hang/ca-lay-hang`)
+  }
   return request.get('/online/tra-hang/ca-lay-hang')
 }
 
@@ -36,6 +60,11 @@ export function taoVanDonTra(id, idKhachHang, pickShiftId = null) {
   return request.post(`/online/tra-hang/${id}/tao-van-don`, { pickShiftId }, {
     params: { idKhachHang },
   })
+}
+
+/** Khách vãng lai: tạo vận đơn GHN hoàn hàng bằng tracking token */
+export function taoVanDonTraCongKhai(token, id, pickShiftId = null) {
+  return request.post(`${guestReturnPath(token)}/tra-hang/${id}/tao-van-don`, { pickShiftId })
 }
 
 /** Admin: danh sách yêu cầu trả hàng */
@@ -50,9 +79,9 @@ export function duyetTraHang(id, payload = {}) {
   return request.post(`/tra-hang/${id}/duyet`, payload)
 }
 
-/** Admin: từ chối yêu cầu */
-export function tuChoiTraHang(id, payload = {}) {
-  return request.post(`/tra-hang/${id}/tu-choi`, payload)
+/** Admin: từ chối yêu cầu (multipart: data JSON + files ảnh) */
+export function tuChoiTraHang(id, payload = {}, files = []) {
+  return request.post(`/tra-hang/${id}/tu-choi`, appendReturnFormData(payload, files))
 }
 
 /** Admin: danh sách lô đơn đã lấy (để chọn khi nhận hàng trả) */

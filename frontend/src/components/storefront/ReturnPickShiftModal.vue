@@ -8,6 +8,7 @@ const props = defineProps({
   visible: { type: Boolean, default: false },
   order: { type: Object, default: null },
   submitting: { type: Boolean, default: false },
+  trackingToken: { type: String, default: '' },
 })
 
 const emit = defineEmits(['close', 'confirm'])
@@ -24,7 +25,7 @@ async function loadShifts() {
   loading.value = true
   error.value = ''
   try {
-    const res = await fetchCaLayHang()
+    const res = await fetchCaLayHang(props.trackingToken)
     shifts.value = res.data || []
     selectedShiftId.value = shifts.value[0]?.id ?? null
     if (!shifts.value.length) {

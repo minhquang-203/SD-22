@@ -1,5 +1,5 @@
 import { onUnmounted, ref, watch } from 'vue'
-import { taoYeuCauTraHang } from '@/api/traHangApi'
+import { taoYeuCauTraHang, taoYeuCauTraHangCongKhai } from '@/api/traHangApi'
 import { getCustomerId } from '@/composables/useAuth'
 import { toast } from '@/composables/useToast'
 
@@ -152,8 +152,9 @@ export function useReturnRequest({ visible, order, emit, requireBank = false }) 
         return 'Vui lòng nhập tên chủ tài khoản.'
       }
     }
-    if (!getCustomerId()) {
-      return 'Vui lòng đăng nhập để yêu cầu trả hàng.'
+    const token = String(currentOrder.trackingToken || '').trim()
+    if (!getCustomerId() && token.length < 32) {
+      return 'Vui lòng tra cứu đơn hàng để yêu cầu trả hàng.'
     }
     return ''
   }
@@ -167,6 +168,7 @@ export function useReturnRequest({ visible, order, emit, requireBank = false }) 
 
     const currentOrder = order()
     const idKhachHang = getCustomerId()
+    const token = String(currentOrder.trackingToken || '').trim()
     submitting.value = true
     error.value = ''
 
@@ -180,12 +182,9 @@ export function useReturnRequest({ visible, order, emit, requireBank = false }) 
         chuTaiKhoan: requireBank ? chuTaiKhoan.value.trim() : null,
       }
 
-      const res = await taoYeuCauTraHang(
-        currentOrder.id,
-        idKhachHang,
-        payload,
-        imageFiles.value,
-      )
+      const res = token && !idKhachHang
+        ? await taoYeuCauTraHangCongKhai(token, currentOrder.id, payload, imageFiles.value)
+        : await taoYeuCauTraHang(currentOrder.id, idKhachHang, payload, imageFiles.value)
       toast('Đã gửi yêu cầu trả hàng. Vui lòng chờ cửa hàng duyệt.', 'info')
       emit('submitted', res.data)
       handleClose()

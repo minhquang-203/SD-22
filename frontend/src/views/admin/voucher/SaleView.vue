@@ -104,7 +104,12 @@
               </td>
               <td>
                 <div class="action-btns">
-                  <button class="icon-btn" title="Chỉnh sửa" @click.stop="openEdit(c)">
+                  <button
+                    v-if="c.status === 'scheduled'"
+                    class="icon-btn"
+                    title="Chỉnh sửa"
+                    @click.stop="openEdit(c)"
+                  >
                     <i class="ti ti-edit"></i>
                   </button>
                   <button
@@ -571,6 +576,10 @@ async function openModal() {
 }
 
 function openEdit(campaign) {
+  if (campaign.status !== 'scheduled') {
+    toast('Chỉ có thể chỉnh sửa đợt giảm giá sắp diễn ra', 'warn')
+    return
+  }
   editingId.value = campaign.id
   form.value = {
     code: campaign.code,

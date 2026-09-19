@@ -127,7 +127,7 @@ public class ChiTietDotGiamGiaService {
     public void add(ChiTietDotGiamGiaRequest request) {
         validateRequiredIds(request);
         DotGiamGia dgg = dotGiamGiaService.getDotGiamGiaOrThrow(request.getIdDotGiamGia());
-        validateDotGiamGiaDangMo(dgg);
+        validateDotGiamGiaCoTheChinhSua(dgg);
         ChiTietSanPham ctsp = getChiTietSanPhamOrThrow(request.getIdChiTietSanPham());
         validateDuplicate(dgg, ctsp.getId(), null);
 
@@ -144,7 +144,7 @@ public class ChiTietDotGiamGiaService {
         ChiTietDotGiamGia ct = getChiTietOrThrow(id);
         validateRequiredIds(request);
         DotGiamGia dgg = dotGiamGiaService.getDotGiamGiaOrThrow(request.getIdDotGiamGia());
-        validateDotGiamGiaDangMo(dgg);
+        validateDotGiamGiaCoTheChinhSua(dgg);
         ChiTietSanPham ctsp = getChiTietSanPhamOrThrow(request.getIdChiTietSanPham());
         validateDuplicate(dgg, ctsp.getId(), id);
 
@@ -160,16 +160,7 @@ public class ChiTietDotGiamGiaService {
     public void delete(Integer id) {
         ChiTietDotGiamGia ct = getChiTietOrThrow(id);
         DotGiamGia dgg = ct.getIdDotGiamGia();
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime ngayBatDau = dgg.getNgayBatDau();
-        LocalDateTime ngayKetThuc = dgg.getNgayKetThuc();
-        if(ngayBatDau != null && ngayKetThuc != null &&
-                !now.isAfter(ngayKetThuc) && !now.isBefore(ngayBatDau)){
-            throw new ApiException("Không thể sửa đợt giảm giá đang hoạt động", "IS_ACTIVE");
-        }
-        if(ngayKetThuc != null && ngayKetThuc.isBefore(now)){
-            throw new ApiException("Không thể chỉnh sửa đợt giảm giá đã kết thúc", "SALE_IS_OVER");
-        }
+        validateDotGiamGiaCoTheChinhSua(dgg);
 
         chiTietDotGiamGiaRepository.delete(ct);
         invalidateChatCatalog();
@@ -222,22 +213,28 @@ public class ChiTietDotGiamGiaService {
         return dotGiamGiaService.calculateGiaSauGiam(ctsp.getGiaBan(), dgg.getPhanTramGiam());
     }
 
-    private void validateDotGiamGiaDangMo(DotGiamGia dgg) {
+    /**
+     * Chỉ cho phép thêm/sửa/xóa sản phẩm khi đợt còn ở trạng thái sắp diễn ra.
+     * Đợt đang hoạt động hoặc đã kết thúc không được chỉnh sửa.
+     */
+    private void validateDotGiamGiaCoTheChinhSua(DotGiamGia dgg) {
         if (!Boolean.TRUE.equals(dgg.getTrangThai())) {
             throw new ApiException("Đợt giảm giá không tồn tại", "NOT_FOUND");
         }
         if (!Boolean.TRUE.equals(dgg.getIsActive())) {
             throw new ApiException("Đợt giảm giá đã ngừng áp dụng", "VALIDATION_ERROR");
         }
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
-        if (dgg.getNgayBatDau() == null || dgg.getNgayKetThuc() == null) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime ngayBatDau = dgg.getNgayBatDau();
+        LocalDateTime ngayKetThuc = dgg.getNgayKetThuc();
+        if (ngayBatDau == null || ngayKetThuc == null) {
             throw new ApiException("Đợt giảm giá chưa được cấu hình thời gian áp dụng", "VALIDATION_ERROR");
         }
-        if (now.isBefore(dgg.getNgayBatDau())) {
-            throw new ApiException("Đợt giảm giá chưa đến ngày bắt đầu, không thể thêm/sửa sản phẩm", "VALIDATION_ERROR");
+        if (ngayKetThuc.isBefore(now)) {
+            throw new ApiException("Không thể chỉnh sửa đợt giảm giá đã kết thúc", "SALE_IS_OVER");
         }
-        if (now.isAfter(dgg.getNgayKetThuc())) {
-            throw new ApiException("Đợt giảm giá đã hết hạn, không thể thêm/sửa sản phẩm", "VALIDATION_ERROR");
+        if (!ngayBatDau.isAfter(now) && !now.isAfter(ngayKetThuc)) {
+            throw new ApiException("Không thể chỉnh sửa đợt giảm giá đang trong thời gian hoạt động", "SALE_IS_ACTIVE");
         }
     }
 

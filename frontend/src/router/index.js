@@ -100,7 +100,7 @@ const router = createRouter({
         },
         {
           path: 'don-hang',
-          redirect: '/tra-cuu-don',
+          redirect: (to) => ({ path: '/tra-cuu-don', query: to.query }),
         },
         {
           path: 'tra-cuu-don',
@@ -112,7 +112,7 @@ const router = createRouter({
           path: 'tra-cuu-don/tra-hang/:id',
           name: 'DonTraHang',
           component: () => import('@/views/storefront/DonTraHang.vue'),
-          meta: { title: 'Đơn trả hàng — SUNOVA', requiresAuth: true },
+          meta: { title: 'Đơn trả hàng — SUNOVA' },
         },
         ...infoRoutes,
         {

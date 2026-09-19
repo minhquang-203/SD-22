@@ -4532,6 +4532,15 @@
   line-height: 1.4;
 }
 
+.sf-order-card__cancel-notice p {
+  margin: 0;
+}
+
+.sf-order-card__cancel-notice .sf-return-detail__photos {
+  margin-top: 0.65rem;
+  margin-bottom: 0;
+}
+
 .sf-order-history {
   display: grid;
   grid-template-columns: minmax(0, 380px) 1fr;
@@ -5464,6 +5473,10 @@
   background: rgba(180, 72, 72, 0.08);
   border: 1px solid rgba(180, 72, 72, 0.2);
   color: #a83a3a;
+}
+
+.sf-return-detail__refund-reject {
+  margin-top: 0.85rem;
 }
 
 .sf-return-detail__reason,

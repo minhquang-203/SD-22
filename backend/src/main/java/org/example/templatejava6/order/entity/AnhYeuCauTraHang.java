@@ -16,6 +16,9 @@ import java.time.LocalDateTime;
 @Table(name = "anh_yeu_cau_tra_hang")
 public class AnhYeuCauTraHang {
 
+    public static final String LOAI_KHACH = "KHACH";
+    public static final String LOAI_TU_CHOI = "TU_CHOI";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
@@ -32,7 +35,17 @@ public class AnhYeuCauTraHang {
     @Column(name = "duong_dan", nullable = false, length = 500)
     private String duongDan;
 
+    @Size(max = 20)
+    @Nationalized
+    @ColumnDefault("'KHACH'")
+    @Column(name = "loai", length = 20)
+    private String loai;
+
     @ColumnDefault("getdate()")
     @Column(name = "ngay_tao")
     private LocalDateTime ngayTao;
+
+    public boolean laAnhTuChoi() {
+        return LOAI_TU_CHOI.equalsIgnoreCase(loai);
+    }
 }

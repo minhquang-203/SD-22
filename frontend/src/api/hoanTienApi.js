@@ -28,7 +28,14 @@ export function hoanTatHoanTien(id, payload = {}, files = []) {
   return request.post(`/hoan-tien/${id}/hoan-tat`, formData)
 }
 
-/** Admin: từ chối hoàn tiền */
-export function tuChoiHoanTien(id, payload = {}) {
-  return request.post(`/hoan-tien/${id}/tu-choi`, payload)
+/** Admin: từ chối hoàn tiền (multipart: data JSON + files ảnh) */
+export function tuChoiHoanTien(id, payload = {}, files = []) {
+  const formData = new FormData()
+  formData.append(
+    'data',
+    new Blob([JSON.stringify(payload)], { type: 'application/json' }),
+    'data.json',
+  )
+  ;(files || []).filter(Boolean).forEach((file) => formData.append('files', file))
+  return request.post(`/hoan-tien/${id}/tu-choi`, formData)
 }

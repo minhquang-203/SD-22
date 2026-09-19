@@ -23,10 +23,17 @@ public class StorefrontReturnDetailResponse extends YeuCauTraHangResponse {
     private String maGiaoDichHoan;
     private String phuongThucHoan;
     private LocalDateTime ngayHoan;
+    /** Ghi chú hoàn tiền — lý do từ chối khi trạng thái TU_CHOI. */
+    private String ghiChuHoanTien;
+    private List<String> anhHoanTienUrls = new ArrayList<>();
     private String diaChiGiao;
     private List<StorefrontReturnTimelineStepResponse> timeline = new ArrayList<>();
 
     public StorefrontReturnDetailResponse(YeuCauTraHang yc, List<String> anhUrls) {
-        super(yc, anhUrls);
+        this(yc, anhUrls, null);
+    }
+
+    public StorefrontReturnDetailResponse(YeuCauTraHang yc, List<String> anhUrls, List<String> anhTuChoiUrls) {
+        super(yc, anhUrls, anhTuChoiUrls);
     }
 }

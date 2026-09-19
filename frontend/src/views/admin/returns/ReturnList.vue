@@ -51,6 +51,10 @@ const FLOW_STEPS = [
 const showRejectModal = ref(false)
 const rejectTarget = ref(null)
 const rejectNote = ref('')
+const rejectFiles = ref([])
+const rejectPreviews = ref([])
+const rejectFileInputRef = ref(null)
+const MAX_REJECT_IMAGES = 6
 const expandedId = ref(null)
 const previewImageUrl = ref('')
 
@@ -81,6 +85,7 @@ watch(previewImageUrl, (url) => {
 onUnmounted(() => {
   document.body.style.overflow = ''
   window.removeEventListener('keydown', onPreviewKeydown)
+  clearRejectImages()
 })
 
 function notify(text, type = 'success') {
@@ -209,13 +214,48 @@ async function handleDuyet(item) {
 function openReject(item) {
   rejectTarget.value = item
   rejectNote.value = ''
+  clearRejectImages()
   showRejectModal.value = true
+}
+
+function clearRejectImages() {
+  rejectPreviews.value.forEach((url) => {
+    if (url) URL.revokeObjectURL(url)
+  })
+  rejectFiles.value = []
+  rejectPreviews.value = []
+  if (rejectFileInputRef.value) rejectFileInputRef.value.value = ''
 }
 
 function closeReject() {
   showRejectModal.value = false
   rejectTarget.value = null
   rejectNote.value = ''
+  clearRejectImages()
+}
+
+function onRejectFileChange(event) {
+  const incoming = Array.from(event.target.files || []).filter((f) => f?.type?.startsWith('image/'))
+  if (event.target) event.target.value = ''
+  if (!incoming.length) return
+  const remaining = MAX_REJECT_IMAGES - rejectFiles.value.length
+  if (remaining <= 0) {
+    notify(`Chỉ được tải tối đa ${MAX_REJECT_IMAGES} ảnh.`, 'error')
+    return
+  }
+  const toAdd = incoming.slice(0, remaining)
+  rejectFiles.value = [...rejectFiles.value, ...toAdd]
+  rejectPreviews.value = [
+    ...rejectPreviews.value,
+    ...toAdd.map((f) => URL.createObjectURL(f)),
+  ]
+}
+
+function removeRejectImage(index) {
+  const url = rejectPreviews.value[index]
+  if (url) URL.revokeObjectURL(url)
+  rejectFiles.value = rejectFiles.value.filter((_, i) => i !== index)
+  rejectPreviews.value = rejectPreviews.value.filter((_, i) => i !== index)
 }
 
 async function confirmReject() {
@@ -223,7 +263,11 @@ async function confirmReject() {
   if (!item) return
   actionLoading.value = item.id
   try {
-    await tuChoiTraHang(item.id, staffPayload({ ghiChu: rejectNote.value.trim() || null }))
+    await tuChoiTraHang(
+      item.id,
+      staffPayload({ ghiChu: rejectNote.value.trim() || null }),
+      rejectFiles.value,
+    )
     notify(`Đã từ chối yêu cầu trả hàng đơn ${item.maHoaDon}.`)
     closeReject()
     await loadList({ silent: true })
@@ -586,11 +630,11 @@ onMounted(() => {
                     <div><strong>Cập nhật:</strong> {{ formatDateTime(item.ngayCapNhat) }}</div>
                   </div>
                   <div v-if="item.anhUrls?.length" class="return-images">
-                    <strong class="return-images__label">Ảnh đính kèm:</strong>
+                    <strong class="return-images__label">Ảnh khách gửi:</strong>
                     <div class="return-images__grid">
                       <button
                         v-for="(url, idx) in item.anhUrls"
-                        :key="`${item.id}-${idx}`"
+                        :key="`${item.id}-khach-${idx}`"
                         type="button"
                         class="return-images__item"
                         title="Xem ảnh"
@@ -601,7 +645,22 @@ onMounted(() => {
                     </div>
                   </div>
                   <div v-else class="return-images return-images--empty">
-                    <strong>Ảnh đính kèm:</strong> —
+                    <strong>Ảnh khách gửi:</strong> —
+                  </div>
+                  <div v-if="item.anhTuChoiUrls?.length" class="return-images">
+                    <strong class="return-images__label">Ảnh từ chối:</strong>
+                    <div class="return-images__grid">
+                      <button
+                        v-for="(url, idx) in item.anhTuChoiUrls"
+                        :key="`${item.id}-tuchoi-${idx}`"
+                        type="button"
+                        class="return-images__item"
+                        title="Xem ảnh"
+                        @click="openImagePreview(url)"
+                      >
+                        <img :src="productImageUrl(url)" :alt="`Ảnh từ chối ${idx + 1}`" />
+                      </button>
+                    </div>
                   </div>
                 </td>
               </tr>
@@ -653,13 +712,47 @@ onMounted(() => {
       <div class="modal-card">
         <h3>Từ chối yêu cầu trả hàng</h3>
         <p class="modal-sub">Đơn {{ rejectTarget?.maHoaDon }}</p>
-        <label class="soleil-toolbar__label">Lý do từ chối</label>
-        <textarea
-          v-model="rejectNote"
-          class="soleil-toolbar__input modal-textarea"
-          rows="3"
-          placeholder="Nhập lý do từ chối (tùy chọn)..."
-        />
+        <label class="soleil-toolbar__label">Lý do từ chối &amp; ảnh</label>
+        <div class="proof-box">
+          <textarea
+            v-model="rejectNote"
+            class="proof-box__textarea"
+            rows="3"
+            placeholder="Nhập lý do từ chối (tùy chọn)..."
+          />
+          <div class="proof-box__footer">
+            <input
+              ref="rejectFileInputRef"
+              type="file"
+              class="proof-box__file"
+              accept="image/*"
+              multiple
+              @change="onRejectFileChange"
+            />
+            <button
+              type="button"
+              class="proof-box__upload"
+              :disabled="rejectPreviews.length >= MAX_REJECT_IMAGES"
+              @click="rejectFileInputRef?.click()"
+            >
+              <Icon icon="icon-park-outline:upload-picture" width="16" />
+              Thêm ảnh
+            </button>
+            <span class="proof-box__count">
+              {{ rejectPreviews.length }}/{{ MAX_REJECT_IMAGES }} ảnh
+            </span>
+          </div>
+          <div v-if="rejectPreviews.length" class="proof-previews">
+            <div
+              v-for="(url, index) in rejectPreviews"
+              :key="`${url}-${index}`"
+              class="proof-preview"
+            >
+              <img :src="url" alt="Ảnh từ chối" />
+              <button type="button" class="proof-preview__remove" @click="removeRejectImage(index)">×</button>
+            </div>
+          </div>
+        </div>
         <div class="modal-actions">
           <button type="button" class="hd-btn hd-btn--ghost" @click="closeReject">Hủy</button>
           <button
@@ -1177,6 +1270,7 @@ onMounted(() => {
 }
 .modal-card .soleil-toolbar__label,
 .modal-card .modal-textarea,
+.modal-card .proof-box,
 .modal-card .overflow-x-auto,
 .modal-card > p,
 .modal-card > .text-sm {
@@ -1255,6 +1349,81 @@ onMounted(() => {
   outline: 2px solid rgba(11, 110, 117, 0.22);
   border-color: var(--hd-accent);
   background: #fff;
+}
+.proof-box {
+  margin-top: 6px;
+  border: 1px solid var(--hd-line-strong);
+  background: #fff;
+  overflow: hidden;
+}
+.proof-box:focus-within { border-color: var(--hd-accent); }
+.proof-box__textarea {
+  display: block;
+  width: 100%;
+  min-height: 88px;
+  border: none;
+  resize: vertical;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 500;
+  line-height: 1.55;
+  color: var(--hd-ink);
+  background: transparent;
+  box-sizing: border-box;
+}
+.proof-box__textarea::placeholder {
+  color: #5a6a72;
+  font-weight: 500;
+  opacity: 1;
+}
+.proof-box__textarea:focus { outline: none; }
+.proof-box__footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--hd-line);
+  background: #f7fafb;
+}
+.proof-box__file { display: none; }
+.proof-box__upload {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--hd-line-strong);
+  background: #fff;
+  color: var(--hd-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.proof-box__upload:disabled { opacity: 0.55; cursor: not-allowed; }
+.proof-box__count { margin-left: auto; font-size: 12px; color: var(--hd-muted); }
+.proof-previews { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 10px 10px; }
+.proof-preview {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  overflow: hidden;
+  border: 1px solid var(--hd-line);
+  background: #fff;
+}
+.proof-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.proof-preview__remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: rgba(15, 26, 28, 0.72);
+  color: #fff;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
 }
 .modal-actions {
   display: flex;

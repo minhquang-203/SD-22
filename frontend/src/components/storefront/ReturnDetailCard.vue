@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { formatVND } from '@/utils/formatVND'
 import { productImageUrl } from '@/utils/productImage'
@@ -20,17 +20,31 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['createReturnLabel'])
+const route = useRoute()
 
 const canCreateReturnLabel = computed(() => props.detail?.trangThai === 'DA_DUYET')
 
-const originalOrderLink = computed(() => ({
-  path: '/tra-cuu-don',
-  query: props.detail?.maHoaDon ? { ma: props.detail.maHoaDon } : {},
-}))
+const originalOrderLink = computed(() => {
+  const token = typeof route.query.token === 'string' ? route.query.token.trim() : ''
+  if (token.length >= 32) {
+    return { path: '/tra-cuu-don', query: { token } }
+  }
+  return {
+    path: '/tra-cuu-don',
+    query: props.detail?.maHoaDon ? { ma: props.detail.maHoaDon } : {},
+  }
+})
 
 const timeline = computed(() => props.detail?.timeline || [])
 
 const proofImages = computed(() => (props.detail?.anhUrls || []).filter(Boolean))
+
+const rejectImages = computed(() => (props.detail?.anhTuChoiUrls || []).filter(Boolean))
+
+const refundRejectImages = computed(() => {
+  if (props.detail?.trangThaiHoanTien !== 'TU_CHOI') return []
+  return (props.detail?.anhHoanTienUrls || []).filter(Boolean)
+})
 
 const statusLabel = computed(() =>
   traHangStatusLabelKhach(props.detail?.trangThai, props.detail?.trangThaiLabel),
@@ -171,6 +185,17 @@ const soTienHoan = computed(() => {
       <p>
         {{ detail.ghiChuAdmin || 'Yêu cầu trả hàng đã bị từ chối. Bạn không thể gửi yêu cầu mới cho đơn này.' }}
       </p>
+      <div v-if="rejectImages.length" class="sf-return-detail__photos">
+        <a
+          v-for="(url, idx) in rejectImages"
+          :key="`reject-${url}-${idx}`"
+          :href="productImageUrl(url)"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img :src="productImageUrl(url)" :alt="`Ảnh từ chối ${idx + 1}`" />
+        </a>
+      </div>
     </section>
 
     <section class="sf-return-detail__section">
@@ -217,6 +242,25 @@ const soTienHoan = computed(() => {
       <p v-if="!detail.trangThaiHoanTien" class="sf-return-detail__refund-hint">
         Hoàn tiền sau khi cửa hàng nhận và kiểm hàng.
       </p>
+      <div
+        v-else-if="detail.trangThaiHoanTien === 'TU_CHOI'"
+        class="sf-return-detail__section--alert sf-return-detail__refund-reject"
+      >
+        <p>
+          {{ detail.ghiChuHoanTien || 'Yêu cầu hoàn tiền đã bị từ chối.' }}
+        </p>
+        <div v-if="refundRejectImages.length" class="sf-return-detail__photos">
+          <a
+            v-for="(url, idx) in refundRejectImages"
+            :key="`refund-reject-${url}-${idx}`"
+            :href="productImageUrl(url)"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <img :src="productImageUrl(url)" :alt="`Ảnh từ chối hoàn tiền ${idx + 1}`" />
+          </a>
+        </div>
+      </div>
 
       <div
         v-if="detail.phuongThucHoan || detail.phuongThucThanhToan || detail.soTaiKhoan"
