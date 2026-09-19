@@ -36,6 +36,7 @@ const selectedLoaiCN = ref([])
 const selectedCongDung = ref([])
 const selectedLoaiDa = ref([])
 const selectedSpf = ref([])
+const selectedPa = ref([])
 const priceMinInput = ref('')
 const priceMaxInput = ref('')
 const appliedPriceMin = ref('')
@@ -51,22 +52,35 @@ const pageSize = 12
 const openAcc = ref({
   price: true,
   brand: true,
-  cat: false,
-  type: false,
-  use: false,
-  skin: false,
-  spf: false,
+  cat: true,
+  type: true,
+  spf: true,
+  pa: true,
+  use: true,
+  skin: true,
 })
+const showAllBrands = ref(false)
+const showAllCongDung = ref(false)
+const filterDrawerOpen = ref(false)
 
 const PRICE_PRESETS = [
   { key: '0-300000', label: 'Dưới 300k', min: '', max: '300000' },
   { key: '300000-500000', label: '300–500k', min: '300000', max: '500000' },
   { key: '500000+', label: 'Trên 500k', min: '500000', max: '' },
-  { key: '', label: 'Mọi mức giá', min: '', max: '' },
+  { key: 'all', label: 'Mọi mức giá', min: '', max: '' },
 ]
 
+const SPF_BANDS = [
+  { key: '50plus', label: 'SPF 50+ (bảo vệ rất cao)' },
+  { key: '50', label: 'SPF 50 (cao)' },
+  { key: '30-49', label: 'SPF 30–49 (trung bình)' },
+  { key: 'lt30', label: 'Dưới SPF 30 (nhẹ)' },
+]
+
+const PA_OPTIONS = ['PA++', 'PA+++', 'PA++++']
+const FILTER_COLLAPSE_LIMIT = 6
+
 let searchTimer
-let priceTimer
 
 function activeProducts(list) {
   return list.filter((p) => p.trangThai !== false)
@@ -211,7 +225,13 @@ const filtered = computed(() => {
     list = list.filter((p) => selectedLoaiCN.value.includes(p.loaiChongNang))
   }
   if (selectedSpf.value.length) {
-    list = list.filter((p) => selectedSpf.value.includes(String(p.chiSoSpf || '')))
+    list = list.filter((p) => {
+      const band = spfBandOf(p.chiSoSpf)
+      return band && selectedSpf.value.includes(band)
+    })
+  }
+  if (selectedPa.value.length) {
+    list = list.filter((p) => selectedPa.value.includes(String(p.chiSoPa || '')))
   }
   if (filterNoiBat.value) {
     list = list.filter((p) => p.noiBat === true)
@@ -267,13 +287,44 @@ const paged = computed(() => {
   return filtered.value.slice(start, start + pageSize)
 })
 
-const spfOptions = computed(() => {
-  const set = new Set()
+const paOptions = computed(() => {
+  const set = new Set(PA_OPTIONS)
   allProducts.value.forEach((p) => {
-    if (p.chiSoSpf) set.add(String(p.chiSoSpf))
+    if (p.chiSoPa) set.add(String(p.chiSoPa))
   })
-  return [...set].sort((a, b) => Number(a) - Number(b))
+  return [...set]
 })
+
+function parseSpf(raw) {
+  const s = String(raw || '').trim()
+  if (!s) return null
+  const hasPlus = /\+/.test(s)
+  const num = Number(String(s).replace(/[^\d.]/g, ''))
+  if (!Number.isFinite(num) || num <= 0) return null
+  return { num, hasPlus }
+}
+
+function spfBandOf(raw) {
+  const p = parseSpf(raw)
+  if (!p) return null
+  if (p.num > 50 || (p.num >= 50 && p.hasPlus)) return '50plus'
+  if (p.num === 50) return '50'
+  if (p.num >= 30 && p.num <= 49) return '30-49'
+  if (p.num < 30) return 'lt30'
+  return null
+}
+
+const visibleBrands = computed(() => (
+  showAllBrands.value
+    ? thuongHieuList.value
+    : thuongHieuList.value.slice(0, FILTER_COLLAPSE_LIMIT)
+))
+
+const visibleCongDung = computed(() => (
+  showAllCongDung.value
+    ? congDungList.value
+    : congDungList.value.slice(0, FILTER_COLLAPSE_LIMIT)
+))
 
 function applyPrice() {
   appliedPriceMin.value = priceMinInput.value
@@ -281,14 +332,15 @@ function applyPrice() {
   page.value = 1
 }
 
-function schedulePriceApply() {
-  clearTimeout(priceTimer)
-  priceTimer = setTimeout(applyPrice, 250)
-}
-
 function applyPricePreset(preset) {
   priceMinInput.value = preset.min
   priceMaxInput.value = preset.max
+  appliedPriceMin.value = preset.min
+  appliedPriceMax.value = preset.max
+  page.value = 1
+}
+
+function applyCustomPrice() {
   applyPrice()
 }
 
@@ -296,10 +348,19 @@ function toggleAcc(key) {
   openAcc.value[key] = !openAcc.value[key]
 }
 
+function closeFilterDrawer() {
+  filterDrawerOpen.value = false
+}
+
+function openFilterDrawer() {
+  filterDrawerOpen.value = true
+}
+
 const activePricePreset = computed(() => {
   const min = String(appliedPriceMin.value || '')
   const max = String(appliedPriceMax.value || '')
-  const match = PRICE_PRESETS.find((p) => p.min === min && p.max === max)
+  if (!min && !max) return 'all'
+  const match = PRICE_PRESETS.find((p) => p.key !== 'all' && p.min === min && p.max === max)
   return match ? match.key : null
 })
 
@@ -310,6 +371,7 @@ const hasActiveFilters = computed(() => (
   || selectedCongDung.value.length
   || selectedLoaiDa.value.length
   || selectedSpf.value.length
+  || selectedPa.value.length
   || !!appliedPriceMin.value
   || !!appliedPriceMax.value
   || filterNoiBat.value
@@ -338,13 +400,22 @@ const activeTags = computed(() => {
     if (item) tags.push({ group: 'skin', id, label: item.ten })
   })
   selectedSpf.value.forEach((id) => {
-    tags.push({ group: 'spf', id, label: `SPF ${id}` })
+    const band = SPF_BANDS.find((b) => b.key === id)
+    tags.push({ group: 'spf', id, label: band?.label || id })
+  })
+  selectedPa.value.forEach((id) => {
+    tags.push({ group: 'pa', id, label: id })
   })
   if (appliedPriceMin.value || appliedPriceMax.value) {
-    const min = appliedPriceMin.value ? Number(appliedPriceMin.value).toLocaleString('vi-VN') : null
-    const max = appliedPriceMax.value ? Number(appliedPriceMax.value).toLocaleString('vi-VN') : null
-    const label = min && max ? `${min}–${max}₫` : min ? `Từ ${min}₫` : `Đến ${max}₫`
-    tags.push({ group: 'price', id: 'price', label })
+    const preset = PRICE_PRESETS.find((p) => p.key !== 'all' && p.min === String(appliedPriceMin.value || '') && p.max === String(appliedPriceMax.value || ''))
+    if (preset) {
+      tags.push({ group: 'price', id: 'price', label: preset.label })
+    } else {
+      const min = appliedPriceMin.value ? Number(appliedPriceMin.value).toLocaleString('vi-VN') : null
+      const max = appliedPriceMax.value ? Number(appliedPriceMax.value).toLocaleString('vi-VN') : null
+      const label = min && max ? `${min}–${max}₫` : min ? `Từ ${min}₫` : `Đến ${max}₫`
+      tags.push({ group: 'price', id: 'price', label })
+    }
   }
   if (filterNoiBat.value) tags.push({ group: 'hot', id: '1', label: 'Nổi bật' })
   return tags
@@ -353,15 +424,14 @@ const activeTags = computed(() => {
 function removeTag(tag) {
   if (tag.group === 'hot') filterNoiBat.value = false
   else if (tag.group === 'price') {
-    priceMinInput.value = ''
-    priceMaxInput.value = ''
-    applyPrice()
+    applyPricePreset(PRICE_PRESETS.find((p) => p.key === 'all'))
   } else if (tag.group === 'brand') toggleId(selectedThuongHieu.value, tag.id)
   else if (tag.group === 'cat') toggleId(selectedDanhMuc.value, tag.id)
   else if (tag.group === 'type') toggleId(selectedLoaiCN.value, tag.id)
   else if (tag.group === 'use') toggleId(selectedCongDung.value, tag.id)
   else if (tag.group === 'skin') toggleId(selectedLoaiDa.value, tag.id)
   else if (tag.group === 'spf') toggleId(selectedSpf.value, tag.id)
+  else if (tag.group === 'pa') toggleId(selectedPa.value, tag.id)
   page.value = 1
 }
 
@@ -381,10 +451,8 @@ function resetFilters() {
   selectedCongDung.value = []
   selectedLoaiDa.value = []
   selectedSpf.value = []
-  priceMinInput.value = ''
-  priceMaxInput.value = ''
-  appliedPriceMin.value = ''
-  appliedPriceMax.value = ''
+  selectedPa.value = []
+  applyPricePreset(PRICE_PRESETS.find((p) => p.key === 'all'))
   filterNoiBat.value = false
   searchQuery.value = ''
   page.value = 1
@@ -462,11 +530,31 @@ onMounted(async () => {
     </div>
 
     <div v-else class="sf-container sf-plp__layout">
-      <aside class="sf-filters" aria-label="Bộ lọc">
+      <button type="button" class="sf-filter-open" @click="openFilterDrawer">
+        <Icon icon="solar:filter-linear" width="18" />
+        Bộ lọc
+        <span v-if="activeTags.length" class="sf-filter-open__badge">{{ activeTags.length }}</span>
+      </button>
+
+      <div
+        v-if="filterDrawerOpen"
+        class="sf-filter-backdrop"
+        aria-hidden="true"
+        @click="closeFilterDrawer"
+      />
+
+      <aside
+        class="sf-filters"
+        :class="{ 'is-drawer-open': filterDrawerOpen }"
+        aria-label="Bộ lọc"
+      >
         <div class="sf-filters__head">
           <h2 class="sf-filters__title">Bộ lọc</h2>
           <button v-if="hasActiveFilters" type="button" class="sf-filters__clear" @click="resetFilters">
-            Xóa hết
+            Xóa tất cả
+          </button>
+          <button type="button" class="sf-filters__close" aria-label="Đóng bộ lọc" @click="closeFilterDrawer">
+            ×
           </button>
         </div>
 
@@ -481,17 +569,16 @@ onMounted(async () => {
           <input v-model="searchQuery" type="search" class="sf-filter-input" placeholder="Tìm tên sản phẩm..." />
         </div>
 
-        <div class="sf-facc" :class="{ 'is-open': openAcc.price }">
-          <button type="button" class="sf-facc__btn" @click="toggleAcc('price')">
-            <span class="sf-facc__label">Giá</span>
-            <i class="sf-facc__count" :class="{ 'is-on': appliedPriceMin || appliedPriceMax }">1</i>
-            <span class="sf-facc__chev" aria-hidden="true">▾</span>
+        <div class="sf-fgroup">
+          <button type="button" class="sf-fgroup__head" @click="toggleAcc('price')">
+            <span>Giá</span>
+            <Icon :icon="openAcc.price ? 'mdi:chevron-up' : 'mdi:chevron-down'" width="18" />
           </button>
-          <div class="sf-facc__body">
+          <div v-show="openAcc.price" class="sf-fgroup__body">
             <div class="sf-fprice-presets">
               <button
                 v-for="preset in PRICE_PRESETS"
-                :key="preset.key || 'all'"
+                :key="preset.key"
                 type="button"
                 class="sf-fpill"
                 :class="{ 'is-on': activePricePreset === preset.key }"
@@ -500,157 +587,169 @@ onMounted(async () => {
                 {{ preset.label }}
               </button>
             </div>
-            <div class="sf-frow">
+            <div class="sf-fprice-inputs">
               <input
                 v-model="priceMinInput"
                 type="number"
-                class="sf-filter-input"
-                placeholder="Từ"
+                class="sf-fprice-input"
                 min="0"
-                @input="schedulePriceApply"
+                placeholder="Từ"
+                @change="applyCustomPrice"
+                @keyup.enter="applyCustomPrice"
               />
-              <span>–</span>
+              <span class="sf-fprice-dash">–</span>
               <input
                 v-model="priceMaxInput"
                 type="number"
-                class="sf-filter-input"
-                placeholder="Đến"
+                class="sf-fprice-input"
                 min="0"
-                @input="schedulePriceApply"
+                placeholder="Đến"
+                @change="applyCustomPrice"
+                @keyup.enter="applyCustomPrice"
               />
             </div>
           </div>
         </div>
 
-        <div class="sf-facc" :class="{ 'is-open': openAcc.brand }">
-          <button type="button" class="sf-facc__btn" @click="toggleAcc('brand')">
-            <span class="sf-facc__label">Thương hiệu</span>
-            <i class="sf-facc__count" :class="{ 'is-on': selectedThuongHieu.length }">{{ selectedThuongHieu.length }}</i>
-            <span class="sf-facc__chev" aria-hidden="true">▾</span>
+        <div class="sf-fgroup">
+          <button type="button" class="sf-fgroup__head" @click="toggleAcc('brand')">
+            <span>Thương hiệu</span>
+            <Icon :icon="openAcc.brand ? 'mdi:chevron-up' : 'mdi:chevron-down'" width="18" />
           </button>
-          <div class="sf-facc__body">
-            <div class="sf-fpills">
-              <button
-                v-for="t in thuongHieuList"
-                :key="t.id"
-                type="button"
-                class="sf-fpill"
-                :class="{ 'is-on': isChecked(selectedThuongHieu, t.id) }"
-                @click="toggleId(selectedThuongHieu, t.id)"
-              >
-                {{ t.ten }}
-              </button>
-            </div>
+          <div v-show="openAcc.brand" class="sf-fgroup__body">
+            <label v-for="t in visibleBrands" :key="t.id" class="sf-fcheck">
+              <input
+                type="checkbox"
+                :checked="isChecked(selectedThuongHieu, t.id)"
+                @change="toggleId(selectedThuongHieu, t.id)"
+              />
+              <span class="sf-fcheck__box" />
+              <span class="sf-fcheck__label">{{ t.ten }}</span>
+            </label>
+            <button
+              v-if="thuongHieuList.length > FILTER_COLLAPSE_LIMIT"
+              type="button"
+              class="sf-fmore"
+              @click="showAllBrands = !showAllBrands"
+            >
+              {{ showAllBrands ? 'Thu gọn ▴' : `Xem thêm (${thuongHieuList.length - FILTER_COLLAPSE_LIMIT}) ▾` }}
+            </button>
           </div>
         </div>
 
-        <div class="sf-facc" :class="{ 'is-open': openAcc.cat }">
-          <button type="button" class="sf-facc__btn" @click="toggleAcc('cat')">
-            <span class="sf-facc__label">Danh mục</span>
-            <i class="sf-facc__count" :class="{ 'is-on': selectedDanhMuc.length }">{{ selectedDanhMuc.length }}</i>
-            <span class="sf-facc__chev" aria-hidden="true">▾</span>
+        <div class="sf-fgroup">
+          <button type="button" class="sf-fgroup__head" @click="toggleAcc('cat')">
+            <span>Danh mục</span>
+            <Icon :icon="openAcc.cat ? 'mdi:chevron-up' : 'mdi:chevron-down'" width="18" />
           </button>
-          <div class="sf-facc__body">
-            <div class="sf-fpills">
-              <button
-                v-for="d in danhMucList"
-                :key="d.id"
-                type="button"
-                class="sf-fpill"
-                :class="{ 'is-on': isChecked(selectedDanhMuc, d.id) }"
-                @click="toggleId(selectedDanhMuc, d.id)"
-              >
-                {{ d.ten }}
-              </button>
-            </div>
+          <div v-show="openAcc.cat" class="sf-fgroup__body">
+            <label v-for="d in danhMucList" :key="d.id" class="sf-fcheck">
+              <input
+                type="checkbox"
+                :checked="isChecked(selectedDanhMuc, d.id)"
+                @change="toggleId(selectedDanhMuc, d.id)"
+              />
+              <span class="sf-fcheck__box" />
+              <span class="sf-fcheck__label">{{ d.ten }}</span>
+            </label>
           </div>
         </div>
 
-        <div class="sf-facc" :class="{ 'is-open': openAcc.type }">
-          <button type="button" class="sf-facc__btn" @click="toggleAcc('type')">
-            <span class="sf-facc__label">Loại chống nắng</span>
-            <i class="sf-facc__count" :class="{ 'is-on': selectedLoaiCN.length }">{{ selectedLoaiCN.length }}</i>
-            <span class="sf-facc__chev" aria-hidden="true">▾</span>
+        <div class="sf-fgroup">
+          <button type="button" class="sf-fgroup__head" @click="toggleAcc('type')">
+            <span>Loại chống nắng</span>
+            <Icon :icon="openAcc.type ? 'mdi:chevron-up' : 'mdi:chevron-down'" width="18" />
           </button>
-          <div class="sf-facc__body">
-            <div class="sf-fpills">
-              <button
-                v-for="(label, key) in LOAI_CHONG_NANG_LABELS"
-                :key="key"
-                type="button"
-                class="sf-fpill"
-                :class="{ 'is-on': isChecked(selectedLoaiCN, key) }"
-                @click="toggleId(selectedLoaiCN, key)"
-              >
-                {{ label }}
-              </button>
-            </div>
+          <div v-show="openAcc.type" class="sf-fgroup__body">
+            <label v-for="(label, key) in LOAI_CHONG_NANG_LABELS" :key="key" class="sf-fcheck">
+              <input
+                type="checkbox"
+                :checked="isChecked(selectedLoaiCN, key)"
+                @change="toggleId(selectedLoaiCN, key)"
+              />
+              <span class="sf-fcheck__box" />
+              <span class="sf-fcheck__label">{{ label }}</span>
+            </label>
           </div>
         </div>
 
-        <div class="sf-facc" :class="{ 'is-open': openAcc.use }">
-          <button type="button" class="sf-facc__btn" @click="toggleAcc('use')">
-            <span class="sf-facc__label">Công dụng</span>
-            <i class="sf-facc__count" :class="{ 'is-on': selectedCongDung.length }">{{ selectedCongDung.length }}</i>
-            <span class="sf-facc__chev" aria-hidden="true">▾</span>
+        <div class="sf-fgroup">
+          <button type="button" class="sf-fgroup__head" @click="toggleAcc('spf')">
+            <span>Chỉ số SPF</span>
+            <Icon :icon="openAcc.spf ? 'mdi:chevron-up' : 'mdi:chevron-down'" width="18" />
           </button>
-          <div class="sf-facc__body">
-            <div class="sf-fpills">
-              <button
-                v-for="c in congDungList"
-                :key="c.id"
-                type="button"
-                class="sf-fpill"
-                :class="{ 'is-on': isChecked(selectedCongDung, c.id) }"
-                @click="toggleId(selectedCongDung, c.id)"
-              >
-                {{ c.ten }}
-              </button>
-            </div>
+          <div v-show="openAcc.spf" class="sf-fgroup__body">
+            <label v-for="band in SPF_BANDS" :key="band.key" class="sf-fcheck">
+              <input
+                type="checkbox"
+                :checked="isChecked(selectedSpf, band.key)"
+                @change="toggleId(selectedSpf, band.key)"
+              />
+              <span class="sf-fcheck__box" />
+              <span class="sf-fcheck__label">{{ band.label }}</span>
+            </label>
           </div>
         </div>
 
-        <div class="sf-facc" :class="{ 'is-open': openAcc.skin }">
-          <button type="button" class="sf-facc__btn" @click="toggleAcc('skin')">
-            <span class="sf-facc__label">Loại da</span>
-            <i class="sf-facc__count" :class="{ 'is-on': selectedLoaiDa.length }">{{ selectedLoaiDa.length }}</i>
-            <span class="sf-facc__chev" aria-hidden="true">▾</span>
+        <div class="sf-fgroup">
+          <button type="button" class="sf-fgroup__head" @click="toggleAcc('pa')">
+            <span>Chỉ số PA</span>
+            <Icon :icon="openAcc.pa ? 'mdi:chevron-up' : 'mdi:chevron-down'" width="18" />
           </button>
-          <div class="sf-facc__body">
-            <div class="sf-fpills">
-              <button
-                v-for="ld in LOAI_DA_OPTIONS"
-                :key="ld.id"
-                type="button"
-                class="sf-fpill"
-                :class="{ 'is-on': isChecked(selectedLoaiDa, ld.id) }"
-                @click="toggleId(selectedLoaiDa, ld.id)"
-              >
-                {{ ld.ten }}
-              </button>
-            </div>
+          <div v-show="openAcc.pa" class="sf-fgroup__body">
+            <label v-for="pa in paOptions" :key="pa" class="sf-fcheck">
+              <input
+                type="checkbox"
+                :checked="isChecked(selectedPa, pa)"
+                @change="toggleId(selectedPa, pa)"
+              />
+              <span class="sf-fcheck__box" />
+              <span class="sf-fcheck__label">{{ pa }}</span>
+            </label>
           </div>
         </div>
 
-        <div v-if="spfOptions.length" class="sf-facc" :class="{ 'is-open': openAcc.spf }">
-          <button type="button" class="sf-facc__btn" @click="toggleAcc('spf')">
-            <span class="sf-facc__label">SPF</span>
-            <i class="sf-facc__count" :class="{ 'is-on': selectedSpf.length }">{{ selectedSpf.length }}</i>
-            <span class="sf-facc__chev" aria-hidden="true">▾</span>
+        <div class="sf-fgroup">
+          <button type="button" class="sf-fgroup__head" @click="toggleAcc('use')">
+            <span>Công dụng</span>
+            <Icon :icon="openAcc.use ? 'mdi:chevron-up' : 'mdi:chevron-down'" width="18" />
           </button>
-          <div class="sf-facc__body">
-            <div class="sf-fpills">
-              <button
-                v-for="s in spfOptions"
-                :key="s"
-                type="button"
-                class="sf-fpill"
-                :class="{ 'is-on': isChecked(selectedSpf, s) }"
-                @click="toggleId(selectedSpf, s)"
-              >
-                SPF {{ s }}
-              </button>
-            </div>
+          <div v-show="openAcc.use" class="sf-fgroup__body">
+            <label v-for="c in visibleCongDung" :key="c.id" class="sf-fcheck">
+              <input
+                type="checkbox"
+                :checked="isChecked(selectedCongDung, c.id)"
+                @change="toggleId(selectedCongDung, c.id)"
+              />
+              <span class="sf-fcheck__box" />
+              <span class="sf-fcheck__label">{{ c.ten }}</span>
+            </label>
+            <button
+              v-if="congDungList.length > FILTER_COLLAPSE_LIMIT"
+              type="button"
+              class="sf-fmore"
+              @click="showAllCongDung = !showAllCongDung"
+            >
+              {{ showAllCongDung ? 'Thu gọn ▴' : `Xem thêm (${congDungList.length - FILTER_COLLAPSE_LIMIT}) ▾` }}
+            </button>
+          </div>
+        </div>
+
+        <div class="sf-fgroup">
+          <button type="button" class="sf-fgroup__head" @click="toggleAcc('skin')">
+            <span>Loại da</span>
+            <Icon :icon="openAcc.skin ? 'mdi:chevron-up' : 'mdi:chevron-down'" width="18" />
+          </button>
+          <div v-show="openAcc.skin" class="sf-fgroup__body">
+            <label v-for="ld in LOAI_DA_OPTIONS" :key="ld.id" class="sf-fcheck">
+              <input
+                type="checkbox"
+                :checked="isChecked(selectedLoaiDa, ld.id)"
+                @change="toggleId(selectedLoaiDa, ld.id)"
+              />
+              <span class="sf-fcheck__box" />
+              <span class="sf-fcheck__label">{{ ld.ten }}</span>
+            </label>
           </div>
         </div>
 
@@ -661,6 +760,11 @@ onMounted(async () => {
             <span class="sf-switch__ui" />
           </span>
         </label>
+
+        <div class="sf-filter-drawer__foot">
+          <button type="button" class="sf-filter-drawer__clear" @click="resetFilters">Xóa</button>
+          <button type="button" class="sf-filter-drawer__apply" @click="closeFilterDrawer">Áp dụng</button>
+        </div>
       </aside>
 
       <div class="sf-plp__main">
@@ -767,13 +871,13 @@ onMounted(async () => {
   margin: 0 0 12px;
   font-size: 24px;
   font-weight: 600;
-  color: #1a1412;
+  color: var(--sf-espresso, #241a12);
 }
 
 .sf-plp__quiz-empty p {
   margin: 0 0 28px;
   font-size: 15px;
   line-height: 1.6;
-  color: #64748b;
+  color: var(--sf-mid, #5a5248);
 }
 </style>
