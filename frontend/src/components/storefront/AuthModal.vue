@@ -292,50 +292,52 @@ function onOtpInput(e) {
 
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="sf-modal-backdrop" @click="onBackdrop">
-      <div class="sf-modal" role="dialog" aria-modal="true" aria-labelledby="sf-auth-title">
-        <button type="button" class="sf-modal__close" aria-label="Đóng" @click="closeAuthModal">
-          <Icon icon="mdi:close" width="22" />
-        </button>
+    <Transition name="sf-modal">
+      <div v-if="visible" class="sf-modal-backdrop" @click="onBackdrop">
+        <div class="sf-modal" role="dialog" aria-modal="true" aria-labelledby="sf-auth-title">
+          <button type="button" class="sf-modal__close" aria-label="Đóng" @click="closeAuthModal">
+            <Icon icon="mdi:close" width="22" />
+          </button>
 
-        <div class="sf-modal__layout">
-          <aside class="sf-modal__aside">
-            <span class="sf-modal__logo">SUN<span>OVA</span></span>
+          <div class="sf-modal__layout">
+            <aside class="sf-modal__aside">
+              <span class="sf-modal__logo">SUN<span>OVA</span></span>
 
-            <div class="sf-modal__sun-ring" aria-hidden="true">
-              <Icon icon="solar:sun-2-linear" width="36" />
-            </div>
+              <div class="sf-modal__sun-ring" aria-hidden="true">
+                <Icon icon="solar:sun-2-linear" width="36" />
+              </div>
 
-            <h2 id="sf-auth-title" class="sf-modal__aside-title">{{ brandTitle }}</h2>
-            <p class="sf-modal__aside-slogan">Chống nắng tinh tế cho làn da Việt</p>
+              <h2 id="sf-auth-title" class="sf-modal__aside-title">{{ brandTitle }}</h2>
+              <p class="sf-modal__aside-slogan">Chống nắng tinh tế cho làn da Việt</p>
 
-            <p class="sf-modal__aside-eyebrow">SOLEIL SKINCARE</p>
-          </aside>
+              <p class="sf-modal__aside-eyebrow">SOLEIL SKINCARE</p>
+            </aside>
 
-          <div class="sf-modal__main">
-            <div v-if="authMode === 'login' || authMode === 'register'" class="sf-modal__tabs">
-              <button type="button" :class="{ active: authMode === 'login' }" @click="switchTab('login')">
-                Đăng nhập
+            <div class="sf-modal__main">
+              <div v-if="authMode === 'login' || authMode === 'register'" class="sf-modal__tabs">
+                <button type="button" :class="{ active: authMode === 'login' }" @click="switchTab('login')">
+                  Đăng nhập
+                </button>
+                <button type="button" :class="{ active: authMode === 'register' }" @click="switchTab('register')">
+                  Tạo tài khoản
+                </button>
+              </div>
+
+              <button
+                v-else
+                type="button"
+                class="sf-auth-back"
+                @click="authMode === 'forgot-reset' ? (authMode = 'forgot-send') : backToLogin()"
+              >
+                <Icon icon="mdi:arrow-left" width="18" />
+                Quay lại
               </button>
-              <button type="button" :class="{ active: authMode === 'register' }" @click="switchTab('register')">
-                Tạo tài khoản
-              </button>
-            </div>
 
-            <button
-              v-else
-              type="button"
-              class="sf-auth-back"
-              @click="authMode === 'forgot-reset' ? (authMode = 'forgot-send') : backToLogin()"
-            >
-              <Icon icon="mdi:arrow-left" width="18" />
-              Quay lại
-            </button>
+              <div v-if="serverError" class="sf-auth-alert">{{ serverError }}</div>
+              <div v-if="serverInfo" class="sf-auth-info">{{ serverInfo }}</div>
 
-            <div v-if="serverError" class="sf-auth-alert">{{ serverError }}</div>
-            <div v-if="serverInfo" class="sf-auth-info">{{ serverInfo }}</div>
-
-            <form v-if="authMode === 'login'" class="sf-modal__form" @submit.prevent="handleLogin">
+              <Transition name="sf-auth-panel" mode="out-in">
+                <form v-if="authMode === 'login'" key="login" class="sf-modal__form" @submit.prevent="handleLogin">
               <div class="sf-field">
                 <label for="modal-taiKhoan">Email hoặc số điện thoại</label>
                 <input
@@ -376,7 +378,7 @@ function onOtpInput(e) {
               </p>
             </form>
 
-            <form v-else-if="authMode === 'register'" class="sf-modal__form" @submit.prevent="handleRegister">
+            <form v-else-if="authMode === 'register'" key="register" class="sf-modal__form" @submit.prevent="handleRegister">
               <div class="sf-field">
                 <label for="modal-hoTen">Họ tên</label>
                 <input id="modal-hoTen" v-model="registerForm.hoTen" type="text" class="sf-modal__input" autocomplete="name" />
@@ -427,7 +429,7 @@ function onOtpInput(e) {
               </p>
             </form>
 
-            <form v-else-if="authMode === 'forgot-send'" class="sf-modal__form" @submit.prevent="handleSendOtp">
+            <form v-else-if="authMode === 'forgot-send'" key="forgot-send" class="sf-modal__form" @submit.prevent="handleSendOtp">
               <p class="sf-auth-hint">
                 Nhập email đã đăng ký. Chúng tôi sẽ gửi mã OTP 6 số để đặt lại mật khẩu.
               </p>
@@ -447,7 +449,7 @@ function onOtpInput(e) {
               </button>
             </form>
 
-            <form v-else class="sf-modal__form" @submit.prevent="handleResetPassword">
+            <form v-else key="forgot-reset" class="sf-modal__form" @submit.prevent="handleResetPassword">
               <p class="sf-auth-hint">
                 Nhập mã OTP đã gửi tới <strong>{{ forgotForm.email }}</strong>
               </p>
@@ -517,9 +519,11 @@ function onOtpInput(e) {
                 </button>
               </p>
             </form>
+              </Transition>
           </div>
         </div>
+        </div>
       </div>
-    </div>
+    </Transition>
   </Teleport>
 </template>

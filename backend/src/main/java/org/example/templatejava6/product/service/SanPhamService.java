@@ -61,20 +61,31 @@ public class SanPhamService {
     private static final Sort SP_NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "ngayTao")
             .and(Sort.by(Sort.Direction.DESC, "id"));
 
+    /** Cảnh báo lô cận hạn theo NV-LO-05: ≤ 30 ngày. */
+    public static final int NGAY_CANH_BAO_CAN_HAN = 30;
+
     @Transactional(readOnly = true)
     public List<SanPhamResponse> getAll() {
-        return getAll(false);
+        return getAll(false, true);
     }
 
     @Transactional(readOnly = true)
     public List<SanPhamResponse> getAll(Boolean excludeKhuyenMai) {
+        return getAll(excludeKhuyenMai, true);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SanPhamResponse> getAll(Boolean excludeKhuyenMai, boolean onlyActive) {
         Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
         Set<Integer> canHanIds = loadCoLoCanHanProductIds();
         Map<Integer, SalePriceAgg> salePriceMap = loadActiveSalePriceMap();
         Set<Integer> saleProductIds = Boolean.TRUE.equals(excludeKhuyenMai)
                 ? salePriceMap.keySet()
                 : Set.of();
-        return sanPhamRepository.findAll(SP_NEWEST_FIRST).stream()
+        var stream = onlyActive
+                ? sanPhamRepository.findByTrangThaiTrue(SP_NEWEST_FIRST).stream()
+                : sanPhamRepository.findAll(SP_NEWEST_FIRST).stream();
+        return stream
                 .filter(sp -> !saleProductIds.contains(sp.getId()))
                 .map(sp -> toSaleListResponse(sp, variantAggMap, canHanIds, salePriceMap.get(sp.getId())))
                 .toList();
@@ -82,27 +93,42 @@ public class SanPhamService {
 
     @Transactional(readOnly = true)
     public Page<SanPhamResponse> phanTrang(Integer pageNo, Integer pageSize) {
+        return phanTrang(pageNo, pageSize, true);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<SanPhamResponse> phanTrang(Integer pageNo, Integer pageSize, boolean onlyActive) {
         Pageable pageable = PageRequest.of(pageNo, pageSize, SP_NEWEST_FIRST);
         Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
         Set<Integer> canHanIds = loadCoLoCanHanProductIds();
-        return sanPhamRepository.findAll(pageable).map(sp -> toListResponse(sp, variantAggMap, canHanIds));
+        Page<SanPham> page = onlyActive
+                ? sanPhamRepository.findByTrangThaiTrue(pageable)
+                : sanPhamRepository.findAll(pageable);
+        return page.map(sp -> toListResponse(sp, variantAggMap, canHanIds));
     }
 
     @Transactional(readOnly = true)
     public List<SanPhamResponse> timKiem(String keyword) {
-        return timKiem(keyword, false);
+        return timKiem(keyword, false, true);
     }
 
     @Transactional(readOnly = true)
     public List<SanPhamResponse> timKiem(String keyword, Boolean excludeKhuyenMai) {
+        return timKiem(keyword, excludeKhuyenMai, true);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SanPhamResponse> timKiem(String keyword, Boolean excludeKhuyenMai, boolean onlyActive) {
         Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
         Set<Integer> canHanIds = loadCoLoCanHanProductIds();
         Map<Integer, SalePriceAgg> salePriceMap = loadActiveSalePriceMap();
         Set<Integer> saleProductIds = Boolean.TRUE.equals(excludeKhuyenMai)
                 ? salePriceMap.keySet()
                 : Set.of();
-        return sanPhamRepository.findByTenContainingIgnoreCase(keyword, SP_NEWEST_FIRST)
-                .stream()
+        var list = onlyActive
+                ? sanPhamRepository.findByTenContainingIgnoreCaseAndTrangThaiTrue(keyword, SP_NEWEST_FIRST)
+                : sanPhamRepository.findByTenContainingIgnoreCase(keyword, SP_NEWEST_FIRST);
+        return list.stream()
                 .filter(sp -> !saleProductIds.contains(sp.getId()))
                 .map(sp -> toSaleListResponse(sp, variantAggMap, canHanIds, salePriceMap.get(sp.getId())))
                 .toList();
@@ -164,6 +190,7 @@ public class SanPhamService {
     public void add(SanPhamRequest request, List<MultipartFile> files) {
         validateSanPhamFields(request);
         validateChiTiets(request.getChiTiets(), null);
+        validateAnhBatBuocKhiTao(request, files);
 
         SanPham sp = MapperUtil.map(request, SanPham.class);
         sp.setMaSanPham(MaGenerator.nextCode("SP", sanPhamRepository.findAll().stream().map(SanPham::getMaSanPham).toList()));
@@ -361,7 +388,7 @@ public class SanPhamService {
 
     private Set<Integer> loadCoLoCanHanProductIds() {
         LocalDate today = LocalDate.now();
-        return new HashSet<>(loHangRepository.findSanPhamIdsCoLoCanHan(today, today.plusMonths(6)));
+        return new HashSet<>(loHangRepository.findSanPhamIdsCoLoCanHan(today, today.plusDays(NGAY_CANH_BAO_CAN_HAN)));
     }
 
     private SanPhamResponse toListResponse(SanPham sp, Map<Integer, VariantAgg> variantAggMap) {
@@ -546,16 +573,23 @@ public class SanPhamService {
         if (request.getChiSoSpf() == null || request.getChiSoSpf().isBlank()) {
             throw new ApiException("Chỉ số SPF không được để trống", "VALIDATION_ERROR");
         }
-        String spf = request.getChiSoSpf().toUpperCase();
-        if (!spf.matches("^SPF[0-9]+\\+?$") && !spf.matches("^[0-9]+\\+?$")) {
-            throw new ApiException("Chỉ số SPF không hợp lệ (VD: SPF50+ hoặc 50+)", "VALIDATION_ERROR");
+        String spfRaw = request.getChiSoSpf().toUpperCase().replace(" ", "");
+        // Chuẩn hóa: cho phép "50+" hoặc "SPF50+" → lưu dạng SPFxx / SPFxx+
+        String spf = spfRaw.startsWith("SPF") ? spfRaw : "SPF" + spfRaw;
+        if (!spf.matches("^SPF\\d{1,3}\\+?$")) {
+            throw new ApiException("Chỉ số SPF không hợp lệ (VD: SPF30, SPF50, SPF50+)", "VALIDATION_ERROR");
         }
-        // Chuẩn hóa lưu dạng SPF...
-        if (!spf.startsWith("SPF")) {
-            request.setChiSoSpf("SPF" + spf);
-        } else {
-            request.setChiSoSpf(spf);
+        String numPart = spf.substring(3).replace("+", "");
+        int spfNum;
+        try {
+            spfNum = Integer.parseInt(numPart);
+        } catch (NumberFormatException ex) {
+            throw new ApiException("Chỉ số SPF không hợp lệ (VD: SPF30, SPF50, SPF50+)", "VALIDATION_ERROR");
         }
+        if (spfNum < 1 || spfNum > 100) {
+            throw new ApiException("Chỉ số SPF phải từ 1 đến 100", "VALIDATION_ERROR");
+        }
+        request.setChiSoSpf(spf);
         if (request.getChiSoPa() == null || request.getChiSoPa().isBlank()) {
             throw new ApiException("Chỉ số PA không được để trống", "VALIDATION_ERROR");
         }
@@ -572,6 +606,30 @@ public class SanPhamService {
         }
         if (request.getKhangNuoc() == null) {
             request.setKhangNuoc(false);
+        }
+    }
+
+    /** Khi tạo mới: bắt buộc ≥1 ảnh (file upload hoặc URL). Sửa SP không bắt upload lại. */
+    private void validateAnhBatBuocKhiTao(SanPhamRequest request, List<MultipartFile> files) {
+        boolean hasFile = files != null && files.stream().anyMatch(f -> f != null && !f.isEmpty());
+        boolean hasAnhMeta = false;
+        if (request.getAnhs() != null) {
+            for (AnhSanPhamRequest anh : request.getAnhs()) {
+                if (anh == null) {
+                    continue;
+                }
+                if (anh.getUrl() != null && !anh.getUrl().isBlank()) {
+                    hasAnhMeta = true;
+                    break;
+                }
+                if (anh.getFileIndex() != null && hasFile) {
+                    hasAnhMeta = true;
+                    break;
+                }
+            }
+        }
+        if (!hasFile && !hasAnhMeta) {
+            throw new ApiException("Sản phẩm phải có ít nhất 1 ảnh", "VALIDATION_ERROR");
         }
     }
 

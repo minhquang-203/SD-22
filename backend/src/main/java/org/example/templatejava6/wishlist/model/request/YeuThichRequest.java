@@ -12,9 +12,7 @@ import lombok.Setter;
 @NoArgsConstructor
 public class YeuThichRequest {
 
-    @NotNull(message = "Id khách hàng không được để trống")
-    private Integer idKhachHang;
-
+    /** Id khách lấy từ JWT — không nhận từ client. */
     @NotNull(message = "Id sản phẩm không được để trống")
     private Integer idSanPham;
 }

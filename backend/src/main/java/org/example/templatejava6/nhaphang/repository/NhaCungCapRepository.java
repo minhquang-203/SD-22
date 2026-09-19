@@ -29,4 +29,12 @@ public interface NhaCungCapRepository extends JpaRepository<NhaCungCap, Integer>
             ORDER BY n.trangThai DESC, n.ten ASC
             """)
     List<NhaCungCap> searchAll(@Param("q") String q);
+
+    boolean existsByTenIgnoreCase(String ten);
+
+    boolean existsByTenIgnoreCaseAndIdNot(String ten, Integer id);
+
+    boolean existsBySoDienThoai(String soDienThoai);
+
+    boolean existsBySoDienThoaiAndIdNot(String soDienThoai, Integer id);
 }

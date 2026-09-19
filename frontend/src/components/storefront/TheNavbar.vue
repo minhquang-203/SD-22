@@ -39,7 +39,9 @@ const searchBarPx = ref(0)
 const megaOpen = ref(false)
 const userOpen = ref(false)
 const notifOpen = ref(false)
+const headerScrolled = ref(false)
 let megaTimer
+let scrollRaf = 0
 
 const navLinks = [
   { to: '/', label: 'Trang chủ', exact: true },
@@ -55,15 +57,26 @@ const extraLinks = [
 
 onMounted(() => {
   document.addEventListener('click', onDocClick)
+  window.addEventListener('scroll', onWindowScroll, { passive: true })
+  onWindowScroll()
   startNotifPolling()
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', onDocClick)
+  window.removeEventListener('scroll', onWindowScroll)
+  if (scrollRaf) cancelAnimationFrame(scrollRaf)
   stopNotifPolling()
   clearTimeout(megaTimer)
 })
 
+function onWindowScroll() {
+  if (scrollRaf) return
+  scrollRaf = requestAnimationFrame(() => {
+    scrollRaf = 0
+    headerScrolled.value = window.scrollY > 10
+  })
+}
 function openMega() {
   clearTimeout(megaTimer)
   megaOpen.value = true
@@ -242,7 +255,7 @@ function toggleUser(e) {
 </script>
 
 <template>
-  <header class="sf-header" :class="{ 'is-searching': searchOpen }">
+  <header class="sf-header" :class="{ 'is-searching': searchOpen, 'is-scrolled': headerScrolled }">
     <div class="sf-header__inner">
       <RouterLink to="/" class="sf-navbar__brand">
         <img src="@/assets/logo/sunova_mark.png" alt="SUNOVA Logo" class="sf-navbar__logo-img" />
@@ -308,18 +321,20 @@ function toggleUser(e) {
             Danh mục
             <span class="sf-nav-drop__chev" aria-hidden="true">▾</span>
           </button>
-          <div v-show="megaOpen" class="sf-nav-drop__panel" @click.stop>
-            <RouterLink
-              v-for="link in extraLinks"
-              :key="link.to"
-              :to="link.to"
-              class="sf-nav-drop__item"
-              :class="{ active: isLinkActive(link) }"
-              @click="megaOpen = false"
-            >
-              {{ link.label }}
-            </RouterLink>
-          </div>
+          <Transition name="sf-drop">
+            <div v-show="megaOpen" class="sf-nav-drop__panel" @click.stop>
+              <RouterLink
+                v-for="link in extraLinks"
+                :key="link.to"
+                :to="link.to"
+                class="sf-nav-drop__item"
+                :class="{ active: isLinkActive(link) }"
+                @click="megaOpen = false"
+              >
+                {{ link.label }}
+              </RouterLink>
+            </div>
+          </Transition>
         </div>
       </nav>
       </div>
@@ -349,41 +364,43 @@ function toggleUser(e) {
             <span v-if="hasNotifBadge" class="sf-cart-badge sf-bell__badge">{{ notifBadgeText }}</span>
           </button>
 
-          <div v-if="notifOpen" class="sf-bell__panel">
-            <div class="sf-bell__header">
-              <span>Thông báo</span>
-              <button
-                v-if="notifications.length"
-                type="button"
-                class="sf-bell__mark-all"
-                @click="markAllNotifications"
-              >
-                Đọc tất cả
-              </button>
+          <Transition name="sf-drop">
+            <div v-if="notifOpen" class="sf-bell__panel">
+              <div class="sf-bell__header">
+                <span>Thông báo</span>
+                <button
+                  v-if="notifications.length"
+                  type="button"
+                  class="sf-bell__mark-all"
+                  @click="markAllNotifications"
+                >
+                  Đọc tất cả
+                </button>
+              </div>
+
+              <ul v-if="notifications.length" class="sf-bell__list">
+                <li
+                  v-for="item in notifications"
+                  :key="item.id"
+                  class="sf-bell__item"
+                  :class="{ 'sf-bell__item--unread': !item.daDoc }"
+                  @click="goToNotif(item)"
+                >
+                  <div class="sf-bell__item-icon" :data-loai="item.loai">
+                    <Icon :icon="iconForNotifLoai(item.loai)" width="18" />
+                  </div>
+                  <div class="sf-bell__item-body">
+                    <div class="sf-bell__item-title">{{ item.tieuDe || 'Thông báo' }}</div>
+                    <div class="sf-bell__item-desc">{{ item.noiDung || '—' }}</div>
+                    <div class="sf-bell__item-time">{{ formatNotifTime(item.ngayTao) }}</div>
+                  </div>
+                  <span v-if="!item.daDoc" class="sf-bell__item-dot" />
+                </li>
+              </ul>
+
+              <div v-else class="sf-bell__empty">Chưa có thông báo nào.</div>
             </div>
-
-            <ul v-if="notifications.length" class="sf-bell__list">
-              <li
-                v-for="item in notifications"
-                :key="item.id"
-                class="sf-bell__item"
-                :class="{ 'sf-bell__item--unread': !item.daDoc }"
-                @click="goToNotif(item)"
-              >
-                <div class="sf-bell__item-icon" :data-loai="item.loai">
-                  <Icon :icon="iconForNotifLoai(item.loai)" width="18" />
-                </div>
-                <div class="sf-bell__item-body">
-                  <div class="sf-bell__item-title">{{ item.tieuDe || 'Thông báo' }}</div>
-                  <div class="sf-bell__item-desc">{{ item.noiDung || '—' }}</div>
-                  <div class="sf-bell__item-time">{{ formatNotifTime(item.ngayTao) }}</div>
-                </div>
-                <span v-if="!item.daDoc" class="sf-bell__item-dot" />
-              </li>
-            </ul>
-
-            <div v-else class="sf-bell__empty">Chưa có thông báo nào.</div>
-          </div>
+          </Transition>
         </div>
 
         <RouterLink to="/gio-hang" class="sf-nav-icon sf-nav-icon--cart" title="Giỏ hàng" aria-label="Giỏ hàng">
@@ -403,12 +420,14 @@ function toggleUser(e) {
           <button type="button" class="sf-header__user" :title="hoTen" @click="toggleUser">
             <span class="sf-header__avatar" aria-hidden="true">{{ avatarLetter }}</span>
           </button>
-          <div v-if="userOpen" class="sf-user-dropdown" @click.stop>
-            <div class="sf-user-dropdown__name">{{ hoTen }}</div>
-            <RouterLink to="/tai-khoan" @click="userOpen = false">Tài khoản</RouterLink>
-            <RouterLink to="/tra-cuu-don" @click="userOpen = false">Tra cứu đơn</RouterLink>
-            <button type="button" @click="handleLogout">Đăng xuất</button>
-          </div>
+          <Transition name="sf-drop">
+            <div v-if="userOpen" class="sf-user-dropdown" @click.stop>
+              <div class="sf-user-dropdown__name">{{ hoTen }}</div>
+              <RouterLink to="/tai-khoan" @click="userOpen = false">Tài khoản</RouterLink>
+              <RouterLink to="/tra-cuu-don" @click="userOpen = false">Tra cứu đơn</RouterLink>
+              <button type="button" @click="handleLogout">Đăng xuất</button>
+            </div>
+          </Transition>
         </div>
       </div>
     </div>

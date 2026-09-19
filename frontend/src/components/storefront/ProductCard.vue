@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { productImageUrl } from '@/utils/productImage'
@@ -12,6 +12,7 @@ const props = defineProps({
 })
 
 const router = useRouter()
+const quickPulse = ref(false)
 
 const hasSale = computed(() => {
   const p = props.product
@@ -44,7 +45,11 @@ const salePrice = computed(() =>
 function quickAdd(e) {
   e.preventDefault()
   e.stopPropagation()
-  router.push(`/san-pham/${props.product.id}`)
+  quickPulse.value = true
+  window.setTimeout(() => {
+    quickPulse.value = false
+    router.push(`/san-pham/${props.product.id}`)
+  }, 180)
 }
 
 function spfLabel() {
@@ -83,6 +88,7 @@ function spfLabel() {
       v-if="showQuickAdd && layout === 'grid'"
       type="button"
       class="sf-product-card__quick-add"
+      :class="{ 'sf-icon-pop': quickPulse }"
       title="Xem chi tiết để chọn biến thể"
       @click="quickAdd"
     >

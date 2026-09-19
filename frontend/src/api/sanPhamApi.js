@@ -1,6 +1,7 @@
 import request from './request'
 
-export const getProducts = () => request.get('/san-pham')
+export const getProducts = () =>
+  request.get('/san-pham', { params: { chiHoatDong: false } })
 
 /** Đếm SP sắp hết hàng / cận hạn — badge sidebar */
 export const getSanPhamCanhBaoCount = () => request.get('/san-pham/canh-bao-count')
@@ -8,7 +9,7 @@ export const getSanPhamCanhBaoCount = () => request.get('/san-pham/canh-bao-coun
 export const getMaTiepTheo = () => request.get('/san-pham/ma-tiep-theo')
 
 export const searchProducts = (keyword) =>
-  request.get('/san-pham/tim', { params: { keyword } })
+  request.get('/san-pham/tim', { params: { keyword, chiHoatDong: false } })
 
 export const getProductDetail = (id) =>
   request.get('/san-pham/detail', { params: { id } })

@@ -25,6 +25,7 @@ const notFound = ref(false)
 const product = ref(null)
 const reviews = ref([])
 const related = ref([])
+const cartPulse = ref(false)
 
 const congDungList = ref([])
 const thanhPhanList = ref([])
@@ -196,6 +197,10 @@ async function addToCart() {
       dungTichMl: v.dungTichMl,
     })
     showToast('Đã thêm vào giỏ hàng')
+    cartPulse.value = true
+    window.setTimeout(() => {
+      cartPulse.value = false
+    }, 420)
     return true
   } catch (error) {
     showToast(typeof error === 'string' ? error : 'Không thêm được vào giỏ hàng')
@@ -409,7 +414,12 @@ onUnmounted(() => {
           </div>
 
           <div class="sf-pdp__actions">
-            <button type="button" class="btn-soleil btn-soleil--block" @click="addToCart">
+            <button
+              type="button"
+              class="btn-soleil btn-soleil--block"
+              :class="{ 'sf-btn-pulse': cartPulse }"
+              @click="addToCart"
+            >
               <span>Thêm vào giỏ</span>
             </button>
             <button type="button" class="btn-soleil-outline btn-soleil--block" @click="buyNow">Mua ngay</button>

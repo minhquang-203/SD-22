@@ -11,9 +11,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Service
 public class NhaCungCapService {
+
+    private static final Pattern SDT_VN = Pattern.compile("^0\\d{9}$");
+    private static final Pattern EMAIL = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
     @Autowired private NhaCungCapRepository nhaCungCapRepository;
 
@@ -34,7 +38,7 @@ public class NhaCungCapService {
     @Transactional
     public NhaCungCapResponse create(NhaCungCapRequest request) {
         NhaCungCap n = new NhaCungCap();
-        apply(n, request);
+        apply(n, request, null);
         n.setMa(nextMa());
         n.setTrangThai(true);
         return new NhaCungCapResponse(nhaCungCapRepository.save(n));
@@ -43,7 +47,7 @@ public class NhaCungCapService {
     @Transactional
     public NhaCungCapResponse update(Integer id, NhaCungCapRequest request) {
         NhaCungCap n = getOrThrow(id);
-        apply(n, request);
+        apply(n, request, id);
         return new NhaCungCapResponse(nhaCungCapRepository.save(n));
     }
 
@@ -59,13 +63,39 @@ public class NhaCungCapService {
                 .orElseThrow(() -> new ApiException("Không tìm thấy nhà cung cấp", "NOT_FOUND"));
     }
 
-    private void apply(NhaCungCap n, NhaCungCapRequest request) {
+    private void apply(NhaCungCap n, NhaCungCapRequest request, Integer excludeId) {
         if (request.getTen() == null || request.getTen().isBlank()) {
             throw new ApiException("Tên nhà cung cấp không được để trống", "VALIDATION_ERROR");
         }
-        n.setTen(request.getTen().trim());
-        n.setSoDienThoai(blankToNull(request.getSoDienThoai()));
-        n.setEmail(blankToNull(request.getEmail()));
+        String ten = request.getTen().trim();
+        boolean tenTrung = excludeId == null
+                ? nhaCungCapRepository.existsByTenIgnoreCase(ten)
+                : nhaCungCapRepository.existsByTenIgnoreCaseAndIdNot(ten, excludeId);
+        if (tenTrung) {
+            throw new ApiException("Tên nhà cung cấp đã tồn tại", "DUPLICATE");
+        }
+
+        String sdt = blankToNull(request.getSoDienThoai());
+        if (sdt != null) {
+            if (!SDT_VN.matcher(sdt).matches()) {
+                throw new ApiException("Số điện thoại không hợp lệ (10 chữ số, bắt đầu bằng 0)", "VALIDATION_ERROR");
+            }
+            boolean sdtTrung = excludeId == null
+                    ? nhaCungCapRepository.existsBySoDienThoai(sdt)
+                    : nhaCungCapRepository.existsBySoDienThoaiAndIdNot(sdt, excludeId);
+            if (sdtTrung) {
+                throw new ApiException("Số điện thoại nhà cung cấp đã tồn tại", "DUPLICATE");
+            }
+        }
+
+        String email = blankToNull(request.getEmail());
+        if (email != null && !EMAIL.matcher(email).matches()) {
+            throw new ApiException("Email nhà cung cấp không hợp lệ", "VALIDATION_ERROR");
+        }
+
+        n.setTen(ten);
+        n.setSoDienThoai(sdt);
+        n.setEmail(email);
         n.setDiaChi(blankToNull(request.getDiaChi()));
         n.setGhiChu(blankToNull(request.getGhiChu()));
     }

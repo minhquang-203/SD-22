@@ -204,23 +204,26 @@ async function saveProfile() {
 async function savePassword() {
   passwordMsg.value = ''
   passwordError.value = ''
-  if (!passwordForm.matKhauCu || !passwordForm.matKhauMoi) {
+  const matKhauCu = passwordForm.matKhauCu?.trim() || ''
+  const matKhauMoi = passwordForm.matKhauMoi?.trim() || ''
+  const matKhauMoiXacNhan = passwordForm.matKhauMoiXacNhan?.trim() || ''
+  if (!matKhauCu || !matKhauMoi) {
     passwordError.value = 'Vui lòng nhập đầy đủ mật khẩu'
     return
   }
-  if (passwordForm.matKhauMoi.length < 6) {
+  if (matKhauMoi.length < 6) {
     passwordError.value = 'Mật khẩu mới tối thiểu 6 ký tự'
     return
   }
-  if (passwordForm.matKhauMoi !== passwordForm.matKhauMoiXacNhan) {
+  if (matKhauMoi !== matKhauMoiXacNhan) {
     passwordError.value = 'Mật khẩu nhập lại không khớp'
     return
   }
   savingPassword.value = true
   try {
     await doiMatKhauToi({
-      matKhauCu: passwordForm.matKhauCu,
-      matKhauMoi: passwordForm.matKhauMoi,
+      matKhauCu,
+      matKhauMoi,
     })
     passwordMsg.value = 'Đã đổi mật khẩu thành công.'
     passwordForm.matKhauCu = ''

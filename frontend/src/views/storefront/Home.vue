@@ -8,6 +8,7 @@ import { fetchAllProducts, fetchDanhMucList } from '@/api/storefrontApi'
 import { fetchActiveBanners } from '@/api/bannerApi'
 import { productImageUrl } from '@/utils/productImage'
 import { rankProductsByQuiz, resolveQuizProfile } from '@/utils/quizRecommend'
+import { vSfReveal } from '@/directives/sfReveal'
 
 const DEFAULT_HERO = {
   id: 'fallback-hero',
@@ -307,7 +308,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <section v-if="loading || categories.length" class="sf-cats" aria-label="Danh mục">
+    <section v-if="loading || categories.length" v-sf-reveal class="sf-cats" aria-label="Danh mục">
       <div v-if="loading" class="sf-container sf-cats__skel" />
       <div v-else class="sf-container sf-cats__row">
         <RouterLink
@@ -322,7 +323,7 @@ onMounted(async () => {
       </div>
     </section>
 
-    <section class="sf-section">
+    <section v-sf-reveal class="sf-section">
       <div class="sf-container">
         <div class="sf-section-head sf-section-head--row">
           <div>
@@ -339,7 +340,7 @@ onMounted(async () => {
       </div>
     </section>
 
-    <section v-if="!loading && quizSuggestions.length" class="sf-section">
+    <section v-if="!loading && quizSuggestions.length" v-sf-reveal class="sf-section">
       <div class="sf-container">
         <div class="sf-section-head sf-section-head--row">
           <div>
@@ -356,7 +357,7 @@ onMounted(async () => {
       </div>
     </section>
 
-    <section class="sf-section">
+    <section v-sf-reveal class="sf-section">
       <div class="sf-container">
         <div class="sf-section-head sf-section-head--row">
           <div>
@@ -372,7 +373,7 @@ onMounted(async () => {
       </div>
     </section>
 
-    <div class="sf-trust">
+    <div v-sf-reveal class="sf-trust">
       <div class="sf-container sf-trust__row">
         <div v-for="item in trustItems" :key="item.title" class="sf-trust__item">
           <strong>{{ item.title }}</strong>

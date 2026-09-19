@@ -14,4 +14,8 @@ public interface DanhMucRepository extends JpaRepository<DanhMuc, Integer> {
     boolean existsByMa(String ma);
 
     boolean existsByMaAndIdNot(String ma, Integer id);
+
+    boolean existsByTenIgnoreCase(String ten);
+
+    boolean existsByTenIgnoreCaseAndIdNot(String ten, Integer id);
 }

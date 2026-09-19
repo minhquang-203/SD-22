@@ -23,14 +23,19 @@ public class SanPhamController {
 
     @GetMapping
     public List<SanPhamResponse> hienThiDanhSach(
-            @RequestParam(value = "excludeKhuyenMai", required = false) Boolean excludeKhuyenMai) {
-        return sanPhamService.getAll(excludeKhuyenMai);
+            @RequestParam(value = "excludeKhuyenMai", required = false) Boolean excludeKhuyenMai,
+            @RequestParam(value = "chiHoatDong", required = false) Boolean chiHoatDong) {
+        // Mặc định chỉ SP đang bán (storefront). Admin truyền chiHoatDong=false để xem cả SP ẩn.
+        boolean onlyActive = chiHoatDong == null || Boolean.TRUE.equals(chiHoatDong);
+        return sanPhamService.getAll(excludeKhuyenMai, onlyActive);
     }
 
     @GetMapping("padding")
     public List<SanPhamResponse> phanTrang(@RequestParam("pageNo") Integer pageNo,
-                                           @RequestParam("pageSize") Integer pageSize) {
-        return sanPhamService.phanTrang(pageNo, pageSize).getContent();
+                                           @RequestParam("pageSize") Integer pageSize,
+                                           @RequestParam(value = "chiHoatDong", required = false) Boolean chiHoatDong) {
+        boolean onlyActive = chiHoatDong == null || Boolean.TRUE.equals(chiHoatDong);
+        return sanPhamService.phanTrang(pageNo, pageSize, onlyActive).getContent();
     }
 
     @GetMapping("detail")
@@ -43,7 +48,7 @@ public class SanPhamController {
         return sanPhamService.previewMaTiepTheo();
     }
 
-    /** Đếm SP sắp hết hàng (tồn &lt; 50) và cận hạn (lô &lt; 6 tháng) — cho badge sidebar. */
+    /** Đếm SP sắp hết hàng (tồn &lt; 50) và cận hạn (lô ≤ 30 ngày) — cho badge sidebar. */
     @GetMapping("canh-bao-count")
     public SanPhamCanhBaoCountResponse canhBaoCount() {
         return sanPhamService.canhBaoCount();
@@ -52,8 +57,10 @@ public class SanPhamController {
     @GetMapping("tim")
     public List<SanPhamResponse> timKiem(
             @RequestParam("keyword") String keyword,
-            @RequestParam(value = "excludeKhuyenMai", required = false) Boolean excludeKhuyenMai) {
-        return sanPhamService.timKiem(keyword, excludeKhuyenMai);
+            @RequestParam(value = "excludeKhuyenMai", required = false) Boolean excludeKhuyenMai,
+            @RequestParam(value = "chiHoatDong", required = false) Boolean chiHoatDong) {
+        boolean onlyActive = chiHoatDong == null || Boolean.TRUE.equals(chiHoatDong);
+        return sanPhamService.timKiem(keyword, excludeKhuyenMai, onlyActive);
     }
 
     @GetMapping("khuyen-mai")

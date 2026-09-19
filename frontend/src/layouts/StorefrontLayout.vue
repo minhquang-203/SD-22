@@ -17,7 +17,11 @@ const route = useRoute()
   <div class="storefront-root storefront-shell">
     <TheNavbar />
     <main class="sf-main">
-      <router-view :key="route.path" />
+      <router-view v-slot="{ Component }">
+        <Transition name="sf-fade" mode="out-in">
+          <component :is="Component" :key="route.path" />
+        </Transition>
+      </router-view>
     </main>
     <TheFooter />
     <AuthModal />

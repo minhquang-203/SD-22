@@ -107,6 +107,12 @@ public class PhieuNhapService {
         }
         int stt = 1;
         for (ChiTietPhieuNhap dong : p.getChiTiets()) {
+            if (dong.getSoLuong() == null || dong.getSoLuong() <= 0) {
+                throw new ApiException("Số lượng phải lớn hơn 0", "VALIDATION_ERROR");
+            }
+            if (dong.getDonGia() == null || dong.getDonGia().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new ApiException("Giá nhập phải lớn hơn 0", "VALIDATION_ERROR");
+            }
             if (dong.getHanSuDung() == null) {
                 throw new ApiException(
                         "Dòng SKU " + dong.getChiTietSanPham().getSku() + " thiếu hạn sử dụng",
@@ -192,8 +198,8 @@ public class PhieuNhapService {
                     throw new ApiException("Số lượng phải lớn hơn 0", "VALIDATION_ERROR");
                 }
                 BigDecimal donGia = dongReq.getDonGia() != null ? dongReq.getDonGia() : BigDecimal.ZERO;
-                if (donGia.compareTo(BigDecimal.ZERO) < 0) {
-                    throw new ApiException("Đơn giá không hợp lệ", "VALIDATION_ERROR");
+                if (donGia.compareTo(BigDecimal.ZERO) <= 0) {
+                    throw new ApiException("Giá nhập phải lớn hơn 0", "VALIDATION_ERROR");
                 }
 
                 ChiTietSanPham ct = chiTietSanPhamRepository.findById(dongReq.getIdChiTietSanPham())
@@ -222,6 +228,10 @@ public class PhieuNhapService {
             canTra = BigDecimal.ZERO;
         }
         p.setCanTraNcc(canTra);
+
+        if (p.getChiTiets() == null || p.getChiTiets().isEmpty()) {
+            throw new ApiException("Phiếu nhập phải có ít nhất 1 dòng hàng", "VALIDATION_ERROR");
+        }
     }
 
     @Transactional(readOnly = true)

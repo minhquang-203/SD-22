@@ -16,9 +16,10 @@ public class YeuThichController {
     @Autowired
     private YeuThichService yeuThichService;
 
+    /** Wishlist của khách đang đăng nhập (id lấy từ JWT — không nhận idKhachHang client). */
     @GetMapping
-    public List<YeuThichResponse> getByKhachHang(@RequestParam("idKhachHang") Integer idKhachHang) {
-        return yeuThichService.getByKhachHang(idKhachHang);
+    public List<YeuThichResponse> danhSachCuaToi() {
+        return yeuThichService.danhSachCuaToi();
     }
 
     @PostMapping("add")
@@ -28,6 +29,6 @@ public class YeuThichController {
 
     @DeleteMapping("delete")
     public void delete(@RequestParam("id") Integer id) {
-        yeuThichService.delete(id);
+        yeuThichService.deleteCuaToi(id);
     }
 }
