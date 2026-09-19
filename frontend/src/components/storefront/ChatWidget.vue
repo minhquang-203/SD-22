@@ -757,7 +757,7 @@ watch(isOpen, (open) => {
   font-size: 12px;
 }
 .chat-product-info strong {
-  color: #111827;
+  color: var(--sf-espresso, #241a12);
 }
 .chat-product-info span {
   color: #b9935a;

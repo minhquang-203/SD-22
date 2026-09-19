@@ -58,7 +58,7 @@ const CAT_TONE = {
   'kien-thuc-spf': 'gold',
   'thoi-tiet-da': 'sky',
   'huong-dan-chon': 'sage',
-  'mua-mua': 'teal',
+  'mua-mua': 'sand',
   'cham-soc-da': 'coral',
 }
 
@@ -120,13 +120,13 @@ function formatDate(dateStr) {
   background: linear-gradient(145deg, #f3e6cf 0%, #e8d5a8 55%, #dcc48a 100%);
 }
 .blog-card__media--sky {
-  background: linear-gradient(145deg, #dceaf3 0%, #b9d4e8 55%, #8fb8d4 100%);
+  background: linear-gradient(145deg, #f3e6cf 0%, #e8d5a8 55%, #d4bc8a 100%);
 }
 .blog-card__media--sage {
-  background: linear-gradient(145deg, #e4ecdf 0%, #c5d6b8 55%, #a8c294 100%);
+  background: linear-gradient(145deg, #ebe4d6 0%, #dccfb8 55%, #c9b896 100%);
 }
-.blog-card__media--teal {
-  background: linear-gradient(145deg, #d7ebea 0%, #aed4d2 55%, #7fb8b5 100%);
+.blog-card__media--sand {
+  background: linear-gradient(145deg, #f0e9d8 0%, #e8dcc8 55%, #d4c8ae 100%);
 }
 .blog-card__media--coral {
   background: linear-gradient(145deg, #f5e0d8 0%, #e8bfb2 55%, #d49a88 100%);
@@ -166,9 +166,9 @@ function formatDate(dateStr) {
 }
 
 .blog-card__tag--gold { color: var(--sf-gold-dark, #9e7340); }
-.blog-card__tag--sky { color: #3a6ea8; }
-.blog-card__tag--sage { color: #4d6b45; }
-.blog-card__tag--teal { color: #2f6f6c; }
+.blog-card__tag--sky { color: var(--sf-gold-dark, #9e7340); }
+.blog-card__tag--sage { color: var(--sf-mid, #5a5248); }
+.blog-card__tag--sand { color: var(--sf-gold-dark, #9e7340); }
 .blog-card__tag--coral { color: var(--sf-accent, #a33b1c); }
 
 .blog-card__dot {

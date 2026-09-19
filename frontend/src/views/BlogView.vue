@@ -136,7 +136,7 @@ const CAT_TONE = {
   'kien-thuc-spf': 'gold',
   'thoi-tiet-da': 'sky',
   'huong-dan-chon': 'sage',
-  'mua-mua': 'teal',
+  'mua-mua': 'sand',
   'cham-soc-da': 'coral',
 }
 
@@ -374,13 +374,13 @@ function formatDate(dateStr) {
   background: linear-gradient(145deg, #f6ead4, #e2c892);
 }
 .blog-featured__media--sky {
-  background: linear-gradient(145deg, #e4f0f7, #9fc0d8);
+  background: linear-gradient(145deg, #f3e6cf, #d4bc8a);
 }
 .blog-featured__media--sage {
-  background: linear-gradient(145deg, #eaf1e4, #b3c9a4);
+  background: linear-gradient(145deg, #ebe4d6, #c9b896);
 }
-.blog-featured__media--teal {
-  background: linear-gradient(145deg, #e2f1f0, #8fc4c1);
+.blog-featured__media--sand {
+  background: linear-gradient(145deg, #f0e9d8, #d4c8ae);
 }
 .blog-featured__media--coral {
   background: linear-gradient(145deg, #f8e8e1, #d9a694);

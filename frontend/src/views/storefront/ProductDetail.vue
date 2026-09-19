@@ -585,7 +585,7 @@ onUnmounted(() => {
 .sf-tabs-nav button.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #c9a96e; }
 .sf-tab-panel { font-size: 15px; line-height: 1.6; color: #334155; animation: fadeIn 0.3s ease; }
 .sf-tag-list { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
-.sf-tag-list li { background: #f7f5f1; padding: 6px 12px; border: 1px solid #e3e9ef; border-radius: 2px; font-size: 13px; font-weight: 500; }
+.sf-tag-list li { background: #f7f5f1; padding: 6px 12px; border: 1px solid #ede5d8; border-radius: 2px; font-size: 13px; font-weight: 500; }
 .sf-pdp :deep(.sf-qty-control) { border-radius: 0; }
 .sf-pdp :deep(.btn-soleil),
 .sf-pdp :deep(.btn-soleil-outline) {

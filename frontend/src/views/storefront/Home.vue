@@ -385,10 +385,10 @@ onMounted(async () => {
 
 <style scoped>
 .sf-home {
-  --home-teal: #0b6e75;
-  --home-teal-deep: #08545a;
-  --home-line: #e3e9ef;
-  --home-muted: #5a6a78;
+  --home-teal: #9e7340;
+  --home-teal-deep: #241a12;
+  --home-line: #ede5d8;
+  --home-muted: #5a5248;
 }
 
 .sf-home-hero {
@@ -397,7 +397,7 @@ onMounted(async () => {
   display: grid;
   align-items: end;
   overflow: hidden;
-  background: #e8f1f4;
+  background: #f9f5f0;
 }
 
 .sf-home-hero__media {
@@ -436,7 +436,7 @@ onMounted(async () => {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.05em;
-  color: var(--home-teal-deep, #08545a);
+  color: var(--home-teal-deep, #241a12);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
 }
 
@@ -512,25 +512,25 @@ onMounted(async () => {
 }
 
 .sf-home-btn--solid {
-  background: var(--home-teal);
-  color: #fff;
+  background: var(--home-teal-deep);
+  color: #f9f5f0;
 }
 
 .sf-home-btn--solid:hover {
-  background: var(--home-teal-deep);
-  color: #fff;
+  background: #1a1410;
+  color: #f9f5f0;
 }
 
 .sf-home-btn--ghost {
-  border: 1px solid rgba(8, 84, 90, 0.35);
+  border: 1px solid rgba(36, 26, 18, 0.35);
   color: var(--home-teal-deep);
-  background: rgba(255, 255, 255, 0.55);
+  background: transparent;
 }
 
 .sf-home-btn--ghost:hover {
-  border-color: var(--home-teal);
-  background: #fff;
-  color: var(--home-teal);
+  border-color: var(--home-teal-deep);
+  background: rgba(249, 245, 240, 0.55);
+  color: var(--home-teal-deep);
 }
 
 .sf-home-hero__nav {
@@ -547,7 +547,7 @@ onMounted(async () => {
   cursor: pointer;
   color: var(--home-teal-deep);
   background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 2px 8px rgba(8, 84, 90, 0.12);
+  box-shadow: 0 2px 8px rgba(36, 26, 18, 0.12);
   transform: translateY(-50%);
 }
 
@@ -575,7 +575,7 @@ onMounted(async () => {
   border: 0;
   border-radius: 50%;
   cursor: pointer;
-  background: rgba(8, 84, 90, 0.28);
+  background: rgba(36, 26, 18, 0.28);
 }
 
 .sf-home-hero__dot.is-active {
@@ -648,7 +648,7 @@ onMounted(async () => {
 .sf-uvbar__skel {
   display: block;
   border-radius: 6px;
-  background: #eef2f5;
+  background: #ede5d8;
 }
 
 .sf-uvbar__skel--temp {
@@ -702,7 +702,7 @@ onMounted(async () => {
 }
 
 .sf-cat:hover {
-  background: #e6f3f4;
+  background: #f9f5f0;
 }
 
 .sf-cat__label {
@@ -724,7 +724,7 @@ onMounted(async () => {
 
 .sf-cats__skel {
   height: 72px;
-  background: #f7f9fb;
+  background: #f9f5f0;
 }
 
 .sf-trust {
