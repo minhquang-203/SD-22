@@ -6,6 +6,8 @@ import org.example.templatejava6.order.entity.YeuCauTraHang;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -18,6 +20,9 @@ public interface YeuCauTraHangRepository extends JpaRepository<YeuCauTraHang, In
     List<YeuCauTraHang> findAllByOrderByNgayTaoDesc();
 
     List<YeuCauTraHang> findByTrangThaiOrderByNgayTaoDesc(TrangThaiTraHang trangThai);
+
+    List<YeuCauTraHang> findByTrangThaiInAndNgayCapNhatBefore(
+            Collection<TrangThaiTraHang> trangThais, LocalDateTime cutoff);
 
     boolean existsByIdHoaDon_Id(Integer idHoaDon);
 

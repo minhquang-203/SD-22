@@ -1,10 +1,9 @@
 package org.example.templatejava6.order.service;
 
-import org.example.templatejava6.common.entity.KhachHang;
 import org.example.templatejava6.common.entity.PhieuGiamGia;
 import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.example.templatejava6.common.exception.ApiException;
-import org.example.templatejava6.customer.repository.KhachHangRepository;
+import org.example.templatejava6.customer.service.DiemTichLuyService;
 import org.example.templatejava6.order.entity.HoaDon;
 import org.example.templatejava6.order.entity.HoaDonChiTiet;
 import org.example.templatejava6.order.entity.LichSuDonHang;
@@ -14,12 +13,9 @@ import org.example.templatejava6.order.repository.LichSuDonHangRepository;
 import org.example.templatejava6.order.repository.ThanhToanHoaDonRepository;
 import org.example.templatejava6.product.service.LoHangService;
 import org.example.templatejava6.voucher.service.PhieuGiamGiaService;
-import org.example.templatejava6.voucher.service.VoucherKhachHangService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
 @Service
@@ -33,8 +29,7 @@ public class PosOrderLifecycleService {
     private final ThanhToanHoaDonRepository thanhToanHoaDonRepository;
     private final LichSuDonHangRepository lichSuDonHangRepository;
     private final PhieuGiamGiaService phieuGiamGiaService;
-    private final VoucherKhachHangService voucherKhachHangService;
-    private final KhachHangRepository khachHangRepository;
+    private final DiemTichLuyService diemTichLuyService;
     private final LoHangService loHangService;
 
     public PosOrderLifecycleService(
@@ -43,16 +38,14 @@ public class PosOrderLifecycleService {
             ThanhToanHoaDonRepository thanhToanHoaDonRepository,
             LichSuDonHangRepository lichSuDonHangRepository,
             PhieuGiamGiaService phieuGiamGiaService,
-            VoucherKhachHangService voucherKhachHangService,
-            KhachHangRepository khachHangRepository,
+            DiemTichLuyService diemTichLuyService,
             LoHangService loHangService) {
         this.hoaDonRepository = hoaDonRepository;
         this.hoaDonChiTietRepository = hoaDonChiTietRepository;
         this.thanhToanHoaDonRepository = thanhToanHoaDonRepository;
         this.lichSuDonHangRepository = lichSuDonHangRepository;
         this.phieuGiamGiaService = phieuGiamGiaService;
-        this.voucherKhachHangService = voucherKhachHangService;
-        this.khachHangRepository = khachHangRepository;
+        this.diemTichLuyService = diemTichLuyService;
         this.loHangService = loHangService;
     }
 
@@ -64,7 +57,7 @@ public class PosOrderLifecycleService {
         }
         hoaDon.setTrangThai(TrangThaiDonHang.HOAN_THANH);
         hoaDonRepository.save(hoaDon);
-        congDiemTichLuy(hoaDon);
+        diemTichLuyService.congDiemTuDonHoanThanh(hoaDon);
         ghiNhatKy(hoaDon, "HOAN_THANH", "Thanh toán VNPAY thành công tại quầy");
     }
 
@@ -101,20 +94,6 @@ public class PosOrderLifecycleService {
         if (!LOAI_TAI_QUAY.equalsIgnoreCase(hoaDon.getLoaiDon())) {
             throw new ApiException("Chỉ hỗ trợ đơn tại quầy.", "INVALID_ORDER_TYPE");
         }
-    }
-
-    private void congDiemTichLuy(HoaDon hoaDon) {
-        KhachHang khachHang = hoaDon.getIdKhachHang();
-        if (khachHang == null || hoaDon.getThanhTien() == null) {
-            return;
-        }
-        int diemThem = hoaDon.getThanhTien()
-                .divide(BigDecimal.valueOf(1000), 0, RoundingMode.FLOOR)
-                .intValue();
-        int diemHien = khachHang.getDiemTichLuy() != null ? khachHang.getDiemTichLuy() : 0;
-        khachHang.setDiemTichLuy(diemHien + diemThem);
-        khachHangRepository.save(khachHang);
-        voucherKhachHangService.tuDongGanKhiCapNhatDiem(khachHang);
     }
 
     private void hoanTonKho(HoaDon hoaDon) {

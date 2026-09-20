@@ -18,8 +18,11 @@ const route = useRoute()
     <TheNavbar />
     <main class="sf-main">
       <router-view v-slot="{ Component }">
+        <!-- Wrapper 1 element: Transition mode="out-in" không animate được multi-root (vd. TraCuuDon). -->
         <Transition name="sf-fade" mode="out-in">
-          <component :is="Component" :key="route.path" />
+          <div :key="route.path" class="sf-page">
+            <component :is="Component" />
+          </div>
         </Transition>
       </router-view>
     </main>

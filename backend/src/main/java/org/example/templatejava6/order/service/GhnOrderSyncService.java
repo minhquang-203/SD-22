@@ -146,6 +146,7 @@ public class GhnOrderSyncService {
         hoaDonRepository.save(hoaDon);
         if (trangThaiMoi == TrangThaiDonHang.HOAN_THANH) {
             hoaDonService.danhDauCodDaThanhToanNeuCan(hoaDon);
+            hoaDonService.congDiemTichLuyNeuCan(hoaDon);
         }
         ghiLichSu(hoaDon, trangThaiMoi, ghiChu != null ? ghiChu : moTa);
         // Load id khách trước khi publish (tránh thiếu topic khách)

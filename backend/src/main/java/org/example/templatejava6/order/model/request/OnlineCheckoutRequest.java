@@ -3,6 +3,7 @@ package org.example.templatejava6.order.model.request;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -28,7 +29,13 @@ public class OnlineCheckoutRequest {
     /** Ten nguoi nhan thuc te (de tao van don GHN). Neu trong se lay theo tai khoan. */
     private String tenNguoiNhan;
 
-    /** So dien thoai nguoi nhan thuc te. Neu trong se lay theo tai khoan. */
+    /**
+     * So dien thoai nguoi nhan thuc te. Neu trong se lay theo tai khoan.
+     * Cho phep rong de fallback ho so; neu co gia tri phai la SĐT VN hop le.
+     */
+    @Pattern(
+            regexp = "^$|^0(3|5|7|8|9)\\d{8}$",
+            message = "Số điện thoại không hợp lệ (10 chữ số, bắt đầu bằng 03/05/07/08/09)")
     private String sdtNguoiNhan;
 
     /** Địa chỉ cụ thể (số nhà, đường). */

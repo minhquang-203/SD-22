@@ -39,6 +39,7 @@ import org.example.templatejava6.product.model.response.LoHangResponse;
 import org.example.templatejava6.product.service.LoHangService;
 
 import org.example.templatejava6.customer.repository.KhachHangRepository;
+import org.example.templatejava6.customer.service.DiemTichLuyService;
 import org.example.templatejava6.order.repository.*;
 import org.example.templatejava6.voucher.repository.PhieuGiamGiaRepository;
 
@@ -133,6 +134,8 @@ public class HoaDonService {
     @Autowired private OrderRealtimeService orderRealtimeService;
 
     @Autowired private LoHangService loHangService;
+
+    @Autowired private DiemTichLuyService diemTichLuyService;
 
 
 
@@ -363,6 +366,8 @@ public class HoaDonService {
 
             danhDauCodDaThanhToanNeuCan(hd);
 
+            congDiemTichLuyNeuCan(hd);
+
         }
 
         ghiLichSuTrangThai(hd, trangThaiMoi, ghiChu, idNhanVien);
@@ -404,6 +409,14 @@ public class HoaDonService {
                     tt.setThoiGian(LocalDateTime.now());
                     thanhToanHoaDonRepository.save(tt);
                 });
+    }
+
+    /**
+     * Cộng điểm khi đơn hoàn thành. Khách vãng lai (chưa đăng nhập) bị bỏ qua.
+     */
+    @Transactional
+    public void congDiemTichLuyNeuCan(HoaDon hoaDon) {
+        diemTichLuyService.congDiemTuDonHoanThanh(hoaDon);
     }
 
     /**

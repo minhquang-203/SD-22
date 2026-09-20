@@ -35,6 +35,10 @@ public enum TrangThaiDonHang {
         if (trangThaiMoi == DA_HUY) {
             return true;
         }
+        // Chờ xác nhận: chỉ được sang Đã xác nhận (không nhảy cóc).
+        if (this == CHO_XAC_NHAN) {
+            return trangThaiMoi == DA_XAC_NHAN;
+        }
         return trangThaiMoi.thuTu > this.thuTu;
     }
 

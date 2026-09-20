@@ -95,4 +95,14 @@ public class TraHangController {
                 id,
                 request != null ? request.getIdNhanVien() : null);
     }
+
+    /**
+     * Chạy thủ công (hoặc job định kỳ) đóng YC đã duyệt / đang hoàn hàng quá hạn gửi hàng.
+     * Đơn về {@code HOAN_THANH}; chưa nhập kho / chưa hoàn tiền.
+     */
+    @PostMapping("/dong-qua-han")
+    public java.util.Map<String, Integer> dongQuaHan() {
+        int closed = returnRequestService.dongCacYeuCauQuaHanGuiHang();
+        return java.util.Map.of("closed", closed);
+    }
 }

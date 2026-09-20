@@ -196,10 +196,10 @@ public class RefundService {
         }
         // VNPAY co the dieu chinh so tien; COD/chuyen khoan giu so tien da tao san.
         boolean laVnpay = PHUONG_THUC_VNPAY.equalsIgnoreCase(ht.getPhuongThuc());
-        if (laVnpay && request != null && request.getSoTien() != null
-                && request.getSoTien().compareTo(BigDecimal.ZERO) >= 0) {
+        if (laVnpay && request != null && request.getSoTien() != null) {
             ht.setSoTien(request.getSoTien());
         }
+        assertSoTienHoanHopLe(ht);
 
         Optional<RefundGateway> gatewayOpt = refundGatewayRegistry.getGatewayOptional(ht.getPhuongThuc());
         if (gatewayOpt.isPresent()) {
@@ -419,6 +419,22 @@ public class RefundService {
                 .map(ThanhToanHoaDon::getSoTien)
                 .filter(s -> s != null && s.compareTo(BigDecimal.ZERO) > 0)
                 .orElse(hoaDon.getThanhTien() != null ? hoaDon.getThanhTien() : BigDecimal.ZERO);
+    }
+
+    /**
+     * Số hoàn phải &gt; 0 và không vượt số đã thu (hoặc thanhTien đơn khi chưa có giao dịch thành công).
+     */
+    private void assertSoTienHoanHopLe(HoanTien ht) {
+        BigDecimal soTien = ht.getSoTien() != null ? ht.getSoTien() : BigDecimal.ZERO;
+        if (soTien.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ApiException("Số tiền hoàn không hợp lệ.", "INVALID_REFUND_AMOUNT");
+        }
+        BigDecimal tran = resolveSoTienHoan(ht.getIdHoaDon());
+        if (tran != null && soTien.compareTo(tran) > 0) {
+            throw new ApiException(
+                    "Số tiền hoàn không được vượt số tiền khách đã thanh toán.",
+                    "INVALID_REFUND_AMOUNT");
+        }
     }
 
     private String resolvePhuongThuc(HoaDon hoaDon) {

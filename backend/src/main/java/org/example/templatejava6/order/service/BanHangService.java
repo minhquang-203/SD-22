@@ -8,6 +8,7 @@ import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.common.security.SecurityUtils;
 import org.example.templatejava6.customer.repository.KhachHangRepository;
+import org.example.templatejava6.customer.service.DiemTichLuyService;
 import org.example.templatejava6.order.entity.HoaDon;
 import org.example.templatejava6.order.entity.HoaDonChiTiet;
 import org.example.templatejava6.order.entity.HoaDonChiTietLo;
@@ -49,7 +50,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -93,6 +93,7 @@ public class BanHangService {
     @Autowired private PhieuGiamGiaService phieuGiamGiaService;
     @Autowired private org.example.templatejava6.voucher.service.VoucherKhachHangService voucherKhachHangService;
     @Autowired private KhachHangRepository khachHangRepository;
+    @Autowired private DiemTichLuyService diemTichLuyService;
     @Autowired private NhanVienRepository nhanVienRepository;
     @Autowired private LoHangService loHangService;
     @Autowired private CheckoutPricingService checkoutPricingService;
@@ -533,13 +534,7 @@ public class BanHangService {
                 phieuGiamGiaService.consumeOne(phieu.getId());
             }
 
-            if (khachHang != null) {
-                int diemThem = thanhTien.divide(BigDecimal.valueOf(1000), 0, RoundingMode.FLOOR).intValue();
-                int diemHien = khachHang.getDiemTichLuy() != null ? khachHang.getDiemTichLuy() : 0;
-                khachHang.setDiemTichLuy(diemHien + diemThem);
-                khachHangRepository.save(khachHang);
-                voucherKhachHangService.tuDongGanKhiCapNhatDiem(khachHang);
-            }
+            diemTichLuyService.congDiemTuDonHoanThanh(hoaDon);
 
             return BanHangHoaDonResponse.from(hoaDon, ttDaiDien, lineResponses, cacDongThanhToan);
         }
@@ -578,13 +573,7 @@ public class BanHangService {
             phieuGiamGiaService.consumeOne(phieu.getId());
         }
 
-        if (khachHang != null) {
-            int diemThem = thanhTien.divide(BigDecimal.valueOf(1000), 0, RoundingMode.FLOOR).intValue();
-            int diemHien = khachHang.getDiemTichLuy() != null ? khachHang.getDiemTichLuy() : 0;
-            khachHang.setDiemTichLuy(diemHien + diemThem);
-            khachHangRepository.save(khachHang);
-            voucherKhachHangService.tuDongGanKhiCapNhatDiem(khachHang);
-        }
+        diemTichLuyService.congDiemTuDonHoanThanh(hoaDon);
 
         return BanHangHoaDonResponse.from(hoaDon, tt, lineResponses);
     }

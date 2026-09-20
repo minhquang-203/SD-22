@@ -115,18 +115,27 @@ public class PhieuGiamGiaService {
         return res;
     }
 
-    /** Dùng mã đã xem trước nếu còn hợp lệ; không thì sinh mới. */
+    /**
+     * Không gửi mã → sinh SNO-XXXXXX mới.
+     * Có gửi mã: trùng thì báo lỗi (không tạo); sai định dạng thì báo lỗi; hợp lệ thì dùng nguyên.
+     */
     private String resolveCreateMa(String requested) {
-        if (requested != null
-                && requested.matches("^SNO-[A-Z0-9]{6}$")
-                && !phieuGiamGiaRepository.existsByMa(requested)) {
-            return requested;
+        if (requested == null || requested.isBlank()) {
+            try {
+                return MaGenerator.randomVoucherCode(6, phieuGiamGiaRepository::existsByMa);
+            } catch (IllegalStateException ex) {
+                throw new ApiException("Không sinh được mã phiếu giảm giá duy nhất", "CODE_GENERATE_FAILED");
+            }
         }
-        try {
-            return MaGenerator.randomVoucherCode(6, phieuGiamGiaRepository::existsByMa);
-        } catch (IllegalStateException ex) {
-            throw new ApiException("Không sinh được mã phiếu giảm giá duy nhất", "CODE_GENERATE_FAILED");
+        if (!requested.matches("^SNO-[A-Z0-9]{6}$")) {
+            throw new ApiException(
+                    "Mã phiếu giảm giá không hợp lệ (định dạng SNO-XXXXXX)",
+                    "VALIDATION_ERROR");
         }
+        if (phieuGiamGiaRepository.existsByMa(requested)) {
+            throw new ApiException("Mã phiếu giảm giá đã tồn tại", "DUPLICATE");
+        }
+        return requested;
     }
 
     @Transactional

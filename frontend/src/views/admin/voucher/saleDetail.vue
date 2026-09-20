@@ -33,7 +33,7 @@
               Quay lại
             </button>
             <button
-              v-if="canEditProducts"
+              v-if="canAddProducts"
               class="sd-btn-primary"
               @click="showModal = true"
             >
@@ -104,14 +104,14 @@
             <i class="ti ti-package-off"></i>
             <p>Chưa có sản phẩm nào trong đợt giảm giá</p>
             <button
-              v-if="canEditProducts"
+              v-if="canAddProducts"
               class="sd-btn-primary"
               style="margin:1rem auto 0"
               @click="showModal = true"
             >
               Thêm sản phẩm đầu tiên
             </button>
-            <p v-else class="sd-empty-hint">Chỉ có thể thêm sản phẩm khi đợt còn sắp diễn ra.</p>
+            <p v-else class="sd-empty-hint">Không thể thêm sản phẩm khi đợt đã kết thúc hoặc ngừng áp dụng.</p>
           </div>
 
           <!-- GRID VIEW -->
@@ -124,7 +124,7 @@
             >
               <div class="sd-product-card__image">
                 <img :src="productImageUrl(product.anhUrl)" :alt="product.name" loading="lazy" />
-                <div v-if="canEditProducts" class="sd-product-card__overlay">
+                <div v-if="canRemoveProducts" class="sd-product-card__overlay">
                   <button class="sd-overlay-btn sd-overlay-btn--danger" @click="removeProduct(product)">
                     <i class="ti ti-trash"></i> Xóa
                   </button>
@@ -142,7 +142,7 @@
             </div>
 
             <button
-              v-if="canEditProducts"
+              v-if="canAddProducts"
               class="sd-add-card"
               :style="{ animationDelay: (filteredProducts.length * 0.05) + 's' }"
               @click="showModal = true"
@@ -176,7 +176,7 @@
                 </div>
                 <div class="sd-product-list-item__save">−{{ formatCurrency(product.priceOld - product.priceNew) }}</div>
                 <button
-                  v-if="canEditProducts"
+                  v-if="canRemoveProducts"
                   class="sd-btn-remove"
                   title="Xóa khỏi đợt"
                   @click="removeProduct(product)"
@@ -292,8 +292,13 @@ const statusBadgeClass = computed(() => {
   return map[sale.value?.timeStatus] || 'sd-badge--expired'
 })
 
-/** Chỉ đợt sắp diễn ra mới được thêm/xóa sản phẩm */
-const canEditProducts = computed(() => sale.value?.timeStatus === 'UPCOMING')
+/** Đợt sắp diễn ra hoặc đang chạy vẫn được thêm sản phẩm */
+const canAddProducts = computed(() =>
+  sale.value?.timeStatus === 'UPCOMING' || sale.value?.timeStatus === 'ACTIVE',
+)
+
+/** Chỉ đợt sắp diễn ra mới được xóa sản phẩm */
+const canRemoveProducts = computed(() => sale.value?.timeStatus === 'UPCOMING')
 
 const progressPercent = computed(() => {
   if (!sale.value?.ngayBatDau || !sale.value?.ngayKetThuc) return 0
@@ -387,8 +392,8 @@ async function loadAvailableProducts() {
 }
 
 async function handleAddProducts() {
-  if (!canEditProducts.value) {
-    toast('Chỉ có thể thêm sản phẩm khi đợt còn sắp diễn ra', 'warn')
+  if (!canAddProducts.value) {
+    toast('Không thể thêm sản phẩm khi đợt đã kết thúc hoặc ngừng áp dụng', 'warn')
     return
   }
   if (!selectedIds.value.length) return
@@ -408,8 +413,8 @@ async function handleAddProducts() {
 }
 
 async function removeProduct(product) {
-  if (!canEditProducts.value) {
-    toast('Chỉ có thể xóa sản phẩm khi đợt còn sắp diễn ra', 'warn')
+  if (!canRemoveProducts.value) {
+    toast('Không thể xóa sản phẩm khi đợt đang chạy', 'warn')
     return
   }
   const ok = await confirm({

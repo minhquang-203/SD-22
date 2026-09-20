@@ -12,6 +12,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.net.URLEncoder;
@@ -53,6 +55,18 @@ public class OrderMailService {
         this.hoaDonRepository = hoaDonRepository;
         this.trackingTokenGenerator = trackingTokenGenerator;
         this.mailSender = mailSenderProvider.getIfAvailable();
+    }
+
+    /**
+     * Nạp lại hóa đơn theo id trong transaction mới (luồng mail sau commit / async)
+     * rồi gửi hóa đơn điện tử.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void guiHoaDonDatHangThanhCong(Integer idHoaDon) {
+        if (idHoaDon == null) {
+            return;
+        }
+        hoaDonRepository.findById(idHoaDon).ifPresent(this::guiHoaDonDatHangThanhCong);
     }
 
     public void guiHoaDonDatHangThanhCong(HoaDon hoaDon) {

@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class PhieuGiamGiaRequest {
 
-    /** Tạo mới: backend tự sinh SNO-XXXXXX. Cập nhật: giữ mã cũ. */
+    /** Tạo mới: để trống thì backend sinh SNO-XXXXXX; gửi mã trùng thì báo DUPLICATE. */
     private String ma;
 
     private String ten;

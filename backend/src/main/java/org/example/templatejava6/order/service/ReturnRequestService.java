@@ -46,6 +46,7 @@ import org.example.templatejava6.shipping.model.request.ReturnShippingOrderReque
 import org.example.templatejava6.shipping.model.response.CreateShippingOrderResponse;
 import org.example.templatejava6.shipping.model.response.GhnPickShiftResponse;
 import org.example.templatejava6.shipping.service.ShippingService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -84,6 +85,13 @@ public class ReturnRequestService {
     private static final int MIN_RETURN_IMAGES = 2;
     /** Số ngày cho phép yêu cầu trả hàng kể từ lúc đơn chuyển sang HOAN_THANH. */
     private static final int SO_NGAY_CHO_PHEP_TRA_HANG = 7;
+
+    /**
+     * Số ngày kể từ lúc duyệt (DA_DUYET / DANG_HOAN_HANG) mà khách phải gửi hàng hoàn;
+     * quá hạn hệ thống đóng YC và đưa đơn về HOAN_THANH.
+     */
+    @Value("${return.customer-ship-deadline-days:7}")
+    private int soNgayChoGuiHangHoan;
 
     /** Trang thai GHN cho biet kien hang hoan da ve tay shop. */
     private static final List<String> GHN_TRANG_THAI_DA_VE_SHOP = List.of("delivered", "returned");
@@ -905,6 +913,75 @@ public class ReturnRequestService {
     }
 
     private record AnhTraHangGrouped(List<String> anhKhach, List<String> anhTuChoi) {
+    }
+
+    /**
+     * Đóng các yêu cầu đã duyệt / đang hoàn hàng nhưng khách không gửi (hoặc shop chưa nhận)
+     * quá số ngày cấu hình. Đơn trở về {@code HOAN_THANH}, chưa nhập kho / chưa hoàn tiền.
+     *
+     * @return số yêu cầu đã đóng
+     */
+    @Transactional
+    public int dongCacYeuCauQuaHanGuiHang() {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(Math.max(1, soNgayChoGuiHangHoan));
+        List<YeuCauTraHang> overdue = yeuCauTraHangRepository.findByTrangThaiInAndNgayCapNhatBefore(
+                List.of(TrangThaiTraHang.DA_DUYET, TrangThaiTraHang.DANG_HOAN_HANG),
+                cutoff);
+        int closed = 0;
+        for (YeuCauTraHang yc : overdue) {
+            if (dongMotYeuCauQuaHan(yc.getId())) {
+                closed++;
+            }
+        }
+        return closed;
+    }
+
+    /**
+     * Đóng một YC quá hạn gửi hàng hoàn (chỉ áp dụng DA_DUYET / DANG_HOAN_HANG).
+     *
+     * @return true nếu đã đóng
+     */
+    @Transactional
+    public boolean dongMotYeuCauQuaHan(Integer idYeuCau) {
+        YeuCauTraHang yc = yeuCauTraHangRepository.findById(idYeuCau).orElse(null);
+        if (yc == null) {
+            return false;
+        }
+        if (yc.getTrangThai() != TrangThaiTraHang.DA_DUYET
+                && yc.getTrangThai() != TrangThaiTraHang.DANG_HOAN_HANG) {
+            return false;
+        }
+        String lyDo = "Hệ thống đóng yêu cầu: quá " + soNgayChoGuiHangHoan
+                + " ngày kể từ khi duyệt mà chưa nhận được hàng hoàn từ khách.";
+        yc.setTrangThai(TrangThaiTraHang.TU_CHOI);
+        yc.setGhiChuAdmin(lyDo);
+        yc.setNgayCapNhat(LocalDateTime.now());
+        yeuCauTraHangRepository.save(yc);
+
+        HoaDon hoaDon = yc.getIdHoaDon();
+        if (hoaDon != null && hoaDon.getTrangThai() == TrangThaiDonHang.TRA_HANG) {
+            TrangThaiDonHang trangThaiCu = hoaDon.getTrangThai();
+            hoaDon.setTrangThai(TrangThaiDonHang.HOAN_THANH);
+            hoaDonRepository.save(hoaDon);
+            ghiNhatKy(hoaDon, "TRA_HANG_QUA_HAN", lyDo);
+            orderRealtimeService.publishStatusChanged(hoaDon, trangThaiCu);
+        } else if (hoaDon != null) {
+            ghiNhatKy(hoaDon, "TRA_HANG_QUA_HAN", lyDo);
+        }
+
+        if (hoaDon != null) {
+            orderMailService.guiYeuCauTraHangBiTuChoi(hoaDon, lyDo);
+            thongBaoService.taoThongBaoKhach(
+                    idKhachHangCua(hoaDon),
+                    LoaiThongBao.TRA_HANG_BI_TU_CHOI,
+                    "Yêu cầu trả hàng đã đóng",
+                    "Yêu cầu trả hàng cho đơn " + hoaDon.getMaHoaDon()
+                            + " đã bị đóng vì quá hạn gửi hàng hoàn. Đơn trở về trạng thái đã giao.",
+                    "/tra-cuu-don/tra-hang/" + yc.getId(),
+                    hoaDon.getId(),
+                    hoaDon.getMaHoaDon());
+        }
+        return true;
     }
 
     private void assertTrongHanTraHang(HoaDon hoaDon) {

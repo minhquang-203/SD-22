@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -27,6 +28,9 @@ public class GuestCheckoutRequest {
     private String tenNguoiNhan;
 
     @NotBlank(message = "Vui lòng nhập số điện thoại người nhận")
+    @Pattern(
+            regexp = "^0(3|5|7|8|9)\\d{8}$",
+            message = "Số điện thoại không hợp lệ (10 chữ số, bắt đầu bằng 03/05/07/08/09)")
     private String sdtNguoiNhan;
 
     @NotBlank(message = "Vui lòng nhập email nhận thông tin đơn hàng")
