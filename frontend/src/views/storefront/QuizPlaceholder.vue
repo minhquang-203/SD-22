@@ -32,24 +32,100 @@
     </transition>
 
     <div v-if="!quizStarted" class="sg-landing">
-      <div class="sg-landing__content">
-        <div class="sg-landing__visual">
-          <div class="sg-landing__circle"></div>
-          <div class="sg-landing__product">SPF</div> 
+      <div class="sg-landing__card">
+        <div class="sg-landing__content">
+          <!-- VISUAL BÊN TRÁI -->
+          <div class="sg-landing__visual">
+            <div class="sg-visual-orbit">
+              <div class="sg-visual-orbit__glow"></div>
+              <div class="sg-visual-orbit__ring"></div>
+              <div class="sg-visual-orbit__ring-outer"></div>
+
+              <!-- Center Luxury Logo Emblem -->
+              <div class="sg-visual-center">
+                <img
+                  src="@/assets/logo/sunova_mark.png"
+                  alt="SUNOVA Logo"
+                  class="sg-visual-center__logo"
+                />
+                <div class="sg-visual-center__brand">SUNOVA</div>
+                <div class="sg-visual-center__pa">SPF 50+ · DERMA UV</div>
+              </div>
+
+              <!-- Floating Luxury Pills -->
+              <div class="sg-visual-pill sg-visual-pill--top">
+                <Icon icon="solar:shield-check-bold" width="16" class="sg-pill-icon" />
+                <span>Màng lọc UV quang phổ rộng</span>
+              </div>
+              <div class="sg-visual-pill sg-visual-pill--bottom">
+                <Icon icon="solar:stars-bold" width="16" class="sg-pill-icon" />
+                <span>Routine chuẩn từng tuýp da</span>
+              </div>
+              <div class="sg-visual-pill sg-visual-pill--side">
+                <Icon icon="solar:heart-bold" width="15" class="sg-pill-icon" />
+                <span>99% Khách hàng hài lòng</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- NỘI DUNG BÊN PHẢI -->
+          <div class="sg-landing__text">
+            <div class="sg-landing__kicker">
+              <span class="sg-landing__kicker-dot"></span>
+              <span>SUNOVA DERMA-AI · 60 GIÂY PHÂN TÍCH</span>
+            </div>
+            <h1 class="sg-landing__title">
+              Khám Phá Kem Chống Nắng
+              <span class="sg-landing__title-accent">Hoàn Hảo Cho Làn Da</span>
+            </h1>
+            <p class="sg-landing__desc">
+              Chỉ với vài câu hỏi trắc nghiệm nhanh, hệ thống da liễu chuyên sâu của SUNOVA sẽ phân tích chính xác tình trạng da và gợi ý công thức màng lọc UV phù hợp nhất với bạn.
+            </p>
+
+            <div class="sg-landing__cta-wrap">
+              <button class="sg-landing__cta" @click="startQuiz" :disabled="loading">
+                <span>{{ loading ? 'ĐANG TẢI CÂU HỎI...' : 'BẮT ĐẦU BÀI TEST NGAY' }}</span>
+                <Icon icon="solar:arrow-right-linear" width="18" class="sg-landing__cta-icon" />
+              </button>
+              <div class="sg-landing__cta-sub">
+                <Icon icon="solar:check-circle-bold" width="16" />
+                <span>100% Miễn phí · Nhận ngay kết quả & gợi ý combo</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="sg-landing__text">
-          <p class="sg-landing__brand">SUNOVA</p>
-          <h1 class="sg-landing__title">TÌM SẢN PHẨM<br/>CHỐNG NẮNG<br/>YÊU THÍCH MỚI</h1>
-          <p class="sg-landing__desc">
-            Sản phẩm chống nắng hoàn hảo chỉ cách bạn vài câu hỏi! Hệ thống SUNOVA sẽ phân tích và gợi ý sản phẩm phù hợp nhất với làn da bạn.
-          </p>
-          <button class="sg-landing__cta" @click="startQuiz" :disabled="loading">
-            {{ loading ? 'ĐANG TẢI...' : 'BẮT ĐẦU QUIZ' }}
-          </button>
+        <!-- 3 TRUST POINTS BÊN DƯỚI -->
+        <div class="sg-landing__features">
+          <div class="sg-feature-item">
+            <div class="sg-feature-item__icon">
+              <Icon icon="solar:stopwatch-bold" width="22" />
+            </div>
+            <div class="sg-feature-item__body">
+              <strong>Chỉ mất 1 phút</strong>
+              <p>5 câu hỏi trắc nghiệm trực quan, dễ thực hiện</p>
+            </div>
+          </div>
+          <div class="sg-feature-item">
+            <div class="sg-feature-item__icon">
+              <Icon icon="solar:test-tube-bold" width="22" />
+            </div>
+            <div class="sg-feature-item__body">
+              <strong>Chuẩn khoa học da liễu</strong>
+              <p>Đánh giá theo loại da, độ nhạy cảm & môi trường</p>
+            </div>
+          </div>
+          <div class="sg-feature-item">
+            <div class="sg-feature-item__icon">
+              <Icon icon="solar:magic-stick-3-bold" width="22" />
+            </div>
+            <div class="sg-feature-item__body">
+              <strong>Gợi ý cá nhân hoá</strong>
+              <p>Chính xác chỉ số SPF/PA và combo chăm sóc da lý tưởng</p>
+            </div>
+          </div>
         </div>
       </div>
-
     </div>
 
     <div v-else class="sg-quiz">
@@ -610,11 +686,11 @@ const retakeQuiz = () => {
   --sq-espresso: #241a12;
   --sq-dark: #1a1412;
   --sq-card-bg: #2e2218;
-  --sq-cream: #f9f5f0;
-  --sq-warm-white: #fffdfa;
+  --sq-cream: #ffffff;
+  --sq-warm-white: #ffffff;
   --sq-gold: #c9a96e;
   --sq-gold-dark: #9e7340;
-  --sq-gold-light: #d4bc8a;
+  --sq-gold-light: #e5d3ab;
   --sq-sand: #e8dcc8;
   --sq-text-muted: #5a4f46;
   --sq-border: #3e3228;
@@ -625,7 +701,9 @@ const retakeQuiz = () => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: linear-gradient(165deg, #fff59d 0%, #fff176 50%, #ffee58 100%);
+  background: radial-gradient(ellipse at 50% 12%, #fffdf8 0%, #fbf6ec 45%, #f5ece0 100%);
+  position: relative;
+  overflow: hidden;
 }
 
 /* ============================================
@@ -689,60 +767,348 @@ const retakeQuiz = () => {
 .modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
 
 /* ============================================
-   LANDING PAGE
+   LANDING PAGE — LUXURY EDITORIAL
    ============================================ */
 .sg-landing {
   flex: 1;
-  display: flex; flex-direction: column; align-items: center;
-  justify-content: center; padding: 60px 24px 40px;
+  width: 100%;
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 40px 24px 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sg-landing__card {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(201, 169, 110, 0.3);
+  border-radius: 28px;
+  padding: 56px 48px 44px;
+  box-shadow: 0 20px 60px rgba(36, 26, 18, 0.06), 0 4px 16px rgba(201, 169, 110, 0.08);
 }
 
 .sg-landing__content {
-  display: flex; align-items: center; gap: 60px;
-  max-width: 960px; width: 100%; margin-bottom: 48px;
+  display: flex;
+  align-items: center;
+  gap: 60px;
+  margin-bottom: 48px;
 }
 
+/* VISUAL BÊN TRÁI */
 .sg-landing__visual {
-  position: relative; flex-shrink: 0; width: 340px; height: 340px;
-  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+  width: 380px;
+  height: 380px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.sg-landing__circle {
-  position: absolute; width: 300px; height: 300px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--sq-gold) 0%, var(--sq-gold-light) 100%);
-  animation: lp-pulse 3s ease-in-out infinite;
+.sg-visual-orbit {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-@keyframes lp-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.04); } }
-
-.sg-landing__product { 
-  position: relative; z-index: 1; font-family: 'Playfair Display', serif; 
-  font-size: 52px; font-weight: 700; color: var(--sq-espresso); letter-spacing: 4px;
+.sg-visual-orbit__glow {
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201, 169, 110, 0.3) 0%, rgba(201, 169, 110, 0.06) 60%, transparent 80%);
+  filter: blur(24px);
+  animation: visual-pulse 4s ease-in-out infinite;
 }
 
-.sg-landing__text { flex: 1; }
-.sg-landing__brand { font-size: 18px; font-style: italic; color: var(--sq-espresso); margin: 0 0 12px; letter-spacing: 1px; }
+.sg-visual-orbit__ring {
+  position: absolute;
+  width: 310px;
+  height: 310px;
+  border-radius: 50%;
+  border: 1px dashed rgba(201, 169, 110, 0.45);
+  animation: visual-spin 35s linear infinite;
+}
+
+.sg-visual-orbit__ring-outer {
+  position: absolute;
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  border: 1px solid rgba(201, 169, 110, 0.18);
+}
+
+.sg-visual-center {
+  position: relative;
+  z-index: 2;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #ffffff 0%, #fdfbf7 50%, #f5ebd7 100%);
+  border: 2px solid rgba(201, 169, 110, 0.55);
+  box-shadow: 0 16px 40px rgba(36, 26, 18, 0.1), inset 0 2px 6px rgba(255, 255, 255, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 16px;
+  transition: transform 0.4s ease;
+}
+
+.sg-visual-center:hover {
+  transform: scale(1.03);
+}
+
+.sg-visual-center__logo {
+  width: 92px;
+  height: 92px;
+  object-fit: contain;
+  margin-bottom: 6px;
+  filter: drop-shadow(0 4px 12px rgba(201, 169, 110, 0.35));
+  animation: sun-float 3s ease-in-out infinite;
+}
+
+.sg-visual-center__brand {
+  font-family: 'Playfair Display', serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--sq-espresso);
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+
+.sg-visual-center__pa {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--sq-gold-dark);
+  margin-top: 4px;
+}
+
+/* Floating Pills */
+.sg-visual-pill {
+  position: absolute;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(201, 169, 110, 0.35);
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(36, 26, 18, 0.08);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--sq-espresso);
+  white-space: nowrap;
+  animation: pill-float 4s ease-in-out infinite;
+}
+
+.sg-pill-icon {
+  color: var(--sq-gold-dark);
+  flex-shrink: 0;
+}
+
+.sg-visual-pill--top {
+  top: 15px;
+  right: -10px;
+  animation-delay: 0s;
+}
+
+.sg-visual-pill--bottom {
+  bottom: 25px;
+  right: -20px;
+  animation-delay: 1.5s;
+}
+
+.sg-visual-pill--side {
+  bottom: 40px;
+  left: -20px;
+  animation-delay: 2.5s;
+}
+
+@keyframes visual-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes visual-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
+@keyframes sun-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes pill-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* NỘI DUNG BÊN PHẢI */
+.sg-landing__text {
+  flex: 1;
+}
+
+.sg-landing__kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(201, 169, 110, 0.12);
+  border: 1px solid rgba(201, 169, 110, 0.35);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--sq-gold-dark);
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+.sg-landing__kicker-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sq-gold);
+  box-shadow: 0 0 6px var(--sq-gold);
+}
 
 .sg-landing__title {
-  font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 700;
-  color: var(--sq-espresso); line-height: 1.1; margin: 0 0 18px;
+  font-family: 'Playfair Display', serif;
+  font-size: 42px;
+  font-weight: 700;
+  color: var(--sq-espresso);
+  line-height: 1.18;
+  margin: 0 0 16px;
+  letter-spacing: -0.5px;
 }
 
-.sg-landing__desc { font-size: 15px; color: var(--sq-text-muted); line-height: 1.7; margin: 0 0 28px; max-width: 420px; }
+.sg-landing__title-accent {
+  display: block;
+  font-style: italic;
+  font-weight: 600;
+  color: var(--sq-gold-dark);
+}
+
+.sg-landing__desc {
+  font-size: 15px;
+  color: var(--sq-text-muted);
+  line-height: 1.7;
+  margin: 0 0 28px;
+  max-width: 520px;
+}
+
+/* CTA */
+.sg-landing__cta-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
 
 .sg-landing__cta {
-  background: var(--sq-espresso); color: var(--sq-cream); border: none;
-  padding: 16px 42px; font-size: 14px; font-weight: 700; letter-spacing: 2px;
-  border-radius: 8px; cursor: pointer; transition: all 0.3s;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #241a12 0%, #3a2a1e 100%);
+  color: #fffdf8;
+  border: 1px solid rgba(201, 169, 110, 0.4);
+  padding: 16px 36px;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 8px 24px rgba(36, 26, 18, 0.22);
 }
-.sg-landing__cta:hover:not(:disabled) { background: var(--sq-dark); color: var(--sq-cream); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(36,26,18,0.3); }
-.sg-landing__cta:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* Testimonial */
-.sg-landing__testimonial { position: relative; max-width: 520px; }
-.sg-testimonial__card { background: var(--sq-espresso); border: 1px solid var(--sq-border); border-radius: 10px; padding: 20px 24px; text-align: center;}
-.sg-testimonial__text { font-size: 13px; font-style: italic; line-height: 1.6; margin: 0 0 10px; color: var(--sq-espresso); opacity: 0.9; }
-.sg-testimonial__author { font-size: 12px; margin: 0; color: var(--sq-espresso); }
+.sg-landing__cta:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, #1a1412 0%, #2e2016 100%);
+  box-shadow: 0 12px 32px rgba(36, 26, 18, 0.32);
+  border-color: var(--sq-gold);
+}
+
+.sg-landing__cta-icon {
+  transition: transform 0.25s;
+}
+
+.sg-landing__cta:hover .sg-landing__cta-icon {
+  transform: translateX(4px);
+}
+
+.sg-landing__cta:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.sg-landing__cta-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--sq-gold-dark);
+  font-weight: 500;
+}
+
+/* 3 TRUST FEATURES BÊN DƯỚI */
+.sg-landing__features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  padding-top: 36px;
+  border-top: 1px solid rgba(201, 169, 110, 0.2);
+}
+
+.sg-feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.sg-feature-item__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(201, 169, 110, 0.12);
+  border: 1px solid rgba(201, 169, 110, 0.3);
+  color: var(--sq-gold-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sg-feature-item__body strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--sq-espresso);
+  margin-bottom: 3px;
+}
+
+.sg-feature-item__body p {
+  font-size: 12.5px;
+  color: var(--sq-text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
 
 /* ============================================
    QUIZ MAIN AREA
@@ -926,13 +1292,25 @@ const retakeQuiz = () => {
 .quiz-close-btn:hover { background: rgba(36,26,18,0.1); border-color: var(--sq-espresso); transform: scale(1.05); }
 
 /* RESPONSIVE */
-@media (max-width: 900px) {
-  .sg-landing__content { flex-direction: column; text-align: center; gap: 28px; }
-  .sg-landing__visual { width: 220px; height: 220px; }
-  .sg-landing__circle { width: 200px; height: 200px; }
-  .sg-landing__product { font-size: 38px; }
+@media (max-width: 960px) {
+  .sg-landing { padding: 24px 16px 40px; }
+  .sg-landing__card { padding: 36px 20px 32px; border-radius: 20px; }
+  .sg-landing__content { flex-direction: column; text-align: center; gap: 36px; margin-bottom: 36px; }
+  .sg-landing__visual { width: 300px; height: 300px; }
+  .sg-visual-orbit__ring { width: 250px; height: 250px; }
+  .sg-visual-orbit__ring-outer { width: 290px; height: 290px; }
+  .sg-visual-center { width: 180px; height: 180px; }
+  .sg-visual-center__logo { width: 76px; height: 76px; }
+  .sg-visual-center__brand { font-size: 15px; }
+  .sg-visual-pill--top { top: 0; right: 0; }
+  .sg-visual-pill--bottom { bottom: 0; right: 0; }
+  .sg-visual-pill--side { display: none; }
   .sg-landing__title { font-size: 30px; }
-  .sg-landing__desc { margin-left: auto; margin-right: auto; }
+  .sg-landing__desc { margin-left: auto; margin-right: auto; font-size: 14px; }
+  .sg-landing__cta-wrap { align-items: center; }
+  .sg-landing__cta { width: 100%; max-width: 320px; justify-content: center; }
+  .sg-landing__features { grid-template-columns: 1fr; gap: 16px; padding-top: 24px; }
+  .sg-feature-item { justify-content: center; text-align: left; }
   .sg-question__layout.has-quote { flex-direction: column; gap: 24px; }
   .sg-question__quote-col { display: none; }
   .sg-question__title { font-size: 22px; }
@@ -942,7 +1320,7 @@ const retakeQuiz = () => {
   .sg-answers--2 .sg-answer-card, .sg-answers--3 .sg-answer-card, .sg-answers--4 .sg-answer-card { width: calc(50% - 8px); min-height: 100px; padding: 16px 12px; }
   .sg-answer-card__label { font-size: 14px; }
   .sg-product-grid { grid-template-columns: repeat(2, 1fr); }
-  .sg-landing__title { font-size: 26px; }
+  .sg-landing__title { font-size: 24px; }
   .sg-progress__sun { font-size: 28px; top: -12px; right: -14px; }
   .sg-result__title { font-size: 22px; }
   .sg-result__skin-name { font-size: 24px; }
