@@ -1,6 +1,28 @@
 <template>
   <div class="sg-quiz-root">
 
+    <!-- HIỆU ỨNG BONG BÓNG BAY LƠ LỬNG NỀN XUNG QUANH QUIZ KÈM ẢNH SẢN PHẨM -->
+    <div class="sg-quiz-bubbles" aria-hidden="true">
+      <div
+        v-for="(bubble, idx) in backgroundBubbles"
+        :key="bubble.id"
+        class="sg-quiz-bubble"
+        :style="bubble.style"
+      >
+        <div class="sg-quiz-bubble__inner">
+          <div class="sg-quiz-bubble__specular"></div>
+          <div class="sg-quiz-bubble__rim"></div>
+          <img
+            :src="(!bubbleImgErrors[idx] && bubble.image) ? bubble.image : sunovaMarkImg"
+            :alt="bubble.name"
+            class="sg-quiz-bubble__img"
+            loading="lazy"
+            @error="handleBubbleImgError(idx)"
+          />
+        </div>
+      </div>
+    </div>
+
     <transition name="modal-fade">
       <div v-if="showExitModal" class="sunova-modal-overlay">
         <div class="sunova-modal">
@@ -328,8 +350,80 @@ import { getQuizQuestions, saveQuizResult } from '@/api/quizApi';
 import { getRoutinesByLoaiDa } from '@/api/routineApi';
 import { rankProductsByQuiz, saveQuizProfile } from '@/utils/quizRecommend';
 import { productImageUrl } from '@/utils/productImage';
+import sunovaMarkImg from '@/assets/logo/sunova_mark.png';
 
 const router = useRouter();
+
+// ============================================
+// HIỆU ỨNG BONG BÓNG BAY LƠ LỬNG NỀN QUIZ
+// ============================================
+const bubbleImgErrors = ref({});
+const handleBubbleImgError = (idx) => {
+  bubbleImgErrors.value[idx] = true;
+};
+
+// Cấu hình 20 bong bóng bay chìm khắp nền (trải đều toàn bộ bề ngang, đi chìm sau lưng phần Quiz)
+const BUBBLE_CONFIGS = [
+  // Nhóm lề trái
+  { left: '3%',  size: 74, duration: 21, delay: -3,  swayDuration: 4.2, opacity: 0.88 },
+  { left: '8%',  size: 88, duration: 25, delay: -11, swayDuration: 5.0, opacity: 0.90 },
+  { left: '15%', size: 62, duration: 19, delay: -7,  swayDuration: 3.8, opacity: 0.85 },
+  
+  // Nhóm chìm sau nửa trái phần Quiz (visual orbit & câu hỏi bên trái)
+  { left: '21%', size: 84, duration: 23, delay: -17, swayDuration: 4.6, opacity: 0.88 },
+  { left: '27%', size: 66, duration: 20, delay: -4,  swayDuration: 4.1, opacity: 0.80 },
+  { left: '33%', size: 90, duration: 26, delay: -14, swayDuration: 5.2, opacity: 0.90 },
+  { left: '38%', size: 58, duration: 28, delay: -9,  swayDuration: 4.4, opacity: 0.75 },
+
+  // Nhóm chìm chính giữa phía sau Quiz (tâm card & giữa các đáp án)
+  { left: '44%', size: 76, duration: 22, delay: -2,  swayDuration: 4.0, opacity: 0.85 },
+  { left: '50%', size: 86, duration: 24, delay: -19, swayDuration: 4.8, opacity: 0.88 },
+  { left: '56%', size: 68, duration: 21, delay: -6,  swayDuration: 4.3, opacity: 0.82 },
+
+  // Nhóm chìm sau nửa phải phần Quiz (nội dung text, CTA & câu hỏi bên phải)
+  { left: '62%', size: 92, duration: 27, delay: -15, swayDuration: 5.4, opacity: 0.90 },
+  { left: '67%', size: 64, duration: 19, delay: -10, swayDuration: 3.9, opacity: 0.82 },
+  { left: '73%', size: 82, duration: 23, delay: -22, swayDuration: 4.7, opacity: 0.86 },
+  { left: '78%', size: 58, duration: 20, delay: -1,  swayDuration: 4.2, opacity: 0.78 },
+
+  // Nhóm lề phải
+  { left: '83%', size: 86, duration: 24, delay: -8,  swayDuration: 4.9, opacity: 0.90 },
+  { left: '88%', size: 70, duration: 22, delay: -16, swayDuration: 4.5, opacity: 0.85 },
+  { left: '93%', size: 90, duration: 26, delay: -12, swayDuration: 5.1, opacity: 0.90 },
+  { left: '97%', size: 56, duration: 18, delay: -13, swayDuration: 3.7, opacity: 0.78 },
+
+  // Nhóm nền sâu tăng hiệu ứng đa tầng
+  { left: '18%', size: 78, duration: 24, delay: -24, swayDuration: 4.5, opacity: 0.82 },
+  { left: '48%', size: 94, duration: 25, delay: -18, swayDuration: 5.0, opacity: 0.88 },
+];
+
+// Danh sách sản phẩm có ảnh hợp lệ
+const bubbleProducts = computed(() => {
+  return allProducts.value.filter(p => p.anhChinhUrl && typeof p.anhChinhUrl === 'string' && p.anhChinhUrl.trim() !== '');
+});
+
+// Danh sách bong bóng hoàn chỉnh kèm style & ảnh sản phẩm
+const backgroundBubbles = computed(() => {
+  const prods = bubbleProducts.value;
+  return BUBBLE_CONFIGS.map((cfg, idx) => {
+    const prod = prods.length > 0 ? prods[idx % prods.length] : null;
+    const rawImg = prod?.anhChinhUrl ? productImageUrl(prod.anhChinhUrl) : null;
+    return {
+      id: idx,
+      name: prod?.ten || 'SUNOVA Sunscreen',
+      image: rawImg,
+      style: {
+        left: cfg.left,
+        width: `${cfg.size}px`,
+        height: `${cfg.size}px`,
+        animationDuration: `${cfg.duration}s`,
+        animationDelay: `${cfg.delay}s`,
+        '--bubble-opacity': cfg.opacity,
+        '--bubble-sway-duration': `${cfg.swayDuration}s`,
+      },
+    };
+  });
+});
 
 // ============================================
 // STATE
@@ -767,6 +861,140 @@ const retakeQuiz = () => {
 .modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
 
 /* ============================================
+   BONG BÓNG BAY LƠ LỬNG NỀN XUNG QUANH QUIZ
+   ============================================ */
+.sg-quiz-bubbles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.sg-quiz-bubble {
+  position: absolute;
+  bottom: -130px;
+  animation-name: bubble-rise;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: bottom, opacity;
+  pointer-events: none;
+}
+
+.sg-quiz-bubble__inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: radial-gradient(
+    circle at 35% 28%,
+    rgba(255, 255, 255, 0.98) 0%,
+    rgba(255, 255, 255, 0.85) 40%,
+    rgba(250, 244, 235, 0.6) 70%,
+    rgba(201, 169, 110, 0.35) 100%
+  );
+  border: 1.5px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    inset 0 0 14px rgba(255, 255, 255, 0.85),
+    inset -3px -3px 8px rgba(201, 169, 110, 0.2),
+    0 8px 22px rgba(36, 26, 18, 0.08),
+    0 2px 6px rgba(201, 169, 110, 0.14);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation-name: bubble-sway;
+  animation-duration: var(--bubble-sway-duration, 4s);
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  will-change: transform;
+}
+
+/* Ánh sáng bóng sáng góc trên bên trái */
+.sg-quiz-bubble__specular {
+  position: absolute;
+  top: 8%;
+  left: 12%;
+  width: 34%;
+  height: 22%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 255, 255, 0.98) 0%,
+    rgba(255, 255, 255, 0.65) 45%,
+    rgba(255, 255, 255, 0) 80%
+  );
+  transform: rotate(-35deg);
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* Viền xà cừ óng ánh tinh tế */
+.sg-quiz-bubble__rim {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 75% 78%,
+    rgba(201, 169, 110, 0.3) 0%,
+    rgba(255, 215, 140, 0.15) 40%,
+    transparent 70%
+  );
+  box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Ảnh sản phẩm bo tròn 100% theo hình dạng bong bóng */
+.sg-quiz-bubble__img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  user-select: none;
+  pointer-events: none;
+  z-index: 2;
+  display: block;
+  transform: scale(0.92);
+  transition: transform 0.3s ease;
+}
+
+/* Keyframes bong bóng bay lên */
+@keyframes bubble-rise {
+  0% {
+    bottom: -130px;
+    opacity: 0;
+  }
+  5% {
+    opacity: var(--bubble-opacity, 0.85);
+  }
+  88% {
+    opacity: var(--bubble-opacity, 0.85);
+  }
+  100% {
+    bottom: 108%;
+    opacity: 0;
+  }
+}
+
+/* Keyframes lắc lư uốn lượn */
+@keyframes bubble-sway {
+  0% {
+    transform: translateX(-16px) rotate(-6deg) scale(0.96);
+  }
+  50% {
+    transform: translateX(12px) rotate(4deg) scale(1.02);
+  }
+  100% {
+    transform: translateX(-14px) rotate(-5deg) scale(0.98);
+  }
+}
+
+/* ============================================
    LANDING PAGE — LUXURY EDITORIAL
    ============================================ */
 .sg-landing {
@@ -778,14 +1006,16 @@ const retakeQuiz = () => {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  z-index: 1;
 }
 
 .sg-landing__card {
   width: 100%;
-  background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(201, 169, 110, 0.3);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(201, 169, 110, 0.32);
   border-radius: 28px;
   padding: 56px 48px 44px;
   box-shadow: 0 20px 60px rgba(36, 26, 18, 0.06), 0 4px 16px rgba(201, 169, 110, 0.08);
@@ -1117,6 +1347,8 @@ const retakeQuiz = () => {
   flex: 1;
   padding: 30px 24px 60px;
   display: flex; flex-direction: column; align-items: center;
+  position: relative;
+  z-index: 1;
 }
 
 /* Progress */
@@ -1193,12 +1425,59 @@ const retakeQuiz = () => {
 .sg-btn-next:hover:not(:disabled) { background: var(--sq-dark); color: var(--sq-cream); transform: translateY(-2px); }
 .sg-btn-next:disabled { opacity: 0.35; cursor: not-allowed; }
 
-/* WHY WE ASK */
-.sg-why { position: relative; max-width: 500px; margin: 36px auto 0; }
-.sg-why__badge { position: absolute; top: -16px; right: -10px; z-index: 2; width: 38px; height: 38px; border-radius: 50%; background: var(--sq-gold); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; color: var(--sq-espresso); box-shadow: 0 3px 10px rgba(0,0,0,0.2); }
-.sg-why__card { background: var(--sq-espresso); border: 1px solid var(--sq-border); border-radius: 10px; padding: 18px 22px; }
-.sg-why__title { font-size: 12px; font-weight: 800; letter-spacing: 1.5px; margin: 0 0 6px; color: var(--sq-gold); }
-.sg-why__text { font-size: 13px; line-height: 1.6; margin: 0; color: var(--sq-cream); opacity: 0.9; }
+/* WHY WE ASK — LUXURY FROSTED IVORY & GOLD */
+.sg-why {
+  position: relative;
+  max-width: 540px;
+  width: 100%;
+  margin: 36px auto 0;
+}
+
+.sg-why__badge {
+  position: absolute;
+  top: -13px;
+  right: 18px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e4cca0 0%, #c9a96e 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 800;
+  color: #ffffff;
+  border: 2px solid #ffffff;
+  box-shadow: 0 4px 12px rgba(201, 169, 110, 0.35);
+}
+
+.sg-why__card {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.94) 0%, rgba(254, 250, 244, 0.88) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(201, 169, 110, 0.35);
+  border-radius: 16px;
+  padding: 18px 24px;
+  box-shadow: 0 10px 30px rgba(36, 26, 18, 0.05), 0 2px 8px rgba(201, 169, 110, 0.07);
+  text-align: left;
+}
+
+.sg-why__title {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+  margin: 0 0 6px;
+  color: var(--sq-gold-dark);
+}
+
+.sg-why__text {
+  font-size: 13.5px;
+  line-height: 1.6;
+  margin: 0;
+  color: var(--sq-espresso);
+  opacity: 0.88;
+}
 
 /* ============================================
    ANALYZING
