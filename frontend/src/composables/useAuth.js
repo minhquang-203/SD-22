@@ -62,6 +62,20 @@ function clearStorage() {
   localStorage.removeItem(STORAGE_KEY)
 }
 
+async function syncGuestQuizOnLogin() {
+  try {
+    const raw = localStorage.getItem('sunova_quiz_profile')
+    if (!raw) return
+    const profile = JSON.parse(raw)
+    if (profile?.idLoaiDa) {
+      const { saveQuizResult } = await import('@/api/quizApi')
+      await saveQuizResult({ idLoaiDa: Number(profile.idLoaiDa) })
+    }
+  } catch {
+    // ignore
+  }
+}
+
 function applyAuth(data) {
   token.value = data.token
   id.value = Number(data.id) || decodeTokenSubject(data.token) || null
@@ -74,6 +88,7 @@ function applyAuth(data) {
   } catch {
     // ignore
   }
+  syncGuestQuizOnLogin()
   notifyAuthChanged(true)
 }
 

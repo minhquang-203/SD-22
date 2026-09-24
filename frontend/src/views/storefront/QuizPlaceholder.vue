@@ -125,7 +125,7 @@
             </div>
             <div class="sg-feature-item__body">
               <strong>Chỉ mất 1 phút</strong>
-              <p>5 câu hỏi trắc nghiệm trực quan, dễ thực hiện</p>
+              <p>{{ totalSteps > 0 ? totalSteps : 5 }} câu hỏi trắc nghiệm trực quan, dễ thực hiện</p>
             </div>
           </div>
           <div class="sg-feature-item">
@@ -152,7 +152,7 @@
 
     <div v-else class="sg-quiz">
 
-      <div class="sg-quiz__header">
+      <div class="sg-quiz__header" v-if="!showResult">
         <div class="sg-progress">
           <button
             v-if="currentStep > 1 && !analyzing && !showResult"
@@ -197,13 +197,18 @@
               <h2 class="sg-question__title">{{ currentQuestion.title }}</h2>
               <p class="sg-question__hint">Chọn một đáp án.</p>
 
-              <div class="sg-answers" :class="answerLayoutClass">
+              <div class="sg-answers" :class="answerLayoutClass" role="radiogroup">
                 <div
                   v-for="(answer, index) in currentQuestion.answers"
                   :key="index"
                   class="sg-answer-card"
                   :class="{ 'sg-answer-card--selected': isSelected(answer) }"
+                  role="radio"
+                  :aria-checked="isSelected(answer)"
+                  tabindex="0"
                   @click="selectAnswer(answer)"
+                  @keydown.enter.prevent="selectAnswer(answer)"
+                  @keydown.space.prevent="selectAnswer(answer)"
                 >
                   <Icon v-if="answer.icon" :icon="answer.icon" class="sg-answer-card__icon" />
                   <h3 class="sg-answer-card__label">{{ answer.label }}</h3>
@@ -251,7 +256,16 @@
               </div>
               <div class="sg-hero-card__info">
                 <h3 class="sg-hero-card__name">{{ recommendedProducts[0].ten }}</h3>
-                <p class="sg-hero-card__price">{{ (recommendedProducts[0].giaMin || recommendedProducts[0].gia) ? formatPrice(recommendedProducts[0].giaMin || recommendedProducts[0].gia) : 'Khám phá ngay ➔' }}</p>
+                <p class="sg-hero-card__price">
+                  <template v-if="recommendedProducts[0].giaSauGiamMin && recommendedProducts[0].giaSauGiamMin < (recommendedProducts[0].giaMin || recommendedProducts[0].gia)">
+                    <span class="sg-price--sale">{{ formatPrice(recommendedProducts[0].giaSauGiamMin) }}</span>
+                    <span class="sg-price--old">{{ formatPrice(recommendedProducts[0].giaMin || recommendedProducts[0].gia) }}</span>
+                  </template>
+                  <template v-else-if="recommendedProducts[0].giaMin || recommendedProducts[0].gia">
+                    {{ formatPrice(recommendedProducts[0].giaMin || recommendedProducts[0].gia) }}
+                  </template>
+                  <template v-else>Khám phá ngay ➔</template>
+                </p>
                 <p class="sg-hero-card__desc">Sản phẩm hoàn hảo nhất đáp ứng các nhu cầu về làn da của bạn. Công thức mỏng nhẹ, bảo vệ tối ưu dưới tác động của tia UV.</p>
                 <button class="sg-btn-buy">XEM CHI TIẾT</button>
               </div>
@@ -450,8 +464,8 @@ const LOAI_DA_INFO = {
   1: { name: 'Da Dầu', desc: 'Da bạn tiết nhiều dầu, dễ bóng nhờn. Nên chọn sản phẩm chống nắng dạng gel, kiềm dầu, kết cấu mỏng nhẹ.' },
   2: { name: 'Da Khô', desc: 'Da bạn thiếu ẩm, dễ bong tróc. Nên chọn sản phẩm chống nắng dưỡng ẩm sâu, dạng kem đặc.' },
   3: { name: 'Da Hỗn Hợp', desc: 'Da bạn vừa dầu vừa khô theo vùng. Nên chọn sản phẩm chống nắng cân bằng, không quá đặc cũng không quá loãng.' },
-  4: { name: 'Da Nhạy Cảm', desc: 'Da bạn dễ kích ứng, mẩn đỏ. Nên chọn sản phẩm chống nắng vật lý (mineral), lành tính, không cồn.' },
-  5: { name: 'Da Thường', desc: 'Da bạn cân bằng, khỏe mạnh. Bạn có thể dùng hầu hết các loại chống nắng, hãy chọn theo sở thích!' },
+  4: { name: 'Da Thường', desc: 'Da bạn cân bằng, khỏe mạnh. Bạn có thể dùng hầu hết các loại chống nắng, hãy chọn theo sở thích!' },
+  5: { name: 'Da Nhạy Cảm', desc: 'Da bạn dễ kích ứng, mẩn đỏ. Nên chọn sản phẩm chống nắng vật lý (mineral), lành tính, không cồn.' },
 };
 
 const WHY_WE_ASK = [
@@ -533,6 +547,8 @@ const handleBeforeUnload = (e) => {
   }
 };
 
+let analyzeTimer = null;
+
 onMounted(() => {
   window.addEventListener('beforeunload', handleBeforeUnload);
   fetchQuizQuestions();
@@ -541,6 +557,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload);
+  if (analyzeTimer) clearTimeout(analyzeTimer);
 });
 
 const cancelExit = () => {
@@ -585,7 +602,10 @@ const fetchProducts = async () => {
 // QUIZ LOGIC
 // ============================================
 const startQuiz = () => {
-  if (questions.value.length === 0) return;
+  if (questions.value.length === 0) {
+    fetchQuizQuestions();
+    return;
+  }
   quizStarted.value = true;
   currentStep.value = 1;
   allowLeave.value = false; 
@@ -651,18 +671,18 @@ const calculateResult = () => {
     }
   });
 
-  // Fallback nếu không có điểm nào
-  if (topSkinTypes.length === 0) topSkinTypes.push(5);
+  // Fallback nếu không có điểm nào -> Da thường (ID 4)
+  if (topSkinTypes.length === 0) topSkinTypes.push(4);
 
-  // Hiển thị tên kết hợp (VD: "Da Dầu & Da Nhạy Cảm")
-  const skinNames = topSkinTypes.map(id => LOAI_DA_INFO[id].name).join(' & ');
+  // Hiển thị tên kết hợp (VD: "Da Dầu & Da Nhạy Cảm") với fallback an toàn
+  const skinNames = topSkinTypes.map(id => LOAI_DA_INFO[id]?.name || `Loại da #${id}`).join(' & ');
   
-  // Hiển thị mô tả
+  // Hiển thị mô tả với fallback an toàn
   let skinDesc = '';
   if (topSkinTypes.length === 1) {
-    skinDesc = LOAI_DA_INFO[topSkinTypes[0]].desc;
+    skinDesc = LOAI_DA_INFO[topSkinTypes[0]]?.desc || '';
   } else {
-    skinDesc = 'Làn da của bạn có sự kết hợp của nhiều yếu tố. ' + topSkinTypes.map(id => LOAI_DA_INFO[id].desc).join(' ');
+    skinDesc = 'Làn da của bạn có sự kết hợp của nhiều yếu tố. ' + topSkinTypes.map(id => LOAI_DA_INFO[id]?.desc || '').filter(Boolean).join(' ');
   }
 
   resultData.value = { skinName: skinNames, description: skinDesc };
@@ -726,7 +746,8 @@ const calculateResult = () => {
   // Lưu kết quả vào DB ngầm
   saveQuizResult({ idLoaiDa: topSkinTypes[0] }).catch(err => console.error("Lỗi lưu quiz:", err));
 
-  setTimeout(() => { analyzing.value = false; showResult.value = true; }, 2500);
+  if (analyzeTimer) clearTimeout(analyzeTimer);
+  analyzeTimer = setTimeout(() => { analyzing.value = false; showResult.value = true; }, 2500);
 };
 
 const recommendProducts = (filters = []) => {
@@ -742,7 +763,6 @@ const recommendProducts = (filters = []) => {
 // NAVIGATION HELPERS
 // ============================================
 const formatPrice = (p) => p ? Math.round(p).toLocaleString('vi-VN') + ' đ' : '0 đ';
-const getImageUrl = (path) => { if (!path) return ''; return (path.startsWith('http') || path.startsWith('/')) ? path : `/uploads/${path}`; };
 
 const goToProducts = () => {
   allowLeave.value = true;
@@ -754,12 +774,8 @@ const goToProduct = (id) => {
   router.push(`/san-pham/${id}`);
 };
 
-const goHome = () => {
-  allowLeave.value = true;
-  router.push('/');
-}
-
 const retakeQuiz = () => {
+  if (analyzeTimer) clearTimeout(analyzeTimer);
   selectedAnswers.value = {};
   scoreMap.value = {};
   resultData.value = { skinName: '', description: '' };
@@ -1561,14 +1577,18 @@ const retakeQuiz = () => {
 .sg-slide-enter-from { opacity: 0; transform: translateX(40px); }
 .sg-slide-leave-to { opacity: 0; transform: translateX(-40px); }
 
-/* Nút Đóng */
-.quiz-close-btn {
-  position: fixed; top: 20px; right: 24px; z-index: 100;
-  background: transparent; border: 1.5px solid rgba(36,26,18,0.3); color: var(--sq-espresso);
-  width: 44px; height: 44px; border-radius: 50%; font-size: 24px;
-  cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s;
+/* Giá khuyến mãi & giá gốc */
+.sg-price--sale {
+  color: var(--sq-gold-dark);
+  font-weight: 800;
+  margin-right: 10px;
 }
-.quiz-close-btn:hover { background: rgba(36,26,18,0.1); border-color: var(--sq-espresso); transform: scale(1.05); }
+.sg-price--old {
+  font-size: 14px;
+  color: #999;
+  text-decoration: line-through;
+  font-weight: 400;
+}
 
 /* RESPONSIVE */
 @media (max-width: 960px) {
@@ -1595,14 +1615,40 @@ const retakeQuiz = () => {
   .sg-question__title { font-size: 22px; }
 }
 
+@media (max-width: 768px) {
+  .sg-hero-card {
+    flex-direction: column;
+  }
+  .sg-hero-card__img {
+    flex: none;
+    width: 100%;
+    max-height: 280px;
+  }
+  .sg-hero-card__info {
+    padding: 24px 20px;
+  }
+  .sg-hero-card__name {
+    font-size: 22px;
+  }
+  .sg-result__hero-label {
+    font-size: 24px;
+  }
+  .sg-result__explanation {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 20px;
+  }
+  .sg-routine-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
 @media (max-width: 640px) {
   .sg-answers--2 .sg-answer-card, .sg-answers--3 .sg-answer-card, .sg-answers--4 .sg-answer-card { width: calc(50% - 8px); min-height: 100px; padding: 16px 12px; }
   .sg-answer-card__label { font-size: 14px; }
-  .sg-product-grid { grid-template-columns: repeat(2, 1fr); }
   .sg-landing__title { font-size: 24px; }
   .sg-progress__sun { font-size: 28px; top: -12px; right: -14px; }
-  .sg-result__title { font-size: 22px; }
-  .sg-result__skin-name { font-size: 24px; }
 }
 
 
