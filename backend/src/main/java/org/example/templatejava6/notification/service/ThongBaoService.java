@@ -35,7 +35,11 @@ public class ThongBaoService {
         this.eventPublisher = eventPublisher;
     }
 
-    /** Tạo thông báo cho admin. Chạy giao dịch riêng + nuốt lỗi để không ảnh hưởng luồng nghiệp vụ chính. */
+    @Transactional
+    public void danhDauDaDocAdminTheoPhien(Integer idPhien) {
+        if (idPhien == null) return;
+        thongBaoRepository.markAdminReadByLoaiAndIdThamChieu(LoaiThongBao.TIN_HO_TRO_MOI, idPhien);
+    }
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void taoThongBao(LoaiThongBao loai, String tieuDe, String noiDung,
                             String link, Integer idThamChieu, String maThamChieu) {

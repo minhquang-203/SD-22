@@ -34,10 +34,12 @@ public class BanHangController {
     private PhieuGiamGiaService phieuGiamGiaService;
 
     @GetMapping("san-pham")
-    public List<BienTheBanResponse> danhSachSanPham(
+    public Page<BienTheBanResponse> danhSachSanPham(
             @RequestParam(value = "keyword", defaultValue = "") String keyword,
-            @RequestParam(value = "page", defaultValue = "0") Integer page) {
-        return banHangService.danhSachSanPhamBan(keyword, page);
+            @RequestParam(value = "page", defaultValue = "0") Integer page,
+            @RequestParam(value = "size", defaultValue = "18") Integer size,
+            @RequestParam(value = "danhMuc", defaultValue = "") String danhMuc) {
+        return banHangService.danhSachSanPhamBan(keyword, page, size, danhMuc);
     }
 
     @GetMapping("san-pham/tim")

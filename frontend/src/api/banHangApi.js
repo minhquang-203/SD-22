@@ -1,7 +1,14 @@
 import request from './request'
 
-export const getSanPhamBan = (keyword = '', page = 0) =>
-  request.get('/ban-hang/san-pham', { params: { keyword, page } })
+export const getSanPhamBan = (keyword = '', page = 0, size = 18, danhMuc = '') =>
+  request.get('/ban-hang/san-pham', {
+    params: {
+      keyword: keyword || undefined,
+      page,
+      size,
+      danhMuc: danhMuc || undefined,
+    },
+  })
 
 /** @deprecated dùng getSanPhamBan */
 export const timSanPham = (keyword) =>

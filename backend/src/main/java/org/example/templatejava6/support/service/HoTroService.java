@@ -6,6 +6,8 @@ import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.common.security.SecurityUtils;
 import org.example.templatejava6.customer.repository.KhachHangRepository;
 import org.example.templatejava6.order.repository.NhanVienRepository;
+import org.example.templatejava6.notification.enums.LoaiThongBao;
+import org.example.templatejava6.notification.service.ThongBaoService;
 import org.example.templatejava6.realtime.service.HoTroRealtimeService;
 import org.example.templatejava6.support.entity.PhienHoTro;
 import org.example.templatejava6.support.entity.TinNhanHoTro;
@@ -35,18 +37,21 @@ public class HoTroService {
     private final KhachHangRepository khachHangRepository;
     private final NhanVienRepository nhanVienRepository;
     private final HoTroRealtimeService hoTroRealtimeService;
+    private final ThongBaoService thongBaoService;
 
     public HoTroService(
             PhienHoTroRepository phienHoTroRepository,
             TinNhanHoTroRepository tinNhanHoTroRepository,
             KhachHangRepository khachHangRepository,
             NhanVienRepository nhanVienRepository,
-            HoTroRealtimeService hoTroRealtimeService) {
+            HoTroRealtimeService hoTroRealtimeService,
+            ThongBaoService thongBaoService) {
         this.phienHoTroRepository = phienHoTroRepository;
         this.tinNhanHoTroRepository = tinNhanHoTroRepository;
         this.khachHangRepository = khachHangRepository;
         this.nhanVienRepository = nhanVienRepository;
         this.hoTroRealtimeService = hoTroRealtimeService;
+        this.thongBaoService = thongBaoService;
     }
 
     @Transactional
@@ -112,6 +117,7 @@ public class HoTroService {
     public void danhDauDaDoc(Integer idPhien) {
         loadPhien(idPhien);
         tinNhanHoTroRepository.markDaDocByPhienAndNguoiGui(idPhien, NGUOI_KHACH);
+        thongBaoService.danhDauDaDocAdminTheoPhien(idPhien);
     }
 
     @Transactional(readOnly = true)
@@ -157,7 +163,27 @@ public class HoTroService {
         }
         TinNhanHoTroResponse res = toTinResponse(tin);
         hoTroRealtimeService.publishTinNhanMoi(phien, tin, res);
+        if (NGUOI_KHACH.equalsIgnoreCase(nguoiGui)) {
+            notifyAdminTinHoTroMoi(phien, noiDung);
+        }
         return res;
+    }
+
+    private void notifyAdminTinHoTroMoi(PhienHoTro phien, String noiDung) {
+        KhachHang kh = phien.getIdKhachHang();
+        String ten = kh != null && kh.getHoTen() != null && !kh.getHoTen().isBlank()
+                ? kh.getHoTen().trim()
+                : "Khách";
+        String sdt = kh != null && kh.getSoDienThoai() != null ? kh.getSoDienThoai().trim() : "";
+        String label = !sdt.isEmpty() ? ten + " (" + sdt + ")" : ten;
+        String tomTat = noiDung != null && noiDung.length() > 120 ? noiDung.substring(0, 117) + "…" : noiDung;
+        thongBaoService.taoThongBao(
+                LoaiThongBao.TIN_HO_TRO_MOI,
+                "Tin hỗ trợ mới",
+                "Khách " + label + " vừa nhắn hỗ trợ" + (tomTat != null && !tomTat.isBlank() ? ": " + tomTat : ""),
+                "/admin/support?phien=" + phien.getId(),
+                phien.getId(),
+                null);
     }
 
     private TinNhanHoTroResponse toTinResponse(TinNhanHoTro tin) {

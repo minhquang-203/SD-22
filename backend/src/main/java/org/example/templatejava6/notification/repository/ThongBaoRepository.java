@@ -30,4 +30,10 @@ public interface ThongBaoRepository extends JpaRepository<ThongBao, Integer> {
     @Modifying
     @Query("update ThongBao t set t.daDoc = true where t.daDoc = false and t.idKhachHang = :idKhachHang")
     int markAllKhachRead(@Param("idKhachHang") Integer idKhachHang);
+
+    @Modifying
+    @Query("update ThongBao t set t.daDoc = true where t.daDoc = false and t.idKhachHang is null "
+            + "and t.loai = :loai and t.idThamChieu = :idThamChieu")
+    int markAdminReadByLoaiAndIdThamChieu(@Param("loai") org.example.templatejava6.notification.enums.LoaiThongBao loai,
+                                          @Param("idThamChieu") Integer idThamChieu);
 }

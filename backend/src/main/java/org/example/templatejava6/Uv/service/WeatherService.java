@@ -17,7 +17,9 @@ public class WeatherService {
 
         try {
             // Bước 1: Tìm tọa độ từ tên thành phố
-            String geoUrl = "https://geocoding-api.open-meteo.com/v1/search?name=" + city + "&count=1";
+            String geoUrl = "https://geocoding-api.open-meteo.com/v1/search?name="
+                    + java.net.URLEncoder.encode(city, java.nio.charset.StandardCharsets.UTF_8)
+                    + "&count=1&language=vi";
             JsonNode geoResponse = restTemplate.getForObject(geoUrl, JsonNode.class);
 
             if (geoResponse != null && geoResponse.has("results")) {

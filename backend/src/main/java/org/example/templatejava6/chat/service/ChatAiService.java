@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.example.templatejava6.Uv.entity.WeatherData;
+import org.example.templatejava6.Uv.service.WeatherService;
 import org.example.templatejava6.chat.dto.ChatRequestDto;
 import org.example.templatejava6.chat.dto.ChatResponseDto;
 import org.example.templatejava6.chat.entity.PhienChatAi;
@@ -12,6 +14,8 @@ import org.example.templatejava6.chat.repository.PhienChatAiRepository;
 import org.example.templatejava6.chat.repository.TinNhanChatAiRepository;
 import org.example.templatejava6.common.entity.KhachHang;
 import org.example.templatejava6.common.exception.ApiException;
+import org.example.templatejava6.customer.entity.DiaChiKhachHang;
+import org.example.templatejava6.customer.repository.DiaChiKhachHangRepository;
 import org.example.templatejava6.customer.repository.KhachHangRepository;
 import org.example.templatejava6.product.entity.SanPham;
 import org.example.templatejava6.product.entity.SanPhamCongDung;
@@ -24,6 +28,8 @@ import org.example.templatejava6.product.repository.SanPhamLoaiDaRepository;
 import org.example.templatejava6.product.repository.SanPhamRepository;
 import org.example.templatejava6.product.repository.SanPhamThanhPhanRepository;
 import org.example.templatejava6.product.service.SanPhamService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
@@ -59,14 +65,36 @@ import org.springframework.context.event.EventListener;
 @Service
 public class ChatAiService {
 
+    private static final Logger log = LoggerFactory.getLogger(ChatAiService.class);
     private static final int HISTORY_LIMIT = 10;
     private static final long CATALOG_TTL_MS = 60 * 1000L;
     private static final Pattern PRODUCT_ID_PATTERN = Pattern.compile("\\[PRODUCT_ID:\\s*(\\d+)\\]");
     private static final NumberFormat VND = NumberFormat.getInstance(new Locale("vi", "VN"));
+    private static final String DEFAULT_UV_CITY_DISPLAY = "Hà Nội";
+    private static final String DEFAULT_UV_CITY_QUERY = "Hanoi";
+
+    /** alias (đã normalize) → [tên hiển thị, tên gửi Open-Meteo] */
+    private static final List<String[]> UV_CITY_ALIASES = List.of(
+            new String[]{"ha noi", "hanoi", "hn", "thanh pho ha noi", "Hà Nội", "Hanoi"},
+            new String[]{"sai gon", "tp hcm", "tphcm", "hcm", "ho chi minh", "thanh pho ho chi minh",
+                    "tp ho chi minh", "sg", "Sài Gòn (TP.HCM)", "Ho Chi Minh City"},
+            new String[]{"da nang", "thanh pho da nang", "dn", "Đà Nẵng", "Da Nang"},
+            new String[]{"hai phong", "thanh pho hai phong", "Hải Phòng", "Hai Phong"},
+            new String[]{"can tho", "thanh pho can tho", "Cần Thơ", "Can Tho"},
+            new String[]{"hue", "thua thien hue", "Huế", "Hue"},
+            new String[]{"nha trang", "khanh hoa", "Nha Trang", "Nha Trang"},
+            new String[]{"vung tau", "ba ria vung tau", "Vũng Tàu", "Vung Tau"},
+            new String[]{"da lat", "lam dong", "Đà Lạt", "Da Lat"},
+            new String[]{"quy nhon", "binh dinh", "Quy Nhơn", "Quy Nhon"},
+            new String[]{"bien hoa", "dong nai", "Biên Hòa", "Bien Hoa"},
+            new String[]{"buon ma thuot", "dak lak", "Buôn Ma Thuột", "Buon Ma Thuot"}
+    );
 
     @Autowired private PhienChatAiRepository phienChatAiRepository;
     @Autowired private TinNhanChatAiRepository tinNhanChatAiRepository;
     @Autowired private KhachHangRepository khachHangRepository;
+    @Autowired private DiaChiKhachHangRepository diaChiKhachHangRepository;
+    @Autowired private WeatherService weatherService;
     @Autowired private SanPhamService sanPhamService;
     @Autowired private SanPhamRepository sanPhamRepository;
     @Autowired private SanPhamCongDungRepository sanPhamCongDungRepository;
@@ -86,7 +114,6 @@ public class ChatAiService {
     private final RestTemplate restTemplate;
     private final AtomicReference<CachedCatalog> catalogCache = new AtomicReference<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ChatAiService.class);
 
     /** Xóa cache catalog để lần chat kế nạp giá mới ngay. */
     public void invalidateCatalog() {
@@ -156,7 +183,10 @@ public class ChatAiService {
                 .collect(Collectors.toMap(ProductCatalogItem::id, ProductCatalogItem::response, (a, b) -> a));
 
         List<TinNhanChatAi> history = loadChatHistory(phien.getId(), tinKhach.getId());
-        TinNhanChatAi tinAi = generateGeminiResponse(request.getNoiDung(), phien, catalog, history);
+        Integer idKhach = request.getIdKhachHang() != null
+                ? request.getIdKhachHang()
+                : (phien.getKhachHang() != null ? phien.getKhachHang().getId() : null);
+        TinNhanChatAi tinAi = generateGeminiResponse(request.getNoiDung(), phien, catalog, history, idKhach);
         tinNhanChatAiRepository.save(tinAi);
 
         return mapToDto(tinAi, byId);
@@ -177,7 +207,8 @@ public class ChatAiService {
             String noiDung,
             PhienChatAi phien,
             List<ProductCatalogItem> catalog,
-            List<TinNhanChatAi> history) {
+            List<TinNhanChatAi> history,
+            Integer idKhachHang) {
         TinNhanChatAi ai = new TinNhanChatAi();
         ai.setPhienChatAi(phien);
         ai.setNguoiGui("AI");
@@ -194,10 +225,12 @@ public class ChatAiService {
                     .map(ProductCatalogItem::promptLine)
                     .collect(Collectors.joining("\n"));
             String systemPrompt = buildSystemPrompt(catalogText);
+            systemPrompt += "\n\n" + buildLiveUvContext(noiDung, idKhachHang);
             systemPrompt += """
 
-                    Khi gợi ý sản phẩm, ghi kèm [PRODUCT_ID: xxx] cho TẤT CẢ sản phẩm được đề cập (có thể nhiều ID).
-                    Không dùng link HTML; hệ thống tự hiển thị thẻ sản phẩm. Chỉ tư vấn sản phẩm trong danh sách.""";
+                    FORMAT SẢN PHẨM: Chỉ khi thực sự gợi ý một sản phẩm cụ thể trong danh sách,
+                    gắn [PRODUCT_ID: xxx] ngay sau tên sản phẩm đó (có thể nhiều ID nếu so sánh 2–3 em).
+                    Không dùng link HTML; hệ thống tự hiện thẻ sản phẩm. Không gắn ID khi chỉ trả lời kiến thức.""";
 
             ObjectNode rootNode = objectMapper.createObjectNode();
             ObjectNode systemInstruction = rootNode.putObject("system_instruction");
@@ -210,7 +243,7 @@ public class ChatAiService {
             userTurn.putArray("parts").addObject().put("text", noiDung != null ? noiDung : "");
 
             ObjectNode generationConfig = rootNode.putObject("generationConfig");
-            generationConfig.put("temperature", 0.7);
+            generationConfig.put("temperature", 0.78);
             generationConfig.put("maxOutputTokens", 2048);
 
             String body = objectMapper.writeValueAsString(rootNode);
@@ -396,33 +429,186 @@ public class ChatAiService {
 
     private String buildSystemPrompt(String catalogText) {
         return """
-                Bạn là chuyên viên tư vấn chống nắng của cửa hàng mỹ phẩm SUNOVA.
-                Trả lời BẰNG TIẾNG VIỆT, ngắn gọn, thân thiện, dễ hiểu.
+                Bạn là SUN — trợ lý chống nắng của cửa hàng mỹ phẩm SUNOVA.
+                Trả lời BẰNG TIẾNG VIỆT.
+
+                === PERSONA & GIỌNG ===
+                - Xưng "mình", gọi khách "bạn". Thân thiện, gần gũi như bạn tư vấn da dày dạn kinh nghiệm.
+                - Có DUYÊN: mỗi lượt có thể thêm tối đa 1 câu đùa/ẩn dụ vui liên quan nắng–da–đời sống VN nếu hợp cảnh;
+                  không cợt nhả, không lố, không meme thô. Tối đa 1 emoji mỗi lượt (có thể 0).
+                - Thông minh & chủ động: hiểu ý ẩn; nếu thiếu thông tin quan trọng (loại da, đi biển/đi làm/văn phòng,
+                  ngân sách) thì HỎI LẠI đúng 1 câu ngắn rồi mới gợi ý mạnh — đừng hỏi dồn 3–4 câu.
+                - Tư vấn sắc: dựa thông số THẬT trong catalog (SPF/PA/loại chống nắng/công dụng/loại da) + UV thật nếu có.
+                  Giải thích ngắn "vì sao chọn cái này". Khi cần, so sánh 2–3 lựa chọn (ưu/nhược 1 dòng mỗi em).
+                - Ngắn gọn: khoảng 3–6 câu/lượt, dễ đọc, xuống dòng thoáng. Không viết văn dài, không liệt kê lan man.
+                - Trung thực: KHÔNG bịa sản phẩm/thông số ngoài danh sách. Hết hàng / không khớp thì nói thật + gợi ý gần nhất.
+                  Da có vấn đề nghiêm trọng (viêm nặng, dị ứng cấp…) -> khuyên gặp bác sĩ da liễu, nói duyên, không hù dọa.
+
+                Ví dụ giọng (tham chiếu, đừng copy cứng):
+                "Da dầu mà gặp nắng Hà Nội thì đúng là cực hình 😅. Bạn nên chọn loại kiềm dầu, SPF50+ PA++++.
+                Mình gợi ý 2 em này — bạn nghiêng về đi biển hay đi làm nhiều hơn?"
 
                 === NHÓM CÂU HỎI KIẾN THỨC ===
-                Bạn ĐƯỢC PHÉP trả lời kiến thức mà KHÔNG cần gợi ý sản phẩm, ví dụ:
+                Được trả lời kiến thức mà KHÔNG cần gợi ý sản phẩm, ví dụ:
                 - Ban đêm có cần bôi kem chống nắng không?
-                - SPF / PA là gì?
-                - Bôi lại sau bao lâu?
+                - SPF / PA là gì? Bôi lại sau bao lâu?
                 - Chống nắng vật lý khác hóa học chỗ nào?
                 - Ngồi trong nhà / văn phòng có cần bôi không?
                 Với các câu này: trả lời đúng kiến thức, KHÔNG ép nhét sản phẩm, KHÔNG gắn [PRODUCT_ID: x].
 
-                === NHÓM CÂU HỎI THEO ĐỊA ĐIỂM / KHÍ HẬU VN ===
-                Ví dụ: "ở Gia Lâm, Hà Nội nên dùng loại nào".
-                Bối cảnh Việt Nam: khí hậu nhiệt đới, nắng gắt, UV thường cao (đặc biệt 10h–15h),
-                độ ẩm cao, dễ đổ mồ hôi. Ưu tiên SPF50+/PA++++, kết cấu mỏng nhẹ/kiềm dầu,
-                kháng nước nếu ra ngoài lâu. Sau đó mới chọn sản phẩm khớp từ danh sách.
+                === ĐỊA ĐIỂM / UV ===
+                Khi khách hỏi UV / nắng / chống nắng theo nơi ở: dùng mục "UV THỰC TẾ" bên dưới (nếu có).
+                Nêu rõ khu vực đang tra (vd "theo khu vực Hà Nội" / "tại Đà Nẵng").
+                Bối cảnh VN: nhiệt đới, nắng gắt, ẩm — ưu tiên SPF50+/PA++++, mỏng nhẹ/kiềm dầu; ra ngoài lâu thì kháng nước.
 
                 === GỢI Ý SẢN PHẨM ===
-                Gắn [PRODUCT_ID: x] cho mỗi sản phẩm cụ thể được gợi ý (có thể nhiều ID).
-                Không có sản phẩm phù hợp thì nói thật, KHÔNG bịa ID / thông số.
-                TUYỆT ĐỐI không bịa SPF/PA/thành phần ngoài danh sách được cấp.
-                Không tư vấn y tế hay thuốc chữa bệnh; da có vấn đề nghiêm trọng -> khuyên gặp bác sĩ da liễu.
+                Chỉ gắn [PRODUCT_ID: x] khi thực sự gợi ý 1 sản phẩm cụ thể trong danh sách (có thể 2–3 ID khi so sánh).
+                Không bịa ID / SPF / PA / thành phần ngoài danh sách được cấp.
+                Không tư vấn thuốc chữa bệnh.
 
                 === DANH SÁCH SẢN PHẨM ĐANG BÁN (còn hàng) ===
                 %s
                 """.formatted(catalogText.isBlank() ? "(Hiện không có sản phẩm còn hàng.)" : catalogText);
+    }
+
+    private record UvLocation(String displayName, String queryCity, boolean defaulted) {}
+
+    private String buildLiveUvContext(String noiDung, Integer idKhachHang) {
+        try {
+            UvLocation loc = resolveUvLocation(noiDung, idKhachHang);
+            WeatherData data = weatherService.getWeatherData(loc.queryCity());
+            if (data == null) {
+                return uvFallbackNote(loc.displayName());
+            }
+            double uv = data.getUvIndex();
+            double temp = data.getTemp();
+            // Geocode thất bại thường để cả hai = 0 — vẫn nói rõ khu vực, dùng kiến thức chung
+            if (uv <= 0 && temp <= 0) {
+                return uvFallbackNote(loc.displayName());
+            }
+            String defaultNote = loc.defaulted()
+                    ? " (mặc định vì chưa xác định được nơi khách hỏi / địa chỉ giao hàng)"
+                    : "";
+            return """
+                    === UV THỰC TẾ ===
+                    Địa điểm: %s%s
+                    Chỉ số UV hiện tại: %.1f (%s). Nhiệt độ khoảng: %.0f°C.
+                    BẮT BUỘC: khi trả lời về UV/nắng/chống nắng, dùng đúng số liệu trên và nêu rõ khu vực "%s".
+                    """.formatted(
+                    loc.displayName(),
+                    defaultNote,
+                    uv,
+                    uvLevelLabel(uv),
+                    temp,
+                    loc.displayName());
+        } catch (Exception ex) {
+            log.warn("Không lấy được UV realtime cho chat: {}", ex.getMessage());
+            return uvFallbackNote(DEFAULT_UV_CITY_DISPLAY);
+        }
+    }
+
+    private String uvFallbackNote(String display) {
+        return """
+                === UV THỰC TẾ ===
+                Không lấy được UV realtime. Dùng kiến thức chung Việt Nam và nêu rõ đang nói theo khu vực "%s" (mặc định/ước lượng).
+                """.formatted(display != null ? display : DEFAULT_UV_CITY_DISPLAY);
+    }
+
+    private UvLocation resolveUvLocation(String noiDung, Integer idKhachHang) {
+        UvLocation fromMsg = extractCityFromMessage(noiDung);
+        if (fromMsg != null) {
+            return fromMsg;
+        }
+        UvLocation fromAddr = extractCityFromCustomerAddress(idKhachHang);
+        if (fromAddr != null) {
+            return fromAddr;
+        }
+        return new UvLocation(DEFAULT_UV_CITY_DISPLAY, DEFAULT_UV_CITY_QUERY, true);
+    }
+
+    private UvLocation extractCityFromMessage(String noiDung) {
+        if (noiDung == null || noiDung.isBlank()) {
+            return null;
+        }
+        String norm = normalizePlace(noiDung);
+        UvLocation best = null;
+        int bestLen = 0;
+        for (String[] row : UV_CITY_ALIASES) {
+            if (row.length < 3) continue;
+            String display = row[row.length - 2];
+            String query = row[row.length - 1];
+            for (int i = 0; i < row.length - 2; i++) {
+                String alias = row[i];
+                if (alias == null || alias.isBlank()) continue;
+                if (norm.contains(alias) && alias.length() > bestLen) {
+                    best = new UvLocation(display, query, false);
+                    bestLen = alias.length();
+                }
+            }
+        }
+        return best;
+    }
+
+    private UvLocation extractCityFromCustomerAddress(Integer idKhachHang) {
+        if (idKhachHang == null) {
+            return null;
+        }
+        try {
+            KhachHang kh = khachHangRepository.findById(idKhachHang).orElse(null);
+            if (kh == null) {
+                return null;
+            }
+            List<DiaChiKhachHang> list = diaChiKhachHangRepository.findByKhachHangOrderByMacDinhDescIdDesc(kh);
+            if (list == null || list.isEmpty()) {
+                return null;
+            }
+            DiaChiKhachHang dc = list.get(0);
+            String tinh = dc.getTinhThanh();
+            if (tinh == null || tinh.isBlank()) {
+                return null;
+            }
+            UvLocation mapped = matchKnownCity(tinh);
+            if (mapped != null) {
+                return mapped;
+            }
+            // Open-Meteo nhận tên tỉnh/thành tiếng Việt hoặc Latin
+            return new UvLocation(tinh.trim(), tinh.trim(), false);
+        } catch (Exception ex) {
+            log.warn("Không đọc được địa chỉ khách {}: {}", idKhachHang, ex.getMessage());
+            return null;
+        }
+    }
+
+    private UvLocation matchKnownCity(String raw) {
+        String norm = normalizePlace(raw);
+        for (String[] row : UV_CITY_ALIASES) {
+            if (row.length < 3) continue;
+            String display = row[row.length - 2];
+            String query = row[row.length - 1];
+            for (int i = 0; i < row.length - 2; i++) {
+                if (norm.contains(row[i]) || row[i].contains(norm)) {
+                    return new UvLocation(display, query, false);
+                }
+            }
+        }
+        return null;
+    }
+
+    private String normalizePlace(String s) {
+        if (s == null) return "";
+        String n = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toLowerCase(Locale.ROOT)
+                .replace('đ', 'd');
+        return n.replaceAll("[^a-z0-9\\s]", " ").replaceAll("\\s+", " ").trim();
+    }
+
+    private String uvLevelLabel(double uv) {
+        if (uv < 3) return "thấp";
+        if (uv < 6) return "trung bình";
+        if (uv < 8) return "cao";
+        if (uv < 11) return "rất cao";
+        return "cực cao";
     }
 
     private TinNhanChatAi generateRuleBasedResponse(

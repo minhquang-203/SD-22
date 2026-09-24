@@ -1,9 +1,14 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import { danhSachPhienHoTro, layTinNhanHoTro, traLoiHoTro, danhDauDaDocPhien } from '@/api/hoTroApi'
 import { subscribeAdminHoTroInbox, subscribeAdminHoTroPhien } from '@/composables/useRealtime'
+import { useAdminBadges } from '@/composables/useAdminBadges'
+
+const route = useRoute()
+const { refreshBadges } = useAdminBadges()
 
 const sessions = ref([])
 const selectedId = ref(null)
@@ -46,6 +51,7 @@ async function selectSession(id) {
     try {
       await danhDauDaDocPhien(id)
       clearUnread(id)
+      void refreshBadges()
     } catch {
       // mở chat vẫn được dù đánh dấu đọc lỗi
     }
@@ -103,7 +109,7 @@ function onRealtimePhien(payload) {
   messages.value.push(tin)
   scrollChat()
   if (tin.nguoiGui === 'KHACH' && selectedId.value) {
-    void danhDauDaDocPhien(selectedId.value)
+    void danhDauDaDocPhien(selectedId.value).then(() => refreshBadges())
     clearUnread(selectedId.value)
   }
 }
@@ -155,6 +161,11 @@ function cleanupPhienSub() {
 onMounted(async () => {
   await loadSessions()
   unsubInbox = subscribeAdminHoTroInbox(onRealtimeInbox)
+  const raw = route.query.phien
+  const id = Number(Array.isArray(raw) ? raw[0] : raw)
+  if (Number.isFinite(id) && id > 0) {
+    await selectSession(id)
+  }
 })
 
 onBeforeUnmount(() => {
@@ -165,6 +176,16 @@ onBeforeUnmount(() => {
 watch(selectedId, () => {
   error.value = ''
 })
+
+watch(
+  () => route.query.phien,
+  (raw) => {
+    const id = Number(Array.isArray(raw) ? raw[0] : raw)
+    if (Number.isFinite(id) && id > 0 && id !== selectedId.value) {
+      void selectSession(id)
+    }
+  },
+)
 </script>
 
 <template>

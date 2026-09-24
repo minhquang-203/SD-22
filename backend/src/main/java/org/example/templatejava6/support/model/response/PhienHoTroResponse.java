@@ -12,6 +12,7 @@ public class PhienHoTroResponse {
     private Integer id;
     private Integer idKhachHang;
     private String tenKhachHang;
+    private String soDienThoai;
     private String trangThai;
     private Integer nguoiXuLyId;
     private String tenNguoiXuLy;
@@ -28,6 +29,7 @@ public class PhienHoTroResponse {
         if (phien.getIdKhachHang() != null) {
             res.setIdKhachHang(phien.getIdKhachHang().getId());
             res.setTenKhachHang(phien.getIdKhachHang().getHoTen());
+            res.setSoDienThoai(phien.getIdKhachHang().getSoDienThoai());
         } else {
             res.setTenKhachHang("Khách vãng lai");
         }

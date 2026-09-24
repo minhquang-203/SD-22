@@ -25,6 +25,8 @@ const {
   pendingOrderCount,
   pendingReturns,
   pendingReturnCount,
+  pendingSupport,
+  pendingSupportCount,
   otherNotifications,
   unreadOtherCount,
   hasNotifBadge,
@@ -33,6 +35,7 @@ const {
   stopPolling,
   loadPendingOrders,
   loadPendingReturns,
+  loadSupportUnread,
   loadOtherNotifications,
   markNotificationRead,
   markAllNotificationsRead,
@@ -56,6 +59,7 @@ const hasContent = computed(
   () =>
     pendingOrders.value.length > 0
     || pendingReturns.value.length > 0
+    || pendingSupport.value.length > 0
     || otherNotifications.value.length > 0,
 )
 
@@ -67,6 +71,7 @@ function iconForLoai(loai) {
     YEU_CAU_TRA_HANG: 'icon-park-outline:return',
     YEU_CAU_HOAN_TIEN: 'icon-park-outline:wallet',
     HOAN_TIEN_HOAN_TAT: 'icon-park-outline:check-one',
+    TIN_HO_TRO_MOI: 'icon-park-outline:message',
     KHUYEN_MAI: 'icon-park-outline:ticket',
     UV: 'icon-park-outline:sun',
     HE_THONG: 'icon-park-outline:remind',
@@ -77,6 +82,10 @@ function iconForLoai(loai) {
 function resolveNotifLink(item) {
   if (item?.link) return item.link
   switch (item?.loai) {
+    case 'TIN_HO_TRO_MOI':
+      return item?.idThamChieu != null || item?.idPhien != null
+        ? `/admin/support?phien=${item.idThamChieu ?? item.idPhien}`
+        : '/admin/support'
     case 'YEU_CAU_TRA_HANG':
       return '/admin/tra-hang'
     case 'YEU_CAU_HOAN_TIEN':
@@ -111,6 +120,7 @@ async function toggleDropdown() {
     await Promise.all([
       loadPendingOrders(),
       loadPendingReturns(),
+      loadSupportUnread(),
       loadOtherNotifications({ updateList: true }),
     ])
     loadingNotif.value = false
@@ -154,6 +164,20 @@ function goToAllPendingOrders() {
 function goToAllPendingReturns() {
   showDropdown.value = false
   router.push('/admin/tra-hang')
+}
+
+function goToAllSupport() {
+  showDropdown.value = false
+  router.push('/admin/support')
+}
+
+async function goToSupport(item) {
+  showDropdown.value = false
+  if (item?.fromThongBao) {
+    await markNotificationRead(item)
+  }
+  const link = resolveNotifLink(item)
+  if (link) router.push(link)
 }
 
 function onClickOutside(event) {
@@ -250,8 +274,11 @@ async function handleLogout() {
               <span v-if="pendingReturnCount > 0" class="admin-notif__header-badge admin-notif__header-badge--return">
                 {{ pendingReturnCount }} trả hàng
               </span>
+              <span v-if="pendingSupportCount > 0" class="admin-notif__header-badge admin-notif__header-badge--support">
+                {{ pendingSupportCount }} hỗ trợ
+              </span>
               <button
-                v-if="unreadOtherCount > 0"
+                v-if="unreadOtherCount > 0 || pendingSupportCount > 0"
                 type="button"
                 class="admin-notif__mark-all"
                 @click="markAllRead"
@@ -329,6 +356,42 @@ async function handleLogout() {
                     <div class="admin-notif__item-desc">
                       {{ customerDisplay(item) }}
                       <template v-if="item.lyDo"> · {{ item.lyDo }}</template>
+                    </div>
+                    <div class="admin-notif__item-time">{{ formatTime(item.ngayTao) }}</div>
+                  </div>
+                </li>
+              </ul>
+            </template>
+
+            <!-- 3. Tin hỗ trợ khách hàng -->
+            <template v-if="pendingSupport.length">
+              <div class="admin-notif__section-row">
+                <div class="admin-notif__section">Hỗ trợ khách hàng</div>
+                <button
+                  type="button"
+                  class="admin-notif__view-all"
+                  @click="goToAllSupport"
+                >
+                  Xem tất cả
+                </button>
+              </div>
+              <ul class="admin-notif__list">
+                <li
+                  v-for="item in pendingSupport"
+                  :key="`support-${item.id}`"
+                  class="admin-notif__item"
+                  :class="{ 'admin-notif__item--unread': !item.daDoc }"
+                  @click="goToSupport(item)"
+                >
+                  <div class="admin-notif__item-icon" data-loai="TIN_HO_TRO_MOI">
+                    <Icon icon="icon-park-outline:message" />
+                  </div>
+                  <div class="admin-notif__item-body">
+                    <div class="admin-notif__item-title">
+                      <span class="admin-notif__item-code">{{ item.tieuDe || 'Tin hỗ trợ mới' }}</span>
+                    </div>
+                    <div class="admin-notif__item-desc">
+                      {{ item.noiDung || 'Khách vừa nhắn hỗ trợ' }}
                     </div>
                     <div class="admin-notif__item-time">{{ formatTime(item.ngayTao) }}</div>
                   </div>
@@ -500,6 +563,11 @@ async function handleLogout() {
   background: rgba(225, 29, 72, 0.12);
 }
 
+.admin-notif__header-badge--support {
+  color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.12);
+}
+
 .admin-notif__mark-all {
   border: none;
   background: transparent;
@@ -603,6 +671,11 @@ async function handleLogout() {
 .admin-notif__item-icon[data-loai='YEU_CAU_TRA_HANG'] {
   background: #fff1f2;
   color: #e11d48;
+}
+
+.admin-notif__item-icon[data-loai='TIN_HO_TRO_MOI'] {
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 
 .admin-notif__item-icon[data-loai='YEU_CAU_HOAN_TIEN'],

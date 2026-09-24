@@ -45,7 +45,10 @@ import org.example.templatejava6.voucher.model.response.VariantSaleInfo;
 import org.example.templatejava6.voucher.repository.PhieuGiamGiaRepository;
 import org.example.templatejava6.voucher.service.PhieuGiamGiaService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -79,7 +82,7 @@ public class BanHangService {
     private static final String MA_COD = "COD";
     private static final String TRANG_THAI_CHO_THANH_TOAN = "CHO_THANH_TOAN";
     private static final String TRANG_THAI_THAT_BAI = "THAT_BAI";
-    private static final int SAN_PHAM_PAGE_SIZE = 48;
+    private static final int SAN_PHAM_PAGE_SIZE = 18;
 
     @Autowired private ChiTietSanPhamRepository chiTietSanPhamRepository;
     @Autowired private AnhSanPhamRepository anhSanPhamRepository;
@@ -101,16 +104,25 @@ public class BanHangService {
     @Autowired private PosOrderLifecycleService posOrderLifecycleService;
 
     @Transactional(readOnly = true)
-    public List<BienTheBanResponse> danhSachSanPhamBan(String keyword, Integer page) {
+    public Page<BienTheBanResponse> danhSachSanPhamBan(String keyword, Integer page, Integer size, String danhMuc) {
         String kw = keyword != null ? keyword.trim() : "";
+        String dm = danhMuc != null ? danhMuc.trim() : "";
         int pageNo = page != null && page >= 0 ? page : 0;
+        int pageSize = size != null && size > 0 ? Math.min(size, 48) : SAN_PHAM_PAGE_SIZE;
+        Pageable pageable = PageRequest.of(pageNo, pageSize);
         Map<Integer, VariantSaleInfo> saleMap = checkoutPricingService.loadActiveSales();
-        List<ChiTietSanPham> variants = chiTietSanPhamRepository
-                .danhSachBienTheBan(kw, PageRequest.of(pageNo, SAN_PHAM_PAGE_SIZE));
-        Map<Integer, String> imageMap = loadMainImageUrls(variants);
-        return variants.stream()
+        Page<ChiTietSanPham> variantPage = chiTietSanPhamRepository.danhSachBienTheBan(kw, dm, pageable);
+        Map<Integer, String> imageMap = loadMainImageUrls(variantPage.getContent());
+        List<BienTheBanResponse> content = variantPage.getContent().stream()
                 .map(cts -> toBienTheBanResponse(cts, saleMap, imageMap))
                 .toList();
+        return new PageImpl<>(content, pageable, variantPage.getTotalElements());
+    }
+
+    /** @deprecated giữ cho endpoint /san-pham/tim — lấy trang đầu. */
+    @Transactional(readOnly = true)
+    public List<BienTheBanResponse> danhSachSanPhamBan(String keyword, Integer page) {
+        return danhSachSanPhamBan(keyword, page, SAN_PHAM_PAGE_SIZE, "").getContent();
     }
 
     private Map<Integer, String> loadMainImageUrls(List<ChiTietSanPham> variants) {

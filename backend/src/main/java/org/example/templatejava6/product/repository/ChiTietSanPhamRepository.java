@@ -82,10 +82,19 @@ public interface ChiTietSanPhamRepository extends JpaRepository<ChiTietSanPham, 
             + "LOWER(sp.ten) LIKE LOWER(CONCAT('%', :keyword, '%')))")
     List<ChiTietSanPham> timBienTheBan(@Param("keyword") String keyword, Pageable pageable);
 
-    @Query("SELECT c FROM ChiTietSanPham c JOIN FETCH c.sanPham sp LEFT JOIN FETCH sp.danhMuc LEFT JOIN FETCH c.mauSac ms "
+    @Query(value = "SELECT c FROM ChiTietSanPham c JOIN c.sanPham sp LEFT JOIN sp.danhMuc LEFT JOIN c.mauSac "
             + "WHERE c.trangThai = true AND sp.trangThai = true AND ("
             + ":keyword = '' OR LOWER(c.sku) LIKE LOWER(CONCAT('%', :keyword, '%')) OR "
             + "LOWER(sp.ten) LIKE LOWER(CONCAT('%', :keyword, '%'))) "
-            + "ORDER BY sp.ten ASC, c.sku ASC")
-    List<ChiTietSanPham> danhSachBienTheBan(@Param("keyword") String keyword, Pageable pageable);
+            + "AND (:danhMuc = '' OR (sp.danhMuc IS NOT NULL AND LOWER(sp.danhMuc.ten) = LOWER(:danhMuc))) "
+            + "ORDER BY sp.ten ASC, c.sku ASC",
+            countQuery = "SELECT COUNT(c) FROM ChiTietSanPham c JOIN c.sanPham sp LEFT JOIN sp.danhMuc dm "
+            + "WHERE c.trangThai = true AND sp.trangThai = true AND ("
+            + ":keyword = '' OR LOWER(c.sku) LIKE LOWER(CONCAT('%', :keyword, '%')) OR "
+            + "LOWER(sp.ten) LIKE LOWER(CONCAT('%', :keyword, '%'))) "
+            + "AND (:danhMuc = '' OR (dm IS NOT NULL AND LOWER(dm.ten) = LOWER(:danhMuc)))")
+    org.springframework.data.domain.Page<ChiTietSanPham> danhSachBienTheBan(
+            @Param("keyword") String keyword,
+            @Param("danhMuc") String danhMuc,
+            Pageable pageable);
 }

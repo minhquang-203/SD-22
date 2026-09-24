@@ -240,7 +240,8 @@ public class PhieuNhapService {
         int pageNo = Math.max(0, page);
         int pageSize = size <= 0 ? 20 : Math.min(size, 50);
         List<ChiTietSanPham> variants = chiTietSanPhamRepository
-                .danhSachBienTheBan(q, PageRequest.of(pageNo, pageSize));
+                .danhSachBienTheBan(q, "", PageRequest.of(pageNo, pageSize))
+                .getContent();
         Map<Integer, String> imageMap = loadMainImageUrls(
                 variants.stream()
                         .map(ChiTietSanPham::getSanPham)

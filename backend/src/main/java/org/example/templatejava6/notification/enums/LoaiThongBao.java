@@ -8,6 +8,7 @@ public enum LoaiThongBao {
     YEU_CAU_TRA_HANG,
     YEU_CAU_HOAN_TIEN,
     HOAN_TIEN_HOAN_TAT,
+    TIN_HO_TRO_MOI,
 
     // Thông báo gửi riêng cho khách hàng (id_khach_hang != NULL)
     DON_HANG_CAP_NHAT,

@@ -19,6 +19,7 @@ import {
   layDonCho,
   huyDonCho,
 } from '@/api/banHangApi'
+import { getDanhMucList } from '@/api/danhMucApi'
 import { formatCurrency, formatDate } from '@/utils/format'
 import { formatDiscountPercent } from '@/utils/formatVND'
 import { productImageUrl } from '@/utils/productImage'
@@ -51,6 +52,11 @@ const productsLoaded = ref(false)
 const searchInput = ref(null)
 /** null = tất cả danh mục */
 const categoryFilter = ref(null)
+const categoryChips = ref([])
+const productPage = ref(0)
+const productTotalPages = ref(0)
+const productTotal = ref(0)
+const PRODUCT_PAGE_SIZE = 18
 
 const cart = ref([])
 const lotModalOpen = ref(false)
@@ -157,18 +163,10 @@ const cartItemCount = computed(() =>
   cart.value.reduce((sum, line) => sum + Number(line.soLuong || 0), 0),
 )
 
-const categoryChips = computed(() => {
-  const set = new Set()
-  for (const p of searchResults.value) {
-    if (p.tenDanhMuc) set.add(p.tenDanhMuc)
-  }
-  return [...set].sort((a, b) => a.localeCompare(b, 'vi'))
-})
+const filteredProducts = computed(() => searchResults.value)
 
-const filteredProducts = computed(() => {
-  if (!categoryFilter.value) return searchResults.value
-  return searchResults.value.filter((p) => p.tenDanhMuc === categoryFilter.value)
-})
+const productPageCurrent = computed(() => productPage.value + 1)
+const productPageTotal = computed(() => Math.max(productTotalPages.value, 1))
 
 const thanhTien = computed(() => Math.max(0, tongTienHang.value - voucherDiscount.value))
 
@@ -347,12 +345,40 @@ function changeQty(line, delta) {
     removeLine(line)
     return
   }
-  if (next > line.soLuongTon) {
-    notify(`Tồn kho còn ${line.soLuongTon}`, 'error')
-    return
+  applyLineQty(line, next)
+}
+
+/** Gõ trực tiếp số lượng trong đơn — kẹp [1, tồn]. */
+function onQtyCommit(line, event) {
+  const el = event?.target
+  const raw = el?.value ?? ''
+  const digits = String(raw).replace(/[^\d]/g, '')
+  let n = digits === '' ? NaN : Number.parseInt(digits, 10)
+  const max = Math.max(0, Number(line.soLuongTon) || 0)
+
+  if (!Number.isFinite(n) || n < 1) {
+    n = 1
+  } else if (n > max) {
+    notify(`Chỉ còn ${max} trong kho`, 'error')
+    n = Math.max(1, max)
   }
+
+  applyLineQty(line, n)
+  if (el) el.value = String(line.soLuong)
+}
+
+function applyLineQty(line, next) {
+  const max = Math.max(0, Number(line.soLuongTon) || 0)
+  let qty = Number(next) || 1
+  if (qty < 1) qty = 1
+  if (max > 0 && qty > max) {
+    notify(`Chỉ còn ${max} trong kho`, 'error')
+    qty = max
+  }
+  if (qty === line.soLuong) return
+
   const hadManual = Boolean(line.phanBoLos?.length || line.idLoHang != null)
-  line.soLuong = next
+  line.soLuong = qty
   if (hadManual) {
     clearManualLot(line)
     notify('Đã đổi số lượng — chọn lại lô hoặc giữ FEFO tự động', 'success')
@@ -536,17 +562,46 @@ function lineLotHint(line) {
   return line.phanBoLos.map((p) => `${p.soLo || '#' + p.idLoHang}×${p.soLuong}`).join(', ')
 }
 
-async function loadProducts() {
+async function loadCategories() {
+  try {
+    const res = await getDanhMucList()
+    const list = Array.isArray(res.data) ? res.data : []
+    categoryChips.value = list
+      .map((d) => d.ten || d.tenDanhMuc)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, 'vi'))
+  } catch {
+    categoryChips.value = []
+  }
+}
+
+async function loadProducts(resetPage = false) {
+  if (resetPage) productPage.value = 0
   loading.value = true
   try {
-    const res = await getSanPhamBan(keyword.value.trim(), 0)
-    searchResults.value = res.data || []
+    const res = await getSanPhamBan(
+      keyword.value.trim(),
+      productPage.value,
+      PRODUCT_PAGE_SIZE,
+      categoryFilter.value || '',
+    )
+    const data = res.data || {}
+    searchResults.value = Array.isArray(data.content) ? data.content : Array.isArray(data) ? data : []
+    productTotal.value = Number(data.totalElements) || searchResults.value.length
+    productTotalPages.value = Number(data.totalPages) || (searchResults.value.length ? 1 : 0)
+    if (data.number != null) productPage.value = Number(data.number) || 0
     productsLoaded.value = true
   } catch (err) {
     notify(String(err), 'error')
   } finally {
     loading.value = false
   }
+}
+
+function goProductPage(page) {
+  if (page < 0 || page >= productTotalPages.value || page === productPage.value) return
+  productPage.value = page
+  void loadProducts(false)
 }
 
 function expiryTone(line) {
@@ -1297,11 +1352,15 @@ watch(selectedPaymentId, () => {
 
 watch(keyword, () => {
   clearTimeout(searchTimer)
-  searchTimer = setTimeout(loadProducts, 300)
+  searchTimer = setTimeout(() => loadProducts(true), 300)
+})
+
+watch(categoryFilter, () => {
+  void loadProducts(true)
 })
 
 onMounted(async () => {
-  await Promise.all([loadMeta(), loadHeldOrders(), loadProducts()])
+  await Promise.all([loadMeta(), loadHeldOrders(), loadCategories(), loadProducts(true)])
   await nextTick()
   searchInput.value?.focus()
 })
@@ -1331,7 +1390,7 @@ onBeforeUnmount(() => {
           Đơn chờ
           <span v-if="heldCount > 0" class="pos-badge">{{ heldCount }}</span>
         </button>
-        <button type="button" class="pos-top-btn" @click="loadProducts">Làm mới</button>
+        <button type="button" class="pos-top-btn" @click="loadProducts(true)">Làm mới</button>
       </div>
     </header>
 
@@ -1366,10 +1425,12 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <div class="pos-grid">
+        <div class="pos-grid" :class="{ 'is-loading': loading && productsLoaded }">
           <div v-if="loading && !productsLoaded" class="pos-grid-loading">Đang tải sản phẩm...</div>
           <div v-else-if="productsLoaded && filteredProducts.length === 0" class="pos-grid-empty">
-            {{ keyword.trim() ? 'Không tìm thấy sản phẩm phù hợp' : 'Không có sản phẩm đang bán' }}
+            {{ keyword.trim() || categoryFilter
+              ? 'Không tìm thấy sản phẩm phù hợp'
+              : 'Không có sản phẩm đang bán' }}
           </div>
           <button
             v-for="item in filteredProducts"
@@ -1393,7 +1454,12 @@ onBeforeUnmount(() => {
               class="pos-card__tag pos-card__tag--warn"
             >Sắp HSD</span>
             <div class="pos-card__img">
-              <img :src="productImageUrl(item.anhUrl)" :alt="item.tenSanPham" loading="lazy" />
+              <img
+                :src="productImageUrl(item.anhUrl)"
+                :alt="item.tenSanPham"
+                loading="lazy"
+                @error="($event.target.src = productImageUrl(''))"
+              />
             </div>
             <p class="pos-card__name">{{ item.tenSanPham }}</p>
             <p v-if="formatVariant(item)" class="pos-card__variant">{{ formatVariant(item) }}</p>
@@ -1411,6 +1477,33 @@ onBeforeUnmount(() => {
               </span>
             </div>
           </button>
+        </div>
+
+        <div v-if="productsLoaded && productTotal > 0" class="pos-pager-row">
+          <span class="pos-pager__meta">{{ productTotal }} sản phẩm</span>
+          <div class="pos-pager" aria-label="Phân trang sản phẩm">
+            <button
+              type="button"
+              class="pos-pager__arrow"
+              aria-label="Trang trước"
+              :disabled="productPage <= 0 || loading || productTotalPages <= 1"
+              @click="goProductPage(productPage - 1)"
+            >
+              <Icon icon="mdi:chevron-left" width="18" />
+            </button>
+            <span class="pos-pager__mid">
+              <b>{{ productPageCurrent }}</b>/{{ productPageTotal }}
+            </span>
+            <button
+              type="button"
+              class="pos-pager__arrow"
+              aria-label="Trang sau"
+              :disabled="productPage >= productTotalPages - 1 || loading || productTotalPages <= 1"
+              @click="goProductPage(productPage + 1)"
+            >
+              <Icon icon="mdi:chevron-right" width="18" />
+            </button>
+          </div>
         </div>
       </section>
 
@@ -1495,7 +1588,15 @@ onBeforeUnmount(() => {
               <div class="pos-line__sum">{{ formatCurrency(line.giaBan * line.soLuong) }}</div>
               <div class="pos-qty">
                 <button type="button" :disabled="line.soLuong <= 1" @click="changeQty(line, -1)">−</button>
-                <span>{{ line.soLuong }}</span>
+                <input
+                  class="pos-qty__input"
+                  type="text"
+                  inputmode="numeric"
+                  :value="line.soLuong"
+                  aria-label="Số lượng"
+                  @keydown.enter.prevent="onQtyCommit(line, $event)"
+                  @blur="onQtyCommit(line, $event)"
+                />
                 <button type="button" :disabled="line.soLuong >= line.soLuongTon" @click="changeQty(line, 1)">＋</button>
               </div>
               <button type="button" class="pos-line__rm" @click="removeLine(line)">Xóa</button>

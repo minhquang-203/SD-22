@@ -63,6 +63,13 @@ const nccSaving = ref(false)
 
 const maxNgayNhap = todayLocal()
 
+const HSD_PRESETS = [
+  { key: '6m', label: '+6 tháng', months: 6 },
+  { key: '1y', label: '+1 năm', months: 12 },
+  { key: '2y', label: '+2 năm', months: 24 },
+  { key: '3y', label: '+3 năm', months: 36 },
+]
+
 const tongTien = computed(() =>
   lines.value.reduce((sum, row) => sum + Number(row.soLuong || 0) * Number(row.donGia || 0), 0),
 )
@@ -74,6 +81,60 @@ function todayLocal() {
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
+}
+
+function formatYmd(date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Cộng tháng giữ ngày trong tháng (clamp cuối tháng nếu cần). */
+function addMonthsYmd(ymd, months) {
+  const base = ymd || todayLocal()
+  const [y, m, d] = base.split('-').map(Number)
+  if (!y || !m || !d) return todayLocal()
+  const dt = new Date(y, m - 1, d)
+  const day = dt.getDate()
+  dt.setMonth(dt.getMonth() + months)
+  if (dt.getDate() < day) dt.setDate(0)
+  return formatYmd(dt)
+}
+
+function baseNgayNhap() {
+  return ngayNhap.value || todayLocal()
+}
+
+function applyHsdPreset(row, preset) {
+  if (readonly.value || !row || !preset) return
+  const hsd = addMonthsYmd(baseNgayNhap(), preset.months)
+  if (hsd <= baseNgayNhap()) {
+    toast('Hạn sử dụng phải sau ngày nhập', 'warn')
+    return
+  }
+  row.hanSuDung = hsd
+  row.hsdPreset = preset.key
+}
+
+function onHsdManualInput(row) {
+  if (!row) return
+  row.hsdPreset = null
+  if (row.hanSuDung && row.hanSuDung <= baseNgayNhap()) {
+    toast('Hạn sử dụng phải sau ngày nhập', 'warn')
+  } else if (row.hanSuDung && row.hanSuDung < todayLocal()) {
+    toast('HSD đang trong quá khứ — kiểm tra lại', 'warn')
+  }
+}
+
+function reapplyHsdPresets() {
+  const base = baseNgayNhap()
+  for (const row of lines.value) {
+    if (!row.hsdPreset) continue
+    const preset = HSD_PRESETS.find((p) => p.key === row.hsdPreset)
+    if (!preset) continue
+    row.hanSuDung = addMonthsYmd(base, preset.months)
+  }
 }
 
 function formatMoney(v) {
@@ -130,6 +191,7 @@ async function loadDetail(id) {
       giaBan: Number(d.giaBan || 0),
       hanSuDung: d.hanSuDung || '',
       soLo: d.soLo || '',
+      hsdPreset: null,
     }))
   } catch (e) {
     toast(formatApiError(e, 'Không tải được phiếu'), 'error')
@@ -356,6 +418,7 @@ function addSelectedToPhieu() {
       giaBan: Number(draft.giaBan || 0),
       hanSuDung: '',
       soLo: '',
+      hsdPreset: null,
     })
     added += 1
   }
@@ -411,6 +474,14 @@ function validateBeforeSave(requireHsd) {
       toast(`SKU ${row.sku}: cần nhập hạn sử dụng trước khi hoàn thành`, 'warn')
       return false
     }
+    if (row.hanSuDung && row.hanSuDung <= ngayNhap.value) {
+      toast(`SKU ${row.sku}: hạn sử dụng phải sau ngày nhập`, 'warn')
+      return false
+    }
+  }
+  const pastHsd = lines.value.find((row) => row.hanSuDung && row.hanSuDung < todayLocal())
+  if (pastHsd) {
+    toast(`SKU ${pastHsd.sku}: HSD đang trong quá khứ — kiểm tra lại`, 'warn')
   }
   return true
 }
@@ -473,6 +544,10 @@ function applySaved(p) {
   maPhieu.value = p.maPhieuNhap
   trangThai.value = p.trangThai
 }
+
+watch(ngayNhap, () => {
+  reapplyHsdPresets()
+})
 
 watch(productQuery, () => {
   if (!showAddModal.value || modalStep.value !== 1) return
@@ -597,14 +672,28 @@ onMounted(async () => {
                   placeholder="0"
                 />
               </label>
-              <label class="pn-line__field">
+              <label class="pn-line__field pn-line__field--hsd">
                 <span>Hạn sử dụng</span>
                 <input
                   v-model="row.hanSuDung"
                   type="date"
                   class="pn-line__input"
+                  :min="ngayNhap || undefined"
                   :disabled="readonly"
+                  @change="onHsdManualInput(row)"
                 />
+                <div v-if="!readonly" class="pn-hsd-presets" role="group" aria-label="Gợi ý hạn sử dụng">
+                  <button
+                    v-for="preset in HSD_PRESETS"
+                    :key="preset.key"
+                    type="button"
+                    class="pn-hsd-preset"
+                    :class="{ 'is-on': row.hsdPreset === preset.key }"
+                    @click="applyHsdPreset(row, preset)"
+                  >
+                    {{ preset.label }}
+                  </button>
+                </div>
               </label>
               <div class="pn-line__field pn-line__field--total">
                 <span>Thành tiền</span>
@@ -1329,6 +1418,46 @@ onMounted(async () => {
   border-color: #8f7349;
   background: #fff;
   box-shadow: 0 0 0 2px rgba(143, 115, 73, 0.18);
+}
+
+.pn-line__field--hsd {
+  grid-column: 1 / -1;
+}
+
+.pn-hsd-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.15rem;
+}
+
+.pn-hsd-preset {
+  border: 1px solid #e0d3be;
+  border-radius: 999px;
+  background: #fffdfa;
+  color: #4a3f34;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  padding: 0.28rem 0.65rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.pn-hsd-preset:hover {
+  background: #f5efe6;
+  border-color: #c9a96e;
+}
+
+.pn-hsd-preset.is-on {
+  background: #241a12;
+  border-color: #241a12;
+  color: #f9f5f0;
 }
 
 .pn-line__input:disabled {
