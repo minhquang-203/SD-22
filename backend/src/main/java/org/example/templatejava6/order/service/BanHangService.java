@@ -24,6 +24,7 @@ import org.example.templatejava6.order.model.response.DonChoDetailResponse;
 import org.example.templatejava6.order.model.response.DonChoListItemResponse;
 import org.example.templatejava6.order.model.response.GiuDonChoResponse;
 import org.example.templatejava6.order.model.response.PosTinhGiaResponse;
+import org.example.templatejava6.order.model.response.PosThanhToanStatusResponse;
 import org.example.templatejava6.order.model.response.LoHangDonHangResponse;
 import org.example.templatejava6.product.entity.LoHang;
 import org.example.templatejava6.order.repository.HoaDonChiTietLoRepository;
