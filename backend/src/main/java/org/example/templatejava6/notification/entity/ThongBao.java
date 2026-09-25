@@ -5,7 +5,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.example.templatejava6.notification.enums.LoaiThongBao;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.LocalDateTime;
 
@@ -28,12 +27,8 @@ public class ThongBao {
     @Enumerated(EnumType.STRING)
     @Column(name = "loai", length = 30)
     private LoaiThongBao loai;
-
-    @Nationalized
     @Column(name = "tieu_de", length = 150, nullable = false)
     private String tieuDe;
-
-    @Nationalized
     @Column(name = "noi_dung", length = 500)
     private String noiDung;
 

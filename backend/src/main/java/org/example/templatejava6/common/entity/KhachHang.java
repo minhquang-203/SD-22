@@ -6,7 +6,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.example.templatejava6.common.model.VaiTro;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -31,7 +30,6 @@ public class KhachHang {
     private String maKhachHang;
 
     @Size(max = 100)
-    @Nationalized
     @Column(name = "ho_ten", length = 100)
     private String hoTen;
 

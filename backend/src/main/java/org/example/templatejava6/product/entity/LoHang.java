@@ -6,7 +6,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.LocalDate;
 
@@ -46,8 +45,6 @@ public class LoHang {
     @ColumnDefault("0")
     @Column(name = "so_luong_loi", nullable = false)
     private Integer soLuongLoi = 0;
-
-    @Nationalized
     @Column(name = "ghi_chu")
     private String ghiChu;
 

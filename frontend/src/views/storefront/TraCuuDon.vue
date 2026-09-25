@@ -10,7 +10,7 @@ import { confirm } from '@/composables/useConfirm'
 import { toast } from '@/composables/useToast'
 import { subscribeCustomerOrders } from '@/composables/useRealtime'
 import { useAuth } from '@/composables/useAuth'
-import { fetchChiTietDonCuaToi, fetchDonCuaToi, huyDonCuaToi, traCuuDonBangToken, traCuuDonCongKhai } from '@/api/donHangApi'
+import { fetchChiTietDonCuaToi, fetchDonCuaToi, huyDonBangToken, huyDonCuaToi, traCuuDonBangToken, traCuuDonCongKhai } from '@/api/donHangApi'
 
 const route = useRoute()
 const router = useRouter()
@@ -160,6 +160,7 @@ async function loadOrders() {
 async function lookupGuestByToken(token) {
   guestError.value = ''
   guestOrder.value = null
+  cancelNotice.value = ''
   if (!token || token.length < 32) {
     guestError.value = 'Link tra cứu không hợp lệ.'
     return
@@ -188,6 +189,7 @@ async function lookupGuestOrder() {
   const email = guestEmail.value.trim()
   guestError.value = ''
   guestOrder.value = null
+  cancelNotice.value = ''
 
   if (!ma || !email) {
     guestError.value = 'Vui lòng nhập mã đơn hàng và email đã dùng khi đặt hàng.'
@@ -394,6 +396,40 @@ async function handleCancelOrder(order) {
     cancelLoadingId.value = null
   }
 }
+
+async function handleGuestCancelOrder(order) {
+  if (!order?.id || cancelLoadingId.value) return
+  const token = guestTrackingToken()
+  if (!token) {
+    guestError.value = 'Thiếu mã tra cứu đơn hàng. Vui lòng tra cứu lại rồi hủy.'
+    return
+  }
+
+  const ok = await confirm({
+    title: 'Hủy đơn hàng',
+    message: `Bạn có chắc muốn hủy đơn ${order.maHoaDon}? Hành động này không thể hoàn tác.`,
+    confirmText: 'Hủy đơn',
+    danger: true,
+  })
+  if (!ok) return
+
+  cancelLoadingId.value = order.id
+  guestError.value = ''
+  cancelNotice.value = ''
+  try {
+    const res = await huyDonBangToken(token, { ghiChu: 'Khách hàng hủy đơn online' })
+    guestOrder.value = {
+      ...(res.data || order),
+      __detailLoaded: true,
+      trackingToken: token,
+    }
+    cancelNotice.value = `Đã hủy đơn ${order.maHoaDon}.`
+  } catch (err) {
+    guestError.value = typeof err === 'string' ? err : 'Không hủy được đơn hàng. Vui lòng thử lại.'
+  } finally {
+    cancelLoadingId.value = null
+  }
+}
 </script>
 
 <template>
@@ -440,6 +476,7 @@ async function handleCancelOrder(order) {
 
       <p v-if="guestLookupLoading && route.query.token" class="sf-order-msg">Đang tải đơn hàng...</p>
       <p v-if="guestError" class="sf-order-msg sf-order-msg--err">{{ guestError }}</p>
+      <p v-if="cancelNotice && !isLoggedIn" class="sf-order-msg sf-order-msg--ok">{{ cancelNotice }}</p>
       <p v-if="returnNotice" class="sf-order-msg sf-order-msg--ok">{{ returnNotice }}</p>
 
       <div v-if="guestOrder" class="sf-order-list">
@@ -447,6 +484,8 @@ async function handleCancelOrder(order) {
           :order="guestOrder"
           :default-open="true"
           read-only
+          :cancel-loading="cancelLoadingId === guestOrder.id"
+          @cancel-order="handleGuestCancelOrder"
           @request-return="openReturn"
         />
       </div>

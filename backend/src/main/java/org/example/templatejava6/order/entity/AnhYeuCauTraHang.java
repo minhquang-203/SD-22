@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.LocalDateTime;
 
@@ -31,12 +30,10 @@ public class AnhYeuCauTraHang {
 
     @NotNull
     @Size(max = 500)
-    @Nationalized
     @Column(name = "duong_dan", nullable = false, length = 500)
     private String duongDan;
 
     @Size(max = 20)
-    @Nationalized
     @ColumnDefault("'KHACH'")
     @Column(name = "loai", length = 20)
     private String loai;

@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.LocalDateTime;
 
@@ -28,7 +27,6 @@ public class AnhHoanTien {
 
     @NotNull
     @Size(max = 500)
-    @Nationalized
     @Column(name = "duong_dan", nullable = false, length = 500)
     private String duongDan;
 

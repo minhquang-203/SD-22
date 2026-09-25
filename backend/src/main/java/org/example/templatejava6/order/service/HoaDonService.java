@@ -605,9 +605,7 @@ public class HoaDonService {
 
                 || trangThaiCu == TrangThaiDonHang.DA_XAC_NHAN
 
-                || trangThaiCu == TrangThaiDonHang.DANG_CHUAN_BI
-
-                || trangThaiCu == TrangThaiDonHang.DANG_GIAO;
+                || trangThaiCu == TrangThaiDonHang.DANG_CHUAN_BI;
 
     }
 

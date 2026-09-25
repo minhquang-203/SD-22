@@ -119,7 +119,9 @@ public class GhnTrackingService {
     }
 
     public static List<GhnTrangThaiOptionResponse> allStatusOptions() {
+        // Bỏ "returned" — NV/admin không được giả lập "Đã hoàn hàng" (chỉ từ đồng bộ GHN).
         return ALL_STATUSES.stream()
+                .filter(status -> !"returned".equals(status))
                 .map(status -> new GhnTrangThaiOptionResponse(status, labelOf(status)))
                 .toList();
     }

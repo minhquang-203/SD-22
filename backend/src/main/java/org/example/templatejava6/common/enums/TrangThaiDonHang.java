@@ -32,8 +32,9 @@ public enum TrangThaiDonHang {
         if (laTrangThaiKetThuc()) {
             return false;
         }
+        // Chỉ hủy khi chưa sang Đang giao (tránh hủy linh tinh / hoàn tồn sai khi đã giao).
         if (trangThaiMoi == DA_HUY) {
-            return true;
+            return this == CHO || coTheHuyTruocKhiGiao();
         }
         // Chờ xác nhận: chỉ được sang Đã xác nhận (không nhảy cóc).
         if (this == CHO_XAC_NHAN) {

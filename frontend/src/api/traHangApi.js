@@ -17,11 +17,9 @@ function guestReturnPath(token) {
   return `/hoa-don/tra-cuu/${encodeURIComponent(token)}`
 }
 
-/** Khách: tạo yêu cầu trả hàng (multipart: data JSON + files ảnh) */
-export function taoYeuCauTraHang(idHoaDon, idKhachHang, payload, files = []) {
-  return request.post(`/online/orders/${idHoaDon}/tra-hang`, appendReturnFormData(payload, files), {
-    params: { idKhachHang },
-  })
+/** Khách: tạo yêu cầu trả hàng (multipart: data JSON + files ảnh). idKhachHang lấy từ JWT phía BE. */
+export function taoYeuCauTraHang(idHoaDon, _idKhachHang, payload, files = []) {
+  return request.post(`/online/orders/${idHoaDon}/tra-hang`, appendReturnFormData(payload, files))
 }
 
 /** Khách vãng lai: tạo yêu cầu trả hàng bằng tracking token */
@@ -33,13 +31,13 @@ export function taoYeuCauTraHangCongKhai(token, idHoaDon, payload, files = []) {
 }
 
 /** Khách: danh sách yêu cầu trả hàng của tôi */
-export function fetchTraHangCuaToi(idKhachHang) {
-  return request.get('/online/tra-hang', { params: { idKhachHang } })
+export function fetchTraHangCuaToi(_idKhachHang) {
+  return request.get('/online/tra-hang')
 }
 
 /** Khách: chi tiết một yêu cầu trả hàng */
-export function fetchChiTietTraHangCuaToi(id, idKhachHang) {
-  return request.get(`/online/tra-hang/${id}`, { params: { idKhachHang } })
+export function fetchChiTietTraHangCuaToi(id, _idKhachHang) {
+  return request.get(`/online/tra-hang/${id}`)
 }
 
 /** Khách vãng lai: chi tiết yêu cầu trả hàng bằng tracking token */
@@ -56,10 +54,8 @@ export function fetchCaLayHang(trackingToken) {
 }
 
 /** Khách: tạo vận đơn GHN hoàn hàng kèm ca lấy hàng đã chọn */
-export function taoVanDonTra(id, idKhachHang, pickShiftId = null) {
-  return request.post(`/online/tra-hang/${id}/tao-van-don`, { pickShiftId }, {
-    params: { idKhachHang },
-  })
+export function taoVanDonTra(id, _idKhachHang, pickShiftId = null) {
+  return request.post(`/online/tra-hang/${id}/tao-van-don`, { pickShiftId })
 }
 
 /** Khách vãng lai: tạo vận đơn GHN hoàn hàng bằng tracking token */

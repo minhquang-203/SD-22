@@ -3,7 +3,6 @@ package org.example.templatejava6.nhaphang.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.Nationalized;
 
 @Getter
 @Setter
@@ -18,8 +17,6 @@ public class NhaCungCap {
 
     @Column(name = "ma", length = 20, nullable = false, unique = true)
     private String ma;
-
-    @Nationalized
     @Column(name = "ten", length = 200, nullable = false)
     private String ten;
 
@@ -28,12 +25,8 @@ public class NhaCungCap {
 
     @Column(name = "email", length = 100)
     private String email;
-
-    @Nationalized
     @Column(name = "dia_chi", length = 255)
     private String diaChi;
-
-    @Nationalized
     @Column(name = "ghi_chu", length = 255)
     private String ghiChu;
 

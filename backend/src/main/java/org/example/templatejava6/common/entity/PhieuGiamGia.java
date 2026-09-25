@@ -8,7 +8,6 @@ import lombok.Setter;
 import org.example.templatejava6.common.enums.LoaiPhieuGiamGia;
 import org.example.templatejava6.common.enums.PhamViPhieuGiamGia;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -29,7 +28,6 @@ public class PhieuGiamGia {
     private String ma;
 
     @Size(max = 100)
-    @Nationalized
     @Column(name = "ten", length = 100)
     private String ten;
 

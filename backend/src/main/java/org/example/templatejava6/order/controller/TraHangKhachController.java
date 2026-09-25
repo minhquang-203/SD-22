@@ -1,6 +1,7 @@
 package org.example.templatejava6.order.controller;
 
 import jakarta.validation.Valid;
+import org.example.templatejava6.common.security.SecurityUtils;
 import org.example.templatejava6.order.model.request.TaoVanDonTraRequest;
 import org.example.templatejava6.order.model.request.TaoYeuCauTraHangRequest;
 import org.example.templatejava6.order.model.response.StorefrontReturnDetailResponse;
@@ -13,7 +14,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -34,22 +34,20 @@ public class TraHangKhachController {
     @PostMapping(value = "/orders/{idHoaDon}/tra-hang", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public YeuCauTraHangResponse taoYeuCau(
             @PathVariable Integer idHoaDon,
-            @RequestParam Integer idKhachHang,
             @Valid @RequestPart("data") TaoYeuCauTraHangRequest request,
             @RequestPart(value = "files", required = false) List<MultipartFile> files) {
-        return returnRequestService.taoYeuCau(idKhachHang, idHoaDon, request, files);
+        // idKhachHang chỉ lấy từ JWT — không nhận query để tránh khách A thao tác đơn của B.
+        return returnRequestService.taoYeuCau(SecurityUtils.currentKhachHangId(), idHoaDon, request, files);
     }
 
     @GetMapping("/tra-hang")
-    public List<YeuCauTraHangResponse> danhSachCuaToi(@RequestParam Integer idKhachHang) {
-        return returnRequestService.danhSachCuaToi(idKhachHang);
+    public List<YeuCauTraHangResponse> danhSachCuaToi() {
+        return returnRequestService.danhSachCuaToi(SecurityUtils.currentKhachHangId());
     }
 
     @GetMapping("/tra-hang/{id}")
-    public StorefrontReturnDetailResponse chiTietCuaToi(
-            @PathVariable Integer id,
-            @RequestParam Integer idKhachHang) {
-        return returnRequestService.chiTietCuaToi(idKhachHang, id);
+    public StorefrontReturnDetailResponse chiTietCuaToi(@PathVariable Integer id) {
+        return returnRequestService.chiTietCuaToi(SecurityUtils.currentKhachHangId(), id);
     }
 
     /** Ca lay hang GHN de khach chon thoi diem shipper den lay hang tra. */
@@ -61,9 +59,10 @@ public class TraHangKhachController {
     @PostMapping("/tra-hang/{id}/tao-van-don")
     public YeuCauTraHangResponse taoVanDonTra(
             @PathVariable Integer id,
-            @RequestParam Integer idKhachHang,
             @RequestBody(required = false) TaoVanDonTraRequest request) {
         return returnRequestService.taoVanDonTra(
-                idKhachHang, id, request != null ? request.getPickShiftId() : null);
+                SecurityUtils.currentKhachHangId(),
+                id,
+                request != null ? request.getPickShiftId() : null);
     }
 }

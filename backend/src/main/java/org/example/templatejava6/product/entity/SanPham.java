@@ -9,7 +9,6 @@ import lombok.Setter;
 import org.example.templatejava6.category.entity.DangSanPham;
 import org.example.templatejava6.category.entity.DanhMuc;
 import org.example.templatejava6.category.entity.ThuongHieu;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.LocalDateTime;
 
@@ -31,7 +30,6 @@ public class SanPham {
     private String maSanPham;
 
     @Size(max = 200)
-    @Nationalized
     @Column(name = "ten", length = 200)
     private String ten;
 
@@ -61,8 +59,6 @@ public class SanPham {
 
     @Column(name = "khang_nuoc")
     private Boolean khangNuoc;
-
-    @Nationalized
     @Column(name = "mo_ta", columnDefinition = "NVARCHAR(MAX)")
     private String moTa;
 

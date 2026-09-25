@@ -9,7 +9,6 @@ import org.example.templatejava6.common.entity.NhanVien;
 import org.example.templatejava6.common.enums.LoaiHoanTien;
 import org.example.templatejava6.common.enums.TrangThaiHoanTien;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -57,7 +56,6 @@ public class HoanTien {
     private String maGiaoDichHoan;
 
     @Size(max = 100)
-    @Nationalized
     @Column(name = "ten_ngan_hang", length = 100)
     private String tenNganHang;
 
@@ -66,18 +64,15 @@ public class HoanTien {
     private String soTaiKhoan;
 
     @Size(max = 100)
-    @Nationalized
     @Column(name = "chu_tai_khoan", length = 100)
     private String chuTaiKhoan;
 
     @Size(max = 255)
-    @Nationalized
     @Column(name = "ghi_chu")
     private String ghiChu;
 
     /** Raw response nha cung cap khi goi API hoan tien (doi soat). */
     @Size(max = 500)
-    @Nationalized
     @Column(name = "phan_hoi_ncc", length = 500)
     private String phanHoiNcc;
 

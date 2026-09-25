@@ -8,7 +8,6 @@ import lombok.Setter;
 import org.example.templatejava6.common.entity.NhanVien;
 import org.example.templatejava6.common.enums.TrangThaiTraHang;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.LocalDateTime;
 
@@ -29,12 +28,10 @@ public class YeuCauTraHang {
     private HoaDon idHoaDon;
 
     @Size(max = 255)
-    @Nationalized
     @Column(name = "ly_do")
     private String lyDo;
 
     @Size(max = 500)
-    @Nationalized
     @Column(name = "mo_ta", length = 500)
     private String moTa;
 
@@ -52,7 +49,6 @@ public class YeuCauTraHang {
     private Integer pickShiftId;
 
     @Size(max = 100)
-    @Nationalized
     @Column(name = "pick_shift_label", length = 100)
     private String pickShiftLabel;
 
@@ -72,12 +68,10 @@ public class YeuCauTraHang {
     private String ghnWardCode;
 
     @Size(max = 255)
-    @Nationalized
     @Column(name = "dia_chi_tra")
     private String diaChiTra;
 
     @Size(max = 100)
-    @Nationalized
     @Column(name = "ten_ngan_hang", length = 100)
     private String tenNganHang;
 
@@ -86,12 +80,10 @@ public class YeuCauTraHang {
     private String soTaiKhoan;
 
     @Size(max = 100)
-    @Nationalized
     @Column(name = "chu_tai_khoan", length = 100)
     private String chuTaiKhoan;
 
     @Size(max = 255)
-    @Nationalized
     @Column(name = "ghi_chu_admin")
     private String ghiChuAdmin;
 

@@ -6,7 +6,6 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.Nationalized;
 
 @Getter
 @Setter
@@ -26,11 +25,8 @@ public class ThuongHieu {
     private String ma;
 
     @Size(max = 100)
-    @Nationalized
     @Column(name = "ten", length = 100)
     private String ten;
-
-    @Nationalized
     @Column(name = "xuat_xu", length = 50)
     private String xuatXu;
 

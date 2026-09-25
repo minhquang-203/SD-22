@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -28,7 +27,6 @@ public class DotGiamGia {
 
     @Size(max = 100)
     @NotNull
-    @Nationalized
     @Column(name = "ten", nullable = false, length = 100)
     private String ten;
 

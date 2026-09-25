@@ -18,12 +18,17 @@ import org.example.templatejava6.order.repository.ThanhToanHoaDonRepository;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
 import org.example.templatejava6.product.service.LoHangService;
 import org.example.templatejava6.realtime.service.OrderRealtimeService;
+import org.example.templatejava6.shipping.service.ShippingService;
 import org.example.templatejava6.voucher.service.PhieuGiamGiaService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class OnlineOrderLifecycleService {
+
+    private static final Logger log = LoggerFactory.getLogger(OnlineOrderLifecycleService.class);
 
     private static final String LOAI_DON_ONLINE = "ONLINE";
     private static final String MA_VNPAY = "VNPAY";
@@ -40,6 +45,7 @@ public class OnlineOrderLifecycleService {
     private final LoHangService loHangService;
     private final RefundService refundService;
     private final OrderRealtimeService orderRealtimeService;
+    private final ShippingService shippingService;
 
     public OnlineOrderLifecycleService(
             HoaDonRepository hoaDonRepository,
@@ -51,7 +57,8 @@ public class OnlineOrderLifecycleService {
             ChiTietGioHangRepository chiTietGioHangRepository,
             LoHangService loHangService,
             RefundService refundService,
-            OrderRealtimeService orderRealtimeService) {
+            OrderRealtimeService orderRealtimeService,
+            ShippingService shippingService) {
         this.hoaDonRepository = hoaDonRepository;
         this.hoaDonChiTietRepository = hoaDonChiTietRepository;
         this.thanhToanHoaDonRepository = thanhToanHoaDonRepository;
@@ -62,6 +69,7 @@ public class OnlineOrderLifecycleService {
         this.loHangService = loHangService;
         this.refundService = refundService;
         this.orderRealtimeService = orderRealtimeService;
+        this.shippingService = shippingService;
     }
 
     @Transactional
@@ -91,6 +99,9 @@ public class OnlineOrderLifecycleService {
             huyDonChuaThanhToan(hoaDon);
             return true;
         }
+
+        // Có mã GHN thì hủy vận đơn trước khi ghi DA_HUY — tránh mã vẫn còn hiệu lực bên GHN.
+        huyVanDonGhnNeuCo(hoaDon);
 
         TrangThaiDonHang trangThaiCu = hoaDon.getTrangThai();
         hoanTonKho(hoaDon);
@@ -260,6 +271,16 @@ public class OnlineOrderLifecycleService {
         return hoaDon.getIdPhuongThucThanhToan() != null
                 && hoaDon.getIdPhuongThucThanhToan().getMa() != null
                 && MA_VNPAY.equalsIgnoreCase(hoaDon.getIdPhuongThucThanhToan().getMa());
+    }
+
+    /** Gọi API hủy vận đơn GHN nếu hóa đơn đã có {@code maVanDonGhn}. */
+    private void huyVanDonGhnNeuCo(HoaDon hoaDon) {
+        String maVanDon = hoaDon.getMaVanDonGhn();
+        if (maVanDon == null || maVanDon.isBlank()) {
+            return;
+        }
+        log.info("Hủy vận đơn GHN {} khi hủy đơn {}", maVanDon, hoaDon.getMaHoaDon());
+        shippingService.cancelOrder(maVanDon);
     }
 
     private void hoanTonKho(HoaDon hoaDon) {
