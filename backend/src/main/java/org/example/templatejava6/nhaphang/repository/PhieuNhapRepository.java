@@ -19,13 +19,19 @@ public interface PhieuNhapRepository extends JpaRepository<PhieuNhap, Integer> {
               AND (:idNcc IS NULL OR p.nhaCungCap.id = :idNcc)
               AND (:from IS NULL OR p.ngayTao >= :from)
               AND (:to IS NULL OR p.ngayTao <= :to)
+              AND (
+                :q IS NULL OR :q = ''
+                OR LOWER(p.maPhieuNhap) LIKE LOWER(CONCAT('%', :q, '%'))
+                OR LOWER(COALESCE(p.soHoaDonDauVao, '')) LIKE LOWER(CONCAT('%', :q, '%'))
+              )
             ORDER BY p.ngayTao DESC
             """)
     List<PhieuNhap> search(
             @Param("trangThai") String trangThai,
             @Param("idNcc") Integer idNcc,
             @Param("from") LocalDateTime from,
-            @Param("to") LocalDateTime to);
+            @Param("to") LocalDateTime to,
+            @Param("q") String q);
 
     @Query("""
             SELECT p FROM PhieuNhap p

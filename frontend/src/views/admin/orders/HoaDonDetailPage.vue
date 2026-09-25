@@ -10,6 +10,8 @@ import { subscribeAdminOrders } from '@/composables/useRealtime'
 import { GHN_STATUS_OPTIONS } from '@/constants/ghnStatuses'
 import { formatCurrency } from '@/utils/format'
 import { toast } from '@/composables/useToast'
+import { printInvoice, saveInvoicePdf } from '@/utils/printInvoice'
+import { normalizeInvoice } from '@/utils/invoiceReceipt'
 
 const route = useRoute()
 const router = useRouter()
@@ -310,8 +312,14 @@ async function loadDetail() {
   }
 }
 
-function printInvoice() {
-  window.print()
+function printInvoiceAction() {
+  if (!detail.value) return
+  void printInvoice(normalizeInvoice(detail.value))
+}
+
+function saveInvoicePdfAction() {
+  if (!detail.value) return
+  void saveInvoicePdf(normalizeInvoice(detail.value))
 }
 
 function goBack() {
@@ -431,10 +439,16 @@ onUnmounted(() => {
               <span class="hoa-don-summary__total-label">Thành tiền</span>
               <span class="hoa-don-summary__total-value">{{ formatCurrency(detail.thanhTien) }}</span>
             </div>
-            <button type="button" class="soleil-btn-outline hd-btn no-print" @click="printInvoice">
-              <Icon icon="icon-park-outline:printer" />
-              In hóa đơn
-            </button>
+            <div class="hoa-don-summary__actions no-print">
+              <button type="button" class="soleil-btn-outline hd-btn" @click="printInvoiceAction">
+                <Icon icon="icon-park-outline:printer" />
+                In lại
+              </button>
+              <button type="button" class="soleil-btn-outline hd-btn" @click="saveInvoicePdfAction">
+                <Icon icon="icon-park-outline:download" />
+                Lưu PDF
+              </button>
+            </div>
           </div>
         </section>
 
@@ -1027,6 +1041,12 @@ onUnmounted(() => {
   margin-top: 1rem;
   padding-top: 0.9rem;
   border-top: 2px solid var(--hd-ink);
+}
+
+.hoa-don-summary__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .hoa-don-summary__total-label {

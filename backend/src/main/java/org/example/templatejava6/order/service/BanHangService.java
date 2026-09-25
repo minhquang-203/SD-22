@@ -24,7 +24,8 @@ import org.example.templatejava6.order.model.response.DonChoDetailResponse;
 import org.example.templatejava6.order.model.response.DonChoListItemResponse;
 import org.example.templatejava6.order.model.response.GiuDonChoResponse;
 import org.example.templatejava6.order.model.response.PosTinhGiaResponse;
-import org.example.templatejava6.order.model.response.PosThanhToanStatusResponse;
+import org.example.templatejava6.order.model.response.LoHangDonHangResponse;
+import org.example.templatejava6.product.entity.LoHang;
 import org.example.templatejava6.order.repository.HoaDonChiTietLoRepository;
 import org.example.templatejava6.order.repository.HoaDonChiTietRepository;
 import org.example.templatejava6.order.repository.HoaDonRepository;
@@ -546,9 +547,12 @@ public class BanHangService {
                 phieuGiamGiaService.consumeOne(phieu.getId());
             }
 
-            diemTichLuyService.congDiemTuDonHoanThanh(hoaDon);
+            int diemCong = diemTichLuyService.congDiemTuDonHoanThanh(hoaDon);
 
-            return BanHangHoaDonResponse.from(hoaDon, ttDaiDien, lineResponses, cacDongThanhToan);
+            BanHangHoaDonResponse done = enrichReceipt(
+                    BanHangHoaDonResponse.from(hoaDon, ttDaiDien, lineResponses, cacDongThanhToan), hoaDon);
+            done.setDiemCong(diemCong > 0 ? diemCong : null);
+            return done;
         }
 
         if (isVnpay) {
@@ -558,7 +562,7 @@ public class BanHangService {
             TaoThanhToanRequest paymentRequest = new TaoThanhToanRequest();
             paymentRequest.setIdHoaDon(hoaDon.getId());
             TaoThanhToanResponse payment = paymentService.taoThanhToan(VnpayGateway.PROVIDER_CODE, paymentRequest, clientIp);
-            BanHangHoaDonResponse res = BanHangHoaDonResponse.from(hoaDon, null, lineResponses);
+            BanHangHoaDonResponse res = enrichReceipt(BanHangHoaDonResponse.from(hoaDon, null, lineResponses), hoaDon);
             res.setPaymentUrl(payment.getPaymentUrl());
             res.setTransactionRef(payment.getTransactionRef());
             res.setTrangThaiThanhToan(TRANG_THAI_CHO_THANH_TOAN);
@@ -585,9 +589,11 @@ public class BanHangService {
             phieuGiamGiaService.consumeOne(phieu.getId());
         }
 
-        diemTichLuyService.congDiemTuDonHoanThanh(hoaDon);
+        int diemCong = diemTichLuyService.congDiemTuDonHoanThanh(hoaDon);
 
-        return BanHangHoaDonResponse.from(hoaDon, tt, lineResponses);
+        BanHangHoaDonResponse done = enrichReceipt(BanHangHoaDonResponse.from(hoaDon, tt, lineResponses), hoaDon);
+        done.setDiemCong(diemCong > 0 ? diemCong : null);
+        return done;
     }
 
     @Transactional(readOnly = true)
@@ -609,7 +615,8 @@ public class BanHangService {
                     .toList();
             List<ThanhToanHoaDon> tatCaThanhToan =
                     thanhToanHoaDonRepository.findByIdHoaDonOrderByThoiGianDesc(hoaDon);
-            hoaDonResponse = BanHangHoaDonResponse.from(hoaDon, thanhToan, lines, tatCaThanhToan);
+            hoaDonResponse = enrichReceipt(
+                    BanHangHoaDonResponse.from(hoaDon, thanhToan, lines, tatCaThanhToan), hoaDon);
             hoaDonResponse.setTrangThaiThanhToan(TRANG_THAI_THANH_CONG);
         }
 
@@ -670,9 +677,62 @@ public class BanHangService {
         List<ThanhToanHoaDon> tatCaThanhToan =
                 thanhToanHoaDonRepository.findByIdHoaDonOrderByThoiGianDesc(hoaDon);
         BanHangHoaDonResponse hoaDonResponse =
-                BanHangHoaDonResponse.from(hoaDon, thanhToan, lines, tatCaThanhToan);
+                enrichReceipt(BanHangHoaDonResponse.from(hoaDon, thanhToan, lines, tatCaThanhToan), hoaDon);
         hoaDonResponse.setTrangThaiThanhToan(TRANG_THAI_THANH_CONG);
         return PosThanhToanStatusResponse.of(hoaDon.getId(), hoaDon.getMaHoaDon(), TRANG_THAI_THANH_CONG, hoaDonResponse);
+    }
+
+    /**
+     * Bổ sung Lô/HSD + điểm tích lũy cho mẫu in hóa đơn (không đổi logic tạo đơn).
+     */
+    private BanHangHoaDonResponse enrichReceipt(BanHangHoaDonResponse response, HoaDon hoaDon) {
+        if (response == null || hoaDon == null) {
+            return response;
+        }
+        if (response.getItems() != null && !response.getItems().isEmpty()) {
+            Map<Integer, List<LoHangDonHangResponse>> loByChiTietId = new HashMap<>();
+            for (HoaDonChiTietLo link : hoaDonChiTietLoRepository.findByHoaDonFetchLo(hoaDon)) {
+                HoaDonChiTiet ct = link.getHoaDonChiTiet();
+                LoHang lo = link.getLoHang();
+                if (ct == null || ct.getId() == null) {
+                    continue;
+                }
+                LoHangDonHangResponse item = new LoHangDonHangResponse();
+                if (lo != null) {
+                    item.setIdLoHang(lo.getId());
+                    item.setSoLo(lo.getSoLo());
+                    item.setHanSuDung(lo.getHanSuDung());
+                    item.setNgayNhap(lo.getNgayNhap());
+                }
+                item.setSoLuongDaBan(link.getSoLuong());
+                loByChiTietId
+                        .computeIfAbsent(ct.getId(), k -> new ArrayList<>())
+                        .add(item);
+            }
+            for (BanHangChiTietResponse line : response.getItems()) {
+                if (line.getId() != null) {
+                    line.setLoHangs(loByChiTietId.getOrDefault(line.getId(), List.of()));
+                }
+            }
+        }
+        if (response.getIdKhachHang() != null
+                && hoaDon.getTrangThai() == TrangThaiDonHang.HOAN_THANH) {
+            if (response.getDiemCong() == null) {
+                BigDecimal thanhTien = response.getThanhTien() != null ? response.getThanhTien() : BigDecimal.ZERO;
+                int diem = thanhTien.divideToIntegralValue(BigDecimal.valueOf(1000)).intValue();
+                if (diem > 0) {
+                    response.setDiemCong(diem);
+                }
+            }
+            // Đọc lại điểm sau cộng (entity KH trên hoaDon đã được cập nhật trong congDiem)
+            if (hoaDon.getIdKhachHang() != null && hoaDon.getIdKhachHang().getDiemTichLuy() != null) {
+                response.setDiemTichLuySau(hoaDon.getIdKhachHang().getDiemTichLuy());
+            } else {
+                khachHangRepository.findById(response.getIdKhachHang()).ifPresent(kh ->
+                        response.setDiemTichLuySau(kh.getDiemTichLuy()));
+            }
+        }
+        return response;
     }
 
     private HoaDon loadDonCho(Integer id) {

@@ -24,8 +24,12 @@ import { formatCurrency, formatDate } from '@/utils/format'
 import { formatDiscountPercent } from '@/utils/formatVND'
 import { productImageUrl } from '@/utils/productImage'
 import { confirm } from '@/composables/useConfirm'
+import { toast } from '@/composables/useToast'
 import { getPhoneValidationError, normalizePhoneDigits } from '@/utils/phone'
 import { getLoHangConHangTheoBienThe } from '@/api/loHangApi'
+import InvoiceReceipt from '@/components/invoice/InvoiceReceipt.vue'
+import { normalizeInvoice } from '@/utils/invoiceReceipt'
+import { printInvoice, saveInvoicePdf } from '@/utils/printInvoice'
 import '@/styles/posAdmin.css'
 
 /**
@@ -56,7 +60,12 @@ const categoryChips = ref([])
 const productPage = ref(0)
 const productTotalPages = ref(0)
 const productTotal = ref(0)
-const PRODUCT_PAGE_SIZE = 18
+/** Số hàng cố định trên lưới POS — pageSize = cols × rows. */
+const PRODUCT_GRID_ROWS = 4
+const productPageSize = ref(20)
+const posGridRef = ref(null)
+let posGridRo = null
+let posGridResizeTimer = null
 
 const cart = ref([])
 const lotModalOpen = ref(false)
@@ -348,33 +357,28 @@ function changeQty(line, delta) {
   applyLineQty(line, next)
 }
 
-/** Gõ trực tiếp số lượng trong đơn — kẹp [1, tồn]. */
+/** Gõ trực tiếp số lượng trong đơn — cùng luật kẹp với +/-. */
 function onQtyCommit(line, event) {
   const el = event?.target
-  const raw = el?.value ?? ''
-  const digits = String(raw).replace(/[^\d]/g, '')
-  let n = digits === '' ? NaN : Number.parseInt(digits, 10)
-  const max = Math.max(0, Number(line.soLuongTon) || 0)
-
-  if (!Number.isFinite(n) || n < 1) {
-    n = 1
-  } else if (n > max) {
-    notify(`Chỉ còn ${max} trong kho`, 'error')
-    n = Math.max(1, max)
-  }
-
-  applyLineQty(line, n)
+  const digits = String(el?.value ?? '').replace(/[^\d]/g, '')
+  const parsed = digits === '' ? NaN : Number.parseInt(digits, 10)
+  applyLineQty(line, parsed, { fromInput: true })
   if (el) el.value = String(line.soLuong)
 }
 
-function applyLineQty(line, next) {
+function applyLineQty(line, next, { fromInput = false } = {}) {
   const max = Math.max(0, Number(line.soLuongTon) || 0)
-  let qty = Number(next) || 1
-  if (qty < 1) qty = 1
-  if (max > 0 && qty > max) {
-    notify(`Chỉ còn ${max} trong kho`, 'error')
+  const raw = typeof next === 'number' ? next : Number(next)
+  let qty = raw
+
+  if (!Number.isFinite(qty) || qty < 1) {
+    if (fromInput) toast('Số lượng tối thiểu là 1', 'warn')
+    qty = 1
+  } else if (max > 0 && qty > max) {
+    toast(`Chỉ còn ${max} sản phẩm trong kho`, 'error')
     qty = max
   }
+
   if (qty === line.soLuong) return
 
   const hadManual = Boolean(line.phanBoLos?.length || line.idLoHang != null)
@@ -582,7 +586,7 @@ async function loadProducts(resetPage = false) {
     const res = await getSanPhamBan(
       keyword.value.trim(),
       productPage.value,
-      PRODUCT_PAGE_SIZE,
+      productPageSize.value,
       categoryFilter.value || '',
     )
     const data = res.data || {}
@@ -596,6 +600,63 @@ async function loadProducts(resetPage = false) {
   } finally {
     loading.value = false
   }
+}
+
+/** Đếm cột thực tế của lưới (theo CSS breakpoint) → pageSize = cols × rows. */
+function measurePosGridCols() {
+  const el = posGridRef.value
+  if (el) {
+    const parts = getComputedStyle(el).gridTemplateColumns.split(/\s+/).filter(Boolean)
+    if (parts.length > 0) return parts.length
+  }
+  const w = window.innerWidth
+  if (w >= 1400) return 5
+  if (w >= 1100) return 4
+  if (w >= 900) return 3
+  return 2
+}
+
+function syncProductPageSize({ reload = true } = {}) {
+  const cols = measurePosGridCols()
+  const next = Math.max(1, cols) * PRODUCT_GRID_ROWS
+  if (next === productPageSize.value) return
+  const prevSize = productPageSize.value
+  const firstIndex = productPage.value * prevSize
+  productPageSize.value = next
+  if (!reload || !productsLoaded.value) return
+  productPage.value = Math.floor(firstIndex / next)
+  void loadProducts(false)
+}
+
+function bindPosGridObserver() {
+  unbindPosGridObserver()
+  const el = posGridRef.value
+  if (!el || typeof ResizeObserver === 'undefined') {
+    window.addEventListener('resize', onPosGridWindowResize)
+    syncProductPageSize({ reload: false })
+    return
+  }
+  posGridRo = new ResizeObserver(() => {
+    clearTimeout(posGridResizeTimer)
+    posGridResizeTimer = setTimeout(() => syncProductPageSize({ reload: true }), 120)
+  })
+  posGridRo.observe(el)
+  syncProductPageSize({ reload: false })
+}
+
+function onPosGridWindowResize() {
+  clearTimeout(posGridResizeTimer)
+  posGridResizeTimer = setTimeout(() => syncProductPageSize({ reload: true }), 120)
+}
+
+function unbindPosGridObserver() {
+  clearTimeout(posGridResizeTimer)
+  posGridResizeTimer = null
+  if (posGridRo) {
+    posGridRo.disconnect()
+    posGridRo = null
+  }
+  window.removeEventListener('resize', onPosGridWindowResize)
 }
 
 function goProductPage(page) {
@@ -801,14 +862,10 @@ function openVietQrModal() {
   showVietQrModal.value = true
 }
 
-async function confirmVietQrReceived() {
+function confirmVietQrReceived() {
   splitTransferConfirmed.value = true
   showVietQrModal.value = false
-  if (!canCheckout.value) {
-    notify('Đã ghi nhận chuyển khoản. Nhập tiền mặt (nhỏ hơn tổng) rồi bấm Tạo hóa đơn.')
-    return
-  }
-  await checkout({ skipConfirm: true })
+  notify('Đã ghi nhận chuyển khoản. Kiểm tra lại đơn rồi bấm «Tạo hóa đơn» để hoàn tất.')
 }
 
 function cancelVietQrModal() {
@@ -1329,20 +1386,13 @@ function resetSale() {
 }
 
 function printReceipt() {
-  document.body.classList.add('printing-receipt')
-  nextTick(() => {
-    window.print()
-    window.addEventListener(
-      'afterprint',
-      () => document.body.classList.remove('printing-receipt'),
-      { once: true },
-    )
-  })
+  if (!receipt.value) return
+  void printInvoice(receipt.value)
 }
 
-function formatDateTime(value) {
-  if (!value) return '—'
-  return new Date(value).toLocaleString('vi-VN')
+function saveReceiptPdf() {
+  if (!receipt.value) return
+  void saveInvoicePdf(receipt.value)
 }
 
 watch(selectedPaymentId, () => {
@@ -1360,6 +1410,9 @@ watch(categoryFilter, () => {
 })
 
 onMounted(async () => {
+  await nextTick()
+  bindPosGridObserver()
+  syncProductPageSize({ reload: false })
   await Promise.all([loadMeta(), loadHeldOrders(), loadCategories(), loadProducts(true)])
   await nextTick()
   searchInput.value?.focus()
@@ -1367,6 +1420,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   stopQrPolling()
+  unbindPosGridObserver()
 })
 </script>
 
@@ -1425,7 +1479,11 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <div class="pos-grid" :class="{ 'is-loading': loading && productsLoaded }">
+        <div
+          ref="posGridRef"
+          class="pos-grid"
+          :class="{ 'is-loading': loading && productsLoaded }"
+        >
           <div v-if="loading && !productsLoaded" class="pos-grid-loading">Đang tải sản phẩm...</div>
           <div v-else-if="productsLoaded && filteredProducts.length === 0" class="pos-grid-empty">
             {{ keyword.trim() || categoryFilter
@@ -1852,83 +1910,26 @@ onBeforeUnmount(() => {
       </div>
     </Teleport>
 
-    <!-- Modal biên lai (Teleport ra body để in đúng) -->
+    <!-- Modal biên lai (xem trước + in qua iframe 80mm) -->
     <Teleport to="body">
       <div v-if="showReceipt && receipt" class="pos-receipt-overlay" @click.self="showReceipt = false">
         <div class="pos-receipt-modal">
-          <div id="pos-receipt-print" class="pos-receipt-print">
-          <div class="pos-receipt-print__brand">SUNOVA</div>
-          <div class="pos-receipt-print__meta">
-            {{ receipt.maHoaDon }}<br />
-            {{ formatDateTime(receipt.ngayTao) }}
+          <div class="pos-receipt-preview">
+            <InvoiceReceipt :invoice="normalizeInvoice(receipt)" />
           </div>
-          <p v-if="receipt.tenNhanVien" class="text-xs mb-1">NV: {{ receipt.tenNhanVien }}</p>
-          <p class="text-xs mb-2">KH: {{ receipt.tenKhachHang }}</p>
-          <table class="pos-receipt-print__table">
-            <thead>
-              <tr>
-                <th>Hàng</th>
-                <th>SL</th>
-                <th>ĐG</th>
-                <th>TT</th>
-              </tr>
-            </thead>
-            <tbody>
-              <template v-for="(item, idx) in receipt.items" :key="idx">
-                <tr class="pos-receipt-print__item-name">
-                  <td colspan="4">
-                    {{ item.tenSanPham }}
-                    <span v-if="item.bienThe" class="pos-receipt-print__variant">{{ item.bienThe }}</span>
-                  </td>
-                </tr>
-                <tr class="pos-receipt-print__item-meta">
-                  <td></td>
-                  <td>{{ item.soLuong }}</td>
-                  <td>{{ formatCurrency(item.donGia) }}</td>
-                  <td>{{ formatCurrency(item.thanhTien) }}</td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-          <div class="pos-receipt-print__summary">
-            <div class="flex justify-between"><span>Tổng</span><span>{{ formatCurrency(receipt.tongTien) }}</span></div>
-            <div v-if="receipt.tienGiamGia > 0" class="flex justify-between">
-              <span>Giảm</span><span>-{{ formatCurrency(receipt.tienGiamGia) }}</span>
-            </div>
-            <div class="flex justify-between font-bold mt-1">
-              <span>Thành tiền</span><span>{{ formatCurrency(receipt.thanhTien) }}</span>
-            </div>
-            <div v-if="receipt.soTienKhachDua != null" class="flex justify-between mt-1">
-              <span>Khách đưa</span><span>{{ formatCurrency(receipt.soTienKhachDua) }}</span>
-            </div>
-            <div v-if="receipt.tienThua != null" class="flex justify-between">
-              <span>Tiền thối</span><span>{{ formatCurrency(receipt.tienThua) }}</span>
-            </div>
-            <template v-if="receipt.danhSachThanhToan && receipt.danhSachThanhToan.length > 1">
-              <div class="mt-1">Thanh toán:</div>
-              <div
-                v-for="(tt, ttIdx) in receipt.danhSachThanhToan"
-                :key="ttIdx"
-                class="flex justify-between"
-              >
-                <span>{{ tt.tenPhuongThucThanhToan }}</span>
-                <span>{{ formatCurrency(tt.soTien) }}</span>
-              </div>
-            </template>
-            <div v-else class="mt-1">PTTT: {{ receipt.tenPhuongThucThanhToan }}</div>
+          <div class="pos-receipt-actions">
+            <button type="button" class="soleil-btn-outline flex-1" @click="printReceipt">
+              In hóa đơn
+            </button>
+            <button type="button" class="soleil-btn-outline flex-1" @click="saveReceiptPdf">
+              Lưu PDF
+            </button>
+            <button type="button" class="soleil-btn-primary flex-1" @click="resetSale">
+              Bán đơn mới
+            </button>
           </div>
-          <p class="pos-receipt-print__thanks">Cảm ơn quý khách!</p>
-        </div>
-        <div class="pos-receipt-actions">
-          <button type="button" class="soleil-btn-outline flex-1" @click="printReceipt">
-            In hóa đơn
-          </button>
-          <button type="button" class="soleil-btn-primary flex-1" @click="resetSale">
-            Bán đơn mới
-          </button>
         </div>
       </div>
-    </div>
     </Teleport>
 
     <!-- Modal QR thanh toán VNPay -->
@@ -2110,7 +2111,8 @@ onBeforeUnmount(() => {
 
             <p class="pos-qr-modal__hint">
               Số tiền QR = phần chuyển khoản còn thiếu.
-              Bấm <strong>Đã nhận chuyển khoản</strong> sẽ tạo hóa đơn (tiền mặt + CK).
+              Bấm <strong>Đã nhận chuyển khoản</strong> chỉ ghi nhận — sau đó bấm
+              <strong>Tạo hóa đơn</strong> trên màn POS để hoàn tất.
             </p>
           </div>
 

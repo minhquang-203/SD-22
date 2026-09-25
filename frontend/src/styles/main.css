@@ -2560,17 +2560,28 @@ h2,
 .pos-receipt-modal {
   background: #fff;
   border-radius: 16px;
-  max-width: 420px;
+  max-width: 360px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
-  padding: 28px;
+  padding: 16px 12px 20px;
+}
+
+.pos-receipt-preview {
+  max-height: calc(90vh - 88px);
+  overflow-y: auto;
 }
 
 .pos-receipt-actions {
   display: flex;
-  gap: 10px;
-  margin-top: 20px;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.pos-receipt-actions .soleil-btn-outline,
+.pos-receipt-actions .soleil-btn-primary {
+  min-width: 0;
 }
 
 .pos-receipt-print {
@@ -2831,204 +2842,12 @@ h2,
   margin-top: 0;
 }
 
-/* In biên lai POS + hóa đơn chi tiết */
+/* In hóa đơn bán lẻ: dùng iframe riêng (printInvoice.js) — không in cả trang admin. */
 @media print {
-  html,
-  body {
-    height: auto !important;
-    overflow: visible !important;
-    background: #fff !important;
-  }
-
-  body.printing-receipt #app {
-    display: none !important;
-  }
-
-  body.printing-receipt * {
-    visibility: visible;
-    overflow: visible !important;
-  }
-
-  body.printing-receipt .pos-receipt-actions {
-    display: none !important;
-  }
-
-  body.printing-receipt .pos-receipt-overlay {
-    position: static !important;
-    inset: auto !important;
-  }
-
-  body.printing-receipt .pos-receipt-modal {
-    position: static !important;
-    width: 72mm !important;
-    margin: 0 auto !important;
-  }
-
-  body.printing-receipt #pos-receipt-print {
-    position: static !important;
-    width: 100% !important;
-  }
-
-  body * {
-    visibility: hidden;
-    overflow: hidden !important;
-  }
-
-  body > .pos-receipt-overlay,
-  body > .pos-receipt-overlay * {
-    overflow: visible !important;
-  }
-
-  #pos-receipt-print,
-  #pos-receipt-print *,
-  #hoa-don-print-area,
-  #hoa-don-print-area * {
-    visibility: visible;
-  }
-
-  #pos-receipt-print {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 72mm;
-    padding: 8px;
-    color: #000 !important;
-    background: #fff !important;
-  }
-
-  .pos-receipt-overlay {
-    position: fixed !important;
-    inset: 0 !important;
-    background: transparent !important;
-    padding: 0 !important;
-    display: block !important;
-    z-index: 99999 !important;
-    overflow: visible !important;
-  }
-
-  .pos-receipt-modal {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    display: block !important;
-    width: 72mm !important;
-    max-width: none !important;
-    max-height: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-    border-radius: 0 !important;
-    overflow: visible !important;
-    background: transparent !important;
-  }
-
-  .pos-receipt-actions,
   .no-print,
-  .confirm-dialog-overlay {
+  .confirm-dialog-overlay,
+  .pos-receipt-actions {
     display: none !important;
-  }
-
-  #hoa-don-print-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 72mm;
-    padding: 8px;
-    background: #fff !important;
-    border: none !important;
-    box-shadow: none !important;
-  }
-
-  #hoa-don-print-area .soleil-card {
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    border-radius: 0 !important;
-  }
-
-  #hoa-don-print-area .hoa-don-detail-grid {
-    display: block !important;
-  }
-
-  #hoa-don-print-area .hoa-don-lines {
-    margin-top: 8px;
-  }
-
-  #hoa-don-print-area table,
-  #pos-receipt-print table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 11px;
-    table-layout: fixed;
-  }
-
-  #hoa-don-print-area th,
-  #hoa-don-print-area td,
-  #pos-receipt-print th,
-  #pos-receipt-print td {
-    padding: 4px 2px;
-    text-align: left;
-    vertical-align: top;
-    color: #000 !important;
-  }
-
-  #pos-receipt-print thead th {
-    border-bottom: 1px dashed #ccc;
-  }
-
-  #pos-receipt-print .pos-receipt-print__item-meta td {
-    border-bottom: 1px dashed #ccc;
-  }
-
-  #pos-receipt-print .pos-receipt-print__item-name td {
-    border-bottom: none;
-    text-align: left !important;
-  }
-
-  #pos-receipt-print th:nth-child(2),
-  #pos-receipt-print td:nth-child(2) {
-    text-align: center;
-  }
-
-  #pos-receipt-print th:nth-child(3),
-  #pos-receipt-print td:nth-child(3),
-  #pos-receipt-print th:nth-child(4),
-  #pos-receipt-print td:nth-child(4) {
-    text-align: right;
-    white-space: nowrap;
-  }
-
-  #hoa-don-print-area th:last-child,
-  #hoa-don-print-area td:last-child,
-  #hoa-don-print-area .text-right {
-    text-align: right;
-  }
-
-  #hoa-don-print-area .text-center {
-    text-align: center;
-  }
-
-  #hoa-don-print-area .hoa-don-section-title {
-    font-size: 12px;
-    margin: 8px 0 4px;
-  }
-
-  #hoa-don-print-area .hoa-don-summary__code {
-    font-size: 14px;
-  }
-
-  #hoa-don-print-area .hoa-don-summary__total-value {
-    font-size: 16px;
-  }
-
-  #hoa-don-print-area .hd-badge {
-    font-size: 9px;
-    padding: 2px 6px;
-  }
-
-  #hoa-don-print-area .hoa-don-print-brand {
-    display: block !important;
   }
 }
 
@@ -3354,6 +3173,16 @@ h2,
 .admin-toast-item--warn {
   border-left: 4px solid #b44a4a;
   background: #fff8f6;
+}
+
+.admin-toast-item--error {
+  border-left: 4px solid #b44a4a;
+  background: #fff8f6;
+}
+
+.admin-toast-item--success {
+  border-left: 4px solid #2f6b4f;
+  background: #f4faf6;
 }
 
 .admin-toast-item--info {

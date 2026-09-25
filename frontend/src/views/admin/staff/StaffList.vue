@@ -13,9 +13,12 @@ import {
 import { ADMIN_ROLES } from '@/constants/adminMenu'
 import {
   assignableRoles,
+  canEditStaffBasic,
   canManageStaff,
   getRoleLabel,
+  isSelfStaff,
   STAFF_ACTION_DENIED,
+  STAFF_SELF_LOCK_DENIED,
 } from '@/utils/adminAuth'
 import { useAdminAuth } from '@/composables/useAdminAuth'
 import { confirm } from '@/composables/useConfirm'
@@ -30,6 +33,7 @@ const staffList = ref([])
 const keyword = ref('')
 const showForm = ref(false)
 const editingId = ref(null)
+const editingSelf = ref(false)
 const showResetPw = ref(false)
 const resetTarget = ref(null)
 const resetMatKhau = ref('')
@@ -61,14 +65,32 @@ const filteredStaff = computed(() => {
   })
 })
 
-const formTitle = computed(() => (editingId.value ? 'Sửa nhân viên' : 'Thêm nhân viên'))
+const formTitle = computed(() => {
+  if (!editingId.value) return 'Thêm nhân viên'
+  return editingSelf.value ? 'Sửa thông tin của bạn' : 'Sửa nhân viên'
+})
 
 const creatableRoles = computed(() => assignableRoles(currentRole.value))
 
 const canAddStaff = computed(() => creatableRoles.value.length > 0)
 
+function isSelf(item) {
+  return isSelfStaff(currentStaffId.value, item)
+}
+
+/** Khóa / thao tác quản trị lên người khác (cấp thấp hơn). */
 function canActOn(item) {
   return canManageStaff(currentRole.value, currentStaffId.value, item)
+}
+
+/** Sửa thông tin cơ bản: chính mình hoặc cấp thấp hơn. */
+function canEdit(item) {
+  return canEditStaffBasic(currentRole.value, currentStaffId.value, item)
+}
+
+/** Đặt lại MK: chính mình hoặc cấp thấp hơn. */
+function canResetPw(item) {
+  return isSelf(item) || canActOn(item)
 }
 
 async function loadStaff() {
@@ -94,6 +116,7 @@ function roleBadgeClass(maVaiTro) {
 
 function openCreate() {
   editingId.value = null
+  editingSelf.value = false
   const roles = creatableRoles.value
   form.value = {
     ...emptyForm(),
@@ -103,8 +126,9 @@ function openCreate() {
 }
 
 function openEdit(item) {
-  if (!canActOn(item)) return
+  if (!canEdit(item)) return
   editingId.value = item.id
+  editingSelf.value = isSelf(item)
   form.value = {
     hoTen: item.hoTen || '',
     email: item.email || '',
@@ -120,11 +144,12 @@ function openEdit(item) {
 function closeForm() {
   showForm.value = false
   editingId.value = null
+  editingSelf.value = false
   form.value = emptyForm()
 }
 
 function openResetPassword(item) {
-  if (!canActOn(item)) return
+  if (!canResetPw(item)) return
   resetTarget.value = item
   resetMatKhau.value = ''
   generatedTempPw.value = ''
@@ -348,7 +373,10 @@ onMounted(() => {
                   <span class="staff-mono">{{ item.maNhanVien || '—' }}</span>
                 </td>
                 <td class="soleil-col-text">
-                  <span class="staff-name">{{ item.hoTen }}</span>
+                  <span class="staff-name">
+                    {{ item.hoTen }}
+                    <span v-if="isSelf(item)" class="staff-you-badge">Bạn</span>
+                  </span>
                 </td>
                 <td class="soleil-col-text">{{ item.email || '—' }}</td>
                 <td class="soleil-col-text">{{ item.soDienThoai || '—' }}</td>
@@ -368,8 +396,8 @@ onMounted(() => {
                     <button
                       type="button"
                       class="soleil-act-btn"
-                      :disabled="!canActOn(item)"
-                      :title="canActOn(item) ? 'Sửa nhân viên' : STAFF_ACTION_DENIED"
+                      :disabled="!canEdit(item)"
+                      :title="canEdit(item) ? (isSelf(item) ? 'Sửa thông tin của bạn' : 'Sửa nhân viên') : STAFF_ACTION_DENIED"
                       @click="openEdit(item)"
                     >
                       <Icon icon="icon-park-outline:edit" width="16" />
@@ -377,8 +405,8 @@ onMounted(() => {
                     <button
                       type="button"
                       class="soleil-act-btn"
-                      :disabled="!canActOn(item)"
-                      :title="canActOn(item) ? 'Đặt lại mật khẩu' : STAFF_ACTION_DENIED"
+                      :disabled="!canResetPw(item)"
+                      :title="canResetPw(item) ? (isSelf(item) ? 'Đổi mật khẩu của bạn' : 'Đặt lại mật khẩu') : STAFF_ACTION_DENIED"
                       @click="openResetPassword(item)"
                     >
                       <Icon icon="icon-park-outline:lock" width="16" />
@@ -388,7 +416,11 @@ onMounted(() => {
                       class="soleil-act-btn"
                       :class="{ 'soleil-act-btn--danger': item.trangThai !== false }"
                       :disabled="!canActOn(item)"
-                      :title="canActOn(item) ? (item.trangThai !== false ? 'Khóa nhân viên' : 'Mở khóa nhân viên') : STAFF_ACTION_DENIED"
+                      :title="isSelf(item)
+                        ? STAFF_SELF_LOCK_DENIED
+                        : (canActOn(item)
+                          ? (item.trangThai !== false ? 'Khóa nhân viên' : 'Mở khóa nhân viên')
+                          : STAFF_ACTION_DENIED)"
                       @click="handleToggleStatus(item)"
                     >
                       <Icon
@@ -410,7 +442,9 @@ onMounted(() => {
         <div class="staff-modal__head">
           <div>
             <h3>{{ formTitle }}</h3>
-            <p>{{ editingId ? 'Cập nhật thông tin nhân viên' : 'Tạo tài khoản nhân viên mới' }}</p>
+            <p>{{ editingId
+              ? (editingSelf ? 'Cập nhật thông tin cá nhân — không thể đổi vai trò' : 'Cập nhật thông tin nhân viên')
+              : 'Tạo tài khoản nhân viên mới' }}</p>
           </div>
           <button type="button" class="soleil-btn-outline staff-icon-btn" aria-label="Đóng" @click="closeForm">
             <Icon icon="icon-park-outline:close" width="15" />
@@ -447,7 +481,18 @@ onMounted(() => {
           <div class="staff-field-grid">
             <label class="staff-field">
               <span>Vai trò *</span>
-              <select v-model="form.maVaiTro" class="staff-control">
+              <select
+                v-model="form.maVaiTro"
+                class="staff-control"
+                :disabled="editingSelf"
+                :title="editingSelf ? STAFF_SELF_LOCK_DENIED : undefined"
+              >
+                <option
+                  v-if="editingSelf"
+                  :value="form.maVaiTro"
+                >
+                  {{ getRoleLabel(form.maVaiTro) }}
+                </option>
                 <option
                   v-for="role in creatableRoles"
                   :key="role"
@@ -668,6 +713,24 @@ onMounted(() => {
 
 .staff-name {
   font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.staff-you-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #6b4f2a;
+  background: #f3e6d2;
+  border: 1px solid #e0d3be;
 }
 
 .staff-actions {
