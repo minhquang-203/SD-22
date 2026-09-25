@@ -1,6 +1,6 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import {
   createNhaCungCap,
@@ -8,6 +8,7 @@ import {
   getPhieuNhapDetail,
   hoanThanhPhieuNhap,
   luuTamPhieuNhap,
+  timBienTheNhapHang,
   timSanPhamNhapHang,
   updatePhieuNhap,
 } from '@/api/nhapHangApi'
@@ -15,6 +16,9 @@ import { toast } from '@/composables/useToast'
 import { confirm } from '@/composables/useConfirm'
 import { formatApiError } from '@/utils/apiError'
 import { productImageUrl } from '@/utils/productImage'
+import { PHONE_VN_REGEX, normalizePhoneDigits } from '@/utils/phone'
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const route = useRoute()
 const router = useRouter()
@@ -46,6 +50,15 @@ const ghiChu = ref('')
 const ngayNhap = ref(todayLocal())
 const nccOptions = ref([])
 
+/** Lỗi inline theo dòng: { [idChiTiet]: { soLuong?, donGia?, hanSuDung? } } */
+const lineErrors = ref({})
+const nccFieldError = ref('')
+const ngayNhapError = ref('')
+const nccFormErrors = ref({ ten: '', soDienThoai: '', email: '' })
+
+const dirtyBaseline = ref('')
+const suppressLeaveGuard = ref(false)
+
 const showAddModal = ref(false)
 const modalStep = ref(1)
 const productQuery = ref('')
@@ -56,6 +69,16 @@ const selectedProductsMap = ref({})
 /** @type {import('vue').Ref<Record<number, { soLuong: number, donGia: number }>>} */
 const variantDraft = ref({})
 let productSearchTimer = null
+
+/** Gợi ý biến thể phẳng trên ô tìm nhanh (không qua modal). */
+const suggestOpen = ref(false)
+const suggestLoading = ref(false)
+const suggestItems = ref([])
+const suggestIndex = ref(-1)
+const highlightLineId = ref(null)
+let suggestSearchTimer = null
+let highlightClearTimer = null
+let suggestBlurTimer = null
 
 const showNccModal = ref(false)
 const nccForm = ref({ ten: '', soDienThoai: '', email: '', diaChi: '', ghiChu: '' })
@@ -145,6 +168,21 @@ function lineThanhTien(row) {
   return Number(row.soLuong || 0) * Number(row.donGia || 0)
 }
 
+/** Giá nhập > giá bán → bán lỗ (vẫn cho lưu). */
+function isLossLine(row) {
+  const nhap = Number(row?.donGia || 0)
+  const ban = Number(row?.giaBan || 0)
+  return ban > 0 && nhap > ban
+}
+
+function lineProfitPerUnit(row) {
+  return Number(row?.giaBan || 0) - Number(row?.donGia || 0)
+}
+
+function lossLineCount() {
+  return lines.value.filter((row) => isLossLine(row)).length
+}
+
 function buildPayload() {
   return {
     idNhaCungCap: idNhaCungCap.value || null,
@@ -163,8 +201,8 @@ function buildPayload() {
 }
 
 async function loadNcc() {
-  const res = await getNhaCungCapList()
-  nccOptions.value = res.data || []
+  const res = await getNhaCungCapList('', true)
+  nccOptions.value = (res.data || []).filter((n) => n.trangThai !== false)
 }
 
 async function loadDetail(id) {
@@ -193,6 +231,7 @@ async function loadDetail(id) {
       soLo: d.soLo || '',
       hsdPreset: null,
     }))
+    markClean()
   } catch (e) {
     toast(formatApiError(e, 'Không tải được phiếu'), 'error')
     router.push('/admin/nhap-hang')
@@ -201,8 +240,74 @@ async function loadDetail(id) {
   }
 }
 
-function removeLine(index) {
+function formFingerprint() {
+  return JSON.stringify({
+    idNhaCungCap: idNhaCungCap.value || null,
+    soHoaDonDauVao: soHoaDonDauVao.value || '',
+    giamGia: Number(giamGia.value || 0),
+    ghiChu: ghiChu.value || '',
+    ngayNhap: ngayNhap.value || '',
+    lines: lines.value.map((r) => ({
+      id: r.idChiTietSanPham,
+      soLuong: Number(r.soLuong || 0),
+      donGia: Number(r.donGia || 0),
+      hanSuDung: r.hanSuDung || '',
+    })),
+  })
+}
+
+function markClean() {
+  dirtyBaseline.value = formFingerprint()
+}
+
+const isDirty = computed(() => {
+  if (readonly.value || suppressLeaveGuard.value) return false
+  if (!dirtyBaseline.value) return false
+  return formFingerprint() !== dirtyBaseline.value
+})
+
+function clearLineError(id, field) {
+  const cur = lineErrors.value[id]
+  if (!cur?.[field]) return
+  const next = { ...cur }
+  delete next[field]
+  const map = { ...lineErrors.value }
+  if (Object.keys(next).length) map[id] = next
+  else delete map[id]
+  lineErrors.value = map
+}
+
+function clearFieldErrors() {
+  lineErrors.value = {}
+  nccFieldError.value = ''
+  ngayNhapError.value = ''
+}
+
+async function scrollToFirstError() {
+  await nextTick()
+  const el = document.querySelector('.pn-line__input--error, .pn-control--error')
+  el?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+  el?.focus?.()
+}
+
+async function removeLine(index) {
+  const row = lines.value[index]
+  if (!row) return
+  const ok = await confirm({
+    title: 'Xóa dòng',
+    message: 'Xóa sản phẩm này khỏi phiếu?',
+    confirmText: 'Xóa',
+    danger: true,
+  })
+  if (!ok) return
+  const id = row.idChiTietSanPham
   lines.value.splice(index, 1)
+  if (lineErrors.value[id]) {
+    const map = { ...lineErrors.value }
+    delete map[id]
+    lineErrors.value = map
+  }
+  toast('Đã xóa dòng khỏi phiếu', 'success')
 }
 
 const selectedProductCount = computed(() => Object.keys(selectedProductsMap.value).length)
@@ -252,6 +357,177 @@ function isVariantSelected(idChiTietSanPham) {
 function allVariantsSelected(product) {
   const list = product?.bienThes || []
   return list.length > 0 && list.every((v) => isVariantSelected(v.idChiTietSanPham))
+}
+
+function normalizeSkuKey(value) {
+  return String(value || '').trim().toUpperCase()
+}
+
+function buildLineFromVariant(v, qty = 1) {
+  return {
+    idChiTietSanPham: v.idChiTietSanPham,
+    sku: v.sku,
+    tenSanPham: v.tenSanPham,
+    tenMauSac: v.tenMauSac,
+    dungTichMl: v.dungTichMl,
+    soLuong: qty,
+    donGia: 0,
+    giaBan: Number(v.giaBan || 0),
+    hanSuDung: '',
+    soLo: '',
+    hsdPreset: null,
+  }
+}
+
+function variantSuggestLabel(v) {
+  const parts = []
+  if (v.tenMauSac) parts.push(v.tenMauSac)
+  if (v.dungTichMl != null && v.dungTichMl !== '') parts.push(`${v.dungTichMl}ml`)
+  const ton = v.soLuongTon != null ? `tồn ${v.soLuongTon}` : null
+  if (ton) parts.push(ton)
+  return parts.length ? parts.join(' · ') : '—'
+}
+
+async function focusLineQty(idChiTiet) {
+  await nextTick()
+  const article = document.querySelector(`.pn-line[data-line-id="${idChiTiet}"]`)
+  article?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+  highlightLineId.value = idChiTiet
+  clearTimeout(highlightClearTimer)
+  highlightClearTimer = setTimeout(() => {
+    if (highlightLineId.value === idChiTiet) highlightLineId.value = null
+  }, 2200)
+  const qtyInput = article?.querySelector('input[data-field="soLuong"]')
+  qtyInput?.focus?.()
+  qtyInput?.select?.()
+}
+
+function addOrFocusVariant(v) {
+  if (!v?.idChiTietSanPham || readonly.value) return
+  const id = v.idChiTietSanPham
+  const existing = lines.value.find((l) => l.idChiTietSanPham === id)
+  if (existing) {
+    toast(`SKU ${v.sku} đã có trên phiếu`, 'warn')
+    closeSuggest()
+    void focusLineQty(id)
+    return
+  }
+  lines.value.push(buildLineFromVariant(v, 1))
+  toast(`Đã thêm ${v.sku}`, 'success')
+  productQuery.value = ''
+  closeSuggest()
+  void focusLineQty(id)
+}
+
+function closeSuggest() {
+  suggestOpen.value = false
+  suggestIndex.value = -1
+  suggestItems.value = []
+}
+
+async function searchVariantsSuggest(keyword = productQuery.value) {
+  const q = String(keyword || '').trim()
+  if (!q) {
+    closeSuggest()
+    return
+  }
+  suggestLoading.value = true
+  suggestOpen.value = true
+  try {
+    const res = await timBienTheNhapHang(q, 0, 30)
+    suggestItems.value = res.data || []
+    suggestOpen.value = suggestItems.value.length > 0
+    suggestIndex.value = suggestItems.value.length ? 0 : -1
+  } catch (e) {
+    toast(formatApiError(e, 'Không tìm được biến thể'), 'error')
+    suggestOpen.value = false
+  } finally {
+    suggestLoading.value = false
+  }
+}
+
+function scheduleSuggestSearch() {
+  if (suggestSearchTimer) clearTimeout(suggestSearchTimer)
+  suggestSearchTimer = setTimeout(() => searchVariantsSuggest(productQuery.value), 280)
+}
+
+async function onSearchEnter() {
+  if (readonly.value) return
+  const q = productQuery.value.trim()
+  if (!q) {
+    await openAddModal()
+    return
+  }
+
+  if (suggestOpen.value && suggestIndex.value >= 0 && suggestItems.value[suggestIndex.value]) {
+    addOrFocusVariant(suggestItems.value[suggestIndex.value])
+    return
+  }
+
+  suggestLoading.value = true
+  try {
+    const res = await timBienTheNhapHang(q, 0, 50)
+    const list = res.data || []
+    const key = normalizeSkuKey(q)
+    const exact = list.find((v) => normalizeSkuKey(v.sku) === key)
+    if (exact) {
+      addOrFocusVariant(exact)
+      return
+    }
+    if (!list.length) {
+      toast(`Không tìm thấy SKU «${q}»`, 'warn')
+      suggestItems.value = []
+      suggestOpen.value = false
+      suggestIndex.value = -1
+      return
+    }
+    suggestItems.value = list
+    suggestOpen.value = true
+    suggestIndex.value = 0
+  } catch (e) {
+    toast(formatApiError(e, 'Không tìm được sản phẩm'), 'error')
+  } finally {
+    suggestLoading.value = false
+  }
+}
+
+function onSearchKeydown(e) {
+  if (e.key === 'Escape') {
+    if (suggestOpen.value) {
+      e.preventDefault()
+      suggestOpen.value = false
+      suggestIndex.value = -1
+    }
+    return
+  }
+
+  const hasSuggest = suggestOpen.value && suggestItems.value.length > 0
+
+  if (e.key === 'ArrowDown' && hasSuggest) {
+    e.preventDefault()
+    suggestIndex.value = Math.min(suggestIndex.value + 1, suggestItems.value.length - 1)
+    return
+  }
+  if (e.key === 'ArrowUp' && hasSuggest) {
+    e.preventDefault()
+    suggestIndex.value = Math.max(suggestIndex.value - 1, 0)
+    return
+  }
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    void onSearchEnter()
+  }
+}
+
+function onSearchFocus() {
+  if (suggestItems.value.length) suggestOpen.value = true
+}
+
+function onSearchBlur() {
+  clearTimeout(suggestBlurTimer)
+  suggestBlurTimer = setTimeout(() => {
+    suggestOpen.value = false
+  }, 160)
 }
 
 async function searchProducts(keyword = productQuery.value) {
@@ -433,17 +709,43 @@ function addSelectedToPhieu() {
 }
 
 async function saveNcc() {
+  const errs = { ten: '', soDienThoai: '', email: '' }
   if (!nccForm.value.ten?.trim()) {
-    toast('Nhập tên nhà cung cấp', 'warn')
+    errs.ten = 'Nhập tên nhà cung cấp'
+  }
+  const sdtRaw = (nccForm.value.soDienThoai || '').trim()
+  if (sdtRaw) {
+    const digits = normalizePhoneDigits(sdtRaw)
+    if (!PHONE_VN_REGEX.test(digits)) {
+      errs.soDienThoai = 'SĐT phải gồm 10 số, bắt đầu bằng 0 (VN)'
+    }
+  }
+  const emailRaw = (nccForm.value.email || '').trim()
+  if (emailRaw && !EMAIL_RE.test(emailRaw)) {
+    errs.email = 'Email không đúng định dạng'
+  }
+  nccFormErrors.value = errs
+  if (errs.ten || errs.soDienThoai || errs.email) {
+    toast('Kiểm tra lại thông tin nhà cung cấp', 'warn')
+    await nextTick()
+    document.querySelector('.pn-modal .pn-control--error')?.focus?.()
     return
   }
   nccSaving.value = true
   try {
-    const res = await createNhaCungCap({ ...nccForm.value, ten: nccForm.value.ten.trim() })
+    const sdtDigits = normalizePhoneDigits(nccForm.value.soDienThoai || '')
+    const res = await createNhaCungCap({
+      ...nccForm.value,
+      ten: nccForm.value.ten.trim(),
+      soDienThoai: sdtDigits || null,
+      email: emailRaw || null,
+    })
     await loadNcc()
     idNhaCungCap.value = res.data.id
+    nccFieldError.value = ''
     showNccModal.value = false
     nccForm.value = { ten: '', soDienThoai: '', email: '', diaChi: '', ghiChu: '' }
+    nccFormErrors.value = { ten: '', soDienThoai: '', email: '' }
     toast('Đã thêm nhà cung cấp', 'success')
   } catch (e) {
     toast(formatApiError(e, 'Không tạo được NCC'), 'error')
@@ -453,32 +755,55 @@ async function saveNcc() {
 }
 
 function validateBeforeSave(requireHsd) {
+  clearFieldErrors()
+  const errs = {}
+  let issueCount = 0
+
   if (!lines.value.length) {
     toast('Thêm ít nhất 1 dòng hàng', 'warn')
     return false
   }
   if (!ngayNhap.value) {
-    toast('Chọn ngày nhập', 'warn')
-    return false
+    ngayNhapError.value = 'Chọn ngày nhập'
+    issueCount += 1
+  } else if (ngayNhap.value > todayLocal()) {
+    ngayNhapError.value = 'Ngày nhập không được lớn hơn ngày hiện tại'
+    issueCount += 1
   }
-  if (ngayNhap.value > todayLocal()) {
-    toast('Ngày nhập không được lớn hơn ngày hiện tại', 'warn')
-    return false
+
+  if (!idNhaCungCap.value) {
+    nccFieldError.value = 'Vui lòng chọn nhà cung cấp'
+    issueCount += 1
   }
+
   for (const row of lines.value) {
+    const e = {}
     if (!row.soLuong || Number(row.soLuong) <= 0) {
-      toast(`SKU ${row.sku}: số lượng phải > 0`, 'warn')
-      return false
+      e.soLuong = 'Số lượng phải > 0'
+      issueCount += 1
+    }
+    if (!row.donGia || Number(row.donGia) <= 0) {
+      e.donGia = 'Đơn giá phải > 0'
+      issueCount += 1
     }
     if (requireHsd && !row.hanSuDung) {
-      toast(`SKU ${row.sku}: cần nhập hạn sử dụng trước khi hoàn thành`, 'warn')
-      return false
+      e.hanSuDung = 'Cần nhập hạn sử dụng'
+      issueCount += 1
+    } else if (row.hanSuDung && ngayNhap.value && row.hanSuDung <= ngayNhap.value) {
+      e.hanSuDung = 'HSD phải sau ngày nhập'
+      issueCount += 1
     }
-    if (row.hanSuDung && row.hanSuDung <= ngayNhap.value) {
-      toast(`SKU ${row.sku}: hạn sử dụng phải sau ngày nhập`, 'warn')
-      return false
-    }
+    if (Object.keys(e).length) errs[row.idChiTietSanPham] = e
   }
+
+  lineErrors.value = errs
+
+  if (issueCount > 0) {
+    toast(`Có ${issueCount} lỗi cần sửa trên phiếu`, 'warn')
+    scrollToFirstError()
+    return false
+  }
+
   const pastHsd = lines.value.find((row) => row.hanSuDung && row.hanSuDung < todayLocal())
   if (pastHsd) {
     toast(`SKU ${pastHsd.sku}: HSD đang trong quá khứ — kiểm tra lại`, 'warn')
@@ -495,10 +820,12 @@ async function onLuuTam() {
     if (phieuId.value) {
       const res = await updatePhieuNhap(phieuId.value, payload)
       applySaved(res.data)
+      markClean()
       toast('Đã cập nhật phiếu tạm', 'success')
     } else {
       const res = await luuTamPhieuNhap(payload)
       applySaved(res.data)
+      markClean()
       toast('Đã lưu phiếu tạm', 'success')
       router.replace(`/admin/nhap-hang/${res.data.id}`)
     }
@@ -512,6 +839,17 @@ async function onLuuTam() {
 async function onHoanThanh() {
   if (readonly.value) return
   if (!validateBeforeSave(true)) return
+
+  const lossCount = lossLineCount()
+  if (lossCount > 0) {
+    const okLoss = await confirm({
+      title: 'Cảnh báo bán lỗ',
+      message: `Có ${lossCount} sản phẩm giá nhập cao hơn giá bán — bán ra sẽ lỗ. Vẫn tiếp tục hoàn thành phiếu?`,
+      confirmText: 'Vẫn hoàn thành',
+    })
+    if (!okLoss) return
+  }
+
   const ok = await confirm({
     title: 'Hoàn thành phiếu nhập',
     message: 'Hoàn thành phiếu sẽ sinh lô và cộng tồn. Không hoàn tác được. Tiếp tục?',
@@ -530,6 +868,8 @@ async function onHoanThanh() {
       phieuId.value = id
     }
     await hoanThanhPhieuNhap(id)
+    suppressLeaveGuard.value = true
+    markClean()
     toast('Đã nhập kho thành công', 'success')
     router.push('/admin/nhap-hang')
   } catch (e) {
@@ -550,8 +890,13 @@ watch(ngayNhap, () => {
 })
 
 watch(productQuery, () => {
-  if (!showAddModal.value || modalStep.value !== 1) return
-  scheduleProductSearch()
+  if (showAddModal.value && modalStep.value === 1) {
+    scheduleProductSearch()
+    return
+  }
+  if (!showAddModal.value && !readonly.value) {
+    scheduleSuggestSearch()
+  }
 })
 
 onMounted(async () => {
@@ -559,7 +904,35 @@ onMounted(async () => {
   const id = route.params.id
   if (id && id !== 'tao') {
     await loadDetail(Number(id))
+  } else {
+    markClean()
   }
+  window.addEventListener('beforeunload', onBeforeUnload)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', onBeforeUnload)
+  if (productSearchTimer) clearTimeout(productSearchTimer)
+  if (suggestSearchTimer) clearTimeout(suggestSearchTimer)
+  clearTimeout(highlightClearTimer)
+  clearTimeout(suggestBlurTimer)
+})
+
+function onBeforeUnload(e) {
+  if (!isDirty.value) return
+  e.preventDefault()
+  e.returnValue = ''
+}
+
+onBeforeRouteLeave(async () => {
+  if (suppressLeaveGuard.value || !isDirty.value) return true
+  const ok = await confirm({
+    title: 'Rời trang',
+    message: 'Phiếu chưa lưu, rời trang sẽ mất dữ liệu?',
+    confirmText: 'Rời trang',
+    danger: true,
+  })
+  return ok
 })
 </script>
 
@@ -617,11 +990,35 @@ onMounted(async () => {
             <input
               v-model="productQuery"
               class="pn-search__input"
-              placeholder="Tìm theo tên sản phẩm hoặc mã SKU…"
-              @keyup.enter="openAddModal"
+              placeholder="SKU hoặc tên SP — Enter thêm thẳng biến thể…"
+              autocomplete="off"
+              @keydown="onSearchKeydown"
+              @focus="onSearchFocus"
+              @blur="onSearchBlur"
             />
+            <div
+              v-if="suggestOpen && (suggestLoading || suggestItems.length)"
+              class="pn-suggest"
+              role="listbox"
+            >
+              <div v-if="suggestLoading" class="pn-suggest__status">Đang tìm biến thể…</div>
+              <button
+                v-for="(v, i) in suggestItems"
+                :key="v.idChiTietSanPham"
+                type="button"
+                class="pn-suggest__item"
+                :class="{ 'is-active': i === suggestIndex }"
+                role="option"
+                :aria-selected="i === suggestIndex"
+                @mousedown.prevent="addOrFocusVariant(v)"
+              >
+                <span class="pn-suggest__sku">{{ v.sku }}</span>
+                <span class="pn-suggest__name">{{ v.tenSanPham }}</span>
+                <span class="pn-suggest__meta">{{ variantSuggestLabel(v) }}</span>
+              </button>
+            </div>
           </div>
-          <button type="button" class="soleil-btn-outline" @click="openAddModal">
+          <button type="button" class="soleil-btn-outline" title="Chọn nhiều SP / biến thể" @click="openAddModal">
             Tìm
           </button>
         </div>
@@ -629,7 +1026,7 @@ onMounted(async () => {
         <div v-if="!lines.length" class="pn-empty-lines">
           <Icon icon="icon-park-outline:inbox" width="28" class="pn-empty-lines__icon" />
           <p>Chưa có dòng hàng</p>
-          <span>Tìm và chọn sản phẩm để bắt đầu nhập kho.</span>
+          <span>Gõ SKU + Enter, hoặc bấm «Tìm» để chọn nhiều biến thể.</span>
         </div>
 
         <div v-else class="pn-lines">
@@ -637,6 +1034,8 @@ onMounted(async () => {
             v-for="(row, idx) in lines"
             :key="row.idChiTietSanPham"
             class="pn-line"
+            :class="{ 'pn-line--flash': highlightLineId === row.idChiTietSanPham }"
+            :data-line-id="row.idChiTietSanPham"
           >
             <div class="pn-line__index">{{ idx + 1 }}</div>
 
@@ -658,8 +1057,15 @@ onMounted(async () => {
                   type="number"
                   min="1"
                   class="pn-line__input"
+                  data-field="soLuong"
+                  :class="{ 'pn-line__input--error': lineErrors[row.idChiTietSanPham]?.soLuong }"
                   :disabled="readonly"
+                  @input="clearLineError(row.idChiTietSanPham, 'soLuong')"
                 />
+                <em
+                  v-if="lineErrors[row.idChiTietSanPham]?.soLuong"
+                  class="pn-line__field-error"
+                >{{ lineErrors[row.idChiTietSanPham].soLuong }}</em>
               </label>
               <label class="pn-line__field">
                 <span>Đơn giá nhập</span>
@@ -668,9 +1074,30 @@ onMounted(async () => {
                   type="number"
                   min="0"
                   class="pn-line__input"
+                  :class="{
+                    'pn-line__input--loss': isLossLine(row),
+                    'pn-line__input--error': lineErrors[row.idChiTietSanPham]?.donGia,
+                  }"
                   :disabled="readonly"
                   placeholder="0"
+                  @input="clearLineError(row.idChiTietSanPham, 'donGia')"
                 />
+                <em
+                  v-if="lineErrors[row.idChiTietSanPham]?.donGia"
+                  class="pn-line__field-error"
+                >{{ lineErrors[row.idChiTietSanPham].donGia }}</em>
+                <p v-else-if="isLossLine(row)" class="pn-line__loss-warn">
+                  ⚠ Giá nhập cao hơn giá bán ({{ formatMoney(row.giaBan) }}) — bán ra sẽ lỗ
+                </p>
+                <p
+                  v-if="Number(row.donGia) > 0 && Number(row.giaBan) > 0"
+                  class="pn-line__profit"
+                  :class="{ 'pn-line__profit--loss': isLossLine(row) }"
+                >
+                  {{ isLossLine(row) ? 'Lỗ/sp' : 'Lợi nhuận/sp' }}:
+                  {{ formatMoney(Math.abs(lineProfitPerUnit(row))) }}
+                  <template v-if="isLossLine(row)"> (âm)</template>
+                </p>
               </label>
               <label class="pn-line__field pn-line__field--hsd">
                 <span>Hạn sử dụng</span>
@@ -678,10 +1105,15 @@ onMounted(async () => {
                   v-model="row.hanSuDung"
                   type="date"
                   class="pn-line__input"
+                  :class="{ 'pn-line__input--error': lineErrors[row.idChiTietSanPham]?.hanSuDung }"
                   :min="ngayNhap || undefined"
                   :disabled="readonly"
-                  @change="onHsdManualInput(row)"
+                  @change="onHsdManualInput(row); clearLineError(row.idChiTietSanPham, 'hanSuDung')"
                 />
+                <em
+                  v-if="lineErrors[row.idChiTietSanPham]?.hanSuDung"
+                  class="pn-line__field-error"
+                >{{ lineErrors[row.idChiTietSanPham].hanSuDung }}</em>
                 <div v-if="!readonly" class="pn-hsd-presets" role="group" aria-label="Gợi ý hạn sử dụng">
                   <button
                     v-for="preset in HSD_PRESETS"
@@ -689,7 +1121,7 @@ onMounted(async () => {
                     type="button"
                     class="pn-hsd-preset"
                     :class="{ 'is-on': row.hsdPreset === preset.key }"
-                    @click="applyHsdPreset(row, preset)"
+                    @click="applyHsdPreset(row, preset); clearLineError(row.idChiTietSanPham, 'hanSuDung')"
                   >
                     {{ preset.label }}
                   </button>
@@ -721,9 +1153,15 @@ onMounted(async () => {
         </div>
 
         <label class="pn-field">
-          <span>Nhà cung cấp</span>
+          <span>Nhà cung cấp *</span>
           <div class="pn-ncc-row">
-            <select v-model="idNhaCungCap" class="pn-control" :disabled="readonly">
+            <select
+              v-model="idNhaCungCap"
+              class="pn-control"
+              :class="{ 'pn-control--error': nccFieldError }"
+              :disabled="readonly"
+              @change="nccFieldError = ''"
+            >
               <option :value="null">— Chọn NCC —</option>
               <option v-for="n in nccOptions" :key="n.id" :value="n.id">
                 {{ n.ma }} — {{ n.ten }}
@@ -739,6 +1177,7 @@ onMounted(async () => {
               <Icon icon="icon-park-outline:plus" width="15" />
             </button>
           </div>
+          <em v-if="nccFieldError" class="pn-field-error">{{ nccFieldError }}</em>
         </label>
 
         <div class="pn-field-grid">
@@ -752,9 +1191,12 @@ onMounted(async () => {
               v-model="ngayNhap"
               type="date"
               class="pn-control"
+              :class="{ 'pn-control--error': ngayNhapError }"
               :max="maxNgayNhap"
               :disabled="readonly"
+              @change="ngayNhapError = ''"
             />
+            <em v-if="ngayNhapError" class="pn-field-error">{{ ngayNhapError }}</em>
           </label>
         </div>
 
@@ -1060,15 +1502,34 @@ onMounted(async () => {
         </div>
         <label class="pn-field">
           <span>Tên *</span>
-          <input v-model="nccForm.ten" class="pn-control" />
+          <input
+            v-model="nccForm.ten"
+            class="pn-control"
+            :class="{ 'pn-control--error': nccFormErrors.ten }"
+            @input="nccFormErrors.ten = ''"
+          />
+          <em v-if="nccFormErrors.ten" class="pn-field-error">{{ nccFormErrors.ten }}</em>
         </label>
         <label class="pn-field">
           <span>SĐT</span>
-          <input v-model="nccForm.soDienThoai" class="pn-control" />
+          <input
+            v-model="nccForm.soDienThoai"
+            class="pn-control"
+            :class="{ 'pn-control--error': nccFormErrors.soDienThoai }"
+            placeholder="0xxxxxxxxx"
+            @input="nccFormErrors.soDienThoai = ''"
+          />
+          <em v-if="nccFormErrors.soDienThoai" class="pn-field-error">{{ nccFormErrors.soDienThoai }}</em>
         </label>
         <label class="pn-field">
           <span>Email</span>
-          <input v-model="nccForm.email" class="pn-control" />
+          <input
+            v-model="nccForm.email"
+            class="pn-control"
+            :class="{ 'pn-control--error': nccFormErrors.email }"
+            @input="nccFormErrors.email = ''"
+          />
+          <em v-if="nccFormErrors.email" class="pn-field-error">{{ nccFormErrors.email }}</em>
         </label>
         <label class="pn-field">
           <span>Địa chỉ</span>
@@ -1279,6 +1740,79 @@ onMounted(async () => {
   box-shadow: 0 0 0 2px rgba(143, 115, 73, 0.18);
 }
 
+.pn-suggest {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 40;
+  max-height: 280px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--pn-line-strong, #a89278);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(15, 26, 28, 0.14);
+  padding: 0.35rem;
+  scrollbar-width: thin;
+  scrollbar-color: #e0d3be transparent;
+}
+
+.pn-suggest__status {
+  padding: 0.65rem 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--pn-muted, #5c4f42);
+}
+
+.pn-suggest__item {
+  display: grid;
+  grid-template-columns: minmax(7rem, auto) 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 0.65rem;
+  row-gap: 0.1rem;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  padding: 0.55rem 0.65rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.pn-suggest__item:hover,
+.pn-suggest__item.is-active {
+  background: #f5efe6;
+}
+
+.pn-suggest__sku {
+  grid-row: 1 / 3;
+  align-self: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #6b4f2a;
+  font-family: ui-monospace, 'Cascadia Mono', monospace;
+  word-break: break-all;
+}
+
+.pn-suggest__name {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--pn-ink, #1a120c);
+}
+
+.pn-suggest__meta {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--pn-muted, #5c4f42);
+}
+
+.pn-line--flash {
+  outline: 2px solid #c4a574;
+  outline-offset: 1px;
+  background: #fffaf3;
+  transition: background 0.35s ease, outline-color 0.35s ease;
+}
+
 .pn-empty-lines {
   display: flex;
   flex-direction: column;
@@ -1420,6 +1954,60 @@ onMounted(async () => {
   box-shadow: 0 0 0 2px rgba(143, 115, 73, 0.18);
 }
 
+.pn-line__input--loss {
+  border-color: #c45c3e;
+  background: #fff8f5;
+}
+
+.pn-line__input--loss:focus {
+  border-color: #a33b1c;
+  box-shadow: 0 0 0 2px rgba(163, 59, 28, 0.16);
+}
+
+.pn-line__input--error {
+  border-color: #c45c3e;
+  background: #fff8f5;
+}
+
+.pn-line__input--error:focus {
+  border-color: #a33b1c;
+  box-shadow: 0 0 0 2px rgba(163, 59, 28, 0.16);
+}
+
+.pn-line__field-error {
+  margin: 0.15rem 0 0;
+  font-style: normal;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.35;
+  color: #a33b1c;
+}
+
+.pn-line__loss-warn {
+  margin: 0.15rem 0 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.35;
+  color: #a33b1c;
+}
+
+.pn-line__profit {
+  margin: 0.1rem 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #5c4f42;
+}
+
+.pn-line__profit--loss {
+  color: #a33b1c;
+}
+
 .pn-line__field--hsd {
   grid-column: 1 / -1;
 }
@@ -1533,6 +2121,25 @@ onMounted(async () => {
   box-shadow: 0 0 0 2px rgba(143, 115, 73, 0.18);
 }
 
+.pn-control--error {
+  border-color: #c45c3e;
+  background: #fff8f5;
+}
+
+.pn-control--error:focus {
+  border-color: #a33b1c;
+  box-shadow: 0 0 0 2px rgba(163, 59, 28, 0.16);
+}
+
+.pn-field-error {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #a33b1c;
+}
+
 .pn-control:disabled,
 .pn-control[readonly] {
   opacity: 0.85;
@@ -1609,7 +2216,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 80;
+  z-index: var(--admin-z-modal, 5000);
   padding: 1.25rem;
 }
 

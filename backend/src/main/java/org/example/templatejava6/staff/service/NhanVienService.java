@@ -48,7 +48,9 @@ public class NhanVienService {
     public NhanVienResponse chiTiet(Integer id) {
         NhanVien actor = currentActor();
         NhanVien target = resolveNhanVien(id);
-        VaiTroRank.assertCanManage(actor, target);
+        if (!VaiTroRank.isSelf(actor, target)) {
+            VaiTroRank.assertCanManage(actor, target);
+        }
         return new NhanVienResponse(target);
     }
 
@@ -79,8 +81,15 @@ public class NhanVienService {
     public NhanVienResponse capNhat(Integer id, NhanVienUpdateRequest request) {
         NhanVien actor = currentActor();
         NhanVien nv = resolveNhanVien(id);
-        VaiTroRank.assertCanManage(actor, nv);
-        VaiTroRank.assertCanAssignRole(actor, request.getMaVaiTro());
+        boolean self = VaiTroRank.isSelf(actor, nv);
+
+        if (self) {
+            VaiTroRank.assertSelfKeepsRole(nv, request.getMaVaiTro());
+        } else {
+            VaiTroRank.assertCanManage(actor, nv);
+            VaiTroRank.assertCanAssignRole(actor, request.getMaVaiTro());
+            nv.setVaiTro(resolveVaiTro(request.getMaVaiTro()));
+        }
 
         String email = normalizeEmail(request.getEmail());
         String sdt = normalizePhone(request.getSoDienThoai());
@@ -89,7 +98,6 @@ public class NhanVienService {
         nv.setHoTen(request.getHoTen().trim());
         nv.setEmail(email);
         nv.setSoDienThoai(sdt);
-        nv.setVaiTro(resolveVaiTro(request.getMaVaiTro()));
         nv.setGioiTinh(request.getGioiTinh());
         nv.setNgayVaoLam(request.getNgayVaoLam());
 
@@ -109,7 +117,9 @@ public class NhanVienService {
     public DatLaiMatKhauResponse datLaiMatKhau(Integer id, NhanVienDatLaiMatKhauRequest request) {
         NhanVien actor = currentActor();
         NhanVien nv = resolveNhanVien(id);
-        VaiTroRank.assertCanManage(actor, nv);
+        if (!VaiTroRank.isSelf(actor, nv)) {
+            VaiTroRank.assertCanManage(actor, nv);
+        }
 
         String raw;
         String matKhauTam = null;

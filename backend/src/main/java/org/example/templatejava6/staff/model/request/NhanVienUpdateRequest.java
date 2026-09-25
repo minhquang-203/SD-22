@@ -28,7 +28,7 @@ public class NhanVienUpdateRequest {
     private String soDienThoai;
 
     @NotNull(message = "Vai trò là bắt buộc")
-    @Pattern(regexp = "NHAN_VIEN|QUAN_LY", message = "Vai trò không hợp lệ")
+    @Pattern(regexp = "NHAN_VIEN|QUAN_LY|CHU", message = "Vai trò không hợp lệ")
     private String maVaiTro;
 
     @Size(max = 10)

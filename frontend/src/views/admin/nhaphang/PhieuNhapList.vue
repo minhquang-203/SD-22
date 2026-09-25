@@ -1,8 +1,9 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import SearchableSelect from '@/components/ui/SearchableSelect.vue'
 import {
   getNhaCungCapList,
   getPhieuNhapList,
@@ -16,10 +17,12 @@ const router = useRouter()
 const loading = ref(false)
 const rows = ref([])
 const nccOptions = ref([])
+const hasLoadedOnce = ref(false)
 
 const filters = ref({
+  q: '',
   trangThai: '',
-  idNcc: '',
+  idNcc: null,
   from: '',
   to: '',
 })
@@ -29,6 +32,27 @@ const STATUS_LABEL = {
   DA_NHAP: 'Đã nhập',
   DA_HUY: 'Đã hủy',
 }
+
+const nccSelectOptions = computed(() =>
+  nccOptions.value.map((n) => ({
+    value: n.id,
+    label: `${n.ma || ''} — ${n.ten || ''}`.replace(/^ — /, ''),
+  })),
+)
+
+const hasActiveFilters = computed(() =>
+  Boolean(
+    filters.value.q?.trim()
+      || filters.value.trangThai
+      || filters.value.idNcc
+      || filters.value.from
+      || filters.value.to,
+  ),
+)
+
+let filterDebounceTimer = null
+let loadSeq = 0
+let lastRequestKey = ''
 
 function statusTone(st) {
   if (st === 'DA_NHAP') return 'ok'
@@ -48,35 +72,80 @@ function formatDate(v) {
   return d.toLocaleDateString('vi-VN')
 }
 
+function buildParams() {
+  const params = {}
+  const q = filters.value.q?.trim()
+  if (q) params.q = q
+  if (filters.value.trangThai) params.trangThai = filters.value.trangThai
+  if (filters.value.idNcc) params.idNcc = Number(filters.value.idNcc)
+  if (filters.value.from) params.from = filters.value.from
+  if (filters.value.to) params.to = filters.value.to
+  return params
+}
+
+function paramsKey(params) {
+  return JSON.stringify(params)
+}
+
 async function loadNcc() {
   try {
-    const res = await getNhaCungCapList()
-    nccOptions.value = res.data || []
+    const res = await getNhaCungCapList('', true)
+    nccOptions.value = (res.data || []).filter((n) => n.trangThai !== false)
   } catch {
     nccOptions.value = []
   }
 }
 
-async function load() {
+/**
+ * @param {{ force?: boolean }} opts force=true: bấm Lọc — hủy debounce, gọi lại dù key trùng
+ */
+async function load(opts = {}) {
+  const force = Boolean(opts.force)
+  const params = buildParams()
+  const key = paramsKey(params)
+  if (!force && key === lastRequestKey && hasLoadedOnce.value) return
+
+  if (filterDebounceTimer) {
+    clearTimeout(filterDebounceTimer)
+    filterDebounceTimer = null
+  }
+
+  const seq = ++loadSeq
+  lastRequestKey = key
   loading.value = true
   try {
-    const params = {}
-    if (filters.value.trangThai) params.trangThai = filters.value.trangThai
-    if (filters.value.idNcc) params.idNcc = Number(filters.value.idNcc)
-    if (filters.value.from) params.from = filters.value.from
-    if (filters.value.to) params.to = filters.value.to
     const res = await getPhieuNhapList(params)
+    if (seq !== loadSeq) return
     rows.value = res.data || []
+    hasLoadedOnce.value = true
   } catch (e) {
+    if (seq !== loadSeq) return
     toast(formatApiError(e, 'Không tải được phiếu nhập'), 'error')
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 
+function scheduleLoad(delayMs = 0) {
+  if (filterDebounceTimer) clearTimeout(filterDebounceTimer)
+  if (delayMs <= 0) {
+    void load()
+    return
+  }
+  filterDebounceTimer = setTimeout(() => {
+    filterDebounceTimer = null
+    void load()
+  }, delayMs)
+}
+
+function applyFiltersNow() {
+  void load({ force: true })
+}
+
 function resetFilters() {
-  filters.value = { trangThai: '', idNcc: '', from: '', to: '' }
-  load()
+  filters.value = { q: '', trangThai: '', idNcc: null, from: '', to: '' }
+  lastRequestKey = ''
+  void load({ force: true })
 }
 
 function openCreate() {
@@ -99,15 +168,31 @@ async function onHuy(row) {
   try {
     await huyPhieuNhap(row.id)
     toast('Đã hủy phiếu', 'success')
-    await load()
+    lastRequestKey = ''
+    await load({ force: true })
   } catch (e) {
     toast(formatApiError(e, 'Không hủy được phiếu'), 'error')
   }
 }
 
+watch(
+  () => [filters.value.trangThai, filters.value.idNcc, filters.value.from, filters.value.to],
+  () => scheduleLoad(0),
+)
+
+watch(
+  () => filters.value.q,
+  () => scheduleLoad(400),
+)
+
 onMounted(async () => {
   await loadNcc()
-  await load()
+  await load({ force: true })
+})
+
+onBeforeUnmount(() => {
+  if (filterDebounceTimer) clearTimeout(filterDebounceTimer)
+  loadSeq += 1
 })
 </script>
 
@@ -126,6 +211,19 @@ onMounted(async () => {
     </PageHeader>
 
     <div class="soleil-toolbar soleil-toolbar--filter pn-filters">
+      <div class="soleil-toolbar__field soleil-toolbar__field--wide">
+        <label class="soleil-toolbar__label">Tìm kiếm</label>
+        <div class="soleil-toolbar__search">
+          <Icon icon="icon-park-outline:search" class="soleil-toolbar__search-icon" />
+          <input
+            v-model="filters.q"
+            class="soleil-toolbar__input"
+            type="search"
+            placeholder="Mã phiếu hoặc số HĐ…"
+            @keydown.enter.prevent="applyFiltersNow"
+          />
+        </div>
+      </div>
       <div class="soleil-toolbar__field">
         <label class="soleil-toolbar__label">Trạng thái</label>
         <select v-model="filters.trangThai" class="soleil-toolbar__select">
@@ -137,10 +235,12 @@ onMounted(async () => {
       </div>
       <div class="soleil-toolbar__field soleil-toolbar__field--wide">
         <label class="soleil-toolbar__label">Nhà cung cấp</label>
-        <select v-model="filters.idNcc" class="soleil-toolbar__select">
-          <option value="">Tất cả</option>
-          <option v-for="n in nccOptions" :key="n.id" :value="n.id">{{ n.ten }}</option>
-        </select>
+        <SearchableSelect
+          v-model="filters.idNcc"
+          class="pn-ncc-select"
+          :options="nccSelectOptions"
+          placeholder="Tất cả NCC"
+        />
       </div>
       <div class="soleil-toolbar__field">
         <label class="soleil-toolbar__label">Từ ngày</label>
@@ -150,7 +250,7 @@ onMounted(async () => {
         <label class="soleil-toolbar__label">Đến ngày</label>
         <input v-model="filters.to" type="date" class="soleil-toolbar__input pn-date" />
       </div>
-      <button type="button" class="soleil-btn-outline" @click="load">
+      <button type="button" class="soleil-btn-outline" @click="applyFiltersNow">
         <Icon icon="icon-park-outline:filter" width="15" />
         Lọc
       </button>
@@ -183,7 +283,12 @@ onMounted(async () => {
             </tr>
             <tr v-else-if="!rows.length">
               <td colspan="6" class="pn-empty-cell">
-                Chưa có phiếu nhập. Bấm «Nhập hàng» để tạo phiếu đầu tiên.
+                <template v-if="hasActiveFilters">
+                  Không có phiếu nhập phù hợp.
+                </template>
+                <template v-else>
+                  Chưa có phiếu nhập. Bấm «Nhập hàng» để tạo phiếu đầu tiên.
+                </template>
               </td>
             </tr>
             <template v-else>
@@ -258,6 +363,7 @@ onMounted(async () => {
   --pn-draft-bg: #ffedd5;
   --pn-cancel: #3f3f46;
   --pn-cancel-bg: #e4e4e7;
+  --pn-mist: #f3ebe1;
 
   display: flex;
   flex-direction: column;
@@ -286,46 +392,26 @@ onMounted(async () => {
 }
 
 .pn-filters {
-  border-color: var(--pn-line) !important;
-  box-shadow: 0 1px 0 rgba(26, 18, 12, 0.04);
+  flex-wrap: wrap;
+  align-items: flex-end;
 }
 
-.pn-filters :deep(.soleil-toolbar__label) {
-  color: var(--pn-ink);
-  font-weight: 700;
-}
-
-.pn-filters :deep(.soleil-toolbar__input),
-.pn-filters :deep(.soleil-toolbar__select) {
-  border-color: var(--pn-line-strong);
-  background: #fff;
-  color: var(--pn-ink);
-  font-weight: 500;
-}
-
-.pn-filters :deep(.soleil-toolbar__input:focus),
-.pn-filters :deep(.soleil-toolbar__select:focus) {
-  border-color: #8b6914;
-  background: #fff;
+.pn-ncc-select {
+  width: 100%;
+  min-width: 0;
 }
 
 .pn-date {
-  padding-left: 14px !important;
+  min-width: 9.5rem;
 }
 
 .pn-table-card {
-  border-color: var(--pn-line-strong) !important;
-}
-
-.pn-table-card :deep(.soleil-table-card__head) {
-  border-bottom-color: var(--pn-line);
-  background: #fff;
+  border-color: var(--pn-line-strong);
 }
 
 .pn-table-title {
   font-size: 14px;
   font-weight: 800;
-  color: var(--pn-ink);
 }
 
 .pn-table-meta {
@@ -335,130 +421,75 @@ onMounted(async () => {
   color: var(--pn-muted);
 }
 
-.pn-table-card :deep(table.pn-table thead th) {
-  background: #8f7349 !important;
-  color: #fffef9 !important;
-  font-size: 11px !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.08em !important;
-  border-bottom: none !important;
-}
-
-.pn-table-card :deep(table.pn-table tbody td) {
-  color: var(--pn-ink);
-  border-bottom: 1px solid var(--pn-line);
-  font-size: 13.5px;
-}
-
-.pn-table-card :deep(table.pn-table tbody tr:hover) {
-  background: #f7f1e8 !important;
-}
-
 .pn-empty-cell {
   text-align: center;
   padding: 2.5rem 1rem !important;
   color: var(--pn-muted);
-  font-weight: 500;
-}
-
-.pn-row--draft {
-  background: #fff7ed;
 }
 
 .pn-code {
-  border: none;
+  border: 0;
   background: none;
   padding: 0;
   font-family: ui-monospace, 'Cascadia Mono', monospace;
-  font-size: 13.5px;
   font-weight: 800;
   color: #0f4c52;
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 
 .pn-code:hover {
-  color: #062f33;
+  text-decoration: underline;
 }
 
 .pn-date-text,
-.pn-ncc {
-  color: var(--pn-ink);
-}
-
 .pn-ncc {
   font-weight: 600;
 }
 
 .pn-money {
-  font-family: ui-monospace, 'Cascadia Mono', monospace;
   font-weight: 800;
-  color: var(--pn-ink);
-  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .pn-badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.3rem 0.7rem;
-  border-radius: 3px;
-  border: 1px solid transparent;
-  font-size: 11.5px;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-
-.pn-badge--draft {
-  background: var(--pn-draft-bg);
-  border-color: #fdba74;
-  color: var(--pn-draft);
 }
 
 .pn-badge--ok {
-  background: var(--pn-ok-bg);
-  border-color: #86efac;
   color: var(--pn-ok);
+  background: var(--pn-ok-bg);
+}
+
+.pn-badge--draft {
+  color: var(--pn-draft);
+  background: var(--pn-draft-bg);
 }
 
 .pn-badge--muted {
-  background: var(--pn-cancel-bg);
-  border-color: #a1a1aa;
   color: var(--pn-cancel);
+  background: var(--pn-cancel-bg);
 }
 
 .pn-actions {
   justify-content: center;
 }
 
-.pn-actions :deep(.soleil-act-btn) {
-  border-color: var(--pn-line-strong);
-  color: var(--pn-ink);
-  background: #fff;
-}
-
-.pn-actions :deep(.soleil-act-btn:hover) {
-  border-color: #8f7349;
-  color: #6b542f;
-  background: #f7f1e8;
-}
-
-:deep(.soleil-col-center) {
-  text-align: center;
-}
-
-:deep(.soleil-col-num) {
-  text-align: right;
-}
-
 .soleil-act-btn--danger {
-  color: #991b1b !important;
+  color: #991b1b;
 }
 
 .soleil-act-btn--danger:hover {
-  background: #fee2e2 !important;
-  border-color: #f87171 !important;
-  color: #7f1d1d !important;
+  background: #fdecec;
+  border-color: #f5c2c2;
+}
+
+.pn-page :deep(table.admin-table--soleil thead th) {
+  background: #8f7349 !important;
+  color: #fffef9 !important;
 }
 </style>

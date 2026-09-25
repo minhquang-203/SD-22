@@ -8,6 +8,7 @@ import org.example.templatejava6.order.entity.ThanhToanHoaDon;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Getter
@@ -20,8 +21,11 @@ public class BanHangHoaDonResponse {
     private String trangThai;
     private LocalDateTime ngayTao;
     private String tenKhachHang;
+    private String soDienThoaiKhachHang;
+    private Integer idKhachHang;
     private String tenNhanVien;
     private String tenPhuongThucThanhToan;
+    private String maPhieuGiamGia;
     private BigDecimal tongTien;
     private BigDecimal tienGiamGia;
     private BigDecimal thanhTien;
@@ -31,6 +35,10 @@ public class BanHangHoaDonResponse {
     private String paymentUrl;
     private String transactionRef;
     private String trangThaiThanhToan;
+    /** Điểm cộng từ đơn này (0 nếu khách lẻ). */
+    private Integer diemCong;
+    /** Tổng điểm sau khi cộng. */
+    private Integer diemTichLuySau;
     private List<BanHangChiTietResponse> items;
     /** Các dòng thanh toán thật (1 hoặc nhiều khi kết hợp). */
     private List<ThanhToanDongResponse> danhSachThanhToan;
@@ -53,10 +61,18 @@ public class BanHangHoaDonResponse {
         res.setLoaiDon(hd.getLoaiDon());
         res.setTrangThai(hd.getTrangThai() != null ? hd.getTrangThai().name() : null);
         res.setNgayTao(hd.getNgayTao());
-        res.setTenKhachHang(hd.getIdKhachHang() != null ? hd.getIdKhachHang().getHoTen() : "Khách lẻ");
+        if (hd.getIdKhachHang() != null) {
+            res.setIdKhachHang(hd.getIdKhachHang().getId());
+            res.setTenKhachHang(hd.getIdKhachHang().getHoTen());
+            res.setSoDienThoaiKhachHang(hd.getIdKhachHang().getSoDienThoai());
+            res.setDiemTichLuySau(hd.getIdKhachHang().getDiemTichLuy());
+        } else {
+            res.setTenKhachHang("Khách lẻ");
+        }
         res.setTenNhanVien(hd.getIdNhanVien() != null ? hd.getIdNhanVien().getHoTen() : null);
         res.setTenPhuongThucThanhToan(
                 hd.getIdPhuongThucThanhToan() != null ? hd.getIdPhuongThucThanhToan().getTen() : null);
+        res.setMaPhieuGiamGia(hd.getIdPhieuGiamGia() != null ? hd.getIdPhieuGiamGia().getMa() : null);
         res.setTongTien(hd.getTongTien());
         res.setTienGiamGia(hd.getTienGiamGia());
         res.setThanhTien(hd.getThanhTien());
@@ -78,13 +94,22 @@ public class BanHangHoaDonResponse {
     @Setter
     public static class ThanhToanDongResponse {
         private String tenPhuongThucThanhToan;
+        private String maPhuongThucThanhToan;
         private BigDecimal soTien;
+        private String maGiaoDich;
+        private BigDecimal soTienKhachDua;
+        private BigDecimal tienThua;
 
         public static ThanhToanDongResponse from(ThanhToanHoaDon tt) {
             ThanhToanDongResponse d = new ThanhToanDongResponse();
-            d.setTenPhuongThucThanhToan(
-                    tt.getIdPhuongThucThanhToan() != null ? tt.getIdPhuongThucThanhToan().getTen() : null);
+            if (tt.getIdPhuongThucThanhToan() != null) {
+                d.setTenPhuongThucThanhToan(tt.getIdPhuongThucThanhToan().getTen());
+                d.setMaPhuongThucThanhToan(tt.getIdPhuongThucThanhToan().getMa());
+            }
             d.setSoTien(tt.getSoTien());
+            d.setMaGiaoDich(tt.getMaGiaoDich());
+            d.setSoTienKhachDua(tt.getSoTienKhachDua());
+            d.setTienThua(tt.getTienThua());
             return d;
         }
     }
@@ -92,14 +117,17 @@ public class BanHangHoaDonResponse {
     @Getter
     @Setter
     public static class BanHangChiTietResponse {
+        private Integer id;
         private String sku;
         private String tenSanPham;
         private String bienThe;
         private Integer soLuong;
         private BigDecimal donGia;
         private BigDecimal thanhTien;
+        private List<LoHangDonHangResponse> loHangs = new ArrayList<>();
 
         public BanHangChiTietResponse(HoaDonChiTiet line) {
+            this.id = line.getId();
             var cts = line.getIdChiTietSanPham();
             this.sku = cts.getSku();
             this.tenSanPham = cts.getSanPham() != null ? cts.getSanPham().getTen() : null;

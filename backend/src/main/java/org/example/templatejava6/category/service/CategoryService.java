@@ -9,12 +9,16 @@ import org.example.templatejava6.common.model.response.MaTiepTheoResponse;
 import org.example.templatejava6.common.util.MaGenerator;
 import org.example.templatejava6.common.util.MapperUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
 public class CategoryService {
+
+    /** Entity thuộc tính không có ngayTao — id IDENTITY tăng dần = mới hơn. */
+    private static final Sort ATTR_NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "id");
 
     @Autowired private DanhMucRepository danhMucRepository;
     @Autowired private ThuongHieuRepository thuongHieuRepository;
@@ -25,7 +29,7 @@ public class CategoryService {
 
     // --- Danh mục ---
     public List<DanhMucResponse> getAllDanhMuc() {
-        return danhMucRepository.findAll().stream().map(DanhMucResponse::new).toList();
+        return danhMucRepository.findAll(ATTR_NEWEST_FIRST).stream().map(DanhMucResponse::new).toList();
     }
 
     public DanhMucResponse detailDanhMuc(Integer id) {
@@ -67,7 +71,7 @@ public class CategoryService {
 
     // --- Thương hiệu ---
     public List<ThuongHieuResponse> getAllThuongHieu() {
-        return thuongHieuRepository.findAll().stream().map(ThuongHieuResponse::new).toList();
+        return thuongHieuRepository.findAll(ATTR_NEWEST_FIRST).stream().map(ThuongHieuResponse::new).toList();
     }
 
     public ThuongHieuResponse detailThuongHieu(Integer id) {
@@ -112,7 +116,7 @@ public class CategoryService {
 
     // --- Dạng sản phẩm ---
     public List<DangSanPhamResponse> getAllDangSanPham() {
-        return dangSanPhamRepository.findAll().stream().map(DangSanPhamResponse::new).toList();
+        return dangSanPhamRepository.findAll(ATTR_NEWEST_FIRST).stream().map(DangSanPhamResponse::new).toList();
     }
 
     public DangSanPhamResponse detailDangSanPham(Integer id) {
@@ -156,7 +160,7 @@ public class CategoryService {
 
     // --- Công dụng ---
     public List<CongDungResponse> getAllCongDung() {
-        return congDungRepository.findAll().stream().map(CongDungResponse::new).toList();
+        return congDungRepository.findAll(ATTR_NEWEST_FIRST).stream().map(CongDungResponse::new).toList();
     }
 
     public CongDungResponse detailCongDung(Integer id) {
@@ -200,7 +204,7 @@ public class CategoryService {
 
     // --- Thành phần ---
     public List<ThanhPhanResponse> getAllThanhPhan() {
-        return thanhPhanRepository.findAll().stream().map(ThanhPhanResponse::new).toList();
+        return thanhPhanRepository.findAll(ATTR_NEWEST_FIRST).stream().map(ThanhPhanResponse::new).toList();
     }
 
     public ThanhPhanResponse detailThanhPhan(Integer id) {
@@ -245,7 +249,7 @@ public class CategoryService {
 
     // --- Màu sắc ---
     public List<MauSacResponse> getAllMauSac() {
-        return mauSacRepository.findAll().stream().map(MauSacResponse::new).toList();
+        return mauSacRepository.findAll(ATTR_NEWEST_FIRST).stream().map(MauSacResponse::new).toList();
     }
 
     public MauSacResponse detailMauSac(Integer id) {
