@@ -28,10 +28,19 @@ public final class VaiTroRank {
         return rankOf(nv.getVaiTro().getMaVaiTro());
     }
 
-    /** Chỉ thao tác lên tài khoản có cấp thấp hơn; không tự thao tác chính mình. */
+    public static boolean isSelf(NhanVien actor, NhanVien target) {
+        return actor != null && target != null
+                && actor.getId() != null
+                && actor.getId().equals(target.getId());
+    }
+
+    /**
+     * Chỉ thao tác lên tài khoản có cấp thấp hơn.
+     * Tự khóa / tự đổi vai trò / đặt lại MK cho người khác cùng cấp vẫn bị chặn.
+     */
     public static void assertCanManage(NhanVien actor, NhanVien target) {
-        if (actor.getId().equals(target.getId())) {
-            throw forbidden();
+        if (isSelf(actor, target)) {
+            throw forbiddenSelf();
         }
         if (rankOf(target) >= rankOf(actor)) {
             throw forbidden();
@@ -49,11 +58,25 @@ public final class VaiTroRank {
         }
     }
 
+    /** Tự sửa: không được đổi vai trò sang mã khác hiện tại. */
+    public static void assertSelfKeepsRole(NhanVien self, String requestedMaVaiTro) {
+        String current = maVaiTro(self.getVaiTro());
+        if (requestedMaVaiTro != null && current != null && !requestedMaVaiTro.equals(current)) {
+            throw forbiddenSelf();
+        }
+    }
+
     public static String maVaiTro(VaiTro vaiTro) {
         return vaiTro != null ? vaiTro.getMaVaiTro() : null;
     }
 
     private static ApiException forbidden() {
         return new ApiException("Không đủ quyền", "FORBIDDEN");
+    }
+
+    private static ApiException forbiddenSelf() {
+        return new ApiException(
+                "Không thể tự thay đổi vai trò/trạng thái của chính mình",
+                "FORBIDDEN");
     }
 }

@@ -18,7 +18,7 @@ export const GHN_STATUS_OPTIONS = [
   { value: 'return_sorting', label: 'Đang phân loại hoàn' },
   { value: 'returning', label: 'Shipper đang hoàn' },
   { value: 'return_fail', label: 'Hoàn hàng không thành công' },
-  { value: 'returned', label: 'Đã hoàn hàng' },
+  // "returned" / Đã hoàn hàng: không cho NV/admin giả lập — chỉ từ đồng bộ GHN thật.
   { value: 'exception', label: 'Có sự cố vận chuyển' },
   { value: 'damage', label: 'Hàng hư hỏng' },
   { value: 'lost', label: 'Hàng thất lạc' },

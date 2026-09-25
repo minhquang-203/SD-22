@@ -23,3 +23,8 @@ export function traCuuDonBangToken(token) {
 export function traCuuDonCongKhai(ma, email) {
   return request.post('/hoa-don/tra-cuu', { ma, email })
 }
+
+/** Khách vãng lai hủy đơn — chứng minh sở hữu bằng tracking token. */
+export function huyDonBangToken(token, payload = {}) {
+  return request.post(`/hoa-don/tra-cuu/${encodeURIComponent(token)}/huy`, payload)
+}

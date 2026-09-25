@@ -59,10 +59,11 @@ public class PhieuNhapService {
     @Autowired private LoHangRepository loHangRepository;
 
     @Transactional(readOnly = true)
-    public List<PhieuNhapResponse> list(String trangThai, Integer idNcc, LocalDate from, LocalDate to) {
+    public List<PhieuNhapResponse> list(String trangThai, Integer idNcc, LocalDate from, LocalDate to, String q) {
         LocalDateTime fromDt = from != null ? from.atStartOfDay() : null;
         LocalDateTime toDt = to != null ? to.atTime(LocalTime.MAX) : null;
-        return phieuNhapRepository.search(trangThai, idNcc, fromDt, toDt).stream()
+        String keyword = q == null ? "" : q.trim();
+        return phieuNhapRepository.search(trangThai, idNcc, fromDt, toDt, keyword).stream()
                 .map(PhieuNhapResponse::summary)
                 .toList();
     }
@@ -97,6 +98,12 @@ public class PhieuNhapService {
         PhieuNhap p = phieuNhapRepository.findDetailById(id)
                 .orElseThrow(() -> new ApiException("Không tìm thấy phiếu nhập", "NOT_FOUND"));
         ensureTam(p);
+        if (p.getNhaCungCap() == null) {
+            throw new ApiException("Phiếu nhập bắt buộc có nhà cung cấp", "VALIDATION_ERROR");
+        }
+        if (!Boolean.TRUE.equals(p.getNhaCungCap().getTrangThai())) {
+            throw new ApiException("Nhà cung cấp đã ngừng dùng", "INACTIVE");
+        }
         if (p.getChiTiets() == null || p.getChiTiets().isEmpty()) {
             throw new ApiException("Phiếu nhập chưa có dòng hàng", "VALIDATION_ERROR");
         }
@@ -165,15 +172,14 @@ public class PhieuNhapService {
         LocalTime timePart = p.getNgayTao() != null ? p.getNgayTao().toLocalTime() : LocalTime.now();
         p.setNgayTao(LocalDateTime.of(ngayNhap, timePart));
 
-        if (request.getIdNhaCungCap() != null) {
-            NhaCungCap ncc = nhaCungCapService.getOrThrow(request.getIdNhaCungCap());
-            if (!Boolean.TRUE.equals(ncc.getTrangThai())) {
-                throw new ApiException("Nhà cung cấp đã ngừng dùng", "INACTIVE");
-            }
-            p.setNhaCungCap(ncc);
-        } else {
-            p.setNhaCungCap(null);
+        if (request.getIdNhaCungCap() == null) {
+            throw new ApiException("Phiếu nhập bắt buộc có nhà cung cấp", "VALIDATION_ERROR");
         }
+        NhaCungCap ncc = nhaCungCapService.getOrThrow(request.getIdNhaCungCap());
+        if (!Boolean.TRUE.equals(ncc.getTrangThai())) {
+            throw new ApiException("Nhà cung cấp đã ngừng dùng", "INACTIVE");
+        }
+        p.setNhaCungCap(ncc);
         p.setSoHoaDonDauVao(blankToNull(request.getSoHoaDonDauVao()));
         p.setGhiChu(blankToNull(request.getGhiChu()));
         BigDecimal giamGia = request.getGiamGia() != null ? request.getGiamGia() : BigDecimal.ZERO;

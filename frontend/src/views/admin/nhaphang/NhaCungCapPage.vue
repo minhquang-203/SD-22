@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import {
@@ -11,6 +11,9 @@ import {
 import { toast } from '@/composables/useToast'
 import { confirm } from '@/composables/useConfirm'
 import { formatApiError } from '@/utils/apiError'
+import { PHONE_VN_REGEX, normalizePhoneDigits } from '@/utils/phone'
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const loading = ref(false)
 const saving = ref(false)
@@ -27,6 +30,7 @@ const form = ref({
   diaChi: '',
   ghiChu: '',
 })
+const fieldErrors = ref({ ten: '', soDienThoai: '', email: '' })
 
 async function load() {
   loading.value = true
@@ -40,10 +44,15 @@ async function load() {
   }
 }
 
+function clearFieldErrors() {
+  fieldErrors.value = { ten: '', soDienThoai: '', email: '' }
+}
+
 function openCreate() {
   editingId.value = null
   formMa.value = '(tự sinh khi lưu)'
   form.value = { ten: '', soDienThoai: '', email: '', diaChi: '', ghiChu: '' }
+  clearFieldErrors()
   showForm.value = true
 }
 
@@ -57,24 +66,51 @@ function openEdit(row) {
     diaChi: row.diaChi || '',
     ghiChu: row.ghiChu || '',
   }
+  clearFieldErrors()
   showForm.value = true
 }
 
 function closeForm() {
   showForm.value = false
+  clearFieldErrors()
+}
+
+function validateFormInline() {
+  const errs = { ten: '', soDienThoai: '', email: '' }
+  if (!form.value.ten?.trim()) {
+    errs.ten = 'Nhập tên nhà cung cấp'
+  }
+  const sdtRaw = (form.value.soDienThoai || '').trim()
+  if (sdtRaw) {
+    const digits = normalizePhoneDigits(sdtRaw)
+    if (!PHONE_VN_REGEX.test(digits)) {
+      errs.soDienThoai = 'SĐT phải gồm 10 số, bắt đầu bằng 0 (VN)'
+    }
+  }
+  const emailRaw = (form.value.email || '').trim()
+  if (emailRaw && !EMAIL_RE.test(emailRaw)) {
+    errs.email = 'Email không đúng định dạng'
+  }
+  fieldErrors.value = errs
+  return !errs.ten && !errs.soDienThoai && !errs.email
 }
 
 async function saveForm() {
-  if (!form.value.ten?.trim()) {
-    toast('Nhập tên nhà cung cấp', 'warn')
+  if (!validateFormInline()) {
+    toast('Kiểm tra lại thông tin nhà cung cấp', 'warn')
+    await nextTick()
+    const el = document.querySelector('.ncc-control--error')
+    el?.focus?.()
+    el?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
     return
   }
   saving.value = true
   try {
+    const sdtDigits = normalizePhoneDigits(form.value.soDienThoai || '')
     const payload = {
       ten: form.value.ten.trim(),
-      soDienThoai: form.value.soDienThoai || null,
-      email: form.value.email || null,
+      soDienThoai: sdtDigits || null,
+      email: (form.value.email || '').trim() || null,
       diaChi: form.value.diaChi || null,
       ghiChu: form.value.ghiChu || null,
     }
@@ -86,6 +122,7 @@ async function saveForm() {
       toast('Đã thêm nhà cung cấp', 'success')
     }
     showForm.value = false
+    clearFieldErrors()
     await load()
   } catch (e) {
     toast(formatApiError(e, 'Không lưu được nhà cung cấp'), 'error')
@@ -246,15 +283,36 @@ onMounted(load)
         </label>
         <label class="ncc-field">
           <span>Tên *</span>
-          <input v-model="form.ten" class="ncc-control" placeholder="Tên nhà cung cấp" />
+          <input
+            v-model="form.ten"
+            class="ncc-control"
+            :class="{ 'ncc-control--error': fieldErrors.ten }"
+            placeholder="Tên nhà cung cấp"
+            @input="fieldErrors.ten = ''"
+          />
+          <em v-if="fieldErrors.ten" class="ncc-field-error">{{ fieldErrors.ten }}</em>
         </label>
         <label class="ncc-field">
           <span>SĐT</span>
-          <input v-model="form.soDienThoai" class="ncc-control" />
+          <input
+            v-model="form.soDienThoai"
+            class="ncc-control"
+            :class="{ 'ncc-control--error': fieldErrors.soDienThoai }"
+            placeholder="0xxxxxxxxx"
+            @input="fieldErrors.soDienThoai = ''"
+          />
+          <em v-if="fieldErrors.soDienThoai" class="ncc-field-error">{{ fieldErrors.soDienThoai }}</em>
         </label>
         <label class="ncc-field">
           <span>Email</span>
-          <input v-model="form.email" class="ncc-control" type="email" />
+          <input
+            v-model="form.email"
+            class="ncc-control"
+            :class="{ 'ncc-control--error': fieldErrors.email }"
+            type="email"
+            @input="fieldErrors.email = ''"
+          />
+          <em v-if="fieldErrors.email" class="ncc-field-error">{{ fieldErrors.email }}</em>
         </label>
         <label class="ncc-field">
           <span>Địa chỉ</span>
@@ -435,7 +493,7 @@ onMounted(load)
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 80;
+  z-index: var(--admin-z-modal, 5000);
   padding: 1rem;
 }
 
@@ -496,6 +554,16 @@ onMounted(load)
   box-shadow: 0 0 0 2px rgba(143, 115, 73, 0.18);
 }
 
+.ncc-control--error {
+  border-color: #c45c3e;
+  background: #fff8f5;
+}
+
+.ncc-control--error:focus {
+  border-color: #a33b1c;
+  box-shadow: 0 0 0 2px rgba(163, 59, 28, 0.16);
+}
+
 .ncc-field {
   display: flex;
   flex-direction: column;
@@ -505,6 +573,15 @@ onMounted(load)
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #4a3f34;
+}
+
+.ncc-field-error {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #a33b1c;
 }
 
 .ncc-modal__actions {

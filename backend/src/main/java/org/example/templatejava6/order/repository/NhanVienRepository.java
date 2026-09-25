@@ -14,10 +14,32 @@ public interface NhanVienRepository extends JpaRepository<NhanVien, Integer> {
 
     List<NhanVien> findByTrangThaiTrue();
 
-    @Query("SELECT n FROM NhanVien n JOIN FETCH n.vaiTro WHERE n.trangThai = true ORDER BY n.hoTen")
+    @Query("""
+            SELECT n FROM NhanVien n JOIN FETCH n.vaiTro v
+            WHERE n.trangThai = true
+            ORDER BY
+              CASE v.maVaiTro
+                WHEN 'CHU' THEN 1
+                WHEN 'QUAN_LY' THEN 2
+                WHEN 'NHAN_VIEN' THEN 3
+                ELSE 4
+              END,
+              n.id DESC
+            """)
     List<NhanVien> findActiveWithVaiTro();
 
-    @Query("SELECT n FROM NhanVien n LEFT JOIN FETCH n.vaiTro ORDER BY n.id DESC")
+    @Query("""
+            SELECT n FROM NhanVien n LEFT JOIN FETCH n.vaiTro v
+            ORDER BY
+              CASE v.maVaiTro
+                WHEN 'CHU' THEN 1
+                WHEN 'QUAN_LY' THEN 2
+                WHEN 'NHAN_VIEN' THEN 3
+                ELSE 4
+              END,
+              CASE WHEN n.trangThai = false THEN 1 ELSE 0 END,
+              n.id DESC
+            """)
     List<NhanVien> findAllWithVaiTro();
 
     @Query("SELECT n FROM NhanVien n LEFT JOIN FETCH n.vaiTro WHERE n.id = :id")

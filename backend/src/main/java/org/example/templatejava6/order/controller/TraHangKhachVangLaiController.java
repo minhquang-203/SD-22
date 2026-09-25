@@ -2,6 +2,7 @@ package org.example.templatejava6.order.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.example.templatejava6.common.util.ClientIpResolver;
 import org.example.templatejava6.order.model.request.TaoVanDonTraRequest;
 import org.example.templatejava6.order.model.request.TaoYeuCauTraHangRequest;
 import org.example.templatejava6.order.model.response.StorefrontReturnDetailResponse;
@@ -45,7 +46,7 @@ public class TraHangKhachVangLaiController {
             @Valid @RequestPart("data") TaoYeuCauTraHangRequest request,
             @RequestPart(value = "files", required = false) List<MultipartFile> files,
             HttpServletRequest httpRequest) {
-        publicLookupRateLimiter.checkOrThrow(clientIp(httpRequest));
+        publicLookupRateLimiter.checkOrThrow(ClientIpResolver.forRateLimit(httpRequest));
         return returnRequestService.taoYeuCauBangToken(token, idHoaDon, request, files);
     }
 
@@ -53,7 +54,7 @@ public class TraHangKhachVangLaiController {
     public List<GhnPickShiftResponse> caLayHang(
             @PathVariable String token,
             HttpServletRequest httpRequest) {
-        publicLookupRateLimiter.checkOrThrow(clientIp(httpRequest));
+        publicLookupRateLimiter.checkOrThrow(ClientIpResolver.forRateLimit(httpRequest));
         returnRequestService.assertTrackingToken(token);
         return returnRequestService.danhSachCaLayHang();
     }
@@ -63,7 +64,7 @@ public class TraHangKhachVangLaiController {
             @PathVariable String token,
             @PathVariable Integer id,
             HttpServletRequest httpRequest) {
-        publicLookupRateLimiter.checkOrThrow(clientIp(httpRequest));
+        publicLookupRateLimiter.checkOrThrow(ClientIpResolver.forRateLimit(httpRequest));
         return returnRequestService.chiTietBangToken(token, id);
     }
 
@@ -73,16 +74,8 @@ public class TraHangKhachVangLaiController {
             @PathVariable Integer id,
             @RequestBody(required = false) TaoVanDonTraRequest request,
             HttpServletRequest httpRequest) {
-        publicLookupRateLimiter.checkOrThrow(clientIp(httpRequest));
+        publicLookupRateLimiter.checkOrThrow(ClientIpResolver.forRateLimit(httpRequest));
         return returnRequestService.taoVanDonTraBangToken(
                 token, id, request != null ? request.getPickShiftId() : null);
-    }
-
-    private static String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 }

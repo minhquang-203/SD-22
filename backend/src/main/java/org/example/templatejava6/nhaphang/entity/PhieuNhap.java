@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.example.templatejava6.common.entity.NhanVien;
-import org.hibernate.annotations.Nationalized;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -50,8 +49,6 @@ public class PhieuNhap {
 
     @Column(name = "trang_thai", length = 20, nullable = false)
     private String trangThai = "PHIEU_TAM";
-
-    @Nationalized
     @Column(name = "ghi_chu", length = 500)
     private String ghiChu;
 

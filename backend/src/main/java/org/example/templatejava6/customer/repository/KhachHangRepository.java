@@ -32,16 +32,43 @@ public interface KhachHangRepository extends JpaRepository<KhachHang, Integer> {
 
     boolean existsByMaKhachHang(String maKhachHang);
 
-    @Query("SELECT k FROM KhachHang k WHERE "
-            + "LOWER(k.hoTen) LIKE LOWER(CONCAT('%', :keyword, '%')) OR "
-            + "LOWER(k.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR "
-            + "k.soDienThoai LIKE CONCAT('%', :keyword, '%')")
+    @Query("""
+            SELECT k FROM KhachHang k
+            ORDER BY COALESCE(k.diemTichLuy, 0) DESC, k.id DESC
+            """)
+    List<KhachHang> findAllOrderByDiemDesc();
+
+    @Query(
+            value = """
+            SELECT k FROM KhachHang k
+            ORDER BY COALESCE(k.diemTichLuy, 0) DESC, k.id DESC
+            """,
+            countQuery = "SELECT COUNT(k) FROM KhachHang k")
+    Page<KhachHang> findAllOrderByDiemDesc(Pageable pageable);
+
+    @Query("""
+            SELECT k FROM KhachHang k WHERE
+              LOWER(k.hoTen) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+              LOWER(k.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+              k.soDienThoai LIKE CONCAT('%', :keyword, '%')
+            ORDER BY COALESCE(k.diemTichLuy, 0) DESC, k.id DESC
+            """)
     List<KhachHang> timKiem(@Param("keyword") String keyword);
 
-    @Query("SELECT k FROM KhachHang k WHERE "
-            + "LOWER(k.hoTen) LIKE LOWER(CONCAT('%', :keyword, '%')) OR "
-            + "LOWER(k.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR "
-            + "k.soDienThoai LIKE CONCAT('%', :keyword, '%')")
+    @Query(
+            value = """
+            SELECT k FROM KhachHang k WHERE
+              LOWER(k.hoTen) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+              LOWER(k.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+              k.soDienThoai LIKE CONCAT('%', :keyword, '%')
+            ORDER BY COALESCE(k.diemTichLuy, 0) DESC, k.id DESC
+            """,
+            countQuery = """
+            SELECT COUNT(k) FROM KhachHang k WHERE
+              LOWER(k.hoTen) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+              LOWER(k.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+              k.soDienThoai LIKE CONCAT('%', :keyword, '%')
+            """)
     Page<KhachHang> timKiem(@Param("keyword") String keyword, Pageable pageable);
 
     /**

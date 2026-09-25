@@ -59,8 +59,6 @@ const openAcc = ref({
   use: true,
   skin: true,
 })
-const showAllBrands = ref(false)
-const showAllCongDung = ref(false)
 const filterDrawerOpen = ref(false)
 
 const PRICE_PRESETS = [
@@ -78,7 +76,6 @@ const SPF_BANDS = [
 ]
 
 const PA_OPTIONS = ['PA++', 'PA+++', 'PA++++']
-const FILTER_COLLAPSE_LIMIT = 6
 
 let searchTimer
 
@@ -313,18 +310,6 @@ function spfBandOf(raw) {
   if (p.num < 30) return 'lt30'
   return null
 }
-
-const visibleBrands = computed(() => (
-  showAllBrands.value
-    ? thuongHieuList.value
-    : thuongHieuList.value.slice(0, FILTER_COLLAPSE_LIMIT)
-))
-
-const visibleCongDung = computed(() => (
-  showAllCongDung.value
-    ? congDungList.value
-    : congDungList.value.slice(0, FILTER_COLLAPSE_LIMIT)
-))
 
 function applyPrice() {
   appliedPriceMin.value = priceMinInput.value
@@ -617,23 +602,17 @@ onMounted(async () => {
             <Icon :icon="openAcc.brand ? 'mdi:chevron-up' : 'mdi:chevron-down'" width="18" />
           </button>
           <div v-show="openAcc.brand" class="sf-fgroup__body">
-            <label v-for="t in visibleBrands" :key="t.id" class="sf-fcheck">
-              <input
-                type="checkbox"
-                :checked="isChecked(selectedThuongHieu, t.id)"
-                @change="toggleId(selectedThuongHieu, t.id)"
-              />
-              <span class="sf-fcheck__box" />
-              <span class="sf-fcheck__label">{{ t.ten }}</span>
-            </label>
-            <button
-              v-if="thuongHieuList.length > FILTER_COLLAPSE_LIMIT"
-              type="button"
-              class="sf-fmore"
-              @click="showAllBrands = !showAllBrands"
-            >
-              {{ showAllBrands ? 'Thu gọn ▴' : `Xem thêm (${thuongHieuList.length - FILTER_COLLAPSE_LIMIT}) ▾` }}
-            </button>
+            <div class="sf-fgroup__scroll">
+              <label v-for="t in thuongHieuList" :key="t.id" class="sf-fcheck">
+                <input
+                  type="checkbox"
+                  :checked="isChecked(selectedThuongHieu, t.id)"
+                  @change="toggleId(selectedThuongHieu, t.id)"
+                />
+                <span class="sf-fcheck__box" />
+                <span class="sf-fcheck__label">{{ t.ten }}</span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -643,15 +622,17 @@ onMounted(async () => {
             <Icon :icon="openAcc.cat ? 'mdi:chevron-up' : 'mdi:chevron-down'" width="18" />
           </button>
           <div v-show="openAcc.cat" class="sf-fgroup__body">
-            <label v-for="d in danhMucList" :key="d.id" class="sf-fcheck">
-              <input
-                type="checkbox"
-                :checked="isChecked(selectedDanhMuc, d.id)"
-                @change="toggleId(selectedDanhMuc, d.id)"
-              />
-              <span class="sf-fcheck__box" />
-              <span class="sf-fcheck__label">{{ d.ten }}</span>
-            </label>
+            <div class="sf-fgroup__scroll">
+              <label v-for="d in danhMucList" :key="d.id" class="sf-fcheck">
+                <input
+                  type="checkbox"
+                  :checked="isChecked(selectedDanhMuc, d.id)"
+                  @change="toggleId(selectedDanhMuc, d.id)"
+                />
+                <span class="sf-fcheck__box" />
+                <span class="sf-fcheck__label">{{ d.ten }}</span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -715,23 +696,17 @@ onMounted(async () => {
             <Icon :icon="openAcc.use ? 'mdi:chevron-up' : 'mdi:chevron-down'" width="18" />
           </button>
           <div v-show="openAcc.use" class="sf-fgroup__body">
-            <label v-for="c in visibleCongDung" :key="c.id" class="sf-fcheck">
-              <input
-                type="checkbox"
-                :checked="isChecked(selectedCongDung, c.id)"
-                @change="toggleId(selectedCongDung, c.id)"
-              />
-              <span class="sf-fcheck__box" />
-              <span class="sf-fcheck__label">{{ c.ten }}</span>
-            </label>
-            <button
-              v-if="congDungList.length > FILTER_COLLAPSE_LIMIT"
-              type="button"
-              class="sf-fmore"
-              @click="showAllCongDung = !showAllCongDung"
-            >
-              {{ showAllCongDung ? 'Thu gọn ▴' : `Xem thêm (${congDungList.length - FILTER_COLLAPSE_LIMIT}) ▾` }}
-            </button>
+            <div class="sf-fgroup__scroll">
+              <label v-for="c in congDungList" :key="c.id" class="sf-fcheck">
+                <input
+                  type="checkbox"
+                  :checked="isChecked(selectedCongDung, c.id)"
+                  @change="toggleId(selectedCongDung, c.id)"
+                />
+                <span class="sf-fcheck__box" />
+                <span class="sf-fcheck__label">{{ c.ten }}</span>
+              </label>
+            </div>
           </div>
         </div>
 

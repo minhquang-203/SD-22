@@ -325,6 +325,87 @@ public class ShippingService {
         return response.toString();
     }
 
+    /**
+     * Hủy vận đơn GHN theo mã ({@code POST /v2/switch-status/cancel}).
+     * Idempotent: đơn đã hủy / không tồn tại bên GHN được coi là thành công.
+     */
+    public void cancelOrder(String orderCode) {
+        if (orderCode == null || orderCode.isBlank()) {
+            return;
+        }
+        if (!properties.isFeeConfigured()) {
+            throw new ApiException(
+                    "Chưa cấu hình ShopId GHN, không hủy được vận đơn " + orderCode.trim() + ".",
+                    "GHN_NOT_CONFIGURED");
+        }
+        String code = orderCode.trim();
+        Map<String, Object> body = Map.of("order_codes", List.of(code));
+        try {
+            JsonNode response = ghnClient.postWithShop("/v2/switch-status/cancel", body);
+            JsonNode data = response != null ? response.path("data") : null;
+            if (data != null && data.isArray() && !data.isEmpty()) {
+                JsonNode first = data.get(0);
+                boolean ok = first.path("result").asBoolean(false);
+                String message = text(first, "message");
+                if (ok || isAlreadyCancelled(message)) {
+                    log.info("Đã hủy vận đơn GHN {}: {}", code, message != null ? message : "OK");
+                    return;
+                }
+                log.warn("GHN từ chối hủy vận đơn {}: {}", code, message);
+                throw new ApiException(
+                        "Không hủy được vận đơn GHN " + code + ". "
+                                + (message != null ? message : "GHN trả kết quả thất bại."),
+                        "GHN_CANCEL_FAILED");
+            }
+            Integer responseCode = response != null ? intOrNull(response, "code") : null;
+            if (responseCode != null && responseCode == 200) {
+                log.info("Đã gửi hủy vận đơn GHN {} (code=200).", code);
+                return;
+            }
+            String chiTiet = ghnMessage(response);
+            throw new ApiException(
+                    "Không hủy được vận đơn GHN " + code + ". Phản hồi GHN: " + chiTiet,
+                    "GHN_CANCEL_FAILED");
+        } catch (ApiException ex) {
+            throw ex;
+        } catch (RestClientException ex) {
+            String chiTiet = ghnError(ex);
+            if (isAlreadyCancelled(chiTiet)) {
+                log.info("Vận đơn GHN {} đã hủy trước đó: {}", code, chiTiet);
+                return;
+            }
+            log.warn("GHN hủy vận đơn thất bại ({}): {}", code, chiTiet);
+            throw new ApiException(
+                    "Không hủy được vận đơn GHN " + code + ". " + chiTiet,
+                    "GHN_CANCEL_FAILED");
+        }
+    }
+
+    private static boolean isAlreadyCancelled(String message) {
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+        String lower = message.toLowerCase(Locale.ROOT);
+        // Chỉ coi là đã hủy sẵn — không match câu "cannot cancel" / "không thể hủy".
+        if (lower.contains("cannot cancel")
+                || lower.contains("can not cancel")
+                || lower.contains("không thể hủy")
+                || lower.contains("khong the huy")
+                || lower.contains("không hủy được")
+                || lower.contains("khong huy duoc")) {
+            return false;
+        }
+        return lower.contains("already cancel")
+                || lower.contains("already cancelled")
+                || lower.contains("đã hủy")
+                || lower.contains("da huy")
+                || lower.contains("order cancelled")
+                || lower.contains("order canceled")
+                || lower.contains("not found")
+                || lower.contains("không tìm thấy")
+                || lower.contains("khong tim thay");
+    }
+
     public CreateShippingOrderResponse createOrder(CreateShippingOrderRequest request) {
         if (!properties.isFeeConfigured()) {
             throw new ApiException("Chưa cấu hình ShopId / kho gửi của GHN.", "GHN_NOT_CONFIGURED");
@@ -341,7 +422,13 @@ public class ShippingService {
                 : null;
 
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("payment_type_id", 2);
+        // 1 = shop trả phí GHN; 2 = người nhận trả lúc giao.
+        // Mặc định 1: phí ship đã nằm trong thanh_tien (hoặc FREE_SHIP do shop chịu), tránh thu trùng.
+        int paymentTypeId = request.getPaymentTypeId() != null ? request.getPaymentTypeId() : 1;
+        if (paymentTypeId != 1 && paymentTypeId != 2) {
+            paymentTypeId = 1;
+        }
+        body.put("payment_type_id", paymentTypeId);
         body.put("required_note", "KHONGCHOXEMHANG");
         body.put("to_name", request.getToName());
         body.put("to_phone", request.getToPhone());

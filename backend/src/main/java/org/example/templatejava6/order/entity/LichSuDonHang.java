@@ -7,7 +7,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.example.templatejava6.common.entity.NhanVien;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.LocalDateTime;
 
@@ -32,7 +31,6 @@ public class LichSuDonHang {
     private String trangThai;
 
     @Size(max = 255)
-    @Nationalized
     @Column(name = "ghi_chu")
     private String ghiChu;
 

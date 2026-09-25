@@ -222,6 +222,28 @@ public class HoaDonStorefrontService {
         return detail;
     }
 
+    /**
+     * Khách vãng lai hủy đơn — chứng minh sở hữu bằng tracking token (cùng token tra cứu / email).
+     */
+    @Transactional
+    public StorefrontOrderDetailResponse huyDonBangToken(String token, String ghiChu, String clientKey) {
+        publicLookupRateLimiter.checkOrThrow(clientKey);
+        String normalized = token != null ? token.trim() : "";
+        if (normalized.length() < 32) {
+            throw new ApiException("Không tìm thấy đơn hàng", "NOT_FOUND");
+        }
+        HoaDon hd = hoaDonRepository.findByTrackingToken(normalized)
+                .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng", "NOT_FOUND"));
+        if (onlineOrderLifecycleService.laVnpayChuaThanhToan(hd)) {
+            throw new ApiException("Không tìm thấy đơn hàng", "NOT_FOUND");
+        }
+        onlineOrderLifecycleService.huyDonOnline(
+                hd,
+                ghiChu != null && !ghiChu.isBlank() ? ghiChu : "Khách hàng hủy đơn online");
+        HoaDon updated = hoaDonRepository.findById(hd.getId()).orElse(hd);
+        return toPublicDetail(updated);
+    }
+
     private StorefrontOrderSummaryResponse buildSummary(HoaDon hd) {
         StorefrontOrderSummaryResponse r = new StorefrontOrderSummaryResponse();
         r.setId(hd.getId());

@@ -5,6 +5,7 @@ import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import { confirm } from '@/composables/useConfirm'
 import { useAdminAuth } from '@/composables/useAdminAuth'
+import { subscribeAdminOrders } from '@/composables/useRealtime'
 import {
   daNhanHangTraHang,
   duyetTraHang,
@@ -80,12 +81,6 @@ function onPreviewKeydown(e) {
 
 watch(previewImageUrl, (url) => {
   document.body.style.overflow = url ? 'hidden' : ''
-})
-
-onUnmounted(() => {
-  document.body.style.overflow = ''
-  window.removeEventListener('keydown', onPreviewKeydown)
-  clearRejectImages()
 })
 
 function notify(text, type = 'success') {
@@ -445,9 +440,30 @@ watch(filteredItems, () => {
   if (page.value > totalPages.value) page.value = totalPages.value
 })
 
+let unsubscribeOrders = null
+
+function onOrderRealtime() {
+  loadList({ silent: true })
+}
+
+function onOrderRealtimeWindow() {
+  loadList({ silent: true })
+}
+
 onMounted(() => {
   window.addEventListener('keydown', onPreviewKeydown)
   loadList()
+  unsubscribeOrders = subscribeAdminOrders(onOrderRealtime)
+  window.addEventListener('sunova-admin-order-realtime', onOrderRealtimeWindow)
+})
+
+onUnmounted(() => {
+  document.body.style.overflow = ''
+  window.removeEventListener('keydown', onPreviewKeydown)
+  clearRejectImages()
+  unsubscribeOrders?.()
+  unsubscribeOrders = null
+  window.removeEventListener('sunova-admin-order-realtime', onOrderRealtimeWindow)
 })
 </script>
 

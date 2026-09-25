@@ -13,7 +13,7 @@ const props = defineProps({
   cancelLoading: { type: Boolean, default: false },
   returnActionLoading: { type: Boolean, default: false },
   detailLoading: { type: Boolean, default: false },
-  /** Chỉ xem (khách vãng lai): ẩn hủy / đánh giá. Trả hàng vẫn hiện nếu đơn đủ điều kiện. */
+  /** Chỉ xem (khách vãng lai): ẩn đánh giá. Hủy / trả hàng vẫn hiện nếu đơn đủ điều kiện. */
   readOnly: { type: Boolean, default: false },
 })
 
@@ -49,7 +49,7 @@ const isCancelled = computed(() => props.order?.trangThai === 'DA_HUY')
 
 const isReturned = computed(() => props.order?.trangThai === 'TRA_HANG')
 
-const canCancel = computed(() => !props.readOnly && coTheHuyDon(props.order?.trangThai))
+const canCancel = computed(() => coTheHuyDon(props.order?.trangThai))
 
 const canRequestReturn = computed(() => props.order?.coTheYeuCauTraHang === true)
 

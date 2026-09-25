@@ -11,7 +11,6 @@ import org.example.templatejava6.common.entity.PhieuGiamGia;
 import org.example.templatejava6.common.entity.PhuongThucThanhToan;
 import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -60,7 +59,6 @@ public class HoaDon {
     private TrangThaiDonHang trangThai;
 
     @Size(max = 255)
-    @Nationalized
     @Column(name = "dia_chi_giao")
     private String diaChiGiao;
 
@@ -89,13 +87,11 @@ public class HoaDon {
 
     /** Ten tinh/thanh nguoi nhan — GHN dia chi 2 cap dung to_province_name. */
     @Size(max = 100)
-    @Nationalized
     @Column(name = "ghn_province_name", length = 100)
     private String ghnProvinceName;
 
     /** Ten phuong/xa nguoi nhan — GHN dia chi 2 cap dung to_ward_name. */
     @Size(max = 100)
-    @Nationalized
     @Column(name = "ghn_ward_name", length = 100)
     private String ghnWardName;
 
@@ -104,7 +100,6 @@ public class HoaDon {
     private BigDecimal thanhTien;
 
     @Size(max = 255)
-    @Nationalized
     @Column(name = "ghi_chu")
     private String ghiChu;
 
@@ -113,7 +108,6 @@ public class HoaDon {
     private LocalDateTime ngayTao;
 
     @Size(max = 100)
-    @Nationalized
     @Column(name = "ten_nguoi_nhan")
     private String tenNguoiNhan;
 

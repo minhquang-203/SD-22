@@ -39,8 +39,9 @@ public class PhieuNhapController {
             @RequestParam(required = false) String trangThai,
             @RequestParam(required = false) Integer idNcc,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return phieuNhapService.list(trangThai, idNcc, from, to);
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String q) {
+        return phieuNhapService.list(trangThai, idNcc, from, to, q);
     }
 
     @GetMapping("{id:\\d+}")

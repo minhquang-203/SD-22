@@ -163,6 +163,22 @@ public interface HoaDonRepository extends JpaRepository<HoaDon, Integer> {
 
     Optional<HoaDon> findByIdAndIdKhachHang_IdAndLoaiDon(Integer id, Integer idKhachHang, String loaiDon);
 
+    /**
+     * Đơn guest (id_khach_hang null) theo email + SĐT — dùng để dọn VNPay chưa trả trước khi đặt lại.
+     */
+    @Query("""
+            SELECT h FROM HoaDon h
+            WHERE h.idKhachHang IS NULL
+              AND h.loaiDon = :loaiDon
+              AND LOWER(h.emailNguoiNhan) = LOWER(:email)
+              AND h.sdtNguoiNhan = :sdt
+            ORDER BY h.ngayTao DESC
+            """)
+    List<HoaDon> findGuestOnlineByEmailAndSdt(
+            @Param("loaiDon") String loaiDon,
+            @Param("email") String email,
+            @Param("sdt") String sdt);
+
     List<HoaDon> findByMaVanDonGhnNotNullAndTrangThaiNotIn(java.util.Collection<TrangThaiDonHang> trangThaiKetThuc);
 
     @Query("""

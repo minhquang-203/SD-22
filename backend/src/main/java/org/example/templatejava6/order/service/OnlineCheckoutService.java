@@ -305,6 +305,10 @@ public class OnlineCheckoutService {
                     "Đơn miễn phí không thể thanh toán qua VNPAY. Vui lòng chọn COD.",
                     "INVALID_PAYMENT_AMOUNT");
         }
+        if (isVnpay) {
+            // Giống khách login: hủy VNPay guest chưa trả (cùng email+SĐT) trước khi tạo đơn mới.
+            huyDonVnpayChuaThanhToanCuaGuest(request.getEmail(), request.getSdtNguoiNhan());
+        }
 
         String wardCode = coGiaTri(request.getToWardCode()) ? request.getToWardCode().trim() : null;
 
@@ -716,6 +720,25 @@ public class OnlineCheckoutService {
     private void huyDonVnpayChuaThanhToanCuaKhach(Integer idKhachHang) {
         List<HoaDon> donCu = hoaDonRepository
                 .findByIdKhachHang_IdAndLoaiDonOrderByNgayTaoDesc(idKhachHang, LOAI_DON_ONLINE);
+        for (HoaDon cu : donCu) {
+            if (onlineOrderLifecycleService.laVnpayChuaThanhToan(cu)) {
+                onlineOrderLifecycleService.huyDonChuaThanhToan(cu);
+            }
+        }
+    }
+
+    /**
+     * Guest không có id_khach_hang — nhận diện theo email + SĐT trên form đặt hàng.
+     * Hủy các đơn ONLINE VNPay chưa THANH_CONG trước khi tạo phiên thanh toán mới.
+     */
+    private void huyDonVnpayChuaThanhToanCuaGuest(String email, String sdt) {
+        String emailNorm = normalizeEmail(email);
+        String phone = sdt != null ? sdt.trim() : "";
+        if (emailNorm == null || emailNorm.isBlank() || phone.isBlank()) {
+            return;
+        }
+        List<HoaDon> donCu = hoaDonRepository.findGuestOnlineByEmailAndSdt(
+                LOAI_DON_ONLINE, emailNorm, phone);
         for (HoaDon cu : donCu) {
             if (onlineOrderLifecycleService.laVnpayChuaThanhToan(cu)) {
                 onlineOrderLifecycleService.huyDonChuaThanhToan(cu);

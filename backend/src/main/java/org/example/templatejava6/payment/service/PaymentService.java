@@ -36,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
@@ -97,6 +98,9 @@ public class PaymentService {
                 .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn.", "NOT_FOUND"));
         validateHoaDonCoTheThanhToan(hoaDon);
 
+        // Tạo link mới (retry / idempotency): đóng hết phiên chờ cũ để URL cũ không còn hiệu lực ghi nhận.
+        huyPhienThanhToanCho(hoaDon);
+
         PhuongThucThanhToan phuongThuc = resolvePhuongThucThanhToan(provider);
         hoaDon.setIdPhuongThucThanhToan(phuongThuc);
         hoaDonRepository.save(hoaDon);
@@ -130,6 +134,24 @@ public class PaymentService {
                 .transactionRef(result.getTransactionRef())
                 .paymentUrl(result.getPaymentUrl())
                 .build();
+    }
+
+    /** Đánh dấu thất bại mọi dòng CHO_THANH_TOAN của đơn — trước khi tạo phiên thanh toán mới. */
+    private void huyPhienThanhToanCho(HoaDon hoaDon) {
+        List<ThanhToanHoaDon> dangCho = thanhToanHoaDonRepository
+                .findByIdHoaDonAndTrangThaiOrderByThoiGianDesc(hoaDon, TRANG_THAI_CHO_THANH_TOAN);
+        if (dangCho.isEmpty()) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        for (ThanhToanHoaDon cu : dangCho) {
+            cu.setTrangThai(TRANG_THAI_THAT_BAI);
+            cu.setThoiGian(now);
+            thanhToanHoaDonRepository.save(cu);
+            String maGd = cu.getMaGiaoDich() != null ? cu.getMaGiaoDich() : ("#" + cu.getId());
+            ghiNhatKy(hoaDon, "HUY_PHIEN_THANH_TOAN",
+                    "Hủy phiên thanh toán chờ cũ: " + maGd + " (tạo link mới).");
+        }
     }
 
     @Transactional

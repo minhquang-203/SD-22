@@ -40,6 +40,12 @@ public class CreateShippingOrderRequest {
     /** So tien thu ho (COD). */
     private Long codAmount;
 
+    /**
+     * Ai tra phi van chuyen cho GHN: {@code 1} = shop, {@code 2} = nguoi nhan.
+     * Mac dinh 1 — SUNOVA da thu (hoac mien) phi ship tren hoa don, khong de GHN thu lai luc giao.
+     */
+    private Integer paymentTypeId;
+
     /** Gia tri khai gia. */
     private Long insuranceValue;
 

@@ -246,6 +246,13 @@ public class ReturnRequestService {
                 "/admin/tra-hang",
                 saved.getId(),
                 hoaDon.getMaHoaDon());
+        if (hoaDon.getIdKhachHang() != null) {
+            hoaDon.getIdKhachHang().getId();
+        }
+        orderRealtimeService.publishReturnUpdated(
+                hoaDon,
+                saved,
+                "Đơn " + hoaDon.getMaHoaDon() + " có yêu cầu trả hàng mới");
         return new YeuCauTraHangResponse(saved, anhUrls);
     }
 
@@ -320,6 +327,13 @@ public class ReturnRequestService {
             hoaDonRepository.save(hoaDon);
             orderRealtimeService.publishStatusChanged(hoaDon, trangThaiCu);
         }
+        if (hoaDon.getIdKhachHang() != null) {
+            hoaDon.getIdKhachHang().getId();
+        }
+        orderRealtimeService.publishReturnUpdated(
+                hoaDon,
+                saved,
+                "Yêu cầu trả hàng đơn " + hoaDon.getMaHoaDon() + " đã được duyệt");
 
         ghiNhatKy(hoaDon, "TRA_HANG_DA_DUYET", "Duyệt yêu cầu trả hàng — đơn chuyển TRA_HANG, chờ khách tạo vận đơn hoàn hàng");
         orderMailService.guiYeuCauTraHangDuocDuyet(hoaDon);
@@ -361,6 +375,10 @@ public class ReturnRequestService {
                 "/tra-cuu-don/tra-hang/" + saved.getId(),
                 hoaDonTuChoi.getId(),
                 hoaDonTuChoi.getMaHoaDon());
+        orderRealtimeService.publishReturnUpdated(
+                hoaDonTuChoi,
+                saved,
+                "Yêu cầu trả hàng đơn " + hoaDonTuChoi.getMaHoaDon() + " bị từ chối");
         return toResponse(saved);
     }
 
@@ -449,6 +467,14 @@ public class ReturnRequestService {
         YeuCauTraHang saved = yeuCauTraHangRepository.save(yc);
         ghiNhatKy(hoaDon, "TRA_HANG_DANG_HOAN", "Đã tạo vận đơn hoàn trả GHN: " + response.getOrderCode()
                 + (caLayHang != null ? " — " + caLayHang.getTitle() : ""));
+        // Realtime để admin/storefront thấy mã vận đơn hoàn ngay (không đợi job 5 phút).
+        if (hoaDon.getIdKhachHang() != null) {
+            hoaDon.getIdKhachHang().getId();
+        }
+        orderRealtimeService.publishReturnUpdated(
+                hoaDon,
+                saved,
+                "Đơn " + hoaDon.getMaHoaDon() + " đã tạo vận đơn hoàn: " + response.getOrderCode());
         return toResponse(saved);
     }
 
@@ -464,6 +490,7 @@ public class ReturnRequestService {
             throw new ApiException(
                     "Yêu cầu trả hàng chưa có vận đơn hoàn để đồng bộ.", "RETURN_NO_TRACKING");
         }
+        String trangThaiGhnCu = yc.getGhnTrangThaiTra();
         String trangThaiGhn = ghnTrackingService.track(maVanDon)
                 .map(GhnTrackingService.TrackingInfo::status)
                 .orElseThrow(() -> new ApiException(
@@ -481,6 +508,20 @@ public class ReturnRequestService {
                     "Vận đơn hoàn GHN " + maVanDon + " đã về shop ("
                             + GhnTrackingService.labelOf(trangThaiGhn)
                             + ") — chờ nhân viên xác nhận nhận hàng và phân loại lô TỐT/LỖI");
+        }
+
+        // Đẩy realtime khi trạng thái GHN hoàn đổi — giống đồng bộ vận đơn đi.
+        if (trangThaiGhnCu == null || !trangThaiGhnCu.equalsIgnoreCase(trangThaiGhn)) {
+            HoaDon hoaDon = saved.getIdHoaDon();
+            if (hoaDon != null) {
+                if (hoaDon.getIdKhachHang() != null) {
+                    hoaDon.getIdKhachHang().getId();
+                }
+                orderRealtimeService.publishReturnUpdated(
+                        hoaDon,
+                        saved,
+                        "Vận đơn hoàn " + maVanDon + ": " + GhnTrackingService.labelOf(trangThaiGhn));
+            }
         }
         return toResponse(saved);
     }
@@ -574,7 +615,14 @@ public class ReturnRequestService {
 
         // Luôn phát realtime khi admin xác nhận đã nhận hàng — kể cả khi đơn đã ở TRA_HANG
         // từ lúc duyệt — để storefront reload trạng thái trả hàng (DA_NHAN_HANG) và vận đơn.
+        if (hoaDon.getIdKhachHang() != null) {
+            hoaDon.getIdKhachHang().getId();
+        }
         orderRealtimeService.publishStatusChanged(hoaDon, trangThaiCu);
+        orderRealtimeService.publishReturnUpdated(
+                hoaDon,
+                saved,
+                "Đơn " + hoaDon.getMaHoaDon() + " đã nhận hàng trả");
 
         ghiNhatKy(hoaDon, "TRA_HANG_DA_NHAN_HANG",
                 ghiChu + " — ghi nhận phân loại lô TỐT/LỖI (chưa nhập kho), chờ quyết định hoàn tiền");

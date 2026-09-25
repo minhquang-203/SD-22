@@ -148,6 +148,8 @@ public class GhnOrderCreationService {
         } else {
             request.setToDistrictId(hoaDon.getGhnDistrictId());
         }
+        // Shop trả phí GHN; phí ship đã thu trên hóa đơn (hoặc FREE_SHIP do shop chịu).
+        request.setPaymentTypeId(1);
         request.setCodAmount(tinhCodAmount(hoaDon));
         request.setItems(buildItems(hoaDon));
         return request;
@@ -211,9 +213,10 @@ public class GhnOrderCreationService {
     }
 
     /**
-     * Voi don COD, thu ho tien hang (sau giam gia). Khong gom phi van chuyen vi GHN dang dat
-     * {@code payment_type_id = 2} (nguoi nhan tra phi ship truc tiep cho GHN), tranh thu trung phi.
-     * Voi don da thanh toan (VNPAY), khong thu ho.
+     * COD: thu hộ đúng {@code thanh_tien} trên hóa đơn (hàng − giảm + ship đã khóa lúc đặt).
+     * Vận đơn đi dùng {@code payment_type_id = 1} (shop trả phí GHN) nên không trừ
+     * {@code phi_van_chuyen} khỏi COD — tránh FREE_SHIP bị thu thiếu tiền hàng.
+     * VNPay / đã trả trước: không thu hộ.
      */
     private Long tinhCodAmount(HoaDon hoaDon) {
         boolean laCod = hoaDon.getIdPhuongThucThanhToan() != null
@@ -221,9 +224,9 @@ public class GhnOrderCreationService {
         if (!laCod || hoaDon.getThanhTien() == null) {
             return null;
         }
-        BigDecimal phiVanChuyen = hoaDon.getPhiVanChuyen() != null ? hoaDon.getPhiVanChuyen() : BigDecimal.ZERO;
-        BigDecimal tienThuHo = hoaDon.getThanhTien().subtract(phiVanChuyen).max(BigDecimal.ZERO);
-        return tienThuHo.longValue();
+        BigDecimal tienThuHo = hoaDon.getThanhTien().max(BigDecimal.ZERO);
+        long amount = tienThuHo.longValue();
+        return amount > 0 ? amount : null;
     }
 
     private List<CreateShippingOrderRequest.Item> buildItems(HoaDon hoaDon) {

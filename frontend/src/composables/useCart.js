@@ -151,15 +151,44 @@ async function refreshCart(options = {}) {
 }
 
 /**
- * Đăng nhập: không gộp giỏ/local guest vào tài khoản.
- * Bỏ giỏ localStorage, chỉ tải giỏ server của khách đang đăng nhập.
+ * Đăng nhập: nếu guest đang có giỏ local thì đẩy từng dòng lên giỏ server, rồi tải lại giỏ server.
+ * Chỉ đồng bộ giỏ hàng hiện tại — không đụng đơn hàng.
  */
 async function syncCartAfterLogin() {
   const idKhachHang = customerIdOrNull()
   if (!idKhachHang) return null
 
+  let localLines = []
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    if (Array.isArray(parsed) && parsed.length) {
+      localLines = parsed.map(normalizeLocalLine)
+    } else if (items.value.length) {
+      localLines = items.value.map((line) => ({ ...line }))
+    }
+  } catch {
+    localLines = items.value.map((line) => ({ ...line }))
+  }
+
+  if (localLines.length) {
+    for (const line of localLines) {
+      const idCtsp = Number(line.idChiTietSanPham)
+      const qty = Math.max(1, Number(line.soLuong) || 1)
+      if (!Number.isFinite(idCtsp) || idCtsp <= 0) continue
+      try {
+        await addGioHangItem({
+          idKhachHang,
+          idChiTietSanPham: idCtsp,
+          soLuong: qty,
+        })
+      } catch {
+        // Bỏ qua dòng lỗi (hết hàng / ngừng bán) — vẫn đồng bộ các dòng còn lại
+      }
+    }
+  }
+
   clearLocal()
-  items.value = []
   loadedCustomerId = null
   return refreshCart({ force: true })
 }

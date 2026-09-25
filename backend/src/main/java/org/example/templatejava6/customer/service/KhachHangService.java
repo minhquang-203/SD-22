@@ -43,13 +43,14 @@ public class KhachHangService {
 
     @Transactional(readOnly = true)
     public List<KhachHangResponse> getAll() {
-        return khachHangRepository.findAll().stream().map(KhachHangResponse::new).toList();
+        return khachHangRepository.findAllOrderByDiemDesc().stream().map(KhachHangResponse::new).toList();
     }
 
     @Transactional(readOnly = true)
     public Page<KhachHangResponse> phanTrang(Integer pageNo, Integer pageSize) {
+        // Sort nằm trong query (điểm DESC, id DESC) — không gắn Sort vào Pageable để tránh đè ORDER BY.
         Pageable pageable = PageRequest.of(pageNo, pageSize);
-        return khachHangRepository.findAll(pageable).map(KhachHangResponse::new);
+        return khachHangRepository.findAllOrderByDiemDesc(pageable).map(KhachHangResponse::new);
     }
 
     @Transactional(readOnly = true)

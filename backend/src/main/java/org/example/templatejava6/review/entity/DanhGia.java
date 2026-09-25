@@ -6,7 +6,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.example.templatejava6.product.entity.SanPham;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.LocalDateTime;
 
@@ -32,8 +31,6 @@ public class DanhGia {
 
     @Column(name = "so_sao")
     private Byte soSao;
-
-    @Nationalized
     @Column(name = "noi_dung", length = 500)
     private String noiDung;
 
@@ -42,8 +39,6 @@ public class DanhGia {
 
     @Column(name = "ngay_tao")
     private LocalDateTime ngayTao;
-
-    @Nationalized
     @Column(name = "phan_hoi_cua_shop", length = 500)
     private String phanHoiCuaShop;
 

@@ -1,6 +1,8 @@
 package org.example.templatejava6.order.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.example.templatejava6.common.util.ClientIpResolver;
 import org.example.templatejava6.order.model.request.HoaDonChuyenTrangThaiRequest;
 import org.example.templatejava6.order.model.request.HoaDonGhnWebhookRequest;
 import org.example.templatejava6.order.model.request.HoaDonRequest;
@@ -24,7 +26,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +61,7 @@ public class HoaDonController {
     public StorefrontOrderDetailResponse traCuuBangToken(
             @RequestParam String token,
             HttpServletRequest httpRequest) {
-        return hoaDonStorefrontService.traCuuBangToken(token, clientIp(httpRequest));
+        return hoaDonStorefrontService.traCuuBangToken(token, ClientIpResolver.forRateLimit(httpRequest));
     }
 
     /** Tra cứu thủ công bằng mã + email (POST để email không nằm query string). */
@@ -71,15 +72,19 @@ public class HoaDonController {
         return hoaDonStorefrontService.traCuuCongKhai(
                 request.getMa(),
                 request.getEmail(),
-                clientIp(httpRequest));
+                ClientIpResolver.forRateLimit(httpRequest));
     }
 
-    private static String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
+    /** Khách vãng lai hủy đơn — chứng minh sở hữu bằng tracking token. */
+    @PostMapping("/tra-cuu/{token}/huy")
+    public StorefrontOrderDetailResponse huyDonBangToken(
+            @PathVariable String token,
+            @RequestBody(required = false) HoaDonTuChoiRequest request,
+            HttpServletRequest httpRequest) {
+        return hoaDonStorefrontService.huyDonBangToken(
+                token,
+                request != null ? request.getGhiChu() : null,
+                ClientIpResolver.forRateLimit(httpRequest));
     }
 
     @PostMapping("/cua-toi/{id}/huy")
