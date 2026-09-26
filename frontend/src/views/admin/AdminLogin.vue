@@ -39,7 +39,7 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="admin-login-page">
+  <div class="admin-login-page admin-shell">
     <div class="admin-login-card">
       <div class="admin-login-card__brand">
         <AppLogo variant="dark" :size="48" />

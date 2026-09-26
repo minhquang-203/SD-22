@@ -18,9 +18,11 @@ import org.example.templatejava6.order.entity.ThanhToanHoaDon;
 import org.example.templatejava6.order.model.request.GuestCheckoutItemRequest;
 import org.example.templatejava6.order.model.request.GuestCheckoutRequest;
 import org.example.templatejava6.order.model.request.GuestTinhGiaRequest;
+import org.example.templatejava6.order.model.request.GiaHienTaiRequest;
 import org.example.templatejava6.order.model.request.HuyDonOnlineRequest;
 import org.example.templatejava6.order.model.request.OnlineCheckoutRequest;
 import org.example.templatejava6.order.model.request.OnlineTinhGiaRequest;
+import org.example.templatejava6.order.model.response.GiaHienTaiItemResponse;
 import org.example.templatejava6.order.model.response.HoaDonChiTietResponse;
 import org.example.templatejava6.order.model.response.HoaDonDetailResponse;
 import org.example.templatejava6.order.model.response.HoaDonResponse;
@@ -57,6 +59,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -187,6 +190,16 @@ public class OnlineCheckoutService {
         if (thanhTien.compareTo(BigDecimal.ZERO) < 0) {
             thanhTien = BigDecimal.ZERO;
         }
+        checkoutPricingService.assertTongTienKhachThay(
+                request.getTongTienKhachThay(),
+                thanhTien,
+                lines.stream().map(LineCalc::chiTietSanPham).toList(),
+                cts -> lines.stream()
+                        .filter(l -> l.chiTietSanPham().getId().equals(cts.getId()))
+                        .map(LineCalc::donGia)
+                        .findFirst()
+                        .orElse(checkoutPricingService.resolveDonGia(cts, saleMap)),
+                checkoutPricingService.toGiaKhachMap(request.getDongGias()));
         if (isVnpay && thanhTien.compareTo(BigDecimal.ZERO) <= 0) {
             throw new ApiException(
                     "Đơn miễn phí không thể thanh toán qua VNPAY. Vui lòng chọn COD.",
@@ -299,6 +312,24 @@ public class OnlineCheckoutService {
         if (thanhTien.compareTo(BigDecimal.ZERO) < 0) {
             thanhTien = BigDecimal.ZERO;
         }
+        Map<Integer, BigDecimal> giaKhachMap = new LinkedHashMap<>();
+        if (request.getItems() != null) {
+            for (GuestCheckoutItemRequest item : request.getItems()) {
+                if (item != null && item.getIdChiTietSanPham() != null && item.getGiaKhachThay() != null) {
+                    giaKhachMap.put(item.getIdChiTietSanPham(), item.getGiaKhachThay());
+                }
+            }
+        }
+        checkoutPricingService.assertTongTienKhachThay(
+                request.getTongTienKhachThay(),
+                thanhTien,
+                lines.stream().map(LineCalc::chiTietSanPham).toList(),
+                cts -> lines.stream()
+                        .filter(l -> l.chiTietSanPham().getId().equals(cts.getId()))
+                        .map(LineCalc::donGia)
+                        .findFirst()
+                        .orElse(checkoutPricingService.resolveDonGia(cts, saleMap)),
+                giaKhachMap);
         boolean isVnpay = MA_VNPAY.equals(maPhuongThuc);
         if (isVnpay && thanhTien.compareTo(BigDecimal.ZERO) <= 0) {
             throw new ApiException(
@@ -369,6 +400,57 @@ public class OnlineCheckoutService {
             payment = paymentService.taoThanhToan(MA_VNPAY, paymentRequest, clientIp);
         }
         return OnlineCheckoutResponse.from(hoaDon, payment);
+    }
+
+    /**
+     * API nhẹ: nhận danh sách idChiTietSanPham → giá hiện tại (kể cả đợt giảm), tồn, trạng thái bán.
+     * Dùng để làm mới giá giỏ guest / khi tab focus lại.
+     */
+    @Transactional(readOnly = true)
+    public List<GiaHienTaiItemResponse> giaHienTai(GiaHienTaiRequest request) {
+        Map<Integer, VariantSaleInfo> saleMap = checkoutPricingService.loadActiveSales();
+        List<GiaHienTaiItemResponse> result = new ArrayList<>();
+        LinkedHashSet<Integer> seen = new LinkedHashSet<>();
+        for (Integer id : request.getIdsChiTietSanPham()) {
+            if (id == null || !seen.add(id)) {
+                continue;
+            }
+            ChiTietSanPham cts = chiTietSanPhamRepository.findById(id).orElse(null);
+            if (cts == null) {
+                result.add(GiaHienTaiItemResponse.builder()
+                        .idChiTietSanPham(id)
+                        .giaBan(BigDecimal.ZERO)
+                        .giaGoc(BigDecimal.ZERO)
+                        .soLuongTon(0)
+                        .trangThaiBienThe(false)
+                        .trangThaiSanPham(false)
+                        .conBan(false)
+                        .build());
+                continue;
+            }
+            BigDecimal giaGoc = cts.getGiaBan() != null ? cts.getGiaBan() : BigDecimal.ZERO;
+            BigDecimal giaBan = checkoutPricingService.resolveDonGia(cts, saleMap);
+            if (giaBan == null) {
+                giaBan = giaGoc;
+            }
+            VariantSaleInfo sale = saleMap.get(cts.getId());
+            boolean bienTheOk = Boolean.TRUE.equals(cts.getTrangThai());
+            boolean sanPhamOk = cts.getSanPham() == null || Boolean.TRUE.equals(cts.getSanPham().getTrangThai());
+            int ton = cts.getSoLuongTon() != null ? cts.getSoLuongTon() : 0;
+            result.add(GiaHienTaiItemResponse.builder()
+                    .idChiTietSanPham(cts.getId())
+                    .idSanPham(cts.getSanPham() != null ? cts.getSanPham().getId() : null)
+                    .tenSanPham(cts.getSanPham() != null ? cts.getSanPham().getTen() : null)
+                    .giaBan(giaBan)
+                    .giaGoc(sale != null && sale.getGiaGoc() != null ? sale.getGiaGoc() : giaGoc)
+                    .phanTramGiam(sale != null ? sale.getPhanTramGiam() : null)
+                    .soLuongTon(ton)
+                    .trangThaiBienThe(bienTheOk)
+                    .trangThaiSanPham(sanPhamOk)
+                    .conBan(bienTheOk && sanPhamOk && ton > 0)
+                    .build());
+        }
+        return result;
     }
 
     /** Tính tạm giá + phí vận chuyển cho khách chưa đăng nhập (không voucher). */

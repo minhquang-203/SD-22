@@ -4,6 +4,7 @@ import { Icon } from '@iconify/vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { productImageUrl } from '@/utils/productImage'
 import { formatDiscountPercent, formatPriceRange } from '@/utils/formatVND'
+import { formatSpfPaBadge } from '@/utils/formatChiSo'
 
 const props = defineProps({
   product: { type: Object, required: true },
@@ -53,10 +54,7 @@ function quickAdd(e) {
 }
 
 function spfLabel() {
-  const parts = []
-  if (props.product.chiSoSpf) parts.push(`SPF ${props.product.chiSoSpf}`)
-  if (props.product.chiSoPa) parts.push(`PA ${props.product.chiSoPa}`)
-  return parts.join(' · ')
+  return formatSpfPaBadge(props.product.chiSoSpf, props.product.chiSoPa)
 }
 </script>
 

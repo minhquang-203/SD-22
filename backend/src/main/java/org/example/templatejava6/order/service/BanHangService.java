@@ -221,6 +221,18 @@ public class BanHangService {
         res.setTienGiamGia(tienGiamGia);
         res.setThanhTien(thanhTien);
         res.setMaPhieuGiamGia(maPhieu);
+        java.util.List<PosTinhGiaResponse.PosDongGia> dongGias = new java.util.ArrayList<>();
+        for (LineCalc line : lines) {
+            PosTinhGiaResponse.PosDongGia dong = new PosTinhGiaResponse.PosDongGia();
+            dong.setIdChiTietSanPham(line.cts.getId());
+            dong.setDonGia(line.donGia);
+            VariantSaleInfo sale = saleMap.get(line.cts.getId());
+            dong.setGiaGoc(sale != null && sale.getGiaGoc() != null ? sale.getGiaGoc() : line.cts.getGiaBan());
+            dong.setSoLuongTon(line.cts.getSoLuongTon());
+            dong.setTrangThai(line.cts.getTrangThai());
+            dongGias.add(dong);
+        }
+        res.setDongGias(dongGias);
         return res;
     }
 
@@ -385,6 +397,27 @@ public class BanHangService {
         BigDecimal thanhTien = tongTien.subtract(tienGiamGia);
         if (thanhTien.compareTo(BigDecimal.ZERO) < 0) {
             thanhTien = BigDecimal.ZERO;
+        }
+
+        Map<Integer, BigDecimal> giaKhachMap = new java.util.HashMap<>();
+        if (req.getItems() != null) {
+            for (TaoDonTaiQuayRequest.ItemRequest item : req.getItems()) {
+                if (item != null && item.getIdChiTietSanPham() != null && item.getGiaKhachThay() != null) {
+                    giaKhachMap.put(item.getIdChiTietSanPham(), item.getGiaKhachThay());
+                }
+            }
+        }
+        if (req.getTongTienKhachThay() != null || !giaKhachMap.isEmpty()) {
+            checkoutPricingService.assertTongTienKhachThay(
+                    req.getTongTienKhachThay() != null ? req.getTongTienKhachThay() : thanhTien,
+                    thanhTien,
+                    lines.stream().map(l -> l.cts).toList(),
+                    cts -> lines.stream()
+                            .filter(l -> l.cts.getId().equals(cts.getId()))
+                            .map(l -> l.donGia)
+                            .findFirst()
+                            .orElse(checkoutPricingService.resolveDonGia(cts, saleMap)),
+                    giaKhachMap);
         }
 
         boolean isVnpay = MA_VNPAY.equals(pttt.getMa());

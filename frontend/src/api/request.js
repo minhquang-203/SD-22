@@ -57,12 +57,8 @@ request.interceptors.request.use((config) => {
       attachBearer(config, getCustomerToken())
     }
   } else if (url.includes('/yeu-cau-mua-so-luong-lon')) {
-    const method = String(config.method || 'get').toLowerCase()
-    if (method === 'post') {
-      attachBearer(config, getCustomerToken())
-    } else {
-      attachBearer(config, getAdminToken())
-    }
+    // POST công khai: gắn token khách nếu có (để BE biết đã đăng nhập)
+    attachBearer(config, getCustomerToken())
   } else if (isCustomerApi) {
     attachBearer(config, getCustomerToken())
   } else {
@@ -144,7 +140,16 @@ request.interceptors.response.use(
       return Promise.reject(msg)
     }
 
-    return Promise.reject(formatApiError(error.response.data))
+    const data = error.response.data
+    if (data?.code === 'PRICE_CHANGED') {
+      return Promise.reject({
+        code: 'PRICE_CHANGED',
+        message: formatApiError(data),
+        details: data.details || {},
+      })
+    }
+
+    return Promise.reject(formatApiError(data))
   },
 )
 

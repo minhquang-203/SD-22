@@ -8,7 +8,7 @@ import { GIOI_HAN_MUA_LE } from '@/constants/cartLimits'
 import { useAuth } from '@/composables/useAuth'
 import { closeBulkOrderModal, useBulkOrderModal } from '@/composables/useBulkOrderModal'
 import { confirm } from '@/composables/useConfirm'
-import { getPhoneValidationError, normalizePhoneDigits } from '@/utils/phone'
+import { normalizePhoneDigits } from '@/utils/phone'
 import { productImageUrl } from '@/utils/productImage'
 import { variantLabel } from '@/composables/useCart'
 
@@ -419,7 +419,11 @@ function validateField(field) {
   }
   if (field === 'soDienThoai') {
     form.soDienThoai = normalizePhoneDigits(form.soDienThoai)
-    errors.soDienThoai = getPhoneValidationError(form.soDienThoai) || ''
+    const d = form.soDienThoai
+    if (!d) errors.soDienThoai = 'Vui lòng nhập số điện thoại'
+    else if (!/^0\d{9}$/.test(d)) {
+      errors.soDienThoai = 'Số điện thoại không hợp lệ (10 chữ số, bắt đầu bằng 0)'
+    } else errors.soDienThoai = ''
   }
   if (field === 'email') {
     form.email = String(form.email || '').trim().toLowerCase()
@@ -537,7 +541,9 @@ async function onSubmit() {
       lower.includes('timeout') ||
       lower.includes('không kết nối') ||
       lower.includes('khong ket noi')
-    formError.value = isNetwork ? 'Chưa gửi được, vui lòng thử lại' : msg
+    formError.value = isNetwork
+      ? 'Chưa gửi được yêu cầu, vui lòng thử lại hoặc gọi hotline 1900 6868'
+      : msg
   } finally {
     submitting.value = false
   }

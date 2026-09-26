@@ -6,9 +6,11 @@ import org.example.templatejava6.common.security.SecurityUtils;
 import org.example.templatejava6.common.util.PaginationUtil;
 import org.example.templatejava6.order.model.request.GuestCheckoutRequest;
 import org.example.templatejava6.order.model.request.GuestTinhGiaRequest;
+import org.example.templatejava6.order.model.request.GiaHienTaiRequest;
 import org.example.templatejava6.order.model.request.HuyDonOnlineRequest;
 import org.example.templatejava6.order.model.request.OnlineCheckoutRequest;
 import org.example.templatejava6.order.model.request.OnlineTinhGiaRequest;
+import org.example.templatejava6.order.model.response.GiaHienTaiItemResponse;
 import org.example.templatejava6.order.model.response.HoaDonDetailResponse;
 import org.example.templatejava6.order.model.response.HoaDonResponse;
 import org.example.templatejava6.order.model.response.OnlineCheckoutResponse;
@@ -72,6 +74,11 @@ public class OnlineCheckoutController {
     @PostMapping("/guest/tinh-gia")
     public OnlineTinhGiaResponse tinhGiaGuest(@Valid @RequestBody GuestTinhGiaRequest request) {
         return onlineCheckoutService.tinhGiaGuest(request);
+    }
+
+    @PostMapping("/guest/gia-hien-tai")
+    public List<GiaHienTaiItemResponse> giaHienTai(@Valid @RequestBody GiaHienTaiRequest request) {
+        return onlineCheckoutService.giaHienTai(request);
     }
 
     @PostMapping("/guest/checkout")

@@ -2,6 +2,7 @@
 import { NPopover } from 'naive-ui'
 import { Icon } from '@iconify/vue'
 import { formatDate } from '@/utils/format'
+import { formatPa, formatSpf } from '@/utils/formatChiSo'
 import { resolveProductImageUrl } from '@/utils/productForm'
 import StatusDot from '@/components/ui/StatusDot.vue'
 
@@ -111,9 +112,9 @@ function formatLoaiChongNang(value) {
             </td>
             <td>
               <div class="flex flex-wrap gap-1">
-                <span v-if="item.chiSoSpf" class="soleil-pill--spf">{{ item.chiSoSpf }}</span>
-                <span v-if="item.chiSoPa" class="soleil-pill--spf">{{ item.chiSoPa }}</span>
-                <span v-if="!item.chiSoSpf && !item.chiSoPa" class="text-[rgba(30,21,16,0.35)]">—</span>
+                <span v-if="formatSpf(item.chiSoSpf)" class="soleil-pill--spf">{{ formatSpf(item.chiSoSpf) }}</span>
+                <span v-if="formatPa(item.chiSoPa)" class="soleil-pill--spf">{{ formatPa(item.chiSoPa) }}</span>
+                <span v-if="!formatSpf(item.chiSoSpf) && !formatPa(item.chiSoPa)" class="text-[rgba(30,21,16,0.35)]">—</span>
               </div>
             </td>
             <td class="text-xs text-[rgba(30,21,16,0.55)]">{{ formatDate(item.ngayTao) }}</td>

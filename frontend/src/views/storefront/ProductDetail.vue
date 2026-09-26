@@ -15,6 +15,7 @@ import {
 import { useCart, GIOI_HAN_MUA_LE } from '@/composables/useCart'
 import { openBulkOrderModal } from '@/composables/useBulkOrderModal'
 import { formatDiscountPercent, formatVND } from '@/utils/formatVND'
+import { formatSpfPaDetail } from '@/utils/formatChiSo'
 import { productImageUrl } from '@/utils/productImage'
 
 const route = useRoute()
@@ -479,8 +480,10 @@ onUnmounted(() => {
 
           <table class="sf-spec-table">
             <tbody>
-              <tr v-if="product.chiSoSpf"><td>SPF</td><td>{{ product.chiSoSpf }}</td></tr>
-              <tr v-if="product.chiSoPa"><td>PA</td><td>{{ product.chiSoPa }}</td></tr>
+              <tr v-if="formatSpfPaDetail(product.chiSoSpf, product.chiSoPa)">
+                <td>Chỉ số</td>
+                <td>{{ formatSpfPaDetail(product.chiSoSpf, product.chiSoPa) }}</td>
+              </tr>
               <tr v-if="product.loaiChongNang"><td>Loại chống nắng</td><td>{{ loaiChongNangLabel(product.loaiChongNang) }}</td></tr>
               <tr><td>Kháng nước</td><td>{{ product.khangNuoc ? 'Có' : 'Không' }}</td></tr>
               <tr v-if="product.tenDangSanPham"><td>Dạng sản phẩm</td><td>{{ product.tenDangSanPham }}</td></tr>

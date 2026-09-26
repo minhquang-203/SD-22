@@ -1,6 +1,4 @@
 /* Product admin — layout concept (khác phiếu/đợt) */
-@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
-
 .product-admin {
   --pa-ink: #1c1917;
   --pa-muted: #78716c;
@@ -16,7 +14,8 @@
   --pa-radius: 6px;
   --tbl-row-h: 56px;
 
-  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+  font-family: var(--admin-font, 'Be Vietnam Pro', system-ui, sans-serif);
+  font-variant-numeric: tabular-nums;
   color: var(--pa-ink);
   display: flex;
   flex-direction: column;

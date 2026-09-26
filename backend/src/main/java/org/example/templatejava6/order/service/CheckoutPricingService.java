@@ -3,7 +3,10 @@ package org.example.templatejava6.order.service;
 import org.example.templatejava6.common.entity.PhieuGiamGia;
 import org.example.templatejava6.common.enums.LoaiPhieuGiamGia;
 import org.example.templatejava6.common.exception.ApiException;
+import org.example.templatejava6.order.model.request.DongGiaKhachThayRequest;
+import org.example.templatejava6.order.model.response.PriceChangedLineResponse;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
+import org.example.templatejava6.product.entity.SanPham;
 import org.example.templatejava6.voucher.model.response.VariantSaleInfo;
 import org.example.templatejava6.voucher.service.DotGiamGiaService;
 import org.springframework.stereotype.Service;
@@ -12,7 +15,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 @Service
 public class CheckoutPricingService {
@@ -37,6 +45,98 @@ public class CheckoutPricingService {
             return sale.getGiaSauGiam();
         }
         return chiTietSanPham.getGiaBan();
+    }
+
+    /**
+     * So sánh tổng khách đang thấy với tổng server vừa tính lại từ DB.
+     * Nếu lệch → 409 PRICE_CHANGED kèm danh sách dòng đổi giá (không tạo đơn).
+     */
+    public void assertTongTienKhachThay(
+            BigDecimal tongTienKhachThay,
+            BigDecimal tongTienServer,
+            List<? extends ChiTietSanPham> variants,
+            Function<ChiTietSanPham, BigDecimal> donGiaServerFn,
+            Map<Integer, BigDecimal> giaKhachTheoVariant) {
+        BigDecimal server = money(tongTienServer);
+        BigDecimal client = money(tongTienKhachThay);
+        Map<Integer, BigDecimal> clientPrices = giaKhachTheoVariant != null
+                ? giaKhachTheoVariant
+                : Map.of();
+
+        List<PriceChangedLineResponse> changedLines = new ArrayList<>();
+        if (variants != null) {
+            for (ChiTietSanPham cts : variants) {
+                if (cts == null || cts.getId() == null) {
+                    continue;
+                }
+                BigDecimal giaMoi = money(donGiaServerFn.apply(cts));
+                BigDecimal giaCu = clientPrices.containsKey(cts.getId())
+                        ? money(clientPrices.get(cts.getId()))
+                        : null;
+                if (giaCu != null && giaCu.compareTo(giaMoi) != 0) {
+                    changedLines.add(new PriceChangedLineResponse(
+                            cts.getId(), tenSanPham(cts), giaCu, giaMoi));
+                }
+            }
+        }
+
+        boolean totalMismatch = tongTienKhachThay == null || client.compareTo(server) != 0;
+        if (!totalMismatch && changedLines.isEmpty()) {
+            return;
+        }
+
+        if (changedLines.isEmpty() && variants != null) {
+            for (ChiTietSanPham cts : variants) {
+                if (cts == null || cts.getId() == null) {
+                    continue;
+                }
+                BigDecimal giaMoi = money(donGiaServerFn.apply(cts));
+                BigDecimal giaCu = clientPrices.containsKey(cts.getId())
+                        ? money(clientPrices.get(cts.getId()))
+                        : giaMoi;
+                if (giaCu.compareTo(giaMoi) != 0) {
+                    changedLines.add(new PriceChangedLineResponse(
+                            cts.getId(), tenSanPham(cts), giaCu, giaMoi));
+                }
+            }
+        }
+
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("changedLines", changedLines);
+        details.put("tongTienMoi", server);
+        throw new ApiException(
+                "Giá sản phẩm đã thay đổi. Vui lòng kiểm tra lại trước khi thanh toán.",
+                "PRICE_CHANGED",
+                details);
+    }
+
+    public Map<Integer, BigDecimal> toGiaKhachMap(Iterable<? extends DongGiaKhachThayRequest> dongGias) {
+        Map<Integer, BigDecimal> map = new HashMap<>();
+        if (dongGias == null) {
+            return map;
+        }
+        for (DongGiaKhachThayRequest dong : dongGias) {
+            if (dong == null || dong.getIdChiTietSanPham() == null || dong.getGiaKhachThay() == null) {
+                continue;
+            }
+            map.put(dong.getIdChiTietSanPham(), dong.getGiaKhachThay());
+        }
+        return map;
+    }
+
+    public static BigDecimal money(BigDecimal value) {
+        if (value == null) {
+            return BigDecimal.ZERO.setScale(0, RoundingMode.HALF_UP);
+        }
+        return value.setScale(0, RoundingMode.HALF_UP);
+    }
+
+    private static String tenSanPham(ChiTietSanPham cts) {
+        SanPham sp = cts.getSanPham();
+        if (sp != null && sp.getTen() != null && !sp.getTen().isBlank()) {
+            return sp.getTen();
+        }
+        return cts.getSku() != null ? cts.getSku() : ("#" + cts.getId());
     }
 
     /**

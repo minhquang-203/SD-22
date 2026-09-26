@@ -23,7 +23,7 @@ public class TaoYeuCauMuaSoLuongLonRequest {
     private String hoTen;
 
     @NotBlank(message = "Số điện thoại bắt buộc")
-    @Pattern(regexp = "^(0[3|5|7|8|9])[0-9]{8}$", message = "Số điện thoại không hợp lệ (10 chữ số, bắt đầu bằng 0)")
+    @Pattern(regexp = "^0\\d{9}$", message = "Số điện thoại không hợp lệ (10 chữ số, bắt đầu bằng 0)")
     private String soDienThoai;
 
     @NotBlank(message = "Email bắt buộc")

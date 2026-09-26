@@ -344,7 +344,7 @@ const deleteRule = async (id) => {
 </script>
 
 <style scoped>
-.rule-manager-container { padding: 24px; background-color: #fcfaf7; min-height: 100vh; color: #333; font-family: system-ui, sans-serif; }
+.rule-manager-container { padding: 24px; background-color: #fcfaf7; min-height: 100vh; color: #333; font-family: var(--admin-font, 'Be Vietnam Pro', system-ui, sans-serif); }
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 1px solid #eae2d8; padding-bottom: 16px; }
 .page-title { font-size: 26px; font-weight: 600; color: #2a201b; margin: 0 0 6px 0; }
 .page-subtitle { font-size: 14px; color: #8a7e75; margin: 0; }

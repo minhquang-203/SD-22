@@ -10,19 +10,16 @@ const props = defineProps({
 const route = useRoute()
 const router = useRouter()
 const hasError = ref(false)
-const errorInfo = ref('')
 
 watch(
   () => route.fullPath,
   () => {
     hasError.value = false
-    errorInfo.value = ''
   },
 )
 
 onErrorCaptured((err) => {
   hasError.value = true
-  errorInfo.value = err?.message ? String(err.message) : 'Lỗi không xác định'
   console.error('[ErrorBoundary]', err)
   return false
 })
@@ -48,7 +45,6 @@ function goHome() {
       <p class="app-error-boundary__msg">
         Đã xảy ra lỗi khi hiển thị nội dung. Bạn có thể tải lại trang hoặc quay về trang chủ.
       </p>
-      <p v-if="errorInfo" class="app-error-boundary__detail">{{ errorInfo }}</p>
       <div class="app-error-boundary__actions">
         <button type="button" class="app-error-boundary__btn app-error-boundary__btn--ghost" @click="reloadPage">
           Tải lại
@@ -94,13 +90,6 @@ function goHome() {
   font-size: 0.95rem;
   line-height: 1.5;
   color: #5a5248;
-}
-
-.app-error-boundary__detail {
-  margin: 0.75rem 0 0;
-  font-size: 0.78rem;
-  color: #8a7a6a;
-  word-break: break-word;
 }
 
 .app-error-boundary__actions {
