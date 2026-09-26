@@ -1,3 +1,11 @@
+import {
+  PA_OPTIONS,
+  SPF_OPTIONS,
+  normalizeSpfForSelect,
+} from '@/constants/chiSoChongNang'
+
+export { PA_OPTIONS, SPF_OPTIONS } from '@/constants/chiSoChongNang'
+
 /**
  * Chuẩn hóa phần SKU: bỏ dấu, viết hoa, khoảng trắng → "-", chỉ giữ A-Z 0-9 và "-".
  */
@@ -73,14 +81,11 @@ export function suggestVariantLabel(tenSanPham, dungTichMl, tenMauSac) {
   return label
 }
 
-/** 4 mức PA cố định trên form */
-export const PA_OPTIONS = ['PA+', 'PA++', 'PA+++', 'PA++++']
-
 /** Bóc prefix SPF khỏi giá trị DB (SPF50+ → 50+; 50+ giữ nguyên). */
 export function stripSpfPrefix(value) {
   const raw = String(value ?? '').trim()
   if (!raw) return ''
-  return raw.replace(/^spf/i, '').trim()
+  return raw.replace(/^spf\s*/i, '').trim()
 }
 
 /** Chỉ giữ số và dấu + cho phần nhập SPF. */
@@ -112,7 +117,7 @@ export function createEmptyProductForm() {
     idThuongHieu: null,
     idDanhMuc: null,
     idDangSanPham: null,
-    /** Form chỉ giữ phần sau SPF (VD 50+); khi lưu mới ghép SPF */
+    /** Giá trị đầy đủ gửi backend: SPF50+, PA++++ */
     chiSoSpf: '',
     chiSoPa: '',
     loaiChongNang: '',
@@ -139,7 +144,7 @@ export function detailToForm(detail, mauSacOptions = []) {
     idThuongHieu: detail.idThuongHieu ?? null,
     idDanhMuc: detail.idDanhMuc ?? null,
     idDangSanPham: detail.idDangSanPham ?? null,
-    chiSoSpf: sanitizeSpfSuffix(stripSpfPrefix(detail.chiSoSpf)),
+    chiSoSpf: normalizeSpfForSelect(detail.chiSoSpf),
     chiSoPa: normalizePaForSelect(detail.chiSoPa),
     loaiChongNang: detail.loaiChongNang || '',
     khangNuoc: detail.khangNuoc ?? false,
@@ -220,12 +225,15 @@ export function validateProductForm(form) {
   if (!form.idDanhMuc) fields.idDanhMuc = 'Vui lòng chọn danh mục'
   if (!form.idDangSanPham) fields.idDangSanPham = 'Vui lòng chọn dạng sản phẩm'
 
-  const spfRaw = sanitizeSpfSuffix(form.chiSoSpf)
-  if (!spfRaw) fields.chiSoSpf = 'Chỉ số SPF không được để trống'
-  else if (/[^0-9+]/.test(spfRaw)) fields.chiSoSpf = 'Chỉ số SPF chỉ gồm số và dấu + (VD: 50+ hoặc 30)'
+  const spfValue = composeSpfForSave(form.chiSoSpf)
+  if (!spfValue) {
+    fields.chiSoSpf = 'Vui lòng chọn chỉ số SPF'
+  } else if (!SPF_OPTIONS.some((o) => o.value === spfValue)) {
+    fields.chiSoSpf = 'Vui lòng chọn chỉ số SPF'
+  }
 
   if (!form.chiSoPa) fields.chiSoPa = 'Vui lòng chọn chỉ số PA'
-  else if (!PA_OPTIONS.includes(form.chiSoPa)) fields.chiSoPa = 'Vui lòng chọn chỉ số PA hợp lệ'
+  else if (!PA_OPTIONS.includes(form.chiSoPa)) fields.chiSoPa = 'Vui lòng chọn chỉ số PA'
 
   if (!form.loaiChongNang) fields.loaiChongNang = 'Vui lòng chọn loại chống nắng'
   else if (!['VAT_LY', 'HOA_HOC', 'LAI'].includes(form.loaiChongNang)) {

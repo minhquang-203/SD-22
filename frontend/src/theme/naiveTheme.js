@@ -1,5 +1,6 @@
 export const naiveThemeOverrides = {
   common: {
+    fontFamily: "'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif",
     primaryColor: '#C9A96E',
     primaryColorHover: '#D4B884',
     primaryColorPressed: '#9E7340',

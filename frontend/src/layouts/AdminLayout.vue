@@ -16,7 +16,7 @@ const isPosPage = computed(() => route.path === '/admin/pos' || route.path.endsW
 </script>
 
 <template>
-  <div class="h-full flex overflow-hidden bg-[var(--admin-bg)]">
+  <div class="h-full flex overflow-hidden bg-[var(--admin-bg)] admin-shell">
     <AdminSidebar :collapsed="collapsed" />
     <div class="flex-1 flex flex-col min-w-0">
       <AdminHeader

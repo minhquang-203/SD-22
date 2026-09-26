@@ -151,8 +151,8 @@ const trustItems = [
 async function loadWeather() {
   weatherLoading.value = true
   try {
-    const res = await axios.get('http://localhost:8080/api/v1/weather/current', {
-      params: { city: 'Hà Nội' },
+    const res = await axios.get('/api/v1/weather/current', {
+      params: { city: 'Hanoi' },
     })
     weather.value = res.data.weather
     isHighUvAlert.value = res.data.isHighAlert

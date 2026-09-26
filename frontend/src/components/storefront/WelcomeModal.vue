@@ -28,7 +28,7 @@ async function loadUv() {
   uvIndex.value = null
   try {
     const res = await axios.get('/api/v1/weather/current', {
-      params: { city: 'Hà Nội' },
+      params: { city: 'Hanoi' },
       timeout: 8000,
     })
     const value = res.data?.weather?.uvIndex

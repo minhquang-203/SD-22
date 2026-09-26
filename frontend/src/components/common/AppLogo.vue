@@ -77,7 +77,7 @@ const taglineStyle = computed(() => ({
 }
 
 .app-logo__title {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: var(--admin-font, 'Be Vietnam Pro', system-ui, sans-serif);
   font-weight: 600;
   letter-spacing: 0.14em;
   line-height: 1;
@@ -85,7 +85,7 @@ const taglineStyle = computed(() => ({
 }
 
 .app-logo__tagline {
-  font-family: 'DM Sans', sans-serif;
+  font-family: var(--admin-font, 'Be Vietnam Pro', system-ui, sans-serif);
   font-size: 9px;
   font-weight: 400;
   letter-spacing: 0.22em;

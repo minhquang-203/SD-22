@@ -495,14 +495,14 @@ onMounted(() => {
 // ===============================================
 const pieSeries = ref([]);
 const pieOptions = ref({
-  chart: { type: 'pie', fontFamily: 'Inter' },
+  chart: { type: 'pie', fontFamily: 'Be Vietnam Pro, system-ui, sans-serif' },
   labels: [],
   colors: ['#4a3319', '#73522f', '#9a754b', '#c29d71', '#e0c8aa'],
   noData: { 
     text: "Chưa có dữ liệu bán hàng", 
     align: 'center', 
     verticalAlign: 'middle', 
-    style: { color: '#8c6b4a', fontSize: '14px', fontFamily: 'Inter' } 
+    style: { color: '#8c6b4a', fontSize: '14px', fontFamily: 'Be Vietnam Pro, system-ui, sans-serif' } 
   },
   dataLabels: { enabled: true, formatter: function (val) { return Math.round(val) + "%"; } },
   legend: { show: true, position: 'bottom' }
@@ -513,7 +513,7 @@ const pieOptions = ref({
 // ===============================================
 const funnelSeries = ref([]);
 const funnelOptions = ref({
-  chart: { type: 'donut', fontFamily: 'Inter' },
+  chart: { type: 'donut', fontFamily: 'Be Vietnam Pro, system-ui, sans-serif' },
   labels: [],
   // Màu sắc: Hoàn thành (xanh lá), Đã hủy (đỏ), Chờ xác nhận (vàng), Đang giao (cam)
   colors: ['#10b981', '#ef4444', '#f59e0b', '#f97316', '#3b82f6'],
@@ -521,7 +521,7 @@ const funnelOptions = ref({
     text: "Chưa có đơn hàng Online", 
     align: 'center', 
     verticalAlign: 'middle', 
-    style: { color: '#8c6b4a', fontSize: '14px', fontFamily: 'Inter' } 
+    style: { color: '#8c6b4a', fontSize: '14px', fontFamily: 'Be Vietnam Pro, system-ui, sans-serif' } 
   },
   dataLabels: { enabled: true, formatter: function (val) { return Math.round(val) + "%"; } },
   legend: { show: true, position: 'bottom' },
@@ -575,7 +575,7 @@ const barOptions = computed(() => {
   }
 
   return {
-    chart: { toolbar: { show: false }, fontFamily: 'Inter', animations: { enabled: true, easing: 'easeinout', speed: 600 } },
+    chart: { toolbar: { show: false }, fontFamily: 'Be Vietnam Pro, system-ui, sans-serif', animations: { enabled: true, easing: 'easeinout', speed: 600 } },
     colors: ['#8c6b4a'],
     fill: isArea ? { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05, stops: [0, 90, 100] } } : {},
     plotOptions: { bar: { horizontal: false, columnWidth: colWidth, borderRadius: 6 } },
@@ -614,7 +614,7 @@ const sparkBrownOptions = ref({ chart: { type: 'area', sparkline: { enabled: tru
 </script>
 
 <style scoped>
-.sunova-dashboard { background-color: #f8f9fa; padding: 24px; min-height: 100vh; font-family: 'Inter', -apple-system, sans-serif; color: #5c4322; }
+.sunova-dashboard { background-color: #f8f9fa; padding: 24px; min-height: 100vh; font-family: var(--admin-font, 'Be Vietnam Pro', system-ui, sans-serif); font-variant-numeric: tabular-nums; color: #5c4322; }
 .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;}
 .page-title { font-size: 24px; font-weight: bold; margin: 0; }
 

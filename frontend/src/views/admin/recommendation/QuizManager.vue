@@ -246,7 +246,7 @@ const confirmDeleteQuestion = async () => {
   background-color: #f3f4f6; 
   padding: 40px 20px; 
   min-height: 100vh; 
-  font-family: 'Inter', 'Helvetica Neue', sans-serif; 
+  font-family: var(--admin-font, 'Be Vietnam Pro', system-ui, sans-serif);
   display: flex;
   justify-content: center;
 }

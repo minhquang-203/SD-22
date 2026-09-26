@@ -328,15 +328,6 @@ const router = createRouter({
           meta: { title: 'Hỗ trợ khách hàng', breadcrumb: 'Hỗ trợ khách hàng' },
         },
         {
-          path: 'yeu-cau-mua-so-luong-lon',
-          name: 'AdminYeuCauMuaSoLuongLon',
-          component: () => import('@/views/admin/orders/YeuCauMuaSoLuongLonPage.vue'),
-          meta: {
-            title: 'Yêu cầu mua số lượng lớn',
-            breadcrumb: 'Yêu cầu mua số lượng lớn',
-          },
-        },
-        {
           path: ':pathMatch(.*)*',
           name: 'AdminNotFound',
           component: () => import('@/views/shared/NotFoundPage.vue'),

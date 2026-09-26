@@ -1,6 +1,4 @@
 /* POS counter — layout theo docs/pos-admin-concept.html */
-@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
-
 .pos-page {
   min-height: 100%;
   height: auto;
@@ -27,7 +25,8 @@
   --pos-catalog-fr: minmax(0, 1.4fr);
   --pos-checkout-w: minmax(360px, 420px);
 
-  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+  font-family: var(--admin-font, 'Be Vietnam Pro', system-ui, sans-serif);
+  font-variant-numeric: tabular-nums;
   color: var(--pos-ink);
   background: var(--pos-bg);
   min-height: 100%;

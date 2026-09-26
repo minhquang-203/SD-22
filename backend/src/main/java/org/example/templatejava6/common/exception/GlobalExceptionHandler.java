@@ -3,12 +3,16 @@ package org.example.templatejava6.common.exception;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -39,9 +43,17 @@ public class GlobalExceptionHandler {
         res.put("status", "FAILED");
         res.put("code", ex.getCode());
         res.put("message", ex.getMessage());
-        HttpStatus status = "FORBIDDEN".equals(ex.getCode())
-                ? HttpStatus.FORBIDDEN
-                : HttpStatus.BAD_REQUEST;
+        if (ex.getDetails() != null) {
+            res.put("details", ex.getDetails());
+        }
+        HttpStatus status;
+        if ("FORBIDDEN".equals(ex.getCode())) {
+            status = HttpStatus.FORBIDDEN;
+        } else if ("PRICE_CHANGED".equals(ex.getCode())) {
+            status = HttpStatus.CONFLICT;
+        } else {
+            status = HttpStatus.BAD_REQUEST;
+        }
         return new ResponseEntity<>(res, status);
     }
 
@@ -81,6 +93,33 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(res, HttpStatus.PAYLOAD_TOO_LARGE);
     }
 
+    @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
+    public ResponseEntity<?> handleNotFound(Exception ex) {
+        Map<String, Object> res = new HashMap<>();
+        res.put("status", "FAILED");
+        res.put("code", "NOT_FOUND");
+        res.put("message", "Không tìm thấy tài nguyên yêu cầu.");
+        return new ResponseEntity<>(res, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<?> handleMethodNotAllowed(HttpRequestMethodNotSupportedException ex) {
+        Map<String, Object> res = new HashMap<>();
+        res.put("status", "FAILED");
+        res.put("code", "METHOD_NOT_ALLOWED");
+        res.put("message", "Phương thức không được hỗ trợ cho yêu cầu này.");
+        return new ResponseEntity<>(res, HttpStatus.METHOD_NOT_ALLOWED);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<?> handleBadJson(HttpMessageNotReadableException ex) {
+        Map<String, Object> res = new HashMap<>();
+        res.put("status", "FAILED");
+        res.put("code", "BAD_REQUEST");
+        res.put("message", "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại.");
+        return new ResponseEntity<>(res, HttpStatus.BAD_REQUEST);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleAll(Exception ex) {
         Map<String, Object> res = new HashMap<>();
@@ -109,8 +148,11 @@ public class GlobalExceptionHandler {
             return "Không thể thực hiện vì dữ liệu đang được sử dụng ở nơi khác.";
         }
 
-        if (raw.contains("insert into") || raw.contains("SQL [")) {
-            return "Không thể lưu dữ liệu. Vui lòng kiểm tra lại thông tin.";
+        if (raw.contains("insert into") || raw.contains("SQL [")
+                || lower.contains("exception") || lower.contains("stack")
+                || lower.contains("org.") || lower.contains("java.")
+                || raw.contains("\n") || raw.length() > 180) {
+            return "Có lỗi xảy ra. Vui lòng thử lại.";
         }
 
         return raw;
@@ -124,3 +166,4 @@ public class GlobalExceptionHandler {
         return root.getMessage();
     }
 }
+

@@ -5,11 +5,10 @@ import ProductImageManager from './ProductImageManager.vue'
 import AttributeChipGroup from '@/components/ui/AttributeChipGroup.vue'
 import SearchableSelect from '@/components/ui/SearchableSelect.vue'
 import { LOAI_DA_OPTIONS } from '@/constants/loaiDa'
+import { SPF_OPTIONS, PA_OPTIONS } from '@/constants/chiSoChongNang'
 import {
   createEmptyProductForm,
   detailToForm,
-  PA_OPTIONS,
-  sanitizeSpfSuffix,
   validateProductForm,
 } from '@/utils/productForm'
 import { getMaTiepTheo } from '@/api/sanPhamApi'
@@ -124,11 +123,6 @@ async function loadPreviewMaSanPham() {
   }
 }
 
-function onSpfInput(event) {
-  form.value.chiSoSpf = sanitizeSpfSuffix(event.target.value)
-  clearField('chiSoSpf')
-}
-
 function pickErrorTab(result) {
   if (result.images) return 'images'
   if (result.fields?.chiTiets || Object.keys(result.chiTiets || {}).length) return 'sku'
@@ -142,7 +136,6 @@ async function scrollToFirstError() {
 }
 
 function handleSubmit() {
-  form.value.chiSoSpf = sanitizeSpfSuffix(form.value.chiSoSpf)
   const result = validateProductForm(form.value)
 
   if (result && result.ok === false) {
@@ -277,21 +270,17 @@ function handleSubmit() {
           </div>
           <div>
             <label class="admin-label">Chỉ số SPF *</label>
-            <div
-              class="spf-input-group"
-              :class="{ 'spf-input-group--invalid': fieldErrors.chiSoSpf }"
+            <select
+              v-model="form.chiSoSpf"
+              class="admin-select"
+              :class="{ 'is-invalid': fieldErrors.chiSoSpf }"
+              @change="clearField('chiSoSpf')"
             >
-              <span class="spf-input-group__prefix" aria-hidden="true">SPF</span>
-              <input
-                :value="form.chiSoSpf"
-                class="admin-input spf-input-group__field"
-                :class="{ 'is-invalid': fieldErrors.chiSoSpf }"
-                placeholder="VD: 50+ hoặc 30"
-                inputmode="text"
-                autocomplete="off"
-                @input="onSpfInput"
-              />
-            </div>
+              <option value="">Chọn chỉ số SPF</option>
+              <option v-for="opt in SPF_OPTIONS" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
             <p v-if="fieldErrors.chiSoSpf" class="field-error">{{ fieldErrors.chiSoSpf }}</p>
           </div>
           <div>
@@ -302,7 +291,7 @@ function handleSubmit() {
               :class="{ 'is-invalid': fieldErrors.chiSoPa }"
               @change="clearField('chiSoPa')"
             >
-              <option value="">— Chọn PA —</option>
+              <option value="">Chọn chỉ số PA</option>
               <option v-for="opt in PA_OPTIONS" :key="opt" :value="opt">{{ opt }}</option>
             </select>
             <p v-if="fieldErrors.chiSoPa" class="field-error">{{ fieldErrors.chiSoPa }}</p>
@@ -390,42 +379,5 @@ function handleSubmit() {
 .admin-input.is-invalid,
 .admin-select.is-invalid {
   border-color: #c45c5c !important;
-}
-.spf-input-group {
-  display: flex;
-  align-items: stretch;
-  width: 100%;
-  border: 1px solid var(--admin-border);
-  border-radius: 8px;
-  overflow: hidden;
-  background: #fff;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-.spf-input-group:focus-within {
-  border-color: var(--admin-primary);
-  box-shadow: 0 0 0 2px rgba(201, 169, 110, 0.12);
-}
-.spf-input-group--invalid {
-  border-color: #c45c5c;
-}
-.spf-input-group__prefix {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 12px;
-  background: rgba(201, 169, 110, 0.12);
-  color: var(--ink, #1e1510);
-  font-weight: 600;
-  font-size: 14px;
-  letter-spacing: 0.02em;
-  border-right: 1px solid var(--admin-border);
-  user-select: none;
-  flex-shrink: 0;
-}
-.spf-input-group__field {
-  border: none !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  flex: 1;
-  min-width: 0;
 }
 </style>

@@ -1,61 +1,64 @@
 package org.example.templatejava6.order.service;
 
-import org.example.templatejava6.common.entity.KhachHang;
-import org.example.templatejava6.common.entity.NhanVien;
+import jakarta.mail.internet.MimeMessage;
 import org.example.templatejava6.common.exception.ApiException;
-import org.example.templatejava6.common.security.SecurityUtils;
-import org.example.templatejava6.customer.repository.KhachHangRepository;
-import org.example.templatejava6.notification.enums.LoaiThongBao;
-import org.example.templatejava6.notification.service.ThongBaoService;
-import org.example.templatejava6.order.entity.YeuCauMuaSoLuongLon;
-import org.example.templatejava6.order.model.request.CapNhatYeuCauMuaSoLuongLonRequest;
 import org.example.templatejava6.order.model.request.TaoYeuCauMuaSoLuongLonRequest;
-import org.example.templatejava6.order.model.response.YeuCauMuaSoLuongLonResponse;
-import org.example.templatejava6.order.repository.NhanVienRepository;
-import org.example.templatejava6.order.repository.YeuCauMuaSoLuongLonRepository;
 import org.example.templatejava6.product.entity.ChiTietSanPham;
+import org.example.templatejava6.product.entity.SanPham;
 import org.example.templatejava6.product.repository.ChiTietSanPhamRepository;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.Set;
+import java.time.format.DateTimeFormatter;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Yêu cầu mua số lượng lớn: validate + gửi email cửa hàng.
+ * Không lưu database, không tạo thông báo admin.
+ */
 @Service
 public class YeuCauMuaSoLuongLonService {
 
-    private static final Set<String> TRANG_THAI_HOP_LE =
-            Set.of("MOI", "DA_LIEN_HE", "HOAN_TAT", "HUY");
-    private static final int SPAM_WINDOW_MINUTES = 5;
+    private static final Logger log = LoggerFactory.getLogger(YeuCauMuaSoLuongLonService.class);
     private static final int MIN_SO_LUONG = 16;
+    private static final long SPAM_WINDOW_MS = 5L * 60L * 1000L;
+    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
-    private final YeuCauMuaSoLuongLonRepository repository;
     private final ChiTietSanPhamRepository chiTietSanPhamRepository;
-    private final KhachHangRepository khachHangRepository;
-    private final NhanVienRepository nhanVienRepository;
-    private final ThongBaoService thongBaoService;
+    private final JavaMailSender mailSender;
+
+    /** key = sdt|idCtsp → epoch millis lần gửi gần nhất */
+    private final ConcurrentHashMap<String, Long> recentSends = new ConcurrentHashMap<>();
+
+    @Value("${spring.mail.username:}")
+    private String fromEmail;
+
+    @Value("${app.mail.from-name:SUNOVA}")
+    private String fromName;
+
+    @Value("${app.bulk-order.email-nhan:vu010746@gmail.com}")
+    private String emailNhan;
 
     public YeuCauMuaSoLuongLonService(
-            YeuCauMuaSoLuongLonRepository repository,
             ChiTietSanPhamRepository chiTietSanPhamRepository,
-            KhachHangRepository khachHangRepository,
-            NhanVienRepository nhanVienRepository,
-            ThongBaoService thongBaoService) {
-        this.repository = repository;
+            ObjectProvider<JavaMailSender> mailSenderProvider) {
         this.chiTietSanPhamRepository = chiTietSanPhamRepository;
-        this.khachHangRepository = khachHangRepository;
-        this.nhanVienRepository = nhanVienRepository;
-        this.thongBaoService = thongBaoService;
+        this.mailSender = mailSenderProvider.getIfAvailable();
     }
 
-    @Transactional
-    public YeuCauMuaSoLuongLonResponse tao(TaoYeuCauMuaSoLuongLonRequest req) {
+    public Map<String, Object> guiYeuCau(TaoYeuCauMuaSoLuongLonRequest req) {
         if (req.getSoLuong() == null || req.getSoLuong() < MIN_SO_LUONG) {
             throw new ApiException(
                     "Tối thiểu " + MIN_SO_LUONG + " sản phẩm cho đơn số lượng lớn",
@@ -66,11 +69,6 @@ public class YeuCauMuaSoLuongLonService {
                 .orElseThrow(() -> new ApiException("Không tìm thấy sản phẩm", "NOT_FOUND"));
 
         int ton = ct.getSoLuongTon() != null ? ct.getSoLuongTon() : 0;
-        if (ton < MIN_SO_LUONG) {
-            throw new ApiException(
-                    "Sản phẩm không đủ tồn để đăng ký mua số lượng lớn (còn " + ton + " sản phẩm)",
-                    "INSUFFICIENT_STOCK");
-        }
         if (req.getSoLuong() > ton) {
             throw new ApiException(
                     "Số lượng yêu cầu vượt quá tồn kho hiện có (còn " + ton + " sản phẩm)",
@@ -81,16 +79,11 @@ public class YeuCauMuaSoLuongLonService {
         if (hoTen == null || hoTen.length() < 2 || hoTen.length() > 60) {
             throw new ApiException("Họ tên từ 2–60 ký tự", "INVALID_NAME");
         }
-        if (!hoTen.matches(".*[\\p{L}].*")) {
-            throw new ApiException(
-                    "Họ tên không được toàn số hoặc ký tự đặc biệt",
-                    "INVALID_NAME");
-        }
 
         String sdt = req.getSoDienThoai() != null
                 ? req.getSoDienThoai().replaceAll("\\D", "")
                 : "";
-        if (!sdt.matches("^(0[35789])\\d{8}$")) {
+        if (!sdt.matches("^0\\d{9}$")) {
             throw new ApiException(
                     "Số điện thoại không hợp lệ (10 chữ số, bắt đầu bằng 0)",
                     "INVALID_PHONE");
@@ -111,122 +104,220 @@ public class YeuCauMuaSoLuongLonService {
             throw new ApiException("Ghi chú tối đa 500 ký tự", "INVALID_NOTE");
         }
 
-        LocalDateTime since = LocalDateTime.now().minusMinutes(SPAM_WINDOW_MINUTES);
-        if (repository.existsRecentDuplicate(sdt, ct.getId(), since)) {
+        purgeExpiredSpamEntries();
+        String spamKey = sdt + "|" + ct.getId();
+        Long last = recentSends.get(spamKey);
+        long now = Instant.now().toEpochMilli();
+        if (last != null && now - last < SPAM_WINDOW_MS) {
             throw new ApiException(
-                    "Yêu cầu đã được gửi, vui lòng chờ liên hệ",
+                    "Yêu cầu đã được gửi, vui lòng chờ SUNOVA liên hệ",
                     "DUPLICATE_REQUEST");
         }
 
-        YeuCauMuaSoLuongLon y = new YeuCauMuaSoLuongLon();
-        y.setIdChiTietSanPham(ct);
-        y.setSoLuong(req.getSoLuong());
-        y.setTenCongTy(tenCongTy);
-        y.setHoTen(hoTen);
-        y.setSoDienThoai(sdt);
-        y.setEmail(email);
-        y.setGhiChu(ghiChu);
-        y.setNhanKhuyenMai(Boolean.TRUE.equals(req.getNhanKhuyenMai()));
-        y.setTrangThai("MOI");
-        y.setNgayTao(LocalDateTime.now());
+        boolean loggedIn = isKhachDangNhap();
+        boolean nhanKm = Boolean.TRUE.equals(req.getNhanKhuyenMai());
+        String tenSp = tenSanPham(ct);
+        String bienThe = bienThe(ct);
 
-        Integer idKhach = optionalKhachHangId();
-        if (idKhach != null) {
-            KhachHang kh = khachHangRepository.findById(idKhach).orElse(null);
-            y.setIdKhachHang(kh);
+        try {
+            guiEmail(ct, req.getSoLuong(), ton, hoTen, sdt, email, tenCongTy, ghiChu, nhanKm, loggedIn, tenSp, bienThe);
+        } catch (ApiException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("[BULK-ORDER] Gửi email thất bại: {}", ex.getMessage());
+            throw new ApiException(
+                    "Chưa gửi được yêu cầu, vui lòng thử lại hoặc gọi hotline 1900 6868",
+                    "MAIL_FAILED");
         }
 
-        YeuCauMuaSoLuongLon saved = repository.save(y);
-
-        String tenSp = ct.getSanPham() != null ? ct.getSanPham().getTen() : ("SKU " + ct.getSku());
-        thongBaoService.taoThongBao(
-                LoaiThongBao.YEU_CAU_MUA_SO_LUONG_LON,
-                "Yêu cầu mua số lượng lớn mới",
-                "Yêu cầu mua số lượng lớn mới: " + tenSp + " x " + saved.getSoLuong(),
-                "/admin/yeu-cau-mua-so-luong-lon",
-                saved.getId(),
-                String.valueOf(saved.getId()));
-
-        return YeuCauMuaSoLuongLonResponse.from(
-                repository.findDetailById(saved.getId()).orElse(saved));
+        recentSends.put(spamKey, now);
+        return Map.of(
+                "status", "OK",
+                "message", "SUNOVA đã nhận yêu cầu. Chúng tôi sẽ liên hệ sớm.");
     }
 
-    @Transactional(readOnly = true)
-    public Page<YeuCauMuaSoLuongLonResponse> danhSach(String trangThai, int page, int size) {
-        String tt = trangThai != null && !trangThai.isBlank() ? trangThai.trim() : null;
-        if (tt != null && !TRANG_THAI_HOP_LE.contains(tt)) {
-            throw new ApiException("Trạng thái không hợp lệ", "INVALID_STATUS");
+    private void guiEmail(
+            ChiTietSanPham ct,
+            int soLuong,
+            int ton,
+            String hoTen,
+            String sdt,
+            String emailKhach,
+            String tenCongTy,
+            String ghiChu,
+            boolean nhanKm,
+            boolean loggedIn,
+            String tenSp,
+            String bienThe) throws Exception {
+        if (mailSender == null || fromEmail == null || fromEmail.isBlank()) {
+            throw new ApiException(
+                    "Chưa gửi được yêu cầu, vui lòng thử lại hoặc gọi hotline 1900 6868",
+                    "MAIL_FAILED");
         }
-        PageRequest pageable = PageRequest.of(
-                Math.max(0, page),
-                Math.min(Math.max(1, size), 50),
-                Sort.by(Sort.Direction.DESC, "ngayTao"));
-        return repository.search(tt, pageable).map(y -> {
-            // trigger lazy load trong transaction
-            if (y.getIdChiTietSanPham() != null) {
-                y.getIdChiTietSanPham().getSku();
-                if (y.getIdChiTietSanPham().getSanPham() != null) {
-                    y.getIdChiTietSanPham().getSanPham().getTen();
-                }
-                if (y.getIdChiTietSanPham().getMauSac() != null) {
-                    y.getIdChiTietSanPham().getMauSac().getTen();
-                }
+        String to = emailNhan != null ? emailNhan.trim() : "";
+        if (to.isBlank()) {
+            throw new ApiException(
+                    "Chưa gửi được yêu cầu, vui lòng thử lại hoặc gọi hotline 1900 6868",
+                    "MAIL_FAILED");
+        }
+
+        String subject = "[SUNOVA] Yêu cầu mua số lượng lớn – " + tenSp + " x " + soLuong;
+        String html = buildHtml(
+                LocalDateTime.now().format(DATE_FMT),
+                tenSp,
+                bienThe,
+                ct.getSku(),
+                soLuong,
+                ton,
+                hoTen,
+                sdt,
+                emailKhach,
+                tenCongTy,
+                ghiChu,
+                nhanKm,
+                loggedIn);
+
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
+        helper.setFrom(String.format("%s <%s>", fromName, fromEmail));
+        helper.setTo(to);
+        helper.setReplyTo(emailKhach);
+        helper.setSubject(subject);
+        helper.setText(html, true);
+        mailSender.send(message);
+        log.info("[BULK-ORDER] Đã gửi yêu cầu {} x{} tới hộp thư cửa hàng", tenSp, soLuong);
+    }
+
+    private static String buildHtml(
+            String thoiGian,
+            String tenSp,
+            String bienThe,
+            String sku,
+            int soLuong,
+            int ton,
+            String hoTen,
+            String sdt,
+            String email,
+            String tenCongTy,
+            String ghiChu,
+            boolean nhanKm,
+            boolean loggedIn) {
+        StringBuilder company = new StringBuilder();
+        if (tenCongTy != null && !tenCongTy.isBlank()) {
+            company.append(row("Tên công ty", esc(tenCongTy)));
+        }
+        StringBuilder note = new StringBuilder();
+        if (ghiChu != null && !ghiChu.isBlank()) {
+            note.append(row("Ghi chú", esc(ghiChu)));
+        }
+        String bienTheRow = (bienThe != null && !bienThe.isBlank())
+                ? row("Biến thể", esc(bienThe))
+                : "";
+        String skuRow = (sku != null && !sku.isBlank()) ? row("SKU", esc(sku)) : "";
+
+        return """
+                <div style="font-family:Segoe UI,Arial,sans-serif;background:#f7f3ee;padding:24px;">
+                  <div style="max-width:640px;margin:0 auto;background:#fffaf5;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
+                    <div style="background:#3d2c22;color:#f5ebe0;padding:18px 22px;">
+                      <div style="font-size:18px;font-weight:700;letter-spacing:0.02em;">SUNOVA</div>
+                      <div style="font-size:13px;opacity:0.85;margin-top:4px;">Yêu cầu mua số lượng lớn</div>
+                    </div>
+                    <div style="padding:22px;">
+                      <p style="margin:0 0 16px;color:#6b5a4e;font-size:13px;">Thời gian gửi: <strong style="color:#3d2c22;">%s</strong></p>
+                      <h3 style="margin:0 0 10px;color:#3d2c22;font-size:15px;">Sản phẩm</h3>
+                      <table style="width:100%%;border-collapse:collapse;margin-bottom:18px;font-size:14px;color:#3d2c22;">
+                        %s
+                        %s
+                        %s
+                        %s
+                        %s
+                      </table>
+                      <h3 style="margin:0 0 10px;color:#3d2c22;font-size:15px;">Khách hàng</h3>
+                      <table style="width:100%%;border-collapse:collapse;font-size:14px;color:#3d2c22;">
+                        %s
+                        %s
+                        %s
+                        %s
+                        %s
+                        %s
+                        %s
+                      </table>
+                      <p style="margin:18px 0 0;color:#8a7566;font-size:12px;">Bấm Trả lời để gửi email trực tiếp cho khách.</p>
+                    </div>
+                  </div>
+                </div>
+                """.formatted(
+                esc(thoiGian),
+                row("Tên sản phẩm", esc(tenSp)),
+                bienTheRow,
+                skuRow,
+                row("Số lượng yêu cầu", String.valueOf(soLuong)),
+                row("Tồn kho hiện tại", String.valueOf(ton)),
+                row("Họ tên", esc(hoTen)),
+                row("Số điện thoại", esc(sdt)),
+                row("Email", esc(email)),
+                company,
+                note,
+                row("Nhận tin khuyến mãi", nhanKm ? "Có" : "Không"),
+                row("Loại khách", loggedIn ? "Đã đăng nhập" : "Khách vãng lai"));
+    }
+
+    private static String row(String label, String value) {
+        return """
+                <tr>
+                  <td style="padding:8px 0;border-bottom:1px solid #efe6dc;width:42%%;color:#8a7566;">%s</td>
+                  <td style="padding:8px 0;border-bottom:1px solid #efe6dc;font-weight:600;">%s</td>
+                </tr>
+                """.formatted(label, value);
+    }
+
+    private static String esc(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
+    }
+
+    private void purgeExpiredSpamEntries() {
+        long cutoff = Instant.now().toEpochMilli() - SPAM_WINDOW_MS;
+        Iterator<Map.Entry<String, Long>> it = recentSends.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<String, Long> e = it.next();
+            if (e.getValue() == null || e.getValue() < cutoff) {
+                it.remove();
             }
-            if (y.getIdNhanVienXuLy() != null) {
-                y.getIdNhanVienXuLy().getHoTen();
-            }
-            return YeuCauMuaSoLuongLonResponse.from(y);
-        });
-    }
-
-    @Transactional(readOnly = true)
-    public YeuCauMuaSoLuongLonResponse chiTiet(Integer id) {
-        return repository.findDetailById(id)
-                .map(YeuCauMuaSoLuongLonResponse::from)
-                .orElseThrow(() -> new ApiException("Không tìm thấy yêu cầu", "NOT_FOUND"));
-    }
-
-    @Transactional(readOnly = true)
-    public long demMoi() {
-        return repository.countByTrangThai("MOI");
-    }
-
-    @Transactional
-    public YeuCauMuaSoLuongLonResponse capNhat(Integer id, CapNhatYeuCauMuaSoLuongLonRequest req) {
-        String tt = req.getTrangThai() != null ? req.getTrangThai().trim() : "";
-        if (!TRANG_THAI_HOP_LE.contains(tt)) {
-            throw new ApiException("Trạng thái không hợp lệ", "INVALID_STATUS");
         }
-        YeuCauMuaSoLuongLon y = repository.findById(id)
-                .orElseThrow(() -> new ApiException("Không tìm thấy yêu cầu", "NOT_FOUND"));
-        y.setTrangThai(tt);
-        y.setGhiChuNoiBo(blankToNull(req.getGhiChuNoiBo()));
-
-        Integer idNv = SecurityUtils.currentNhanVienId();
-        NhanVien nv = nhanVienRepository.findById(idNv).orElse(null);
-        y.setIdNhanVienXuLy(nv);
-
-        repository.save(y);
-        return YeuCauMuaSoLuongLonResponse.from(
-                repository.findDetailById(id).orElse(y));
     }
 
-    private Integer optionalKhachHangId() {
+    private static String tenSanPham(ChiTietSanPham ct) {
+        SanPham sp = ct.getSanPham();
+        if (sp != null && sp.getTen() != null && !sp.getTen().isBlank()) {
+            return sp.getTen();
+        }
+        return ct.getSku() != null ? ct.getSku() : ("#" + ct.getId());
+    }
+
+    private static String bienThe(ChiTietSanPham ct) {
+        StringBuilder sb = new StringBuilder();
+        if (ct.getMauSac() != null && ct.getMauSac().getTen() != null) {
+            sb.append(ct.getMauSac().getTen());
+        }
+        if (ct.getDungTichMl() != null) {
+            if (sb.length() > 0) sb.append(" · ");
+            sb.append(ct.getDungTichMl().stripTrailingZeros().toPlainString()).append(" ml");
+        }
+        return sb.toString();
+    }
+
+    private static boolean isKhachDangNhap() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || auth.getName() == null) {
-            return null;
+            return false;
         }
-        boolean isKhach = auth.getAuthorities().stream()
+        return auth.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
-                .anyMatch(a -> "ROLE_KHACH_HANG".equals(a));
-        if (!isKhach) {
-            return null;
-        }
-        try {
-            return Integer.parseInt(auth.getName());
-        } catch (NumberFormatException ex) {
-            return null;
-        }
+                .anyMatch("ROLE_KHACH_HANG"::equals);
     }
 
     private static String blankToNull(String s) {
