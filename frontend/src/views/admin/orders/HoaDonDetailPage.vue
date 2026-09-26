@@ -7,7 +7,7 @@ import GanLoDonHangModal from '@/components/admin/orders/GanLoDonHangModal.vue'
 import { getHoaDonDetail, getLichSu, taoVanDonGhn, giaLapWebhookGhn, tuChoiDon } from '@/api/hoaDonApi'
 import { confirm, alertDialog } from '@/composables/useConfirm'
 import { subscribeAdminOrders } from '@/composables/useRealtime'
-import { GHN_STATUS_OPTIONS } from '@/constants/ghnStatuses'
+import { GHN_STATUS_OPTIONS, GHN_STATUS_MAIN_OPTIONS } from '@/constants/ghnStatuses'
 import { formatCurrency } from '@/utils/format'
 import { toast } from '@/composables/useToast'
 import { printInvoice, saveInvoicePdf } from '@/utils/printInvoice'
@@ -31,7 +31,7 @@ const showGanLoModal = ref(false)
 const webhookLoading = ref(false)
 const webhookMessage = ref('')
 const webhookMessageType = ref('success')
-const selectedGhnStatus = ref(GHN_STATUS_OPTIONS[0]?.value || '')
+const selectedGhnStatus = ref(GHN_STATUS_MAIN_OPTIONS[0]?.value || '')
 const webhookGhiChu = ref('')
 
 const TRANG_THAI_KET_THUC = new Set(['HOAN_THANH', 'TRA_HANG', 'DA_HUY'])
@@ -94,7 +94,7 @@ function notifyWebhook(text, type = 'success') {
 }
 
 function resetWebhookSelection() {
-  selectedGhnStatus.value = GHN_STATUS_OPTIONS[0]?.value || ''
+  selectedGhnStatus.value = GHN_STATUS_MAIN_OPTIONS[0]?.value || ''
   webhookGhiChu.value = ''
 }
 
@@ -535,7 +535,7 @@ onUnmounted(() => {
                   class="hoa-don-webhook__select"
                 >
                   <option
-                    v-for="opt in GHN_STATUS_OPTIONS"
+                    v-for="opt in GHN_STATUS_MAIN_OPTIONS"
                     :key="opt.value"
                     :value="opt.value"
                   >

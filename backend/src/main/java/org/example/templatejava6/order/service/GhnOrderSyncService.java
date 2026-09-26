@@ -84,11 +84,13 @@ public class GhnOrderSyncService {
         if (status == null) {
             throw new ApiException("Trang thai GHN khong hop le.", "VALIDATION_ERROR");
         }
-        // NV/admin không được giả lập "Đã hoàn hàng" — trạng thái này chỉ từ đồng bộ GHN thật.
-        if ("returned".equalsIgnoreCase(status)) {
+        // NV/admin không được tự chuyển đơn sang TRẢ HÀNG ở màn cập nhật nhanh.
+        // Trả hàng phải đi qua luồng yêu cầu trả hàng; trạng thái "returned" chỉ
+        // được cập nhật khi đồng bộ từ GHN thật (dongBo), không qua giả lập webhook.
+        if (anhXa(status) == TrangThaiDonHang.TRA_HANG) {
             throw new ApiException(
-                    "Không cho phép nhân viên/admin chuyển trạng thái \"Đã hoàn hàng\". "
-                            + "Trạng thái này chỉ cập nhật khi đồng bộ từ GHN.",
+                    "Không cho phép nhân viên/admin chuyển đơn sang trạng thái trả hàng ở màn cập nhật này. "
+                            + "Trả hàng phải xử lý qua luồng yêu cầu trả hàng.",
                     "GHN_STATUS_NOT_ALLOWED");
         }
 
