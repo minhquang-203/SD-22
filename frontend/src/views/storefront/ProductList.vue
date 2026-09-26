@@ -759,14 +759,13 @@ onMounted(async () => {
             >
               Khuyến mãi
             </RouterLink>
-            <button
-              v-if="isGoiYPage"
-              type="button"
-              :class="{ active: sortBy === 'relevance' }"
-              @click="setSort('relevance')"
+            <RouterLink
+              to="/san-pham/goi-y"
+              class="sf-sort-tabs__link"
+              :class="{ active: isGoiYPage }"
             >
-              Phù hợp
-            </button>
+              Gợi ý
+            </RouterLink>
             <button type="button" :class="{ active: sortBy === 'popular' }" @click="setSort('popular')">Phổ biến</button>
             <button type="button" :class="{ active: sortBy === 'newest' }" @click="setSort('newest')">Mới nhất</button>
             <button type="button" :class="{ active: sortBy === 'bestseller' }" @click="setSort('bestseller')">Bán chạy</button>
