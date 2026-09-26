@@ -268,8 +268,7 @@ public class GhnOrderCreationService {
 
     private static boolean canTaoVanDonGhn(TrangThaiDonHang trangThai) {
         return trangThai == TrangThaiDonHang.DA_XAC_NHAN
-                || trangThai == TrangThaiDonHang.DANG_CHUAN_BI
-                || trangThai == TrangThaiDonHang.DANG_GIAO;
+                || trangThai == TrangThaiDonHang.DANG_CHUAN_BI;
     }
 
     private void ghiLichSu(HoaDon hoaDon, String ghiChu) {

@@ -1041,7 +1041,7 @@ onMounted(() => {
             <strong>-{{ formatVND(selectedSavings) }}</strong>
           </div>
           <div class="sf-checkout-summary__row">
-            <span>Phí vận chuyển (GHN)</span>
+            <span>Phí vận chuyển</span>
             <strong v-if="feeLoading">Đang tính...</strong>
             <strong v-else>{{ shippingFee ? formatVND(shippingFee) : 'Miễn phí' }}</strong>
           </div>

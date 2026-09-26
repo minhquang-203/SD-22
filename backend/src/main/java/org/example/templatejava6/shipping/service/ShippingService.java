@@ -442,8 +442,8 @@ public class ShippingService {
                         "Thiếu tên tỉnh/thành hoặc phường/xã người nhận (địa chỉ 2 cấp).",
                         "GHN_MISSING_ADDRESS");
             }
-            putNewToAddress(body, request.getToProvinceName(), request.getToWardName(),
-                    request.getToProvinceId(), request.getToWardCode(), null);
+            // Tạo đơn tra to_ward_code (mã xã v3). to_ward_id_v2 chỉ dành cho API tính phí.
+            putCreateToAddress(body, request);
         } else {
             body.put("is_new_to_address", false);
             body.put("to_ward_code", request.getToWardCode());
@@ -640,6 +640,53 @@ public class ShippingService {
             log.info("Không gửi from_ward_name/from_province_name, GHN lấy kho theo ShopId {}.",
                     properties.getShopId());
         }
+    }
+
+    /**
+     * Tạo vận đơn địa chỉ 2 cấp: GHN tra {@code to_ward_code} (id xã v3 dạng chuỗi)
+     * cùng tên tỉnh/phường khách đã chọn. Không gửi {@code to_ward_id_v2}
+     * (field của API tính phí) — gửi nhầm làm GHN báo phường không tồn tại
+     * dù mã đó có trong danh mục.
+     * {@code to_address} chỉ còn số nhà/đường, không lặp lại phường và tỉnh.
+     */
+    private void putCreateToAddress(Map<String, Object> body, CreateShippingOrderRequest request) {
+        body.put("is_new_to_address", true);
+        body.put("to_province_name", request.getToProvinceName().trim());
+        body.put("to_ward_name", request.getToWardName().trim());
+        putNewWardCode(body, "to_ward_code", request.getToWardCode());
+        String street = streetOnly(request.getToAddress(), request.getToWardName(), request.getToProvinceName());
+        if (!isBlank(street)) {
+            body.put("to_address", street);
+        }
+    }
+
+    /**
+     * Bỏ hậu tố ", phường, tỉnh" khỏi địa chỉ giao (form lưu cả ba phần).
+     * Giữ nguyên nếu không khớp tên đã chọn, để không cắt nhầm số nhà có dấu phẩy.
+     */
+    static String streetOnly(String address, String wardName, String provinceName) {
+        if (isBlank(address)) {
+            return address;
+        }
+        List<String> parts = new ArrayList<>();
+        for (String raw : address.split(",")) {
+            if (raw != null && !raw.isBlank()) {
+                parts.add(raw.trim());
+            }
+        }
+        if (parts.size() >= 3
+                && samePlaceName(parts.get(parts.size() - 1), provinceName)
+                && samePlaceName(parts.get(parts.size() - 2), wardName)) {
+            return String.join(", ", parts.subList(0, parts.size() - 2));
+        }
+        return address.trim();
+    }
+
+    private static boolean samePlaceName(String left, String right) {
+        if (isBlank(left) || isBlank(right)) {
+            return false;
+        }
+        return normalizeName(left).equals(normalizeName(right));
     }
 
     /**
