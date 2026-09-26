@@ -23,3 +23,18 @@ export const GHN_STATUS_OPTIONS = [
   { value: 'damage', label: 'Hàng hư hỏng' },
   { value: 'lost', label: 'Hàng thất lạc' },
 ]
+
+/**
+ * Trạng thái GHN "chính" dùng cho màn cập nhật trạng thái giao hàng nhanh của admin.
+ *
+ * Chỉ gồm các mốc ánh xạ trực tiếp sang trạng thái vòng đời của dự án
+ * (Đang chuẩn bị → Đang giao → Hoàn thành). KHÔNG bao gồm các trạng thái
+ * hoàn/trả hàng, hủy hay sự cố — trả hàng phải đi qua luồng yêu cầu trả hàng,
+ * không cho admin tự chuyển ở màn này.
+ */
+export const GHN_STATUS_MAIN_OPTIONS = [
+  { value: 'ready_to_pick', label: 'Chờ lấy hàng' }, // -> Đang chuẩn bị
+  { value: 'picked', label: 'Đã lấy hàng' }, // -> Đang giao
+  { value: 'delivering', label: 'Đang giao hàng' }, // -> Đang giao
+  { value: 'delivered', label: 'Đã giao' }, // -> Hoàn thành
+]

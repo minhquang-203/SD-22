@@ -7,7 +7,7 @@ import GanLoDonHangModal from '@/components/admin/orders/GanLoDonHangModal.vue'
 import { getHoaDonDetail, getLichSu, taoVanDonGhn, giaLapWebhookGhn, tuChoiDon } from '@/api/hoaDonApi'
 import { confirm, alertDialog } from '@/composables/useConfirm'
 import { subscribeAdminOrders } from '@/composables/useRealtime'
-import { GHN_STATUS_OPTIONS } from '@/constants/ghnStatuses'
+import { GHN_STATUS_OPTIONS, GHN_STATUS_MAIN_OPTIONS } from '@/constants/ghnStatuses'
 import { formatCurrency } from '@/utils/format'
 import { toast } from '@/composables/useToast'
 import { printInvoice, saveInvoicePdf } from '@/utils/printInvoice'
@@ -31,17 +31,32 @@ const showGanLoModal = ref(false)
 const webhookLoading = ref(false)
 const webhookMessage = ref('')
 const webhookMessageType = ref('success')
-const selectedGhnStatus = ref(GHN_STATUS_OPTIONS[0]?.value || '')
+const selectedGhnStatus = ref(GHN_STATUS_MAIN_OPTIONS[0]?.value || '')
 const webhookGhiChu = ref('')
 
 const TRANG_THAI_KET_THUC = new Set(['HOAN_THANH', 'TRA_HANG', 'DA_HUY'])
-const TRANG_THAI_TAO_VAN_DON = new Set(['DA_XAC_NHAN', 'DANG_CHUAN_BI', 'DANG_GIAO'])
+const TRANG_THAI_TAO_VAN_DON = new Set(['DA_XAC_NHAN', 'DANG_CHUAN_BI'])
+
+function maTrangThai(detailOrStatus) {
+  if (detailOrStatus == null) return ''
+  if (typeof detailOrStatus === 'string') return detailOrStatus.trim()
+  if (typeof detailOrStatus === 'object') {
+    if (typeof detailOrStatus.trangThai === 'string') return detailOrStatus.trangThai.trim()
+    if (typeof detailOrStatus.name === 'string') return detailOrStatus.name.trim()
+  }
+  return String(detailOrStatus).trim()
+}
+
+function chuaCoMaVanDonGhn(detail) {
+  const ma = detail?.maVanDonGhn
+  return ma == null || String(ma).trim() === ''
+}
 
 const coTheTaoVanDon = computed(
   () =>
     detail.value &&
-    !detail.value.maVanDonGhn &&
-    TRANG_THAI_TAO_VAN_DON.has(detail.value.trangThai),
+    chuaCoMaVanDonGhn(detail.value) &&
+    TRANG_THAI_TAO_VAN_DON.has(maTrangThai(detail.value.trangThai)),
 )
 
 const coTheXacNhanDon = computed(() => detail.value?.trangThai === 'CHO_XAC_NHAN')
@@ -61,8 +76,8 @@ const coTheXuLyDon = computed(
 const coTheGiaLapWebhook = computed(
   () =>
     detail.value &&
-    detail.value.maVanDonGhn &&
-    !TRANG_THAI_KET_THUC.has(detail.value.trangThai),
+    !chuaCoMaVanDonGhn(detail.value) &&
+    !TRANG_THAI_KET_THUC.has(maTrangThai(detail.value.trangThai)),
 )
 
 const canCapNhatWebhook = computed(
@@ -94,7 +109,7 @@ function notifyWebhook(text, type = 'success') {
 }
 
 function resetWebhookSelection() {
-  selectedGhnStatus.value = GHN_STATUS_OPTIONS[0]?.value || ''
+  selectedGhnStatus.value = GHN_STATUS_MAIN_OPTIONS[0]?.value || ''
   webhookGhiChu.value = ''
 }
 
@@ -171,6 +186,16 @@ async function tryTaoVanDonSauXacNhan() {
     }
     return false
   }
+  return taoVanDonGhnHienTai()
+}
+
+/** Tạo / tạo lại vận đơn GHN khi đơn đủ trạng thái và chưa có mã. */
+async function handleTaoVanDonGhn() {
+  if (!orderId.value || !coTheTaoVanDon.value || ghnLoading.value) return
+  await taoVanDonGhnHienTai()
+}
+
+async function taoVanDonGhnHienTai() {
   ghnLoading.value = true
   try {
     const res = await taoVanDonGhn(orderId.value)
@@ -426,11 +451,15 @@ onUnmounted(() => {
               <span class="hoa-don-summary__label">Địa chỉ nhận hàng</span>
               <span class="hoa-don-summary__value">{{ detail.diaChiGiao }}</span>
             </div>
-            <div v-if="detail.maVanDonGhn" class="hoa-don-summary__meta-item">
+            <div v-if="!chuaCoMaVanDonGhn(detail)" class="hoa-don-summary__meta-item">
               <span class="hoa-don-summary__label">Mã vận đơn</span>
               <span class="hoa-don-summary__value">
                 <span class="hoa-don-mono">{{ detail.maVanDonGhn }}</span>
               </span>
+            </div>
+            <div v-else-if="coTheTaoVanDon" class="hoa-don-summary__meta-item">
+              <span class="hoa-don-summary__label">Mã vận đơn</span>
+              <span class="hoa-don-summary__value hoa-don-summary__muted">Chưa tạo vận đơn GHN</span>
             </div>
           </div>
 
@@ -508,6 +537,27 @@ onUnmounted(() => {
           </div>
         </section>
 
+        <section v-if="coTheTaoVanDon" class="hoa-don-strip no-print">
+          <div>
+            <h2 class="hoa-don-strip__title">Vận đơn GHN</h2>
+            <p class="hoa-don-strip__hint">
+              Đơn chưa có mã vận đơn GHN. Bấm tạo lại để gọi GHN
+              (khi lần tạo tự động sau xác nhận bị lỗi).
+            </p>
+          </div>
+          <div class="hoa-don-strip__btns">
+            <button
+              type="button"
+              class="soleil-btn-primary hd-btn hoa-don-strip__primary"
+              :disabled="ghnLoading || actionLoading"
+              @click="handleTaoVanDonGhn"
+            >
+              <Icon icon="mdi:truck-delivery-outline" />
+              {{ ghnLoading ? 'Đang tạo vận đơn...' : 'Tạo lại vận đơn GHN' }}
+            </button>
+          </div>
+        </section>
+
         <div class="hoa-don-modules">
         <div v-if="coTheGiaLapWebhook" class="hoa-don-ops no-print">
           <section class="soleil-card hd-panel hd-module hoa-don-webhook">
@@ -535,7 +585,7 @@ onUnmounted(() => {
                   class="hoa-don-webhook__select"
                 >
                   <option
-                    v-for="opt in GHN_STATUS_OPTIONS"
+                    v-for="opt in GHN_STATUS_MAIN_OPTIONS"
                     :key="opt.value"
                     :value="opt.value"
                   >
@@ -1024,6 +1074,11 @@ onUnmounted(() => {
   font-weight: 600;
   word-break: break-word;
   color: var(--hd-ink);
+}
+
+.hoa-don-summary__muted {
+  font-weight: 500;
+  color: var(--hd-warn);
 }
 
 .hoa-don-summary__sub {

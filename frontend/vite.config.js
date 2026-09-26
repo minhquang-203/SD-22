@@ -24,6 +24,15 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         timeout: 180000,
+        configure: (proxy) => {
+          // Giữ UTF-8 khi proxy JSON (địa chỉ / GHN tiếng Việt)
+          proxy.on('proxyRes', (proxyRes) => {
+            const ct = proxyRes.headers['content-type']
+            if (ct && ct.includes('application/json') && !ct.includes('charset')) {
+              proxyRes.headers['content-type'] = 'application/json;charset=UTF-8'
+            }
+          })
+        },
       },
       '/ws': {
         target: 'http://localhost:8080',
