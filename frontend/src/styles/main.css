@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+}
+
 :root {
   /* Soleil design tokens — tham chiếu PhieuGiamGia.html */
   --cream: #f9f5f0;
@@ -12,8 +16,10 @@
   --coral: #d4624a;
   --sage: #7a8c6e;
   --sky: #5b8fa8;
-  --font-display: 'Cormorant Garamond', serif;
-  --font-body: 'DM Sans', sans-serif;
+  --font-display: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+  --font-body: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+  /* Phông duy nhất khu admin */
+  --admin-font: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-pill: 99px;
@@ -60,9 +66,55 @@ body,
 body {
   font-family: var(--font-body);
   font-size: 14px;
-  font-weight: 300;
+  font-weight: 400;
   color: var(--ink);
   background: #ffffff;
+}
+
+/* ——— Khu admin: 1 phông Be Vietnam Pro ——— */
+.admin-shell {
+  --font-display: var(--admin-font);
+  --font-body: var(--admin-font);
+  --font-serif: var(--admin-font);
+  font-family: var(--admin-font);
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+}
+
+.admin-shell,
+.admin-shell button,
+.admin-shell input,
+.admin-shell select,
+.admin-shell textarea {
+  font-family: var(--admin-font);
+}
+
+.admin-shell h1,
+.admin-shell h2,
+.admin-shell .page-title,
+.admin-shell .admin-page-title,
+.admin-shell .soleil-page-header__title {
+  font-family: var(--admin-font);
+  font-style: normal;
+  font-weight: 600;
+}
+
+.admin-shell table td,
+.admin-shell table th,
+.admin-shell .admin-table td,
+.admin-shell .admin-table th,
+.admin-shell .soleil-table td,
+.admin-shell .soleil-table th,
+.admin-shell [class*='money'],
+.admin-shell [class*='gia'],
+.admin-shell [class*='tien'],
+.admin-shell [class*='so-luong'],
+.admin-shell [class*='qty'] {
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-toast-stack {
+  font-family: var(--admin-font);
 }
 
 /* Thanh cuộn — vùng nội dung sáng */
@@ -151,8 +203,8 @@ h2,
 .admin-page-title {
   margin: 0;
   font-size: 28px;
-  font-weight: 300;
-  font-style: italic;
+  font-weight: 600;
+  font-style: normal;
   color: var(--ink);
   line-height: 1.2;
   letter-spacing: -0.01em;
@@ -598,8 +650,8 @@ h2,
   margin: 0;
   font-family: var(--font-display);
   font-size: 42px;
-  font-weight: 300;
-  font-style: italic;
+  font-weight: 600;
+  font-style: normal;
   color: var(--ink);
   line-height: 1.1;
   letter-spacing: -0.01em;
@@ -685,9 +737,9 @@ h2,
 }
 
 .admin-sidebar-naive__title {
-  font-family: var(--font-display);
+  font-family: var(--admin-font);
   font-size: 28px;
-  font-weight: 300;
+  font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--warm-tan);
@@ -2888,8 +2940,10 @@ h2,
 
 .admin-login-card__title {
   margin: 8px 0 0;
-  font-family: var(--font-display);
+  font-family: var(--admin-font);
   font-size: 1.75rem;
+  font-weight: 600;
+  font-style: normal;
   color: var(--ink);
 }
 

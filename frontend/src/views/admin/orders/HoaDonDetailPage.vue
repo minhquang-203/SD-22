@@ -331,7 +331,12 @@ async function loadDetail() {
     lichSu.value = lsRes.data || []
     resetWebhookSelection()
   } catch (err) {
-    error.value = String(err)
+    detail.value = null
+    const msg = typeof err === 'string' ? err : 'Không tải được hóa đơn'
+    error.value =
+      /not found|không tìm|404/i.test(msg)
+        ? 'Không tìm thấy hóa đơn này'
+        : msg
   } finally {
     loading.value = false
   }
@@ -407,8 +412,13 @@ onUnmounted(() => {
       Đang tải hóa đơn...
     </div>
 
-    <div v-else-if="error" class="admin-alert admin-alert-error px-4 py-3">
-      {{ error }}
+    <div v-else-if="error" class="soleil-card hd-panel p-8 text-center">
+      <h2 class="text-lg font-semibold text-[#3e2c1c] mb-2">{{ error }}</h2>
+      <p class="text-sm text-[#5a6a72] mb-4">Hóa đơn không tồn tại hoặc không tải được. Vui lòng quay lại danh sách.</p>
+      <button type="button" class="soleil-btn-outline hd-btn" @click="goBack">
+        <Icon icon="icon-park-outline:back" />
+        Về danh sách hóa đơn
+      </button>
     </div>
 
     <template v-else-if="detail">

@@ -2,9 +2,22 @@ import axios from 'axios'
 import router from '@/router'
 import { formatApiError } from '@/utils/apiError'
 import { getAdminToken, useAdminAuth } from '@/composables/useAdminAuth'
+<<<<<<< HEAD
 import { getCustomerToken, clearCustomerAuth } from '@/composables/useAuth'
+=======
+import { getCustomerToken, useAuth } from '@/composables/useAuth'
+import { useAuthModal } from '@/composables/useAuthModal'
+import { toast } from '@/composables/useToast'
+>>>>>>> 1391de8fff197ee69316cdfc8232a7a4b6810198
 
-const CUSTOMER_API_PREFIXES = ['/yeu-thich', '/khach-hang/toi', '/gio-hang', '/online', '/hoa-don/cua-toi', '/khach/quiz/ket-qua']
+const CUSTOMER_API_PREFIXES = [
+  '/yeu-thich',
+  '/khach-hang/toi',
+  '/gio-hang',
+  '/online',
+  '/hoa-don/cua-toi',
+  '/khach/quiz/ket-qua',
+]
 
 const request = axios.create({
   baseURL: '/api',
@@ -22,7 +35,6 @@ function attachBearer(config, token) {
 }
 
 function isCustomerApiUrl(url) {
-  // Checkout / tra cứu khách vãng lai là công khai: không gắn token, không coi 401/403 là hết phiên.
   if (url.includes('/online/guest')) return false
   if (url.includes('/hoa-don/tra-cuu')) return false
   return CUSTOMER_API_PREFIXES.some((prefix) => url.includes(prefix))
@@ -42,13 +54,15 @@ request.interceptors.request.use((config) => {
   const isCustomerApi = isCustomerApiUrl(url)
 
   if (isHoTro) {
-    // Admin inbox ưu tiên token nhân viên; storefront dùng token khách
     const adminToken = getAdminToken()
     if (adminToken) {
       attachBearer(config, adminToken)
     } else {
       attachBearer(config, getCustomerToken())
     }
+  } else if (url.includes('/yeu-cau-mua-so-luong-lon')) {
+    // POST công khai: gắn token khách nếu có (để BE biết đã đăng nhập)
+    attachBearer(config, getCustomerToken())
   } else if (isCustomerApi) {
     attachBearer(config, getCustomerToken())
   } else {
@@ -66,13 +80,12 @@ request.interceptors.response.use(
   (error) => {
     if (!error.response) {
       const isGateway =
-        error.code === 'ERR_BAD_RESPONSE' ||
-        String(error.message || '').includes('502')
-      return Promise.reject(
-        isGateway
-          ? 'Không kết nối được backend. Hãy chạy backend trước (start-backend.cmd).'
-          : error.message || 'Không kết nối được server',
-      )
+        error.code === 'ERR_BAD_RESPONSE' || String(error.message || '').includes('502')
+      const msg = isGateway
+        ? 'Không kết nối được máy chủ. Vui lòng thử lại sau.'
+        : 'Mất kết nối mạng. Vui lòng kiểm tra internet và thử lại.'
+      toast(msg, 'warn')
+      return Promise.reject(msg)
     }
 
     const status = error.response.status
@@ -80,7 +93,9 @@ request.interceptors.response.use(
     const isCustomerApi = isCustomerApiUrl(url)
     const isAdminLoginRequest = url.includes('/auth/nhan-vien/dang-nhap')
     const isKhachAuthRequest = url.includes('/auth/khach/')
+    const onAdmin = router.currentRoute.value.path.startsWith('/admin')
 
+<<<<<<< HEAD
     if (isCustomerApi && (status === 401 || status === 403)) {
       clearCustomerAuth()
       return Promise.reject('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại')
@@ -97,13 +112,68 @@ request.interceptors.response.use(
             expired: '1',
           },
         })
+=======
+    // 401 — hết phiên: đăng xuất đúng khu
+    if (status === 401 && !isAdminLoginRequest && !isKhachAuthRequest) {
+      if (isCustomerApi || (!onAdmin && getCustomerToken())) {
+        try {
+          useAuth().dangXuat()
+        } catch {
+          /* ignore */
+        }
+        try {
+          useAuthModal().openAuthModal('login', router.currentRoute.value.fullPath)
+        } catch {
+          /* ignore */
+        }
+        const msg = 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại'
+        toast(msg, 'warn')
+        return Promise.reject(msg)
       }
-      return Promise.reject('Phiên đăng nhập quản trị đã hết hạn, vui lòng đăng nhập lại')
+
+      if (getAdminToken()) {
+        useAdminAuth().dangXuat()
+        if (onAdmin && router.currentRoute.value.path !== '/admin/dang-nhap') {
+          router.push({
+            path: '/admin/dang-nhap',
+            query: {
+              redirect: router.currentRoute.value.fullPath,
+              expired: '1',
+            },
+          })
+        }
+        const msg = 'Phiên đăng nhập quản trị đã hết hạn, vui lòng đăng nhập lại'
+        toast(msg, 'warn')
+        return Promise.reject(msg)
+>>>>>>> 1391de8fff197ee69316cdfc8232a7a4b6810198
+      }
     }
 
-    return Promise.reject(formatApiError(error.response.data))
+    // 403 — không đủ quyền (không đăng xuất)
+    if (status === 403 && !isAdminLoginRequest && !isKhachAuthRequest) {
+      const msg = 'Bạn không có quyền thực hiện thao tác này'
+      toast(msg, 'warn')
+      return Promise.reject(msg)
+    }
+
+    // 5xx
+    if (status >= 500) {
+      const msg = 'Hệ thống đang gặp sự cố, vui lòng thử lại sau'
+      toast(msg, 'warn')
+      return Promise.reject(msg)
+    }
+
+    const data = error.response.data
+    if (data?.code === 'PRICE_CHANGED') {
+      return Promise.reject({
+        code: 'PRICE_CHANGED',
+        message: formatApiError(data),
+        details: data.details || {},
+      })
+    }
+
+    return Promise.reject(formatApiError(data))
   },
 )
 
 export default request
-

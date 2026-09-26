@@ -146,7 +146,7 @@ const formatDate = (dateString) => {
   padding: 24px;
   background-color: #f8fafc;
   min-height: 100vh;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--admin-font, 'Be Vietnam Pro', system-ui, sans-serif);
 }
 .dash-header { margin-bottom: 24px; }
 .page-title { font-size: 24px; font-weight: 700; color: #1e293b; margin: 0 0 8px 0; }
@@ -189,7 +189,7 @@ const formatDate = (dateString) => {
 .close-btn:hover { color: #0f172a; }
 .modal-body { padding: 24px; }
 .review-quote { background: #f8fafc; padding: 12px 16px; border-radius: 8px; font-style: italic; color: #475569; margin: 0 0 16px 0; font-size: 14px; border-left: 4px solid #cbd5e1; }
-.reply-input { width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; font-family: 'Inter', sans-serif; font-size: 14px; resize: vertical; box-sizing: border-box; }
+.reply-input { width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; font-family: var(--admin-font, 'Be Vietnam Pro', system-ui, sans-serif); font-size: 14px; resize: vertical; box-sizing: border-box; }
 .reply-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
 .modal-footer { padding: 16px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 12px; background: #f8fafc; }
 .btn-cancel { padding: 8px 16px; border: 1px solid #cbd5e1; background: white; color: #475569; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s;}

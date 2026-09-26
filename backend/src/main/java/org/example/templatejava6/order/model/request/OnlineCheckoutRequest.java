@@ -1,5 +1,6 @@
 package org.example.templatejava6.order.model.request;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -15,6 +16,16 @@ public class OnlineCheckoutRequest {
 
     @NotEmpty(message = "Vui lòng chọn ít nhất một sản phẩm trong giỏ hàng")
     private List<@NotNull Integer> idsChiTietGioHang;
+
+    /**
+     * Tổng thanh toán khách đang thấy trên màn hình (sau giảm + phí ship).
+     * Server tính lại; nếu khác → 409 PRICE_CHANGED.
+     */
+    @NotNull(message = "Thiếu tổng tiền khách đang thấy")
+    private java.math.BigDecimal tongTienKhachThay;
+
+    /** Đơn giá từng biến thể khách đang thấy — dùng để nêu dòng đổi giá. */
+    private List<DongGiaKhachThayRequest> dongGias;
 
     @NotBlank(message = "Vui lòng chọn phương thức thanh toán")
     private String maPhuongThucThanhToan;

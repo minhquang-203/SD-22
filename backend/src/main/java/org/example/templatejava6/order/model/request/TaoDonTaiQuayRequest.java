@@ -19,6 +19,8 @@ public class TaoDonTaiQuayRequest {
     private String ghiChu;
     private Integer idHoaDonCho;
 
+    /** Tổng thanh toán nhân viên đang thấy trên màn hình POS (sau giảm giá). */
+    private BigDecimal tongTienKhachThay;
 
     private List<ThanhToanItemRequest> danhSachThanhToan;
 
@@ -36,6 +38,8 @@ public class TaoDonTaiQuayRequest {
     public static class ItemRequest {
         private Integer idChiTietSanPham;
         private Integer soLuong;
+        /** Đơn giá NV đang thấy trên màn hình POS. */
+        private BigDecimal giaKhachThay;
         /**
          * null = trừ theo FEFO (hoặc dùng {@link #phanBoLos}).
          * Có giá trị = trừ đúng 1 lô (tương thích cũ).

@@ -30,12 +30,12 @@
 
           <h4 class="mt-4">✨ Sản phẩm phù hợp với UV {{ weatherData.uvIndex }}:</h4>
           <div class="product-grid" v-if="suggestedProducts && suggestedProducts.length > 0">
-            <div v-for="sp in suggestedProducts" :key="sp.maSanPham" class="product-card">
+            <div v-for="sp in suggestedProducts" :key="sp.id || sp.maSanPham" class="product-card">
               <div class="sp-info">
                 <p class="sp-title">{{ sp.ten }}</p>
-                <span class="sp-spf">SPF: {{ sp.chiSoSpf }}</span>
+                <span v-if="formatSpf(sp.chiSoSpf)" class="sp-spf">{{ formatSpf(sp.chiSoSpf) }}</span>
               </div>
-              <button class="btn-detail" @click="viewDetail(sp.maSanPham)">✏️</button>
+              <button class="btn-detail" type="button" @click="viewDetail(sp)">✏️</button>
             </div>
           </div>
           <div v-else class="empty-state">
@@ -60,9 +60,12 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import axios from 'axios'
+import { formatSpf } from '@/utils/formatChiSo'
 
-const API_BASE = 'http://localhost:8080/api/v1'
+const API_BASE = '/api/v1'
+const router = useRouter()
 
 const weatherData = ref(null)
 const suggestedProducts = ref([])
@@ -75,7 +78,7 @@ const loadData = async () => {
   loading.value = true
   try {
     const res = await axios.get(`${API_BASE}/weather/current`, {
-      params: { city: searchCity.value }
+      params: { city: searchCity.value || 'Hanoi' }
     })
     weatherData.value = res.data.weather
     isHighAlert.value = res.data.isHighAlert
@@ -106,14 +109,18 @@ const saveConfiguration = async () => {
   try {
     await axios.put(`${API_BASE}/admin/config/uv`, configForm.value)
     alert('✅ Đã lưu cấu hình!')
-    await loadData() // load lại để cập nhật cảnh báo theo ngưỡng mới
+    await loadData()
   } catch (err) {
     console.error('Lỗi lưu cấu hình:', err)
     alert('❌ Lưu cấu hình thất bại!')
   }
 }
 
-const viewDetail = (id) => window.location.href = `/admin/products/detail/${id}`
+const viewDetail = (sp) => {
+  const id = sp?.id
+  if (id == null) return
+  router.push(`/admin/san-pham/${id}/bien-the`)
+}
 
 onMounted(async () => {
   await loadConfig()

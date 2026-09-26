@@ -36,13 +36,15 @@ const { visible, options } = useConfirmState()
 
 <style scoped>
 .confirm-dialog-title {
-  font-family: var(--font-serif, Georgia, serif);
+  font-family: var(--admin-font, 'Be Vietnam Pro', system-ui, sans-serif);
   font-size: 1.2rem;
   font-weight: 600;
+  font-style: normal;
   color: var(--ink, #1e1510);
   margin-bottom: 0.75rem;
 }
 .confirm-dialog-message {
+  font-family: var(--admin-font, 'Be Vietnam Pro', system-ui, sans-serif);
   font-size: 0.9rem;
   line-height: 1.55;
   color: rgba(30, 21, 16, 0.72);

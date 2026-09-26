@@ -15,6 +15,12 @@ import {
   searchProducts,
 } from '@/api/storefrontApi'
 import { rankProductsByQuiz, resolveQuizProfile } from '@/utils/quizRecommend'
+import {
+  MUC_BAO_VE,
+  PA_CHUAN,
+  formatPa,
+  phanLoaiSpf,
+} from '@/constants/chiSoChongNang'
 
 const route = useRoute()
 const router = useRouter()
@@ -68,14 +74,8 @@ const PRICE_PRESETS = [
   { key: 'all', label: 'Mọi mức giá', min: '', max: '' },
 ]
 
-const SPF_BANDS = [
-  { key: '50plus', label: 'SPF 50+ (bảo vệ rất cao)' },
-  { key: '50', label: 'SPF 50 (cao)' },
-  { key: '30-49', label: 'SPF 30–49 (trung bình)' },
-  { key: 'lt30', label: 'Dưới SPF 30 (nhẹ)' },
-]
-
-const PA_OPTIONS = ['PA++', 'PA+++', 'PA++++']
+const SPF_BANDS = MUC_BAO_VE
+const PA_OPTIONS = PA_CHUAN
 
 let searchTimer
 
@@ -223,8 +223,8 @@ const filtered = computed(() => {
   }
   if (selectedSpf.value.length) {
     list = list.filter((p) => {
-      const band = spfBandOf(p.chiSoSpf)
-      return band && selectedSpf.value.includes(band)
+      const muc = phanLoaiSpf(p.chiSoSpf)
+      return muc && selectedSpf.value.includes(muc)
     })
   }
   if (selectedPa.value.length) {
@@ -284,32 +284,7 @@ const paged = computed(() => {
   return filtered.value.slice(start, start + pageSize)
 })
 
-const paOptions = computed(() => {
-  const set = new Set(PA_OPTIONS)
-  allProducts.value.forEach((p) => {
-    if (p.chiSoPa) set.add(String(p.chiSoPa))
-  })
-  return [...set]
-})
-
-function parseSpf(raw) {
-  const s = String(raw || '').trim()
-  if (!s) return null
-  const hasPlus = /\+/.test(s)
-  const num = Number(String(s).replace(/[^\d.]/g, ''))
-  if (!Number.isFinite(num) || num <= 0) return null
-  return { num, hasPlus }
-}
-
-function spfBandOf(raw) {
-  const p = parseSpf(raw)
-  if (!p) return null
-  if (p.num > 50 || (p.num >= 50 && p.hasPlus)) return '50plus'
-  if (p.num === 50) return '50'
-  if (p.num >= 30 && p.num <= 49) return '30-49'
-  if (p.num < 30) return 'lt30'
-  return null
-}
+const paOptions = PA_OPTIONS
 
 function applyPrice() {
   appliedPriceMin.value = priceMinInput.value
@@ -389,7 +364,7 @@ const activeTags = computed(() => {
     tags.push({ group: 'spf', id, label: band?.label || id })
   })
   selectedPa.value.forEach((id) => {
-    tags.push({ group: 'pa', id, label: id })
+    tags.push({ group: 'pa', id, label: formatPa(id) || id })
   })
   if (appliedPriceMin.value || appliedPriceMax.value) {
     const preset = PRICE_PRESETS.find((p) => p.key !== 'all' && p.min === String(appliedPriceMin.value || '') && p.max === String(appliedPriceMax.value || ''))
@@ -656,7 +631,7 @@ onMounted(async () => {
 
         <div class="sf-fgroup">
           <button type="button" class="sf-fgroup__head" @click="toggleAcc('spf')">
-            <span>Chỉ số SPF</span>
+            <span>Mức chống nắng (SPF)</span>
             <Icon :icon="openAcc.spf ? 'mdi:chevron-up' : 'mdi:chevron-down'" width="18" />
           </button>
           <div v-show="openAcc.spf" class="sf-fgroup__body">
@@ -685,7 +660,7 @@ onMounted(async () => {
                 @change="toggleId(selectedPa, pa)"
               />
               <span class="sf-fcheck__box" />
-              <span class="sf-fcheck__label">{{ pa }}</span>
+              <span class="sf-fcheck__label">{{ formatPa(pa) || pa }}</span>
             </label>
           </div>
         </div>
@@ -759,14 +734,13 @@ onMounted(async () => {
             >
               Khuyến mãi
             </RouterLink>
-            <button
-              v-if="isGoiYPage"
-              type="button"
-              :class="{ active: sortBy === 'relevance' }"
-              @click="setSort('relevance')"
+            <RouterLink
+              to="/san-pham/goi-y"
+              class="sf-sort-tabs__link"
+              :class="{ active: isGoiYPage }"
             >
-              Phù hợp
-            </button>
+              Gợi ý
+            </RouterLink>
             <button type="button" :class="{ active: sortBy === 'popular' }" @click="setSort('popular')">Phổ biến</button>
             <button type="button" :class="{ active: sortBy === 'newest' }" @click="setSort('newest')">Mới nhất</button>
             <button type="button" :class="{ active: sortBy === 'bestseller' }" @click="setSort('bestseller')">Bán chạy</button>

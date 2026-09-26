@@ -13,6 +13,7 @@ export function normalizeInvoice(raw) {
     soLuong: line.soLuong ?? 0,
     donGia: line.donGia ?? 0,
     thanhTien: line.thanhTien ?? 0,
+    tienGiamGia: line.tienGiamGia ?? line.giamGia ?? null,
     loHangs: (line.loHangs || []).map((lo) => ({
       soLo: lo.soLo || lo.maLo || '',
       hanSuDung: lo.hanSuDung || null,
@@ -40,10 +41,18 @@ export function normalizeInvoice(raw) {
     diemCong = Math.floor(Number(raw.thanhTien) / 1000)
   }
 
+  const loaiDon = raw.loaiDon || ''
+  let hinhThuc = ''
+  if (/TAI_QUAY|tai.?quay|pos/i.test(loaiDon)) hinhThuc = 'Tại quầy'
+  else if (/ONLINE|online/i.test(loaiDon)) hinhThuc = 'Online'
+  else if (loaiDon) hinhThuc = loaiDon
+
   return {
     id: raw.id,
     maHoaDon: raw.maHoaDon || '',
     ngayTao: raw.ngayTao,
+    loaiDon,
+    hinhThuc,
     tenNhanVien: raw.tenNhanVien || '',
     tenKhachHang: raw.tenKhachHang || 'Khách lẻ',
     soDienThoaiKhachHang: raw.soDienThoaiKhachHang || '',
@@ -86,7 +95,6 @@ export function formatReceiptDateTime(value) {
 export function formatReceiptDate(value) {
   if (!value) return ''
   const s = String(value)
-  // LocalDate: yyyy-mm-dd
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s)
   if (m) return `${m[3]}/${m[2]}/${m[1]}`
   const d = new Date(value)
@@ -95,4 +103,66 @@ export function formatReceiptDate(value) {
   const mm = String(d.getMonth() + 1).padStart(2, '0')
   const yyyy = d.getFullYear()
   return `${dd}/${mm}/${yyyy}`
+}
+
+const CHU_SO = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín']
+
+function docHangChuc(n, full) {
+  const chuc = Math.floor(n / 10)
+  const donvi = n % 10
+  let s = ''
+  if (chuc > 1) {
+    s = `${CHU_SO[chuc]} mươi`
+    if (donvi === 1) s += ' mốt'
+    else if (donvi === 5) s += ' lăm'
+    else if (donvi) s += ` ${CHU_SO[donvi]}`
+  } else if (chuc === 1) {
+    s = 'mười'
+    if (donvi === 1) s += ' một'
+    else if (donvi === 5) s += ' lăm'
+    else if (donvi) s += ` ${CHU_SO[donvi]}`
+  } else if (full && donvi) {
+    s = `lẻ ${CHU_SO[donvi]}`
+  } else if (donvi) {
+    s = CHU_SO[donvi]
+  }
+  return s
+}
+
+function docBaSo(n, full) {
+  const tram = Math.floor(n / 100)
+  const du = n % 100
+  let s = ''
+  if (tram > 0) {
+    s = `${CHU_SO[tram]} trăm`
+    if (du) s += ` ${docHangChuc(du, true)}`
+  } else {
+    s = docHangChuc(du, full)
+  }
+  return s
+}
+
+/** Đọc số tiền VND thành chữ */
+export function soTienBangChu(value) {
+  let n = Math.round(Number(value) || 0)
+  if (n === 0) return 'Không đồng'
+  if (n < 0) return `Âm ${soTienBangChu(-n)}`
+
+  const hang = ['', 'nghìn', 'triệu', 'tỷ', 'nghìn tỷ']
+  const parts = []
+  let i = 0
+  let full = false
+  while (n > 0 && i < hang.length) {
+    const block = n % 1000
+    if (block > 0) {
+      const chunk = docBaSo(block, full)
+      parts.unshift(hang[i] ? `${chunk} ${hang[i]}` : chunk)
+    }
+    n = Math.floor(n / 1000)
+    i += 1
+    full = true
+  }
+  let text = parts.join(' ').replace(/\s+/g, ' ').trim()
+  text = text.charAt(0).toUpperCase() + text.slice(1)
+  return `${text} đồng`
 }

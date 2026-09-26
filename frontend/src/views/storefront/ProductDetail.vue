@@ -12,8 +12,10 @@ import {
   fetchProductReviews,
   fetchThanhPhanList,
 } from '@/api/storefrontApi'
-import { useCart } from '@/composables/useCart'
+import { useCart, GIOI_HAN_MUA_LE } from '@/composables/useCart'
+import { openBulkOrderModal } from '@/composables/useBulkOrderModal'
 import { formatDiscountPercent, formatVND } from '@/utils/formatVND'
+import { formatSpfPaDetail } from '@/utils/formatChiSo'
 import { productImageUrl } from '@/utils/productImage'
 
 const route = useRoute()
@@ -129,7 +131,7 @@ const colors = computed(() => {
 
 const volumesForColor = computed(() => {
   if (!selectedVariant.value?.tenMauSac) return variants.value
-  return variants.value.filter((v) => v.tenMauSac === selectedVariant.value.tenMauSac)
+  return variants.value.filter((v) => v.tenMauSac === selectedVariant.value?.tenMauSac)
 })
 
 const loaiDaNames = computed(() => {
@@ -156,17 +158,48 @@ function showToast(msg) {
 
 function selectVariant(v) {
   selectedVariantId.value = v.id
-  const max = Number(v.soLuongTon) || 1
+  const max = Math.min(Number(v.soLuongTon) || 1, GIOI_HAN_MUA_LE)
   if (quantity.value > max) quantity.value = Math.max(1, max)
 }
 
 watch(
   () => selectedVariant.value?.soLuongTon,
   (ton) => {
-    const max = Number(ton) || 1
+    const max = Math.min(Number(ton) || 1, GIOI_HAN_MUA_LE)
     if (quantity.value > max) quantity.value = Math.max(1, max)
   },
 )
+
+function pdpMaxQty() {
+  const v = selectedVariant.value
+  if (!v) return 1
+  return Math.min(Number(v.soLuongTon) || 1, GIOI_HAN_MUA_LE)
+}
+
+function onPdpIncrease() {
+  const v = selectedVariant.value
+  if (!v) return
+  const stock = Number(v.soLuongTon) || 0
+  if (quantity.value >= stock && stock < GIOI_HAN_MUA_LE) {
+    showToast(`Chỉ còn ${stock} sản phẩm`)
+    return
+  }
+  if (quantity.value >= GIOI_HAN_MUA_LE) {
+    openBulkOrderModal({
+      idChiTietSanPham: v.id,
+      idSanPham: product.value?.id,
+      tenSanPham: product.value?.ten,
+      anhUrl: activeImage.value || product.value?.anhChinhUrl,
+      tenMauSac: v.tenMauSac,
+      dungTichMl: v.dungTichMl,
+      sku: v.sku,
+      soLuongTon: stock,
+      soLuongMongMuon: GIOI_HAN_MUA_LE + 1,
+    })
+    return
+  }
+  quantity.value = Math.min(pdpMaxQty(), quantity.value + 1)
+}
 
 async function addToCart() {
   const v = selectedVariant.value
@@ -181,7 +214,7 @@ async function addToCart() {
   try {
     const originalPrice = Number(v.giaGoc ?? v.giaBan)
     const sellingPrice = v.giaSauGiam != null ? Number(v.giaSauGiam) : originalPrice
-    await addItem({
+    const payload = {
       idChiTietSanPham: v.id,
       idSanPham: product.value.id,
       tenSanPham: product.value.ten,
@@ -195,8 +228,20 @@ async function addToCart() {
       anhUrl: activeImage.value || product.value.anhChinhUrl,
       tenMauSac: v.tenMauSac,
       dungTichMl: v.dungTichMl,
-    })
-    showToast('Đã thêm vào giỏ hàng')
+    }
+    const result = await addItem(payload)
+    if (result?.capped && result.capReason === 'retail') {
+      openBulkOrderModal({
+        ...(result.line || payload),
+        soLuongMongMuon: GIOI_HAN_MUA_LE + 1,
+      })
+      showToast(`Đã thêm tối đa ${GIOI_HAN_MUA_LE} sản phẩm (mua lẻ)`)
+    } else if (result?.capped && result.capReason === 'stock') {
+      const stock = Number(v.soLuongTon) || 0
+      showToast(`Chỉ còn ${stock} sản phẩm`)
+    } else {
+      showToast('Đã thêm vào giỏ hàng')
+    }
     cartPulse.value = true
     window.setTimeout(() => {
       cartPulse.value = false
@@ -249,16 +294,21 @@ async function loadProduct(id) {
     }
     activeImageIndex.value = 0
 
-    const allRes = await fetchAllProducts()
-    const sameCat = (allRes.data || []).filter(
-      (p) =>
-        p.id !== product.value.id &&
-        p.trangThai !== false &&
-        p.tenDanhMuc === product.value.tenDanhMuc,
-    )
-    related.value = sameCat.slice(0, 4)
+    try {
+      const allRes = await fetchAllProducts()
+      const sameCat = (allRes.data || []).filter(
+        (p) =>
+          p?.id !== product.value?.id &&
+          p?.trangThai !== false &&
+          p?.tenDanhMuc === product.value?.tenDanhMuc,
+      )
+      related.value = sameCat.slice(0, 4)
+    } catch {
+      related.value = []
+    }
   } catch {
     notFound.value = true
+    product.value = null
   } finally {
     loading.value = false
   }
@@ -276,9 +326,12 @@ let intervalId = null;
 onMounted(() => {
   loadProduct(route.params.id)
   intervalId = setInterval(async () => {
-    if (route.params.id) {
+    if (!route.params.id || notFound.value) return
+    try {
       const res = await fetchProductReviews(route.params.id)
       reviews.value = res.data || []
+    } catch {
+      /* giữ danh sách đánh giá hiện có */
     }
   }, 10000)
 })
@@ -407,8 +460,8 @@ onUnmounted(() => {
               <button
                 type="button"
                 aria-label="Tăng số lượng"
-                :disabled="selectedVariant?.soLuongTon != null && quantity >= selectedVariant.soLuongTon"
-                @click="quantity++"
+                :disabled="false"
+                @click="onPdpIncrease"
               >+</button>
             </div>
           </div>
@@ -427,8 +480,10 @@ onUnmounted(() => {
 
           <table class="sf-spec-table">
             <tbody>
-              <tr v-if="product.chiSoSpf"><td>SPF</td><td>{{ product.chiSoSpf }}</td></tr>
-              <tr v-if="product.chiSoPa"><td>PA</td><td>{{ product.chiSoPa }}</td></tr>
+              <tr v-if="formatSpfPaDetail(product.chiSoSpf, product.chiSoPa)">
+                <td>Chỉ số</td>
+                <td>{{ formatSpfPaDetail(product.chiSoSpf, product.chiSoPa) }}</td>
+              </tr>
               <tr v-if="product.loaiChongNang"><td>Loại chống nắng</td><td>{{ loaiChongNangLabel(product.loaiChongNang) }}</td></tr>
               <tr><td>Kháng nước</td><td>{{ product.khangNuoc ? 'Có' : 'Không' }}</td></tr>
               <tr v-if="product.tenDangSanPham"><td>Dạng sản phẩm</td><td>{{ product.tenDangSanPham }}</td></tr>

@@ -554,7 +554,7 @@ watch(
 
 <style scoped>
 .voucher-modal {
-  font-family: 'Archivo', system-ui, sans-serif;
+  font-family: var(--admin-font, 'Be Vietnam Pro', system-ui, sans-serif);
 }
 
 .voucher-modal-box {
@@ -684,8 +684,10 @@ watch(
 
 .voucher-input.mono {
   text-transform: uppercase;
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: var(--admin-font, 'Be Vietnam Pro', system-ui, sans-serif);
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
 .voucher-input.is-invalid {

@@ -2858,6 +2858,22 @@
   margin: 0;
 }
 
+.sf-footer__store {
+  margin: 0.45rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--sf-mid);
+}
+
+.sf-footer__store a {
+  color: var(--sf-gold-dark);
+  text-decoration: none;
+}
+
+.sf-footer__store a:hover {
+  text-decoration: underline;
+}
+
 .sf-footer__link--muted {
   opacity: 0.45;
   pointer-events: none;
@@ -4390,11 +4406,11 @@
 }
 
 /* Toast góc phải — Soleil */
-.sf-toast-stack {
+  .sf-toast-stack {
   position: fixed;
   top: 88px;
   right: 20px;
-  z-index: 3000;
+  z-index: 7000;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;

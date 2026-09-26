@@ -17,6 +17,13 @@ export function tinhGiaGuest(payload) {
   return request.post('/online/guest/tinh-gia', payload)
 }
 
+/** Lấy giá/tồn hiện tại của danh sách biến thể (guest + refresh giỏ). */
+export function fetchGiaHienTai(idsChiTietSanPham) {
+  return request.post('/online/guest/gia-hien-tai', {
+    idsChiTietSanPham: idsChiTietSanPham || [],
+  })
+}
+
 export function fetchOnlineOrders() {
   return request.get('/online/orders')
 }

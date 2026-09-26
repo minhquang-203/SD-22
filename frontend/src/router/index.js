@@ -9,8 +9,8 @@ import { toast } from '@/composables/useToast'
 import { INFO_PAGES } from '@/constants/storefrontInfo'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import StorefrontLayout from '@/layouts/StorefrontLayout.vue'
-import BlogView from '@/views/BlogView.vue'
-import BlogDetailView from '@/views/BlogDetailView.vue'
+import TinTucView from '@/views/storefront/TinTucView.vue'
+import TinTucDetailView from '@/views/storefront/TinTucDetailView.vue'
 
 const infoRoutes = Object.keys(INFO_PAGES).map((slug) => ({
   path: slug,
@@ -121,16 +121,26 @@ const router = createRouter({
           component: () => import('@/views/storefront/QuizPlaceholder.vue'),
           meta: { title: 'Quiz da — SUNOVA' },
         },
-          {
-    path: '/blog',
-    name: 'blog',
-    component: BlogView,
-  },
-  {
-    path: '/blog/:slug',
-    name: 'blog-detail',
-    component: BlogDetailView,
-  },
+        {
+          path: 'tin-tuc',
+          name: 'TinTuc',
+          component: TinTucView,
+          meta: { title: 'Tin tức & Cẩm nang — SUNOVA' },
+        },
+        {
+          path: 'tin-tuc/:slug',
+          name: 'TinTucDetail',
+          component: TinTucDetailView,
+          meta: { title: 'Chi tiết bài viết — SUNOVA' },
+        },
+        {
+          path: 'blog',
+          redirect: '/tin-tuc',
+        },
+        {
+          path: 'blog/:slug',
+          redirect: (to) => `/tin-tuc/${to.params.slug}`,
+        },
       ],
     },
 
@@ -317,9 +327,50 @@ const router = createRouter({
           component: () => import('@/views/admin/support/SupportPage.vue'),
           meta: { title: 'Hỗ trợ khách hàng', breadcrumb: 'Hỗ trợ khách hàng' },
         },
+        {
+          path: ':pathMatch(.*)*',
+          name: 'AdminNotFound',
+          component: () => import('@/views/shared/NotFoundPage.vue'),
+          props: { variant: 'admin' },
+          meta: { title: 'Không tìm thấy trang', breadcrumb: '404' },
+        },
+      ],
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'StorefrontNotFound',
+      component: StorefrontLayout,
+      children: [
+        {
+          path: '',
+          name: 'StorefrontNotFoundPage',
+          component: () => import('@/views/shared/NotFoundPage.vue'),
+          props: { variant: 'storefront' },
+          meta: { title: 'Không tìm thấy trang — SUNOVA' },
+        },
       ],
     },
   ],
+})
+
+let chunkReloadTried = false
+
+router.onError((error) => {
+  const msg = String(error?.message || error || '')
+  const isChunk =
+    msg.includes('Failed to fetch dynamically imported module') ||
+    msg.includes('Importing a module script failed') ||
+    msg.includes('Loading chunk') ||
+    msg.includes('error loading dynamically imported module')
+
+  if (isChunk && !chunkReloadTried) {
+    chunkReloadTried = true
+    window.location.reload()
+    return
+  }
+
+  console.error('[router.onError]', error)
+  toast('Không tải được trang, vui lòng thử lại', 'warn')
 })
 
 router.beforeEach((to) => {

@@ -1,5 +1,6 @@
 <script setup>
 import { Icon } from '@iconify/vue'
+import { formatPa, formatSpf } from '@/utils/formatChiSo'
 
 const model = defineModel({ type: Object, required: true })
 
@@ -59,7 +60,7 @@ const emit = defineEmits(['reset'])
       <label v-if="!compact" class="soleil-toolbar__label">SPF</label>
       <select v-model="model.chiSoSpf" class="soleil-toolbar__select">
         <option value="">{{ compact ? 'SPF' : 'Tất cả' }}</option>
-        <option v-for="spf in spfOptions" :key="spf" :value="spf">{{ spf }}</option>
+        <option v-for="spf in spfOptions" :key="spf" :value="spf">{{ formatSpf(spf) || spf }}</option>
       </select>
     </div>
 
@@ -67,7 +68,7 @@ const emit = defineEmits(['reset'])
       <label v-if="!compact" class="soleil-toolbar__label">PA</label>
       <select v-model="model.chiSoPa" class="soleil-toolbar__select">
         <option value="">{{ compact ? 'PA' : 'Tất cả' }}</option>
-        <option v-for="pa in paOptions" :key="pa" :value="pa">{{ pa }}</option>
+        <option v-for="pa in paOptions" :key="pa" :value="pa">{{ formatPa(pa) || pa }}</option>
       </select>
     </div>
 

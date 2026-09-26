@@ -1,10 +1,10 @@
-/* Shared screen + print (80mm receipt) */
+/* ========== Hóa đơn nhiệt 80mm ========== */
 .inv-receipt {
   width: 72mm;
   max-width: 100%;
   margin: 0 auto;
   padding: 8px 4px;
-  font-family: 'Consolas', 'Courier New', ui-monospace, monospace;
+  font-family: 'Be Vietnam Pro', Arial, Helvetica, sans-serif;
   font-size: 11px;
   line-height: 1.35;
   color: #111;
@@ -69,12 +69,6 @@
   word-break: break-word;
 }
 
-.inv-receipt__row--sub {
-  font-size: 10px;
-  color: #333;
-  padding-left: 4px;
-}
-
 .inv-receipt__strong {
   font-weight: 700;
 }
@@ -116,51 +110,48 @@
   font-variant-numeric: tabular-nums;
 }
 
+.inv-receipt__txn {
+  font-size: 9px;
+  color: #444;
+  font-weight: 400;
+  white-space: normal;
+}
+
 .inv-receipt__grand {
   font-weight: 800;
   font-size: 13px;
   margin-top: 4px;
 }
 
-.inv-receipt__pay-title {
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-
-.inv-receipt__pay-block + .inv-receipt__pay-block {
-  margin-top: 4px;
-}
-
-.inv-receipt__points {
-  text-align: center;
-  font-weight: 600;
-}
-
 .inv-receipt__qr {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
+  text-align: center;
+  margin: 4px 0;
 }
 
-.inv-receipt__qr-cap {
-  font-size: 10px;
-  text-align: center;
+.inv-receipt__qr :deep(canvas),
+.inv-receipt__qr :deep(img) {
+  margin: 0 auto;
 }
 
-.inv-receipt__policy,
-.inv-receipt__thanks,
-.inv-receipt__legal {
-  text-align: center;
-  margin-top: 6px;
+.inv-receipt__policy {
+  margin: 6px 0 0;
+  font-size: 9px;
+  color: #444;
+  line-height: 1.35;
 }
 
 .inv-receipt__thanks {
+  text-align: center;
   font-weight: 600;
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .inv-receipt__legal {
+  text-align: center;
   font-size: 9px;
   color: #444;
   margin-top: 8px;
+  line-height: 1.35;
 }

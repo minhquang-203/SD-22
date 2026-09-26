@@ -16,4 +16,7 @@ public class GuestCheckoutItemRequest {
     @NotNull(message = "Thiếu số lượng sản phẩm")
     @Min(value = 1, message = "Số lượng phải lớn hơn 0")
     private Integer soLuong;
+
+    /** Đơn giá khách đang thấy trên màn hình (sau đợt giảm nếu có). */
+    private java.math.BigDecimal giaKhachThay;
 }

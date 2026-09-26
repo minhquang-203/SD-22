@@ -21,6 +21,13 @@ public class GuestCheckoutRequest {
     @NotEmpty(message = "Vui lòng chọn ít nhất một sản phẩm")
     private List<@Valid GuestCheckoutItemRequest> items;
 
+    /**
+     * Tổng thanh toán khách đang thấy trên màn hình (sau phí ship).
+     * Server tính lại; nếu khác → 409 PRICE_CHANGED.
+     */
+    @jakarta.validation.constraints.NotNull(message = "Thiếu tổng tiền khách đang thấy")
+    private java.math.BigDecimal tongTienKhachThay;
+
     @NotBlank(message = "Vui lòng chọn phương thức thanh toán")
     private String maPhuongThucThanhToan;
 

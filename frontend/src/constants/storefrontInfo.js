@@ -1,5 +1,7 @@
 /** Nhóm sidebar + nội dung trang thông tin storefront */
 
+import { storeInfo } from '@/constants/storeInfo'
+
 export const INFO_GROUPS = [
   {
     id: 'policy',
@@ -23,19 +25,20 @@ export const INFO_GROUPS = [
   },
 ]
 
+/** Liên hệ / trụ sở — lấy từ storeInfo (đồng bộ hóa đơn & footer) */
 export const CONTACT_FAKE = {
-  hotline: '1900 6868',
-  email: 'cskh@sunova.vn',
-  address: 'Tầng 5, 80 Phố Chùa Bộc, Đống Đa, Hà Nội',
-  hours: 'Thứ 2 – Thứ 7: 8:00 – 21:00 · Chủ nhật: 9:00 – 18:00',
+  hotline: storeInfo.hotline,
+  email: storeInfo.email,
+  address: storeInfo.diaChi,
+  hours: storeInfo.hours,
 }
 
 export const STORES_FAKE = [
   {
     city: 'Hà Nội',
-    name: 'SUNOVA Chùa Bộc',
-    address: 'Tầng 1, 80 Phố Chùa Bộc, Đống Đa, Hà Nội',
-    phone: '024 3856 6868',
+    name: 'SUNOVA Chùa Bộc (trụ sở)',
+    address: storeInfo.diaChi,
+    phone: storeInfo.hotline,
     hours: '9:00 – 21:00',
   },
   {
@@ -180,7 +183,11 @@ export const INFO_PAGES = {
       {
         type: 'list',
         items: [
-          'Liên hệ hotline 1900 6868 hoặc email cskh@sunova.vn, cung cấp mã đơn và lý do đổi trả.',
+          'Liên hệ hotline ' +
+            storeInfo.hotline +
+            ' hoặc email ' +
+            storeInfo.email +
+            ', cung cấp mã đơn và lý do đổi trả.',
           'SUNOVA hướng dẫn gửi hàng về kho hoặc mang sản phẩm đến cửa hàng gần nhất.',
           'Sau khi kiểm tra, chúng tôi đổi sản phẩm tương đương hoặc hoàn tiền theo phương thức thanh toán ban đầu.',
         ],
@@ -248,7 +255,9 @@ export const INFO_PAGES = {
         type: 'list',
         items: [
           'Không bán hoặc chia sẻ thông tin cá nhân cho bên thứ ba ngoài mục đích vận hành đơn hàng.',
-          'Khách hàng có quyền yêu cầu chỉnh sửa hoặc xóa dữ liệu bằng cách liên hệ cskh@sunova.vn.',
+          'Khách hàng có quyền yêu cầu chỉnh sửa hoặc xóa dữ liệu bằng cách liên hệ ' +
+            storeInfo.email +
+            '.',
         ],
       },
     ],

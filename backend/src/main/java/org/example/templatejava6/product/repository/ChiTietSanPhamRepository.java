@@ -22,6 +22,14 @@ public interface ChiTietSanPhamRepository extends JpaRepository<ChiTietSanPham, 
     @Query("SELECT c FROM ChiTietSanPham c WHERE c.id = :id")
     Optional<ChiTietSanPham> findByIdForUpdate(@Param("id") Integer id);
 
+    @Query("""
+            SELECT c FROM ChiTietSanPham c
+            JOIN FETCH c.sanPham
+            LEFT JOIN FETCH c.mauSac
+            WHERE c.id = :id
+            """)
+    Optional<ChiTietSanPham> findByIdWithSanPham(@Param("id") Integer id);
+
     List<ChiTietSanPham> findBySanPhamAndTrangThaiTrue(SanPham sanPham);
 
     List<ChiTietSanPham> findBySanPham(SanPham sanPham);

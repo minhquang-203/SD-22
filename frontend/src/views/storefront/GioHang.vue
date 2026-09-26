@@ -7,7 +7,9 @@ import {
   maxQtyFor,
   useCart,
   variantLabel,
+  GIOI_HAN_MUA_LE,
 } from '@/composables/useCart'
+import { openBulkOrderModal } from '@/composables/useBulkOrderModal'
 import { toast } from '@/composables/useToast'
 import { formatDiscountPercent, formatVND } from '@/utils/formatVND'
 import { productImageUrl } from '@/utils/productImage'
@@ -61,10 +63,17 @@ async function onDecrease(line) {
 async function onIncrease(line) {
   try {
     const result = await increaseQty(line.idChiTietSanPham)
-    if (result === 'max') {
-      const fresh = items.value.find((l) => l.idChiTietSanPham === line.idChiTietSanPham) ?? line
-      const stock = fresh.soLuongTon ?? maxQtyFor(fresh)
-      toast(`Số lượng đã đạt mức tối đa (còn ${stock} trong kho)`)
+    if (result.status === 'max') {
+      if (result.capReason === 'retail') {
+        openBulkOrderModal({
+          ...(result.line || line),
+          soLuongMongMuon: GIOI_HAN_MUA_LE + 1,
+        })
+      } else {
+        const fresh = items.value.find((l) => l.idChiTietSanPham === line.idChiTietSanPham) ?? line
+        const stock = fresh.soLuongTon ?? maxQtyFor(fresh)
+        toast(`Chỉ còn ${stock} sản phẩm`)
+      }
     }
     syncQtyInput(line.idChiTietSanPham)
   } catch (error) {
@@ -77,13 +86,20 @@ async function onQtyInput(line, e) {
   qtyInputs.value[line.idChiTietSanPham] = raw
   if (raw === '' || raw === undefined) return
   try {
-    const { hitMin, hitMax } = await setQty(line.idChiTietSanPham, raw)
+    const { hitMin, hitMax, capReason, line: snap } = await setQty(line.idChiTietSanPham, raw)
     syncQtyInput(line.idChiTietSanPham)
     if (hitMin) toast('Đã đạt số lượng tối thiểu')
     if (hitMax) {
-      const fresh = items.value.find((l) => l.idChiTietSanPham === line.idChiTietSanPham) ?? line
-      const stock = fresh.soLuongTon ?? maxQtyFor(fresh)
-      toast(`Số lượng đã đạt mức tối đa (còn ${stock} trong kho)`)
+      if (capReason === 'retail') {
+        openBulkOrderModal({
+          ...(snap || line),
+          soLuongMongMuon: Math.max(GIOI_HAN_MUA_LE + 1, Number(raw) || GIOI_HAN_MUA_LE + 1),
+        })
+      } else {
+        const fresh = items.value.find((l) => l.idChiTietSanPham === line.idChiTietSanPham) ?? line
+        const stock = fresh.soLuongTon ?? maxQtyFor(fresh)
+        toast(`Chỉ còn ${stock} sản phẩm`)
+      }
     }
   } catch (error) {
     syncQtyInput(line.idChiTietSanPham)
