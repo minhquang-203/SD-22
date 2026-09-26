@@ -1910,7 +1910,7 @@ onBeforeUnmount(() => {
       </div>
     </Teleport>
 
-    <!-- Modal biên lai (xem trước + in qua iframe 80mm) -->
+    <!-- Modal biên lai (xem trước + in khổ 80mm) -->
     <Teleport to="body">
       <div v-if="showReceipt && receipt" class="pos-receipt-overlay" @click.self="showReceipt = false">
         <div class="pos-receipt-modal">

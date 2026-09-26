@@ -51,7 +51,7 @@ const navLinks = [
 
 const extraLinks = [
   { to: '/san-pham/khuyen-mai', label: 'Khuyến mãi' },
-  { to: '/blog', label: 'Blog' },
+  { to: '/tin-tuc', label: 'Tin tức' },
   { to: '/san-pham/goi-y', label: 'Sản phẩm gợi ý' },
 ]
 

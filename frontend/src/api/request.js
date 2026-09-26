@@ -2,9 +2,18 @@ import axios from 'axios'
 import router from '@/router'
 import { formatApiError } from '@/utils/apiError'
 import { getAdminToken, useAdminAuth } from '@/composables/useAdminAuth'
-import { getCustomerToken } from '@/composables/useAuth'
+import { getCustomerToken, useAuth } from '@/composables/useAuth'
+import { useAuthModal } from '@/composables/useAuthModal'
+import { toast } from '@/composables/useToast'
 
-const CUSTOMER_API_PREFIXES = ['/yeu-thich', '/khach-hang/toi', '/gio-hang', '/online', '/hoa-don/cua-toi', '/khach/quiz/ket-qua']
+const CUSTOMER_API_PREFIXES = [
+  '/yeu-thich',
+  '/khach-hang/toi',
+  '/gio-hang',
+  '/online',
+  '/hoa-don/cua-toi',
+  '/khach/quiz/ket-qua',
+]
 
 const request = axios.create({
   baseURL: '/api',
@@ -22,7 +31,6 @@ function attachBearer(config, token) {
 }
 
 function isCustomerApiUrl(url) {
-  // Checkout / tra cứu khách vãng lai là công khai: không gắn token, không coi 401/403 là hết phiên.
   if (url.includes('/online/guest')) return false
   if (url.includes('/hoa-don/tra-cuu')) return false
   return CUSTOMER_API_PREFIXES.some((prefix) => url.includes(prefix))
@@ -42,12 +50,18 @@ request.interceptors.request.use((config) => {
   const isCustomerApi = isCustomerApiUrl(url)
 
   if (isHoTro) {
-    // Admin inbox ưu tiên token nhân viên; storefront dùng token khách
     const adminToken = getAdminToken()
     if (adminToken) {
       attachBearer(config, adminToken)
     } else {
       attachBearer(config, getCustomerToken())
+    }
+  } else if (url.includes('/yeu-cau-mua-so-luong-lon')) {
+    const method = String(config.method || 'get').toLowerCase()
+    if (method === 'post') {
+      attachBearer(config, getCustomerToken())
+    } else {
+      attachBearer(config, getAdminToken())
     }
   } else if (isCustomerApi) {
     attachBearer(config, getCustomerToken())
@@ -66,13 +80,12 @@ request.interceptors.response.use(
   (error) => {
     if (!error.response) {
       const isGateway =
-        error.code === 'ERR_BAD_RESPONSE' ||
-        String(error.message || '').includes('502')
-      return Promise.reject(
-        isGateway
-          ? 'Không kết nối được backend. Hãy chạy backend trước (start-backend.cmd).'
-          : error.message || 'Không kết nối được server',
-      )
+        error.code === 'ERR_BAD_RESPONSE' || String(error.message || '').includes('502')
+      const msg = isGateway
+        ? 'Không kết nối được máy chủ. Vui lòng thử lại sau.'
+        : 'Mất kết nối mạng. Vui lòng kiểm tra internet và thử lại.'
+      toast(msg, 'warn')
+      return Promise.reject(msg)
     }
 
     const status = error.response.status
@@ -80,24 +93,55 @@ request.interceptors.response.use(
     const isCustomerApi = isCustomerApiUrl(url)
     const isAdminLoginRequest = url.includes('/auth/nhan-vien/dang-nhap')
     const isKhachAuthRequest = url.includes('/auth/khach/')
+    const onAdmin = router.currentRoute.value.path.startsWith('/admin')
 
-    if (isCustomerApi && (status === 401 || status === 403)) {
-      return Promise.reject('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại')
+    // 401 — hết phiên: đăng xuất đúng khu
+    if (status === 401 && !isAdminLoginRequest && !isKhachAuthRequest) {
+      if (isCustomerApi || (!onAdmin && getCustomerToken())) {
+        try {
+          useAuth().dangXuat()
+        } catch {
+          /* ignore */
+        }
+        try {
+          useAuthModal().openAuthModal('login', router.currentRoute.value.fullPath)
+        } catch {
+          /* ignore */
+        }
+        const msg = 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại'
+        toast(msg, 'warn')
+        return Promise.reject(msg)
+      }
+
+      if (getAdminToken()) {
+        useAdminAuth().dangXuat()
+        if (onAdmin && router.currentRoute.value.path !== '/admin/dang-nhap') {
+          router.push({
+            path: '/admin/dang-nhap',
+            query: {
+              redirect: router.currentRoute.value.fullPath,
+              expired: '1',
+            },
+          })
+        }
+        const msg = 'Phiên đăng nhập quản trị đã hết hạn, vui lòng đăng nhập lại'
+        toast(msg, 'warn')
+        return Promise.reject(msg)
+      }
     }
 
-    if (!isCustomerApi && !isAdminLoginRequest && !isKhachAuthRequest && getAdminToken() && (status === 401 || status === 403)) {
-      useAdminAuth().dangXuat()
-      const currentPath = router.currentRoute.value.path
-      if (currentPath.startsWith('/admin') && currentPath !== '/admin/dang-nhap') {
-        router.push({
-          path: '/admin/dang-nhap',
-          query: {
-            redirect: router.currentRoute.value.fullPath,
-            expired: '1',
-          },
-        })
-      }
-      return Promise.reject('Phiên đăng nhập quản trị đã hết hạn, vui lòng đăng nhập lại')
+    // 403 — không đủ quyền (không đăng xuất)
+    if (status === 403 && !isAdminLoginRequest && !isKhachAuthRequest) {
+      const msg = 'Bạn không có quyền thực hiện thao tác này'
+      toast(msg, 'warn')
+      return Promise.reject(msg)
+    }
+
+    // 5xx
+    if (status >= 500) {
+      const msg = 'Hệ thống đang gặp sự cố, vui lòng thử lại sau'
+      toast(msg, 'warn')
+      return Promise.reject(msg)
     }
 
     return Promise.reject(formatApiError(error.response.data))
@@ -105,4 +149,3 @@ request.interceptors.response.use(
 )
 
 export default request
-

@@ -5,6 +5,7 @@ import AdminSidebar from '@/components/admin/AdminSidebar.vue'
 import AdminHeader from '@/components/admin/AdminHeader.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import AdminToast from '@/components/admin/AdminToast.vue'
+import ErrorBoundary from '@/components/ui/ErrorBoundary.vue'
 
 const collapsed = ref(false)
 const route = useRoute()
@@ -28,11 +29,13 @@ const isPosPage = computed(() => route.path === '/admin/pos' || route.path.endsW
         class="admin-main-content flex-1"
         :class="isPosPage ? 'admin-main-content--pos' : 'overflow-auto'"
       >
-        <router-view v-slot="{ Component }">
-          <transition name="admin-page-fade" mode="out-in">
-            <component :is="Component" />
-          </transition>
-        </router-view>
+        <ErrorBoundary variant="admin">
+          <router-view v-slot="{ Component }">
+            <transition name="admin-page-fade" mode="out-in">
+              <component :is="Component" />
+            </transition>
+          </router-view>
+        </ErrorBoundary>
       </main>
     </div>
     <ConfirmDialog />

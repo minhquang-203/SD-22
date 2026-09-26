@@ -7,9 +7,11 @@ import {
   updateGioHangItem,
 } from '@/api/gioHangApi'
 import { getCustomerId } from '@/composables/useAuth'
+import { GIOI_HAN_MUA_LE } from '@/constants/cartLimits'
 
 const STORAGE_KEY = 'sunova_cart'
-const MAX_PER_LINE = 10
+/** @deprecated dùng GIOI_HAN_MUA_LE */
+export const MAX_PER_LINE = GIOI_HAN_MUA_LE
 
 const items = ref([])
 const loading = ref(false)
@@ -56,11 +58,35 @@ export function variantLabel(line) {
 export function maxQtyFor(line) {
   const stock = Math.max(0, Number(line?.soLuongTon) || 0)
   if (stock <= 0) return 1
-  return Math.min(stock, MAX_PER_LINE)
+  return Math.min(stock, GIOI_HAN_MUA_LE)
+}
+
+/**
+ * Khi chạm max: 'stock' nếu tồn < giới hạn mua lẻ; 'retail' nếu chạm trần mua lẻ.
+ */
+export function capReasonFor(line) {
+  const stock = Math.max(0, Number(line?.soLuongTon) || 0)
+  if (stock > 0 && stock < GIOI_HAN_MUA_LE) return 'stock'
+  return 'retail'
 }
 
 function clampQty(line, qty) {
   return Math.max(1, Math.min(maxQtyFor(line), Number(qty) || 1))
+}
+
+function lineSnapshot(line) {
+  if (!line) return null
+  return {
+    idChiTietSanPham: line.idChiTietSanPham,
+    idSanPham: line.idSanPham,
+    tenSanPham: line.tenSanPham,
+    anhUrl: line.anhUrl,
+    tenMauSac: line.tenMauSac,
+    dungTichMl: line.dungTichMl,
+    sku: line.sku,
+    soLuongTon: line.soLuongTon,
+    soLuongHienTai: line.soLuong,
+  }
 }
 
 function mergeLine(existing, payload, addQty) {
@@ -244,19 +270,48 @@ export function useCart() {
   )
 
   async function addItem(payload) {
+    const addQty = Math.max(1, Number(payload.soLuong) || 1)
     const idKhachHang = customerIdOrNull()
+    const existingBefore = items.value.find((l) => l.idChiTietSanPham === payload.idChiTietSanPham)
+    const currentQty = existingBefore ? Number(existingBefore.soLuong) || 0 : 0
+    const probeLine = {
+      ...(existingBefore || payload),
+      soLuongTon: payload.soLuongTon ?? existingBefore?.soLuongTon,
+    }
+    const max = maxQtyFor(probeLine)
+    const attempted = currentQty + addQty
+    const willCap = attempted > max
+    const reason = willCap ? capReasonFor(probeLine) : null
+
     if (!idKhachHang) {
       addLocalItem(payload)
-      return items.value
+      const line = items.value.find((l) => l.idChiTietSanPham === payload.idChiTietSanPham)
+      return {
+        items: items.value,
+        capped: willCap,
+        capReason: reason,
+        line: lineSnapshot(line),
+      }
     }
 
     const res = await addGioHangItem({
       idKhachHang,
       idChiTietSanPham: payload.idChiTietSanPham,
-      soLuong: Math.max(1, Number(payload.soLuong) || 1),
+      soLuong: addQty,
     })
     applyCartResponse(res.data)
-    return res.data
+    const line = items.value.find((l) => l.idChiTietSanPham === payload.idChiTietSanPham)
+    // Server chỉ kẹp theo tồn — nếu tồn > 15 mà attempted > 15, tự kẹp lại về 15
+    if (line && Number(line.soLuong) > GIOI_HAN_MUA_LE) {
+      await setQty(line.idChiTietSanPham, GIOI_HAN_MUA_LE)
+    }
+    const fresh = items.value.find((l) => l.idChiTietSanPham === payload.idChiTietSanPham)
+    return {
+      items: items.value,
+      capped: willCap || (fresh && attempted > Number(fresh.soLuong)),
+      capReason: reason || (willCap ? capReasonFor(fresh || probeLine) : null),
+      line: lineSnapshot(fresh),
+    }
   }
 
   async function removeItem(idChiTietSanPham) {
@@ -319,21 +374,26 @@ export function useCart() {
     return setQty(idChiTietSanPham, line.soLuong - 1).then(() => 'ok')
   }
 
-  /** @returns {'ok'|'max'} */
+  /**
+   * @returns {{ status: 'ok'|'max', capReason: null|'retail'|'stock', line: object|null }}
+   */
   async function increaseQty(idChiTietSanPham) {
     const line = items.value.find((l) => l.idChiTietSanPham === idChiTietSanPham)
-    if (!line) return 'ok'
+    if (!line) return { status: 'ok', capReason: null, line: null }
     const max = maxQtyFor(line)
-    if (line.soLuong >= max) return 'max'
-    return setQty(idChiTietSanPham, line.soLuong + 1).then(() => 'ok')
+    if (line.soLuong >= max) {
+      return { status: 'max', capReason: capReasonFor(line), line: lineSnapshot(line) }
+    }
+    await setQty(idChiTietSanPham, line.soLuong + 1)
+    return { status: 'ok', capReason: null, line: lineSnapshot(line) }
   }
 
   /**
-   * @returns {{ clamped: number, hitMin: boolean, hitMax: boolean }}
+   * @returns {{ clamped: number, hitMin: boolean, hitMax: boolean, capReason: null|'retail'|'stock', line: object|null }}
    */
   async function setQty(idChiTietSanPham, soLuong) {
     const line = items.value.find((l) => l.idChiTietSanPham === idChiTietSanPham)
-    if (!line) return { clamped: 1, hitMin: false, hitMax: false }
+    if (!line) return { clamped: 1, hitMin: false, hitMax: false, capReason: null, line: null }
     const raw = Number(soLuong)
     const max = maxQtyFor(line)
     let hitMin = false
@@ -346,16 +406,24 @@ export function useCart() {
       target = max
       hitMax = true
     }
+    const reason = hitMax ? capReasonFor(line) : null
     const idKhachHang = customerIdOrNull()
     if (!idKhachHang || !line.idChiTietGioHang) {
       line.soLuong = target
       saveLocal()
-      return { clamped: target, hitMin, hitMax }
+      return { clamped: target, hitMin, hitMax, capReason: reason, line: lineSnapshot(line) }
     }
 
     const res = await updateGioHangItem(idKhachHang, line.idChiTietGioHang, target)
     applyCartResponse(res.data)
-    return { clamped: target, hitMin, hitMax }
+    const fresh = items.value.find((l) => l.idChiTietSanPham === idChiTietSanPham)
+    return {
+      clamped: target,
+      hitMin,
+      hitMax,
+      capReason: reason,
+      line: lineSnapshot(fresh),
+    }
   }
 
   async function clearCart() {
@@ -420,8 +488,11 @@ export function useCart() {
     syncAfterCheckout,
     syncAfterGuestCheckout,
     syncCartAfterLogin,
+    GIOI_HAN_MUA_LE,
   }
 }
+
+export { GIOI_HAN_MUA_LE }
 
 export function getCartCount() {
   return items.value.reduce((sum, line) => sum + (line.soLuong || 0), 0)

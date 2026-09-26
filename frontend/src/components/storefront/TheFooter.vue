@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Icon } from '@iconify/vue'
+import { storeInfo } from '@/constants/storeInfo'
 
 const email = ref('')
 
@@ -22,6 +23,13 @@ function onNewsletter(e) {
             với kết cấu nhẹ, phù hợp khí hậu nhiệt đới.
           </p>
           <p class="sf-footer__slogan">Vẻ đẹp dưới ánh nắng — Soleil by SUNOVA</p>
+          <p class="sf-footer__store">{{ storeInfo.diaChi }}</p>
+          <p class="sf-footer__store">
+            Hotline
+            <a :href="`tel:${storeInfo.hotline.replace(/\s/g, '')}`">{{ storeInfo.hotline }}</a>
+            ·
+            <a :href="`mailto:${storeInfo.email}`">{{ storeInfo.email }}</a>
+          </p>
         </div>
 
         <div class="col-6 col-lg-2 col-md-3">
@@ -36,7 +44,7 @@ function onNewsletter(e) {
         <div class="col-6 col-lg-2 col-md-3">
           <div class="sf-footer__title">Về SUNOVA</div>
           <RouterLink class="sf-footer__link" to="/gioi-thieu">Giới thiệu</RouterLink>
-          <span class="sf-footer__link sf-footer__link--muted" title="Sắp ra mắt">Tin tức</span>
+          <RouterLink class="sf-footer__link" to="/tin-tuc">Tin tức</RouterLink>
           <RouterLink class="sf-footer__link" to="/lien-he">Liên hệ</RouterLink>
           <RouterLink class="sf-footer__link" to="/he-thong-cua-hang">Hệ thống cửa hàng</RouterLink>
         </div>

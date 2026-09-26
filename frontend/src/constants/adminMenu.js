@@ -178,6 +178,13 @@ export const ADMIN_MENU = [
         path: "/admin/support",
         roles: ALL_STAFF_ROLES,
       },
+      {
+        key: "yeu-cau-mua-so-luong-lon",
+        label: "Yêu cầu mua số lượng lớn",
+        icon: "icon-park-outline:shopping-bag",
+        path: "/admin/yeu-cau-mua-so-luong-lon",
+        roles: ALL_STAFF_ROLES,
+      },
     ],
   },
   {

@@ -86,6 +86,12 @@ public class SecurityConfig {
                     .requestMatchers("/api/gio-hang", "/api/gio-hang/**").hasRole("KHACH_HANG")
                     // Checkout khách chưa đăng nhập: công khai, phải đặt TRƯỚC rule /api/online/**
                     .requestMatchers(HttpMethod.POST, "/api/online/guest/tinh-gia", "/api/online/guest/checkout").permitAll()
+                    // Yêu cầu mua số lượng lớn: POST công khai; GET/PUT nhân viên — TRƯỚC /api/**
+                    .requestMatchers(HttpMethod.POST, "/api/yeu-cau-mua-so-luong-lon").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/yeu-cau-mua-so-luong-lon", "/api/yeu-cau-mua-so-luong-lon/**")
+                        .hasAnyRole("NHAN_VIEN", "QUAN_LY", "CHU")
+                    .requestMatchers(HttpMethod.PUT, "/api/yeu-cau-mua-so-luong-lon/**")
+                        .hasAnyRole("NHAN_VIEN", "QUAN_LY", "CHU")
                     .requestMatchers("/api/online", "/api/online/**").hasRole("KHACH_HANG")
                     // Tra cứu đơn + trả hàng khách vãng lai (token): đặt TRƯỚC rule /cua-toi
                     .requestMatchers("/api/hoa-don/tra-cuu", "/api/hoa-don/tra-cuu/**").permitAll()

@@ -4,6 +4,10 @@ import InvoiceReceipt from '@/components/invoice/InvoiceReceipt.vue'
 import { normalizeInvoice } from '@/utils/invoiceReceipt'
 import receiptCss from '@/components/invoice/invoiceReceipt.css?inline'
 
+const FONT_LINK =
+  '<link rel="preconnect" href="https://fonts.googleapis.com">' +
+  '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&display=swap">'
+
 const PRINT_CSS = `
 @page { size: 80mm auto; margin: 0; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -15,6 +19,7 @@ html, body {
   color: #111;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
+  font-family: 'Be Vietnam Pro', Arial, Helvetica, sans-serif;
 }
 body { width: 80mm; }
 .invoice-print-root {
@@ -36,8 +41,8 @@ function waitFrames(n = 2) {
 }
 
 /**
- * Mount InvoiceReceipt vào iframe ẩn và gọi print / Save PDF.
- * @param {object} rawInvoice — response POS hoặc chi tiết HĐ
+ * Mount InvoiceReceipt vào iframe ẩn và gọi print / Save PDF (khổ 80mm).
+ * @param {object} rawInvoice
  * @param {{ mode?: 'print'|'pdf' }} options
  */
 export async function printInvoice(rawInvoice, options = {}) {
@@ -64,6 +69,7 @@ export async function printInvoice(rawInvoice, options = {}) {
   doc.open()
   doc.write(
     `<!DOCTYPE html><html><head><meta charset="utf-8"><title>HoaDon_${invoice.maHoaDon}</title>` +
+      FONT_LINK +
       `<style>${PRINT_CSS}</style></head><body><div class="invoice-print-root" id="mount"></div></body></html>`,
   )
   doc.close()
@@ -78,7 +84,7 @@ export async function printInvoice(rawInvoice, options = {}) {
   try {
     await nextTick()
     await waitFrames(3)
-    await new Promise((r) => setTimeout(r, 150))
+    await new Promise((r) => setTimeout(r, 180))
 
     const win = iframe.contentWindow
     if (!win) return
@@ -100,7 +106,6 @@ export async function printInvoice(rawInvoice, options = {}) {
       win.addEventListener('afterprint', cleanup, { once: true })
       setTimeout(cleanup, 60_000)
       win.focus()
-      // PDF: cùng dialog in — chọn máy in "Microsoft Print to PDF" / "Save as PDF"
       void mode
       win.print()
     })
@@ -116,6 +121,6 @@ export async function printInvoice(rawInvoice, options = {}) {
   }
 }
 
-export function saveInvoicePdf(rawInvoice) {
-  return printInvoice(rawInvoice, { mode: 'pdf' })
+export function saveInvoicePdf(rawInvoice, options = {}) {
+  return printInvoice(rawInvoice, { ...options, mode: 'pdf' })
 }

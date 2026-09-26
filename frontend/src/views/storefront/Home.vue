@@ -4,10 +4,13 @@ import { RouterLink } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import axios from 'axios'
 import ProductCard from '@/components/storefront/ProductCard.vue'
+import BlogIconSprite from '@/components/storefront/blog/BlogIconSprite.vue'
+import TinTucCard from '@/components/storefront/blog/TinTucCard.vue'
 import { fetchAllProducts, fetchDanhMucList } from '@/api/storefrontApi'
 import { fetchActiveBanners } from '@/api/bannerApi'
 import { productImageUrl } from '@/utils/productImage'
 import { rankProductsByQuiz, resolveQuizProfile } from '@/utils/quizRecommend'
+import { getBaiMoiNhat } from '@/constants/tinTuc'
 import { vSfReveal } from '@/directives/sfReveal'
 
 const DEFAULT_HERO = {
@@ -28,6 +31,7 @@ const quizSuggestions = ref([])
 const quizSkinName = ref('')
 const categories = ref([])
 const homeBanners = ref([DEFAULT_HERO])
+const tinTucMoi = getBaiMoiNhat(3)
 
 const BANNER_INTERVAL_MS = 5000
 const currentBannerIndex = ref(0)
@@ -369,6 +373,22 @@ onMounted(async () => {
         <div v-if="loading" class="sf-skeleton-grid" />
         <div v-else-if="suggestions.length" class="sf-product-grid">
           <ProductCard v-for="p in suggestions" :key="`s-${p.id}`" :product="p" />
+        </div>
+      </div>
+    </section>
+
+    <section v-if="tinTucMoi.length" v-sf-reveal class="sf-section">
+      <div class="sf-container">
+        <BlogIconSprite />
+        <div class="sf-section-head sf-section-head--row">
+          <div>
+            <h2 class="sf-section-title">Cẩm nang chống nắng</h2>
+            <p class="sf-home-sub">Kiến thức SPF · PA và cập nhật từ SUNOVA</p>
+          </div>
+          <RouterLink to="/tin-tuc" class="sf-home-more">Xem tất cả →</RouterLink>
+        </div>
+        <div class="sf-home-news-grid">
+          <TinTucCard v-for="bai in tinTucMoi" :key="bai.id" :bai="bai" />
         </div>
       </div>
     </section>
@@ -778,6 +798,21 @@ onMounted(async () => {
   }
   .sf-trust__row {
     grid-template-columns: 1fr;
+  }
+  .sf-home-news-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sf-home-news-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+@media (max-width: 900px) {
+  .sf-home-news-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

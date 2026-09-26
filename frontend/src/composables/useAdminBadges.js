@@ -5,6 +5,7 @@ import { fetchTraHangList } from '@/api/traHangApi'
 import { fetchHoanTienList } from '@/api/hoanTienApi'
 import { getSanPhamCanhBaoCount } from '@/api/sanPhamApi'
 import { danhSachPhienHoTro } from '@/api/hoTroApi'
+import { demYeuCauMuaSoLuongLonMoi } from '@/api/yeuCauMuaSoLuongLonApi'
 import { useAdminAuth } from '@/composables/useAdminAuth'
 import { toast } from '@/composables/useToast'
 import {
@@ -30,6 +31,7 @@ const productWarnCount = ref(0)
 const pendingSupport = ref([])
 const pendingSupportCount = ref(0)
 const supportUnreadSessions = ref(0)
+const pendingBulkCount = ref(0)
 const otherNotifications = ref([])
 const unreadOtherCount = ref(0)
 
@@ -56,12 +58,13 @@ const sidebarBadgeByPath = computed(() => ({
   '/admin/hoan-tien': pendingRefundCount.value,
   '/admin/products': productWarnCount.value,
   '/admin/support': supportUnreadSessions.value,
+  '/admin/yeu-cau-mua-so-luong-lon': pendingBulkCount.value,
 }))
 
 /** Dùng buộc NMenu re-render khi số badge đổi */
 const badgeVersion = computed(
   () =>
-    `${pendingOrderCount.value}-${pendingReturnCount.value}-${pendingRefundCount.value}-${productWarnCount.value}-${pendingSupportCount.value}-${supportUnreadSessions.value}-${unreadOtherCount.value}`,
+    `${pendingOrderCount.value}-${pendingReturnCount.value}-${pendingRefundCount.value}-${productWarnCount.value}-${pendingSupportCount.value}-${supportUnreadSessions.value}-${pendingBulkCount.value}-${unreadOtherCount.value}`,
 )
 
 let pollTimer = null
@@ -212,6 +215,20 @@ async function loadOtherNotifications({ updateList = true } = {}) {
   }
 }
 
+async function loadPendingBulk() {
+  const { isLoggedIn } = useAdminAuth()
+  if (!isLoggedIn.value) {
+    pendingBulkCount.value = 0
+    return
+  }
+  try {
+    const res = await demYeuCauMuaSoLuongLonMoi()
+    pendingBulkCount.value = Number(res.data?.count) || 0
+  } catch {
+    pendingBulkCount.value = 0
+  }
+}
+
 async function refreshBadges() {
   await Promise.all([
     loadPendingOrders(),
@@ -219,6 +236,7 @@ async function refreshBadges() {
     loadPendingRefunds(),
     loadProductWarnings(),
     loadSupportUnread(),
+    loadPendingBulk(),
     loadOtherNotifications({ updateList: true }),
   ])
 }
@@ -323,6 +341,7 @@ export function useAdminBadges() {
     pendingSupport,
     pendingSupportCount,
     supportUnreadSessions,
+    pendingBulkCount,
     otherNotifications,
     unreadOtherCount,
     notifBadgeCount,
