@@ -530,15 +530,75 @@ onMounted(() => {
               <p style="color: #666; margin-bottom: 16px;">{{ quizData.moTaLoaiDa }}</p>
               <p style="font-size: 0.875rem; color: #999; margin-bottom: 24px;">Ngày làm bài: {{ new Date(quizData.thoiGianLam).toLocaleString('vi-VN') }}</p>
               
-              <!-- Hiển thị sản phẩm gợi ý ngay tại đây -->
+              <!-- 1. SẢN PHẨM CHÂN ÁI — TOP 1 (Nổi bật nhất) -->
+              <div v-if="recommendedProducts.length > 0" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                  <span style="font-size: 20px;">👑</span>
+                  <h4 style="font-size: 1.1rem; color: var(--text-color); margin: 0;">Sản phẩm chân ái của bạn</h4>
+                </div>
+
+                <!-- Hero Card — Top 1 -->
+                <div
+                  @click="router.push(`/san-pham/${recommendedProducts[0].id}`)"
+                  style="display: flex; gap: 20px; border: 2px solid var(--primary-color); border-radius: 12px; padding: 20px; cursor: pointer; background: #fffdf8; transition: box-shadow 0.2s; margin-bottom: 24px;"
+                  onmouseover="this.style.boxShadow='0 8px 24px rgba(0,0,0,0.12)'"
+                  onmouseout="this.style.boxShadow='none'"
+                >
+                  <div style="width: 140px; min-width: 140px; aspect-ratio: 1; background: #f9f9f9; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                    <img
+                      v-if="recommendedProducts[0].anhChinhUrl"
+                      :src="productImageUrl(recommendedProducts[0].anhChinhUrl)"
+                      :alt="recommendedProducts[0].ten"
+                      style="width: 100%; height: 100%; object-fit: contain;"
+                    />
+                  </div>
+                  <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 8px;">
+                    <div style="display: inline-flex; align-items: center; gap: 6px; background: var(--primary-color); color: #fff; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; width: fit-content; letter-spacing: 0.5px;">
+                      ✦ PHÙ HỢP NHẤT VỚI BẠN
+                    </div>
+                    <div style="font-size: 1.05rem; font-weight: 700; color: #1a1412; line-height: 1.4;">{{ recommendedProducts[0].ten }}</div>
+                    <div style="font-size: 1.1rem; font-weight: 800; color: var(--primary-color);">
+                      {{ formatVND(recommendedProducts[0].giaSauGiamMin || recommendedProducts[0].giaMin || 0) }}
+                    </div>
+                    <div style="font-size: 0.85rem; color: #888; margin-top: 4px;">Nhấn để xem chi tiết & mua ngay →</div>
+                  </div>
+                </div>
+
+                <!-- Các lựa chọn thay thế (Top 2-4) -->
+                <div v-if="recommendedProducts.length > 1">
+                  <h4 style="font-size: 0.95rem; color: #888; margin-bottom: 12px; font-weight: 600; letter-spacing: 0.3px;">Các lựa chọn thay thế phù hợp (Theo ngân sách)</h4>
+                  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px;">
+                    <div
+                      v-for="product in recommendedProducts.slice(1)"
+                      :key="product.id"
+                      style="border: 1px solid #eee; border-radius: 8px; padding: 12px; cursor: pointer; transition: transform 0.2s; background: #fff;"
+                      @click="router.push(`/san-pham/${product.id}`)"
+                      onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'"
+                      onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'"
+                    >
+                      <div style="width: 100%; aspect-ratio: 1; margin-bottom: 10px; background: #f9f9f9; border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                        <img v-if="product.anhChinhUrl" :src="productImageUrl(product.anhChinhUrl)" :alt="product.ten" style="width: 100%; height: 100%; object-fit: contain;" />
+                      </div>
+                      <div style="font-size: 0.82rem; font-weight: 600; color: #333; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4;">
+                        {{ product.ten }}
+                      </div>
+                      <div style="font-size: 0.88rem; font-weight: 700; color: var(--primary-color);">
+                        {{ formatVND(product.giaSauGiamMin || product.giaMin || 0) }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. COMBO ROUTINE DÀNH RIÊNG CHO BẠN -->
               <div v-if="routineCombo" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee;">
                 <h4 style="font-size: 1.1rem; margin-bottom: 8px; color: var(--text-color);">Combo dành riêng cho bạn</h4>
                 <p style="color: #666; margin-bottom: 16px;"><strong>{{ routineCombo.ten }}</strong>: {{ routineCombo.moTa }}</p>
                 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px;">
-                  <div 
-                    v-for="ct in routineCombo.chiTiets" 
-                    :key="ct.idSanPham" 
-                    style="border: 1px solid #eee; border-radius: 8px; padding: 12px; cursor: pointer; transition: transform 0.2s;"
+                  <div
+                    v-for="ct in routineCombo.chiTiets"
+                    :key="ct.idSanPham"
+                    style="border: 1px solid #eee; border-radius: 8px; padding: 12px; cursor: pointer; transition: transform 0.2s; text-align: center;"
                     @click="router.push(`/san-pham/${ct.idSanPham}`)"
                     onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'"
                     onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'"
@@ -546,36 +606,13 @@ onMounted(() => {
                     <div style="width: 100%; aspect-ratio: 1; margin-bottom: 12px; background: #f9f9f9; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
                       <img v-if="ct.anhChinhUrl" :src="productImageUrl(ct.anhChinhUrl)" :alt="ct.tenSanPham" style="width: 100%; height: 100%; object-fit: contain;" />
                     </div>
-                    <div style="font-size: 0.9rem; font-weight: 600; color: #333; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                    <div style="font-size: 0.9rem; font-weight: 600; color: #333; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                       Bước {{ ct.thuTu }}: {{ ct.tenSanPham }}
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div v-else-if="recommendedProducts.length > 0" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee;">
-                <h4 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--text-color);">Sản phẩm chân ái dành cho bạn</h4>
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px;">
-                  <div 
-                    v-for="product in recommendedProducts" 
-                    :key="product.id" 
-                    style="border: 1px solid #eee; border-radius: 8px; padding: 12px; cursor: pointer; transition: transform 0.2s;"
-                    @click="router.push(`/san-pham/${product.id}`)"
-                    onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'"
-                    onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'"
-                  >
-                    <div style="width: 100%; aspect-ratio: 1; margin-bottom: 12px; background: #f9f9f9; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
-                      <img v-if="product.anhChinhUrl" :src="productImageUrl(product.anhChinhUrl)" :alt="product.ten" style="width: 100%; height: 100%; object-fit: contain;" />
-                    </div>
-                    <div style="font-size: 0.9rem; font-weight: 600; color: #333; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                      {{ product.ten }}
-                    </div>
-                    <div style="font-size: 0.9rem; font-weight: 700; color: var(--primary-color);">
-                      {{ formatVND(product.giaSauGiamMin || product.giaMin || 0) }}
-                    </div>
-                  </div>
-                </div>
-              </div>
 
               <div style="display: flex; gap: 12px;">
                 <RouterLink to="/quiz" class="sf-btn-primary">

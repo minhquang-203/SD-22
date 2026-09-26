@@ -149,3 +149,8 @@ export function getCustomerId() {
   loadFromStorage()
   return id.value
 }
+
+export function clearCustomerAuth() {
+  clearStorage()
+  notifyAuthChanged(false)
+}

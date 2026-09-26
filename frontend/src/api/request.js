@@ -2,7 +2,7 @@ import axios from 'axios'
 import router from '@/router'
 import { formatApiError } from '@/utils/apiError'
 import { getAdminToken, useAdminAuth } from '@/composables/useAdminAuth'
-import { getCustomerToken } from '@/composables/useAuth'
+import { getCustomerToken, clearCustomerAuth } from '@/composables/useAuth'
 
 const CUSTOMER_API_PREFIXES = ['/yeu-thich', '/khach-hang/toi', '/gio-hang', '/online', '/hoa-don/cua-toi', '/khach/quiz/ket-qua']
 
@@ -82,6 +82,7 @@ request.interceptors.response.use(
     const isKhachAuthRequest = url.includes('/auth/khach/')
 
     if (isCustomerApi && (status === 401 || status === 403)) {
+      clearCustomerAuth()
       return Promise.reject('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại')
     }
 
