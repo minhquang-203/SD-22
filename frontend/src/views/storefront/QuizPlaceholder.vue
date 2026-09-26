@@ -300,6 +300,13 @@
           <div class="sg-result__routine" v-if="routineCombo">
             <h3 class="sg-result__routine-title">COMBO DÀNH RIÊNG CHO BẠN</h3>
             <p class="sg-result__routine-subtitle"><strong>{{ routineCombo.ten }}</strong>: {{ routineCombo.moTa }}</p>
+
+            <!-- TỔNG GIÁ CẢ BỘ ROUTINE (ĐỂ KHÁCH VÀ ADMIN THẤY RÕ TRỌN BỘ) -->
+            <div class="sg-routine-total-box" v-if="routineTotalPrice > 0">
+              <span class="sg-routine-total-label">Tổng giá cả bộ:</span>
+              <span class="sg-routine-total-price">{{ formatPrice(routineTotalPrice) }}</span>
+            </div>
+
             <div class="sg-routine-grid">
               <div
                 v-for="ct in routineCombo.chiTiets"
@@ -313,6 +320,9 @@
                   <div v-else class="sg-routine-card__placeholder">SUNOVA</div>
                 </div>
                 <h4 class="sg-routine-card__name">{{ ct.tenSanPham }}</h4>
+                <div class="sg-routine-card__price" v-if="ct.gia">
+                  {{ formatPrice(ct.gia) }}
+                </div>
                 <p style="font-size: 11px; color: #a09488; text-align: center; margin-top: 5px;">{{ ct.ghiChu }}</p>
                 <a class="sg-routine-card__link">XEM THÊM</a>
               </div>
@@ -336,6 +346,9 @@
                   <div v-else class="sg-routine-card__placeholder">SUNOVA</div>
                 </div>
                 <h4 class="sg-routine-card__name">{{ product.ten }}</h4>
+                <div class="sg-routine-card__price" v-if="product.giaMin || product.gia">
+                  {{ formatPrice(product.giaSauGiamMin || product.giaMin || product.gia) }}
+                </div>
                 <a class="sg-routine-card__link">XEM THÊM</a>
               </div>
             </div>
@@ -526,6 +539,12 @@ const sortedScores = computed(() => {
       return item;
     })
     .sort((a, b) => b.points - a.points);
+});
+
+// Tính tổng giá cả bộ routine
+const routineTotalPrice = computed(() => {
+  if (!routineCombo.value?.chiTiets) return 0;
+  return routineCombo.value.chiTiets.reduce((sum, ct) => sum + (ct.gia || 0), 0);
 });
 
 // NAVIGATION GUARDS - BẮT SỰ KIỆN CHUYỂN TRANG
@@ -720,14 +739,20 @@ const calculateResult = () => {
       }
 
       if (isRoutineValid) {
-        // API routine trả anhChinhUrl = null — lấy ảnh từ danh sách sản phẩm đã tải.
+        // Sắp xếp các bước theo thứ tự tăng dần và gắn giá, ảnh từ danh mục sản phẩm đã tải
+        const sortedChiTiets = (fetchedRoutine.chiTiets || [])
+          .slice()
+          .sort((a, b) => (a.thuTu || 0) - (b.thuTu || 0));
+
         routineCombo.value = {
           ...fetchedRoutine,
-          chiTiets: (fetchedRoutine.chiTiets || []).map((ct) => {
+          chiTiets: sortedChiTiets.map((ct) => {
             const p = allProducts.value.find((x) => x.id === ct.idSanPham);
+            const itemPrice = p ? (p.giaSauGiamMin || p.giaMin || p.gia || 0) : 0;
             return {
               ...ct,
               anhChinhUrl: ct.anhChinhUrl || p?.anhChinhUrl || null,
+              gia: itemPrice,
             };
           }),
         };
@@ -1553,7 +1578,30 @@ const retakeQuiz = () => {
 /* ROUTINE CHÉO */
 .sg-result__routine { width: 100%; margin-bottom: 50px; text-align: center; }
 .sg-result__routine-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; color: var(--sq-espresso); margin: 0 0 8px; }
-.sg-result__routine-subtitle { font-size: 14px; color: var(--sq-text-muted); margin: 0 0 30px; }
+.sg-result__routine-subtitle { font-size: 14px; color: var(--sq-text-muted); margin: 0 0 18px; }
+
+.sg-routine-total-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--sq-cream);
+  border: 1.5px solid var(--sq-gold);
+  padding: 8px 24px;
+  border-radius: 30px;
+  margin: 0 auto 30px;
+  box-shadow: 0 4px 15px rgba(201, 169, 110, 0.15);
+}
+.sg-routine-total-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sq-espresso);
+  letter-spacing: 0.5px;
+}
+.sg-routine-total-price {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--sq-gold-dark);
+}
 
 .sg-routine-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
 .sg-routine-card { background: var(--sq-cream); border-radius: 12px; padding: 20px; cursor: pointer; transition: transform 0.3s; position: relative; }
@@ -1562,7 +1610,8 @@ const retakeQuiz = () => {
 .sg-routine-card__img { width: 100%; aspect-ratio: 1; margin-bottom: 16px; display: flex; align-items: center; justify-content: center; }
 .sg-routine-card__img img { width: 100%; height: 100%; object-fit: contain; }
 .sg-routine-card__placeholder { font-weight: 700; opacity: 0.3; }
-.sg-routine-card__name { font-size: 13px; font-weight: 600; color: var(--sq-espresso); margin: 0 0 12px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sg-routine-card__name { font-size: 13px; font-weight: 600; color: var(--sq-espresso); margin: 0 0 8px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sg-routine-card__price { font-size: 14px; font-weight: 700; color: var(--sq-gold-dark); margin: 0 0 6px; }
 .sg-routine-card__link { font-size: 12px; font-weight: 700; color: var(--sq-gold-dark); text-decoration: none; border-bottom: 1px solid var(--sq-gold-dark); padding-bottom: 2px; }
 
 /* ACTIONS */
