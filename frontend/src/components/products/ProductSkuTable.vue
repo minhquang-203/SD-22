@@ -1,5 +1,6 @@
 <script setup>
 import { suggestSku, suggestVariantLabel } from '@/utils/productForm'
+import MoneyInput from '@/components/common/MoneyInput.vue'
 
 const rows = defineModel({ type: Array, required: true })
 
@@ -173,14 +174,13 @@ function removeRow(index) {
               <p v-if="rowError(index, 'dungTichMl')" class="field-error">{{ rowError(index, 'dungTichMl') }}</p>
             </td>
             <td>
-              <input
-                v-model.number="row.giaBan"
-                type="number"
-                class="admin-input"
-                :class="{ 'is-invalid': rowError(index, 'giaBan') }"
-                min="0"
-                step="1000"
-                placeholder="VD: 460000"
+              <MoneyInput
+                v-model="row.giaBan"
+                class="admin-input-money"
+                input-class="admin-input"
+                :error="!!rowError(index, 'giaBan')"
+                :min="0"
+                placeholder="VD: 460.000"
                 @input="clearRowError(index, 'giaBan')"
               />
               <p v-if="rowError(index, 'giaBan')" class="field-error">{{ rowError(index, 'giaBan') }}</p>

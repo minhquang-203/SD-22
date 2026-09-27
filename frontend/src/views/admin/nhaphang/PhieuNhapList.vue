@@ -62,7 +62,7 @@ function statusTone(st) {
 
 function formatMoney(v) {
   const n = Number(v || 0)
-  return n.toLocaleString('vi-VN') + ' ₫'
+  return n.toLocaleString('vi-VN') + ' đ'
 }
 
 function formatDate(v) {

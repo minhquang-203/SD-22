@@ -40,6 +40,7 @@ const warning = ref('')
 const fieldErrors = ref({})
 const chiTietErrors = ref({})
 const imageError = ref('')
+const imagesProcessing = ref(false)
 const formBodyRef = ref(null)
 
 const title = computed(() =>
@@ -344,6 +345,7 @@ function handleSubmit() {
             :mau-options="imageMauOptions"
             :error="imageError"
             @clear-error="imageError = ''"
+            @update:processing="imagesProcessing = $event"
           />
           <p
             v-if="!imageMauOptions.length"
@@ -358,11 +360,11 @@ function handleSubmit() {
         class="px-5 py-4 border-t flex items-center justify-end gap-3"
         style="border-color: var(--admin-border)"
       >
-        <button type="button" class="admin-btn admin-btn-default" :disabled="loading" @click="emit('close')">
+        <button type="button" class="admin-btn admin-btn-default" :disabled="loading || imagesProcessing" @click="emit('close')">
           Hủy
         </button>
-        <button type="button" class="admin-btn admin-btn-primary" :disabled="loading" @click="handleSubmit">
-          {{ loading ? 'Đang lưu...' : mode === 'create' ? 'Thêm sản phẩm' : 'Cập nhật' }}
+        <button type="button" class="admin-btn admin-btn-primary" :disabled="loading || imagesProcessing" @click="handleSubmit">
+          {{ imagesProcessing ? 'Đang xử lý ảnh...' : loading ? 'Đang lưu...' : mode === 'create' ? 'Thêm sản phẩm' : 'Cập nhật' }}
         </button>
       </div>
     </div>

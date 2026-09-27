@@ -92,13 +92,23 @@
           <div v-if="showGiaTri" class="col-span-5">
             <label class="voucher-label">{{ giaTriLabel }} *</label>
             <input
+              v-if="form.loai === 'PHAN_TRAM'"
               v-model.number="form.giaTri"
               type="number"
               :min="1"
-              :max="form.loai === 'PHAN_TRAM' ? 100 : undefined"
+              :max="100"
               :class="inputClass('giaTri')"
               class="voucher-input"
-              :placeholder="form.loai === 'PHAN_TRAM' ? 'VD: 20' : 'VD: 50000'"
+              placeholder="VD: 20"
+              @input="clearError('giaTri')"
+            />
+            <MoneyInput
+              v-else
+              v-model="form.giaTri"
+              :min="1"
+              :error="!!errors.giaTri"
+              :input-class="['voucher-input', errors.giaTri ? 'is-invalid' : '']"
+              placeholder="VD: 50.000"
               @input="clearError('giaTri')"
             />
             <p v-if="errors.giaTri" class="voucher-field-error">{{ errors.giaTri }}</p>
@@ -159,12 +169,11 @@
 
           <div class="col-span-6">
             <label class="voucher-label">Đơn tối thiểu</label>
-            <input
-              v-model.number="form.giaTriDonToiThieu"
-              type="number"
-              min="0"
-              :class="inputClass('giaTriDonToiThieu')"
-              class="voucher-input"
+            <MoneyInput
+              v-model="form.giaTriDonToiThieu"
+              :min="0"
+              :error="!!errors.giaTriDonToiThieu"
+              :input-class="['voucher-input', errors.giaTriDonToiThieu ? 'is-invalid' : '']"
               placeholder="0 = không yêu cầu"
               @input="clearError('giaTriDonToiThieu')"
             />
@@ -175,12 +184,11 @@
 
           <div v-if="showGiamToiDa" class="col-span-6">
             <label class="voucher-label">{{ giamToiDaLabel }}</label>
-            <input
-              v-model.number="form.giamToiDa"
-              type="number"
-              min="1"
-              :class="inputClass('giamToiDa')"
-              class="voucher-input"
+            <MoneyInput
+              v-model="form.giamToiDa"
+              :min="1"
+              :error="!!errors.giamToiDa"
+              :input-class="['voucher-input', errors.giamToiDa ? 'is-invalid' : '']"
               :placeholder="
                 form.loai === 'FREE_SHIP'
                   ? 'Miễn toàn bộ phí ship nếu để trống'
@@ -242,6 +250,7 @@ import { reactive, watch, computed, ref } from "vue";
 import { Icon } from "@iconify/vue";
 import { toast } from "@/composables/useToast";
 import { fetchNextVoucherMa } from "@/api/voucherApi";
+import MoneyInput from "@/components/common/MoneyInput.vue";
 
 const props = defineProps({
   modelValue: Boolean,

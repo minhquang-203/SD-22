@@ -5885,10 +5885,14 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Page transition */
-.sf-fade-enter-active,
+/* Page transition — chỉ fade-in trang mới; leave cắt ngay (khớp duration leave=0) */
+.sf-fade-enter-active {
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
 .sf-fade-leave-active {
-  transition: opacity 0.24s ease, transform 0.24s ease;
+  transition: none;
+  display: none;
 }
 
 .sf-fade-enter-from {
@@ -5898,7 +5902,6 @@ html {
 
 .sf-fade-leave-to {
   opacity: 0;
-  transform: translateY(-6px);
 }
 
 /* Auth modal: overlay fade + panel scale */

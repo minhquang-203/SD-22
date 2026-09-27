@@ -32,8 +32,12 @@ build/
 ### VS Code ###
 .vscode/
 
-### Uploads (ảnh sản phẩm upload runtime) ###
-uploads/
+### Uploads — bỏ qua ảnh upload runtime; GIỮ ảnh seed sp*.jpg để clone máy mới vẫn hiện ảnh ###
+uploads/*
+!uploads/products/
+uploads/products/*
+!uploads/products/sp*.jpg
+!uploads/products/.gitkeep
 
 ### Secrets / local overrides (commit .env.example only)
 .env

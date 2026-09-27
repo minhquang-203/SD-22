@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onBeforeUnmount, nextTick, watch } from 'vue'
+import { ref, onBeforeUnmount, onMounted, nextTick, watch } from 'vue'
 import request from '@/api/request'
 import { formatVND } from '@/utils/formatVND'
 import { productImageUrl } from '@/utils/productImage'
@@ -19,6 +19,8 @@ const { isLoggedIn } = useAuth()
 const { openAuthModal } = useAuthModal()
 
 const CHAT_AI_PHIEN_KEY = 'sunova_chat_ai_phien'
+const STAFF_WELCOME =
+  'Bạn đang kết nối với nhân viên SUNOVA, vui lòng để lại câu hỏi.'
 
 const isOpen = ref(false)
 const isTyping = ref(false)
@@ -34,7 +36,13 @@ const hoTroPhienId = ref(null)
 const connectingStaff = ref(false)
 const sendingStaff = ref(false)
 const showMenu = ref(false)
+/** Guest bấm chat NV → hiện lời mời + resume sau login */
+const needLoginForStaff = ref(false)
+const pendingStaffAfterLogin = ref(false)
 let unsubscribeHoTro = null
+/** Cache tin AI khi sang NV để quay lại không lẫn */
+const aiMessagesCache = ref([])
+const aiSessionCache = ref(null)
 
 function readStoredAiPhien() {
   const raw = localStorage.getItem(CHAT_AI_PHIEN_KEY)
@@ -98,6 +106,7 @@ async function restoreAiSession() {
 
 async function openChat(mode) {
   showMenu.value = false
+  needLoginForStaff.value = false
 
   if (mode === 'NGUOI') {
     isOpen.value = true
@@ -116,6 +125,12 @@ async function openChat(mode) {
   isOpen.value = true
 
   if (messages.value.length === 0) {
+    if (aiMessagesCache.value.length > 0) {
+      messages.value = aiMessagesCache.value.map((m) => ({ ...m }))
+      sessionId.value = aiSessionCache.value
+      scrollToBottom()
+      return
+    }
     const ok = await restoreAiSession()
     if (!ok || messages.value.length === 0) {
       pushAiWelcome()
@@ -177,13 +192,32 @@ function ensureHoTroSubscribed() {
   unsubscribeHoTro = subscribeCustomerHoTroPhien(hoTroPhienId.value, appendRealtimeTin)
 }
 
+function promptLoginForStaff() {
+  needLoginForStaff.value = true
+  pendingStaffAfterLogin.value = true
+  isOpen.value = true
+  openAuthModal('login', router.currentRoute.value.fullPath)
+}
+
+function openLoginFromPrompt() {
+  pendingStaffAfterLogin.value = true
+  openAuthModal('login', router.currentRoute.value.fullPath)
+}
+
 async function switchToStaff() {
   if (!isLoggedIn.value) {
-    openAuthModal('login')
+    promptLoginForStaff()
     return
   }
+  needLoginForStaff.value = false
   connectingStaff.value = true
   try {
+    // Giữ lịch sử AI riêng trước khi sang NV
+    if (chatMode.value === 'AI') {
+      aiMessagesCache.value = messages.value.map((m) => ({ ...m }))
+      aiSessionCache.value = sessionId.value
+    }
+
     const res = await taoHoacLayPhienHoTro()
     const phien = res.data
     hoTroPhienId.value = phien.id
@@ -201,7 +235,7 @@ async function switchToStaff() {
     if (messages.value.length === 0) {
       messages.value.push({
         nguoiGui: 'NHAN_VIEN',
-        noiDung: 'Bạn đã kết nối với hỗ trợ viên SUNOVA. Hãy mô tả nhu cầu của bạn nhé!',
+        noiDung: STAFF_WELCOME,
         thoiGian: new Date(),
       })
     }
@@ -209,11 +243,17 @@ async function switchToStaff() {
     ensureHoTroSubscribed()
     scrollToBottom()
   } catch (err) {
-    messages.value.push({
-      nguoiGui: 'AI',
-      noiDung: typeof err === 'string' ? err : 'Không kết nối được nhân viên. Vui lòng thử lại.',
-      thoiGian: new Date(),
-    })
+    const text =
+      typeof err === 'string' ? err : 'Không kết nối được nhân viên. Vui lòng thử lại.'
+    // Không hiện "không có quyền" — đã xử lý ở request.js; đẩy vào bubble nếu đang mở khung
+    if (isOpen.value) {
+      messages.value.push({
+        nguoiGui: 'AI',
+        noiDung: text,
+        thoiGian: new Date(),
+      })
+      scrollToBottom()
+    }
   } finally {
     connectingStaff.value = false
   }
@@ -223,7 +263,14 @@ function switchToAi() {
   cleanupHoTroSub()
   chatMode.value = 'AI'
   hoTroPhienId.value = null
+  needLoginForStaff.value = false
   messages.value = []
+  if (aiMessagesCache.value.length > 0) {
+    messages.value = aiMessagesCache.value.map((m) => ({ ...m }))
+    sessionId.value = aiSessionCache.value
+    scrollToBottom()
+    return
+  }
   sessionId.value = null
   restoreAiSession().then((ok) => {
     if (!ok || messages.value.length === 0) {
@@ -232,6 +279,35 @@ function switchToAi() {
     scrollToBottom()
   })
 }
+
+function onCustomerAuthChanged(event) {
+  if (!event?.detail?.loggedIn || !pendingStaffAfterLogin.value) return
+  pendingStaffAfterLogin.value = false
+  needLoginForStaff.value = false
+  isOpen.value = true
+  switchToStaff()
+}
+
+onMounted(() => {
+  window.addEventListener('sunova-customer-auth-changed', onCustomerAuthChanged)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('sunova-customer-auth-changed', onCustomerAuthChanged)
+  cleanupHoTroSub()
+})
+
+watch(isOpen, (open) => {
+  if (!open) {
+    showMenu.value = false
+    cleanupHoTroSub()
+    return
+  }
+  if (chatMode.value === 'NGUOI' && hoTroPhienId.value) {
+    ensureHoTroSubscribed()
+  }
+})
+
 
 const sendMessage = async () => {
   if (!inputMessage.value.trim()) return
@@ -314,23 +390,6 @@ function bubbleClass(nguoiGui) {
   if (nguoiGui === 'NHAN_VIEN') return 'msg-staff'
   return 'msg-ai'
 }
-
-onBeforeUnmount(() => {
-  cleanupHoTroSub()
-})
-
-watch(isOpen, (open) => {
-  if (!open) {
-    showMenu.value = false
-    // Đóng khung → huỷ subscribe (tránh chồng handler khi mở lại)
-    cleanupHoTroSub()
-    return
-  }
-  // Mở lại khung đang ở chế độ tư vấn viên → subscribe đúng 1 lần
-  if (chatMode.value === 'NGUOI' && hoTroPhienId.value) {
-    ensureHoTroSubscribed()
-  }
-})
 </script>
 
 <template>
@@ -354,7 +413,7 @@ watch(isOpen, (open) => {
               <button 
                 type="button"
                 class="chat-menu-item"
-                aria-label="Chat với tư vấn viên"
+                aria-label="Chat với nhân viên"
                 @click="openChat('NGUOI')"
               >
               <span class="chat-menu-icon chat-menu-icon--staff">
@@ -362,7 +421,7 @@ watch(isOpen, (open) => {
           <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
               </span>
-              <span class="chat-menu-label">Chat với tư vấn viên</span>
+              <span class="chat-menu-label">Chat với nhân viên</span>
               </button>
         </div>
 
@@ -381,7 +440,7 @@ watch(isOpen, (open) => {
           </div>
           <div>
             <h4>{{ chatMode === 'NGUOI' ? 'Tư vấn viên SUNOVA' : 'SUNOVA AI CHATBOT' }}</h4>
-            <span>{{ chatMode === 'NGUOI' ? 'Chat với tư vấn viên' : 'Trực tuyến' }}</span>
+            <span>{{ chatMode === 'NGUOI' ? 'Chat với nhân viên' : 'Trực tuyến' }}</span>
           </div>
         </div>
         <button type="button" class="chat-close-btn" @click="toggleChat">&times;</button>
@@ -389,24 +448,24 @@ watch(isOpen, (open) => {
 
       <div class="chat-mode-bar">
         <button
-          v-if="chatMode === 'AI'"
+          v-if="chatMode === 'AI' && !needLoginForStaff"
           type="button"
           class="chat-mode-btn"
           :disabled="connectingStaff"
           @click="switchToStaff"
         >
-          {{ connectingStaff ? 'Đang kết nối...' : 'Gặp nhân viên tư vấn' }}
+          {{ connectingStaff ? 'Đang kết nối...' : 'Chat với nhân viên' }}
         </button>
         <button
-          v-else
+          v-else-if="chatMode === 'NGUOI'"
           type="button"
           class="chat-mode-btn chat-mode-btn--ghost"
           @click="switchToAi"
         >
-          Quay lại chat AI
+          Trợ lý AI
         </button>
         <button
-          v-if="chatMode === 'AI'"
+          v-if="chatMode === 'AI' && !needLoginForStaff"
           type="button"
           class="chat-mode-btn chat-mode-btn--ghost"
           :disabled="restoringAi || isTyping"
@@ -414,9 +473,27 @@ watch(isOpen, (open) => {
         >
           Chat mới
         </button>
+        <button
+          v-if="needLoginForStaff"
+          type="button"
+          class="chat-mode-btn chat-mode-btn--ghost"
+          @click="needLoginForStaff = false; pendingStaffAfterLogin = false"
+        >
+          Trợ lý AI
+        </button>
       </div>
 
-      <div ref="messagesContainer" class="chat-body" @click="handleChatClick">
+      <div
+        v-if="needLoginForStaff"
+        class="chat-login-prompt"
+      >
+        <p>Vui lòng đăng nhập để chat với nhân viên</p>
+        <button type="button" class="chat-mode-btn" @click="openLoginFromPrompt">
+          Đăng nhập
+        </button>
+      </div>
+
+      <div v-else ref="messagesContainer" class="chat-body" @click="handleChatClick">
         <div
           v-for="(msg, idx) in messages"
           :key="msg.id || idx"
@@ -460,7 +537,7 @@ watch(isOpen, (open) => {
         </div>
       </div>
 
-      <div class="chat-footer">
+      <div v-if="!needLoginForStaff" class="chat-footer">
         <input
           v-model="inputMessage"
           type="text"
@@ -679,6 +756,26 @@ watch(isOpen, (open) => {
   background: transparent;
   color: var(--sf-mid, #5a5248);
   border-color: var(--sf-sand, #e8dcc8);
+}
+
+.chat-login-prompt {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 28px 20px;
+  text-align: center;
+  background: #f9fafb;
+}
+
+.chat-login-prompt p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--sf-espresso, #2a201b);
+  line-height: 1.45;
+  max-width: 240px;
 }
 
 .chat-body {

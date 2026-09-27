@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { suggestSku, suggestVariantLabel } from '@/utils/productForm'
+import MoneyInput from '@/components/common/MoneyInput.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -153,13 +154,11 @@ function submit() {
         </div>
         <div class="md:col-span-2">
           <label class="admin-label">Giá bán *</label>
-          <input
-            v-model.number="form.giaBan"
-            type="number"
-            class="admin-input"
-            min="0"
-            step="1000"
-            placeholder="VD: 460000"
+          <MoneyInput
+            v-model="form.giaBan"
+            input-class="admin-input"
+            :min="0"
+            placeholder="VD: 460.000"
           />
         </div>
       </div>

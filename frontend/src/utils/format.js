@@ -1,9 +1,7 @@
 export function formatCurrency(value) {
   const num = Number(value || 0)
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-  }).format(num)
+  if (!Number.isFinite(num)) return '0 đ'
+  return `${Math.trunc(num).toLocaleString('vi-VN')} đ`
 }
 
 export function formatDate(value) {
