@@ -468,22 +468,89 @@ public class ShippingService {
         body.put("items", buildItems(request));
 
         try {
-            JsonNode response = ghnClient.postWithShop("/v2/shipping-order/create", body);
-            JsonNode data = response != null ? response.path("data") : null;
-            if (data == null || data.isMissingNode() || !data.hasNonNull("order_code")) {
-                String chiTiet = ghnMessage(response);
-                log.warn("GHN không trả về mã vận đơn (new={}, request={}): {}", isNewTo, body, chiTiet);
-                throw new ApiException("GHN không trả về mã vận đơn. Phản hồi GHN: " + chiTiet, "GHN_ERROR");
+            return postCreateOrder(body, isNewTo);
+        } catch (ApiException ex) {
+            if (!isAddressConflict(ex.getMessage()) || !relaxConflictingStreet(body, request)) {
+                throw ex;
             }
-            return new CreateShippingOrderResponse(
-                    data.path("order_code").asText(),
-                    data.hasNonNull("total_fee") ? data.path("total_fee").asLong() : null,
-                    text(data, "expected_delivery_time"));
+            log.warn("GHN từ chối dòng đường, tạo lại theo phường/xã: {}", body.get("to_address"));
+            try {
+                return postCreateOrder(body, isNewTo);
+            } catch (RestClientException retryEx) {
+                String retryDetail = ghnError(retryEx);
+                log.warn("GHN tạo vận đơn vẫn thất bại sau khi bỏ dòng đường (request={}): {}",
+                        body, retryDetail);
+                throw new ApiException(ghnCreateFailMessage(retryDetail), "GHN_ERROR");
+            }
         } catch (RestClientException ex) {
             String chiTiet = ghnError(ex);
-            log.warn("GHN tạo vận đơn thất bại (new={}, request={}): {}", isNewTo, body, chiTiet);
-            throw new ApiException(ghnCreateFailMessage(chiTiet), "GHN_ERROR");
+            if (!isAddressConflict(chiTiet) || !relaxConflictingStreet(body, request)) {
+                log.warn("GHN tạo vận đơn thất bại (new={}, request={}): {}", isNewTo, body, chiTiet);
+                throw new ApiException(ghnCreateFailMessage(chiTiet), "GHN_ERROR");
+            }
+            log.warn("GHN To address conflict, tạo lại theo phường/xã {}: {}",
+                    body.get("to_address"), chiTiet);
+            try {
+                return postCreateOrder(body, isNewTo);
+            } catch (RestClientException retryEx) {
+                String retryDetail = ghnError(retryEx);
+                log.warn("GHN tạo vận đơn vẫn thất bại sau khi bỏ dòng đường (request={}): {}",
+                        body, retryDetail);
+                throw new ApiException(ghnCreateFailMessage(retryDetail), "GHN_ERROR");
+            }
         }
+    }
+
+    private CreateShippingOrderResponse postCreateOrder(Map<String, Object> body, boolean isNewTo) {
+        JsonNode response = ghnClient.postWithShop("/v2/shipping-order/create", body);
+        JsonNode data = response != null ? response.path("data") : null;
+        if (data == null || data.isMissingNode() || !data.hasNonNull("order_code")) {
+            String chiTiet = ghnMessage(response);
+            log.warn("GHN không trả về mã vận đơn (new={}, request={}): {}", isNewTo, body, chiTiet);
+            throw new ApiException("GHN không trả về mã vận đơn. Phản hồi GHN: " + chiTiet, "GHN_ERROR");
+        }
+        return new CreateShippingOrderResponse(
+                data.path("order_code").asText(),
+                data.hasNonNull("total_fee") ? data.path("total_fee").asLong() : null,
+                text(data, "expected_delivery_time"));
+    }
+
+    /**
+     * GHN dò {@code to_address} rồi đối với mã xã. Dòng đường có thật nhưng thuộc chỗ khác
+     * bị {@code To address conflict}; chữ không dò ra thì lại được. Khi đó gửi lại đúng
+     * phường/tỉnh khách đã chọn, còn dòng đường gốc để trong ghi chú cho shipper.
+     */
+    private static boolean relaxConflictingStreet(Map<String, Object> body, CreateShippingOrderRequest request) {
+        String current = body.get("to_address") != null ? String.valueOf(body.get("to_address")).trim() : "";
+        String fallback = wardLevelAddress(request);
+        if (fallback.equals(current)) {
+            return false;
+        }
+        if (!current.isBlank()) {
+            body.put("note", "Địa chỉ khách ghi: " + current);
+        }
+        body.put("to_address", fallback);
+        return true;
+    }
+
+    private static boolean isAddressConflict(String message) {
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+        String lower = message.toLowerCase(Locale.ROOT);
+        return lower.contains("address conflict")
+                || lower.contains("xung đột địa chỉ")
+                || lower.contains("xung dot dia chi");
+    }
+
+    private static String wardLevelAddress(CreateShippingOrderRequest request) {
+        if (!isBlank(request.getToWardName()) && !isBlank(request.getToProvinceName())) {
+            return request.getToWardName().trim() + ", " + request.getToProvinceName().trim();
+        }
+        if (!isBlank(request.getToWardName())) {
+            return request.getToWardName().trim();
+        }
+        return "Dia chi nhan hang";
     }
 
     public static boolean looksLikeNewWardCode(String wardCode) {
