@@ -1,8 +1,7 @@
 <script setup>
 import { computed } from 'vue'
-import { NQrCode } from 'naive-ui'
 import logoMark from '@/assets/logo/sunova_mark.png'
-import { storeInfo, buildLookupUrl } from '@/constants/storeInfo'
+import { storeInfo } from '@/constants/storeInfo'
 import {
   formatReceiptMoney,
   formatReceiptDateTime,
@@ -48,8 +47,6 @@ const showPoints = computed(
     inv.value.idKhachHang != null &&
     (inv.value.diemCong != null || inv.value.diemTichLuySau != null),
 )
-
-const qrValue = computed(() => buildLookupUrl(inv.value.maHoaDon))
 
 function paymentLabel(p) {
   return p.tenPhuongThucThanhToan || p.maPhuongThucThanhToan || 'Thanh toán'
@@ -185,8 +182,10 @@ function itemSubLine(item) {
 
     <div class="inv-receipt__rule" />
 
-    <section class="inv-receipt__qr">
-      <NQrCode :value="qrValue" :size="88" :padding="2" error-correction-level="M" />
+    <section class="inv-receipt__foot">
+      <p class="inv-receipt__lookup">
+        Tra cứu đơn hàng: nhập mã hóa đơn tại mục Tra cứu đơn trên website SUNOVA
+      </p>
       <p class="inv-receipt__policy">{{ storeInfo.returnPolicy }}</p>
     </section>
 

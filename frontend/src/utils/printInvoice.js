@@ -1,5 +1,4 @@
 import { createApp, h, nextTick } from 'vue'
-import { NQrCode } from 'naive-ui'
 import InvoiceReceipt from '@/components/invoice/InvoiceReceipt.vue'
 import { normalizeInvoice } from '@/utils/invoiceReceipt'
 import receiptCss from '@/components/invoice/invoiceReceipt.css?inline'
@@ -78,7 +77,6 @@ export async function printInvoice(rawInvoice, options = {}) {
   const app = createApp({
     render: () => h(InvoiceReceipt, { invoice, compact: true }),
   })
-  app.component('NQrCode', NQrCode)
   app.mount(mountEl)
 
   try {

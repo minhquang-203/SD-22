@@ -22,7 +22,6 @@ export const storeInfo = {
     return this.mst
   },
 
-  lookupBaseUrl: 'https://sunova.vn/tra-cuu',
   fanpageUrl: 'https://www.facebook.com/sunova.official',
   hours: 'Thứ 2 – Thứ 7: 8:00 – 21:00 · Chủ nhật: 9:00 – 18:00',
   returnPolicy: 'Đổi trả trong 7 ngày khi còn nguyên tem và hóa đơn.',
@@ -36,9 +35,4 @@ export const storeInfo = {
     email: 'b2b@sunova.vn',
     hours: '8:00–21:00',
   },
-}
-
-export function buildLookupUrl(maHoaDon) {
-  if (!maHoaDon) return storeInfo.website
-  return `${storeInfo.lookupBaseUrl}?ma=${encodeURIComponent(maHoaDon)}`
 }
