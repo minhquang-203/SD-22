@@ -127,6 +127,14 @@ const shippingFee = computed(() => {
 const estimatedTotal = computed(() =>
   Math.max(0, selectedSubtotal.value - voucherDiscount.value + shippingFee.value),
 )
+
+function seenUnitPrice(line) {
+  return Math.round(Number(line?.giaBan) || 0)
+}
+
+function seenCheckoutTotal() {
+  return Math.round(estimatedTotal.value)
+}
 const hasSelectedCartItems = computed(() => selectedItems.value.length > 0)
 
 const showCheckoutForm = computed(
@@ -352,6 +360,7 @@ async function recalcShippingFee() {
       toAddressV2: form.diaChiCuThe.trim(),
       toProvinceId: form.provinceId || undefined,
       toWardCode: form.wardCode,
+      insuranceValue: Math.round(selectedSubtotal.value) || undefined,
     })
     ghnFee.value = typeof res.data?.total === 'number' ? res.data.total : null
     feeNotice.value = res.data?.fromGhn ? '' : res.data?.message || ''
@@ -472,6 +481,13 @@ watch(
   },
 )
 
+watch(selectedSubtotal, () => {
+  if (form.maPhieuGiamGia) return
+  if (isNewWardCode(form.wardCode) && form.diaChiCuThe.trim()) {
+    void recalcShippingFee()
+  }
+})
+
 watch(
   () => form.diaChiCuThe,
   () => {
@@ -547,11 +563,13 @@ async function submitCheckout() {
       const guestItems = selectedItems.value.map((line) => ({
         idChiTietSanPham: line.idChiTietSanPham,
         soLuong: line.soLuong,
+        giaKhachThay: seenUnitPrice(line),
       }))
       const purchasedVariantIds = guestItems.map((item) => item.idChiTietSanPham)
       guestCheckoutEmail.value = form.email.trim()
       const guestRes = await createGuestCheckout({
         items: guestItems,
+        tongTienKhachThay: seenCheckoutTotal(),
         maPhuongThucThanhToan: selectedPayment.value,
         idempotencyKey: idempotencyKey.value,
         email: form.email.trim(),
@@ -598,6 +616,11 @@ async function submitCheckout() {
 
     const res = await createOnlineCheckout({
       idsChiTietGioHang: purchasedIds,
+      tongTienKhachThay: seenCheckoutTotal(),
+      dongGias: selectedItems.value.map((line) => ({
+        idChiTietSanPham: line.idChiTietSanPham,
+        giaKhachThay: seenUnitPrice(line),
+      })),
       maPhuongThucThanhToan: selectedPayment.value,
       maPhieuGiamGia: form.maPhieuGiamGia.trim() || null,
       idempotencyKey: idempotencyKey.value,
@@ -626,7 +649,10 @@ async function submitCheckout() {
     idempotencyKey.value = newIdempotencyKey()
     toast('Đặt hàng thành công')
   } catch (error) {
-    toast(typeof error === 'string' ? error : 'Không thể đặt hàng, vui lòng thử lại')
+    const message = typeof error === 'string'
+      ? error
+      : error?.message || 'Không thể đặt hàng, vui lòng thử lại'
+    toast(message)
   } finally {
     submitting.value = false
   }
