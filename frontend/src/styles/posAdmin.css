@@ -1015,7 +1015,8 @@
   color: var(--pos-muted);
 }
 
-.pos-counter .pos-pay-extra input {
+.pos-counter .pos-pay-extra input,
+.pos-counter .pos-pay-extra .money-input__control {
   height: 36px;
   padding: 0 10px;
   border: 1px solid var(--pos-line-strong);
@@ -1025,11 +1026,17 @@
   font-weight: 600;
   font-family: inherit;
   width: 100%;
+  box-sizing: border-box;
 }
 
-.pos-counter .pos-pay-extra input:focus {
+.pos-counter .pos-pay-extra input:focus,
+.pos-counter .pos-pay-extra .money-input__control:focus {
   outline: none;
   border-color: var(--pos-cream);
+}
+
+.pos-counter .pos-pay-extra .money-input {
+  width: 100%;
 }
 
 .pos-counter .pos-denoms {

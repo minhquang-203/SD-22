@@ -3,6 +3,11 @@ import {
   SPF_OPTIONS,
   normalizeSpfForSelect,
 } from '@/constants/chiSoChongNang'
+import {
+  PRODUCT_IMAGE_ALLOWED_TYPES,
+  PRODUCT_IMAGE_MAX_BYTES,
+  PRODUCT_IMAGE_MAX_COUNT,
+} from '@/constants/productImages'
 
 export { PA_OPTIONS, SPF_OPTIONS } from '@/constants/chiSoChongNang'
 
@@ -269,17 +274,21 @@ export function validateProductForm(form) {
     })
   }
 
-  const ALLOWED = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-  const MAX = 5 * 1024 * 1024
+  const ALLOWED = PRODUCT_IMAGE_ALLOWED_TYPES
+  const MAX = PRODUCT_IMAGE_MAX_BYTES
+  if ((form.anhs || []).length > PRODUCT_IMAGE_MAX_COUNT) {
+    images = `Tối đa ${PRODUCT_IMAGE_MAX_COUNT} ảnh cho mỗi sản phẩm`
+  }
   for (const img of form.anhs || []) {
+    if (images) break
     if (img.file) {
       const type = (img.file.type || '').toLowerCase()
       if (!ALLOWED.includes(type) && !type.startsWith('image/jpeg')) {
-        images = 'Chỉ chấp nhận ảnh JPG, PNG hoặc WEBP'
+        images = 'Định dạng ảnh không hợp lệ. Chỉ chấp nhận JPG, JPEG, PNG, WEBP'
         break
       }
       if (img.file.size > MAX) {
-        images = 'Ảnh vượt quá 5MB'
+        images = `Ảnh quá lớn, mỗi ảnh tối đa ${MAX / (1024 * 1024)}MB`
         break
       }
     }

@@ -36,6 +36,58 @@ function isCustomerApiUrl(url) {
   return CUSTOMER_API_PREFIXES.some((prefix) => url.includes(prefix))
 }
 
+/** Chuẩn hoá path axios (baseURL /api đã tách). */
+function normalizeApiPath(url) {
+  return String(url || '').split('?')[0].replace(/\/+$/, '')
+}
+
+/**
+ * Hỗ trợ chat: chọn JWT theo endpoint (không ưu tiên admin trên storefront).
+ * - POST /ho-tro/phien, POST /ho-tro/tin-nhan → chỉ KHÁCH
+ * - GET /ho-tro/phien, POST .../tra-loi, PUT .../da-doc → chỉ NV/QL/CHU
+ * - GET .../tin-nhan → cả hai: theo khu /admin hay storefront
+ */
+function attachHoTroBearer(config, url) {
+  const method = String(config.method || 'get').toLowerCase()
+  const path = normalizeApiPath(url)
+  const onAdmin = router.currentRoute.value.path.startsWith('/admin')
+
+  const isCustomerOnly =
+    (method === 'post' && /\/ho-tro\/phien$/.test(path)) ||
+    (method === 'post' && /\/ho-tro\/tin-nhan$/.test(path))
+
+  const isAdminOnly =
+    (method === 'get' && /\/ho-tro\/phien$/.test(path)) ||
+    (method === 'post' && /\/ho-tro\/phien\/\d+\/tra-loi$/.test(path)) ||
+    (method === 'put' && /\/ho-tro\/phien\/\d+\/da-doc$/.test(path))
+
+  if (isCustomerOnly) {
+    attachBearer(config, getCustomerToken())
+    return
+  }
+  if (isAdminOnly) {
+    attachBearer(config, getAdminToken())
+    return
+  }
+  // GET /ho-tro/phien/{id}/tin-nhan
+  if (method === 'get' && /\/ho-tro\/phien\/\d+\/tin-nhan$/.test(path)) {
+    attachBearer(config, onAdmin ? getAdminToken() : getCustomerToken())
+    return
+  }
+  // Fallback an toàn theo khu
+  attachBearer(config, onAdmin ? getAdminToken() : getCustomerToken())
+}
+
+function isCustomerHoTroUrl(url, method) {
+  const m = String(method || 'get').toLowerCase()
+  const path = normalizeApiPath(url)
+  return (
+    (m === 'post' && /\/ho-tro\/phien$/.test(path)) ||
+    (m === 'post' && /\/ho-tro\/tin-nhan$/.test(path)) ||
+    (m === 'get' && /\/ho-tro\/phien\/\d+\/tin-nhan$/.test(path))
+  )
+}
+
 request.interceptors.request.use((config) => {
   if (config.data instanceof FormData) {
     if (config.headers?.set) {
@@ -50,12 +102,7 @@ request.interceptors.request.use((config) => {
   const isCustomerApi = isCustomerApiUrl(url)
 
   if (isHoTro) {
-    const adminToken = getAdminToken()
-    if (adminToken) {
-      attachBearer(config, adminToken)
-    } else {
-      attachBearer(config, getCustomerToken())
-    }
+    attachHoTroBearer(config, url)
   } else if (url.includes('/yeu-cau-mua-so-luong-lon')) {
     // POST công khai: gắn token khách nếu có (để BE biết đã đăng nhập)
     attachBearer(config, getCustomerToken())
@@ -89,14 +136,16 @@ request.interceptors.response.use(
 
     const status = error.response.status
     const url = String(error.config?.url || '')
+    const method = String(error.config?.method || 'get')
     const isCustomerApi = isCustomerApiUrl(url)
+    const isCustomerHoTro = url.includes('/ho-tro') && isCustomerHoTroUrl(url, method)
     const isAdminLoginRequest = url.includes('/auth/nhan-vien/dang-nhap')
     const isKhachAuthRequest = url.includes('/auth/khach/')
     const onAdmin = router.currentRoute.value.path.startsWith('/admin')
 
     // 401 — hết phiên: đăng xuất đúng khu
     if (status === 401 && !isAdminLoginRequest && !isKhachAuthRequest) {
-      if (isCustomerApi || (!onAdmin && getCustomerToken())) {
+      if (isCustomerApi || isCustomerHoTro || (!onAdmin && getCustomerToken())) {
         try {
           useAuth().dangXuat()
         } catch {
@@ -131,6 +180,14 @@ request.interceptors.response.use(
 
     // 403 — không đủ quyền (không đăng xuất)
     if (status === 403 && !isAdminLoginRequest && !isKhachAuthRequest) {
+      // Storefront chat hỗ trợ: tránh chữ "không có quyền" / Forbidden với khách
+      if (!onAdmin && isCustomerHoTro) {
+        const msg = getCustomerToken()
+          ? 'Không kết nối được nhân viên. Vui lòng thử lại.'
+          : 'Vui lòng đăng nhập để chat với nhân viên'
+        toast(msg, 'warn')
+        return Promise.reject(msg)
+      }
       const msg = 'Bạn không có quyền thực hiện thao tác này'
       toast(msg, 'warn')
       return Promise.reject(msg)

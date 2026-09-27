@@ -28,6 +28,7 @@ import { toast } from '@/composables/useToast'
 import { getPhoneValidationError, normalizePhoneDigits } from '@/utils/phone'
 import { getLoHangConHangTheoBienThe } from '@/api/loHangApi'
 import InvoiceReceipt from '@/components/invoice/InvoiceReceipt.vue'
+import MoneyInput from '@/components/common/MoneyInput.vue'
 import { normalizeInvoice } from '@/utils/invoiceReceipt'
 import { printInvoice, saveInvoicePdf } from '@/utils/printInvoice'
 import { useAdminAuth } from '@/composables/useAdminAuth'
@@ -119,12 +120,12 @@ const paymentMethods = computed(() =>
   }),
 )
 const selectedPaymentId = ref(null)
-const cashGiven = ref('')
+const cashGiven = ref(null)
 const transferRef = ref('')
 const ghiChu = ref('')
 
 const isSplitMode = ref(false)
-const splitCashAmount = ref('')
+const splitCashAmount = ref(null)
 const splitTransferRef = ref('')
 const splitTransferConfirmed = ref(false)
 const showVietQrModal = ref(false)
@@ -908,19 +909,19 @@ function clearCustomer() {
 }
 
 function fillExactCash() {
-  cashGiven.value = String(thanhTien.value)
+  cashGiven.value = Number(thanhTien.value) || 0
 }
 
 function addDenomination(amount) {
-  cashGiven.value = String(cashGivenNum.value + amount)
+  cashGiven.value = cashGivenNum.value + amount
 }
 
 function clearCash() {
-  cashGiven.value = ''
+  cashGiven.value = null
 }
 
 function resetSplitFields() {
-  splitCashAmount.value = ''
+  splitCashAmount.value = null
   splitTransferRef.value = ''
   splitTransferConfirmed.value = false
   showVietQrModal.value = false
@@ -929,7 +930,7 @@ function resetSplitFields() {
 function toggleSplitMode() {
   isSplitMode.value = !isSplitMode.value
   resetSplitFields()
-  cashGiven.value = ''
+  cashGiven.value = null
   transferRef.value = ''
   const cash = paymentByMa.value.TIEN_MAT
   if (cash) selectedPaymentId.value = cash.id
@@ -1113,7 +1114,7 @@ function formatHeldAgo(dateStr) {
 function clearCartOnly() {
   cart.value = []
   clearVoucher()
-  cashGiven.value = ''
+  cashGiven.value = null
   transferRef.value = ''
 }
 
@@ -1363,7 +1364,7 @@ function clearSaleAfterPaid() {
   clearCustomer()
   cart.value = []
   clearVoucher()
-  cashGiven.value = ''
+  cashGiven.value = null
   transferRef.value = ''
   isSplitMode.value = false
   resetSplitFields()
@@ -1496,7 +1497,7 @@ function resetSale() {
   voucherCode.value = ''
   appliedVoucher.value = ''
   voucherDiscount.value = 0
-  cashGiven.value = ''
+  cashGiven.value = null
   transferRef.value = ''
   isSplitMode.value = false
   resetSplitFields()
@@ -1522,7 +1523,7 @@ function saveReceiptPdf() {
 }
 
 watch(selectedPaymentId, () => {
-  cashGiven.value = ''
+  cashGiven.value = null
   transferRef.value = ''
 })
 
@@ -1861,7 +1862,12 @@ onBeforeUnmount(() => {
           <div v-if="isSplitMode" class="pos-pay-extra">
             <div>
               <label>Tiền mặt</label>
-              <input v-model="splitCashAmount" type="number" min="0" placeholder="0" />
+              <MoneyInput
+                v-model="splitCashAmount"
+                :min="0"
+                placeholder="0"
+                input-class="pos-money-field"
+              />
               <p v-if="splitCashNum > 0 && splitCashNum >= thanhTien" class="pos-pay-msg pos-pay-msg--warn">
                 Tiền mặt đã đủ — dùng Tiền mặt thường, hoặc nhập ít hơn để kết hợp.
               </p>
@@ -1900,7 +1906,12 @@ onBeforeUnmount(() => {
           <div v-else-if="isCash" class="pos-pay-extra">
             <div>
               <label>Tiền khách đưa</label>
-              <input v-model="cashGiven" type="number" min="0" placeholder="0" />
+              <MoneyInput
+                v-model="cashGiven"
+                :min="0"
+                placeholder="0"
+                input-class="pos-money-field"
+              />
             </div>
             <div class="pos-denoms">
               <button type="button" class="pos-denom" @click="addDenomination(50000)">+50k</button>

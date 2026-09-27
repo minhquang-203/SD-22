@@ -17,6 +17,7 @@ import { confirm } from '@/composables/useConfirm'
 import { formatApiError } from '@/utils/apiError'
 import { productImageUrl } from '@/utils/productImage'
 import { PHONE_VN_REGEX, normalizePhoneDigits } from '@/utils/phone'
+import MoneyInput from '@/components/common/MoneyInput.vue'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -161,7 +162,7 @@ function reapplyHsdPresets() {
 }
 
 function formatMoney(v) {
-  return Number(v || 0).toLocaleString('vi-VN') + ' ₫'
+  return Number(v || 0).toLocaleString('vi-VN') + ' đ'
 }
 
 function lineThanhTien(row) {
@@ -690,7 +691,10 @@ function updateVariantQty(idChiTietSanPham, value) {
 function updateVariantPrice(idChiTietSanPham, value) {
   const draft = variantDraft.value[idChiTietSanPham]
   if (!draft) return
-  const price = Math.max(0, Number(value) || 0)
+  const price =
+    value == null || value === ''
+      ? 0
+      : Math.max(0, Number(value) || 0)
   variantDraft.value = {
     ...variantDraft.value,
     [idChiTietSanPham]: { ...draft, donGia: price },
@@ -1104,16 +1108,18 @@ onBeforeRouteLeave(async () => {
               </label>
               <label class="pn-line__field">
                 <span>Đơn giá nhập</span>
-                <input
-                  v-model.number="row.donGia"
-                  type="number"
-                  min="0"
-                  class="pn-line__input"
-                  :class="{
-                    'pn-line__input--loss': isLossLine(row),
-                    'pn-line__input--error': lineErrors[row.idChiTietSanPham]?.donGia,
-                  }"
+                <MoneyInput
+                  v-model="row.donGia"
+                  :min="0"
                   :disabled="readonly"
+                  :error="!!lineErrors[row.idChiTietSanPham]?.donGia"
+                  :input-class="[
+                    'pn-line__input',
+                    {
+                      'pn-line__input--loss': isLossLine(row),
+                      'pn-line__input--error': lineErrors[row.idChiTietSanPham]?.donGia,
+                    },
+                  ]"
                   placeholder="0"
                   @input="clearLineError(row.idChiTietSanPham, 'donGia')"
                 />
@@ -1252,12 +1258,12 @@ onBeforeRouteLeave(async () => {
           </div>
           <label class="pn-field pn-field--inline">
             <span>Giảm giá</span>
-            <input
-              v-model.number="giamGia"
-              type="number"
-              min="0"
-              class="pn-control"
+            <MoneyInput
+              v-model="giamGia"
+              :min="0"
               :disabled="readonly"
+              input-class="pn-control"
+              placeholder="0"
             />
           </label>
           <div class="pn-totals__row pn-totals__row--emph">
@@ -1465,14 +1471,13 @@ onBeforeRouteLeave(async () => {
                       {{ v.soLuongTon ?? 0 }}
                     </td>
                     <td class="num pn-qty-table__price">
-                      <input
-                        type="number"
-                        min="0"
-                        step="1000"
-                        class="pn-qty-input"
+                      <MoneyInput
+                        :model-value="variantDraft[v.idChiTietSanPham]?.donGia ?? null"
+                        :min="0"
                         :disabled="!isVariantSelected(v.idChiTietSanPham)"
-                        :value="variantDraft[v.idChiTietSanPham]?.donGia ?? 0"
-                        @input="updateVariantPrice(v.idChiTietSanPham, $event.target.value)"
+                        input-class="pn-qty-input"
+                        placeholder="0"
+                        @update:model-value="updateVariantPrice(v.idChiTietSanPham, $event)"
                       />
                     </td>
                     <td class="num pn-qty-table__qty">

@@ -8,6 +8,7 @@ import org.example.templatejava6.common.service.ProductFileStorageService;
 import org.example.templatejava6.common.util.MaGenerator;
 import org.example.templatejava6.common.util.MapperUtil;
 import org.example.templatejava6.common.model.response.MaTiepTheoResponse;
+import org.example.templatejava6.product.ProductImageLimits;
 import org.example.templatejava6.product.entity.*;
 import org.example.templatejava6.product.model.request.AnhSanPhamRequest;
 import org.example.templatejava6.product.model.request.ChiTietSanPhamRequest;
@@ -191,6 +192,7 @@ public class SanPhamService {
         validateSanPhamFields(request);
         validateChiTiets(request.getChiTiets(), null);
         validateAnhBatBuocKhiTao(request, files);
+        validateAnhLimits(request, files);
 
         SanPham sp = MapperUtil.map(request, SanPham.class);
         sp.setMaSanPham(MaGenerator.nextCode("SP", sanPhamRepository.findAll().stream().map(SanPham::getMaSanPham).toList()));
@@ -219,6 +221,7 @@ public class SanPhamService {
         validateMaSanPham(request.getMaSanPham(), id);
         validateSanPhamFields(request);
         validateChiTiets(request.getChiTiets(), id);
+        validateAnhLimits(request, files);
 
         Boolean trangThai = sp.getTrangThai();
         Boolean noiBat = sp.getNoiBat();
@@ -630,6 +633,31 @@ public class SanPhamService {
         }
         if (!hasFile && !hasAnhMeta) {
             throw new ApiException("Sản phẩm phải có ít nhất 1 ảnh", "VALIDATION_ERROR");
+        }
+    }
+
+    /** Tối đa ProductImageLimits.MAX_COUNT ảnh; kiểm tra dung lượng từng file multipart. */
+    private void validateAnhLimits(SanPhamRequest request, List<MultipartFile> files) {
+        int anhCount = request.getAnhs() == null ? 0 : (int) request.getAnhs().stream()
+                .filter(a -> a != null)
+                .count();
+        if (anhCount > ProductImageLimits.MAX_COUNT) {
+            throw new ApiException(
+                    "Tối đa " + ProductImageLimits.MAX_COUNT + " ảnh cho mỗi sản phẩm",
+                    "VALIDATION_ERROR");
+        }
+        if (files == null) {
+            return;
+        }
+        for (MultipartFile file : files) {
+            if (file == null || file.isEmpty()) {
+                continue;
+            }
+            if (file.getSize() > ProductImageLimits.MAX_BYTES) {
+                throw new ApiException(
+                        "Ảnh quá lớn, mỗi ảnh tối đa " + ProductImageLimits.MAX_FILE_SIZE_LABEL,
+                        "VALIDATION_ERROR");
+            }
         }
     }
 

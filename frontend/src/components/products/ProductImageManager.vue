@@ -1,6 +1,15 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { resolveProductImageUrl } from '@/utils/productForm'
+import {
+  PRODUCT_IMAGE_ACCEPT,
+  PRODUCT_IMAGE_MAX_BYTES,
+  PRODUCT_IMAGE_MAX_COUNT,
+} from '@/constants/productImages'
+import {
+  compressProductImage,
+  isAllowedProductImageFile,
+} from '@/utils/compressProductImage'
 
 const images = defineModel({ type: Array, required: true })
 
@@ -10,14 +19,12 @@ const props = defineProps({
   error: { type: String, default: '' },
 })
 
-const emit = defineEmits(['clear-error'])
+const emit = defineEmits(['clear-error', 'update:processing'])
 
 const fileInputRef = ref(null)
 const dragOver = ref(false)
 const localReject = ref('')
-
-const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-const MAX_BYTES = 5 * 1024 * 1024
+const processing = ref(false)
 
 const colorSelectOptions = computed(() => {
   const map = new Map()
@@ -31,12 +38,18 @@ const colorSelectOptions = computed(() => {
 
 const displayError = computed(() => props.error || localReject.value)
 
+function setProcessing(v) {
+  processing.value = v
+  emit('update:processing', v)
+}
+
 function previewSrc(img) {
   if (img.previewUrl) return img.previewUrl
   return resolveProductImageUrl(img.url) || ''
 }
 
 function openFilePicker() {
+  if (processing.value) return
   fileInputRef.value?.click()
 }
 
@@ -49,39 +62,58 @@ function syncThuTu() {
   }
 }
 
-function isAllowedImage(file) {
-  const type = (file?.type || '').toLowerCase()
-  return ALLOWED_TYPES.includes(type)
-}
-
-function addFiles(fileList) {
+async function addFiles(fileList) {
   localReject.value = ''
   emit('clear-error')
-  const selected = Array.from(fileList || [])
-  const accepted = []
-  for (const file of selected) {
-    if (!file) continue
-    if (!isAllowedImage(file)) {
-      localReject.value = `Bỏ qua "${file.name}": chỉ chấp nhận JPG, PNG hoặc WEBP`
-      continue
-    }
-    if (file.size > MAX_BYTES) {
-      localReject.value = `Bỏ qua "${file.name}": ảnh vượt quá 5MB`
-      continue
-    }
-    accepted.push(file)
+  const selected = Array.from(fileList || []).filter(Boolean)
+  if (!selected.length) return
+
+  const room = PRODUCT_IMAGE_MAX_COUNT - images.value.length
+  if (room <= 0) {
+    localReject.value = `Tối đa ${PRODUCT_IMAGE_MAX_COUNT} ảnh cho mỗi sản phẩm`
+    return
   }
-  accepted.forEach((file) => {
-    images.value.push({
-      url: '',
-      file,
-      previewUrl: URL.createObjectURL(file),
-      laAnhChinh: images.value.length === 0,
-      thuTu: images.value.length,
-      idMauSac: null,
-    })
-  })
-  syncThuTu()
+  if (selected.length > room) {
+    localReject.value = `Tối đa ${PRODUCT_IMAGE_MAX_COUNT} ảnh cho mỗi sản phẩm`
+  }
+
+  const toProcess = selected.slice(0, Math.max(0, room))
+  setProcessing(true)
+  try {
+    for (const file of toProcess) {
+      if (!isAllowedProductImageFile(file)) {
+        localReject.value = `"${file.name}": định dạng không hợp lệ. Chỉ chấp nhận JPG, JPEG, PNG, WEBP`
+        continue
+      }
+      try {
+        const compressed = await compressProductImage(file)
+        if (compressed.size > PRODUCT_IMAGE_MAX_BYTES) {
+          localReject.value = `"${file.name}": ảnh quá lớn, mỗi ảnh tối đa ${PRODUCT_IMAGE_MAX_BYTES / (1024 * 1024)}MB`
+          continue
+        }
+        if (images.value.length >= PRODUCT_IMAGE_MAX_COUNT) {
+          localReject.value = `Tối đa ${PRODUCT_IMAGE_MAX_COUNT} ảnh cho mỗi sản phẩm`
+          break
+        }
+        images.value.push({
+          url: '',
+          file: compressed,
+          previewUrl: URL.createObjectURL(compressed),
+          laAnhChinh: images.value.length === 0,
+          thuTu: images.value.length,
+          idMauSac: null,
+        })
+      } catch (err) {
+        localReject.value =
+          typeof err?.message === 'string'
+            ? `"${file.name}": ${err.message}`
+            : `"${file.name}": không xử lý được ảnh`
+      }
+    }
+    syncThuTu()
+  } finally {
+    setProcessing(false)
+  }
 }
 
 function onFilesSelected(event) {
@@ -140,16 +172,25 @@ function onColorChange(img, event) {
     <input
       ref="fileInputRef"
       type="file"
-      accept="image/jpeg,image/png,image/webp"
+      :accept="PRODUCT_IMAGE_ACCEPT"
       multiple
       class="hidden"
+      :disabled="processing"
       @change="onFilesSelected"
     />
 
     <div class="pim__head">
-      <h4 class="pim__title">Ảnh sản phẩm</h4>
-      <button type="button" class="admin-btn admin-btn-success" @click="openFilePicker">
-        Tải ảnh lên
+      <h4 class="pim__title">
+        Ảnh sản phẩm
+        <span class="pim__count">{{ images.length }}/{{ PRODUCT_IMAGE_MAX_COUNT }}</span>
+      </h4>
+      <button
+        type="button"
+        class="admin-btn admin-btn-success"
+        :disabled="processing || images.length >= PRODUCT_IMAGE_MAX_COUNT"
+        @click="openFilePicker"
+      >
+        {{ processing ? 'Đang xử lý ảnh...' : 'Tải ảnh lên' }}
       </button>
     </div>
 
@@ -162,16 +203,22 @@ function onColorChange(img, event) {
 
     <div
       class="pim__drop"
-      :class="{ 'pim__drop--active': dragOver }"
-      @dragover.prevent="dragOver = true"
+      :class="{ 'pim__drop--active': dragOver, 'pim__drop--busy': processing }"
+      @dragover.prevent="!processing && (dragOver = true)"
       @dragleave.prevent="dragOver = false"
       @drop="onDrop"
       @click="openFilePicker"
     >
-      <p>
-        Kéo thả ảnh vào đây hoặc <strong>bấm để chọn</strong>
-      </p>
-      <span>JPG, PNG, WEBP — tối đa 5MB mỗi ảnh</span>
+      <p v-if="processing">Đang thu nhỏ / nén ảnh trước khi tải lên…</p>
+      <template v-else>
+        <p>
+          Kéo thả ảnh vào đây hoặc <strong>bấm để chọn</strong>
+        </p>
+        <span
+          >JPG, JPEG, PNG, WEBP — tối đa {{ PRODUCT_IMAGE_MAX_COUNT }} ảnh, mỗi ảnh
+          {{ PRODUCT_IMAGE_MAX_BYTES / (1024 * 1024) }}MB (tự thu nhỏ nếu quá lớn)</span
+        >
+      </template>
     </div>
 
     <div v-if="images.length === 0" class="pim__empty">
@@ -201,6 +248,7 @@ function onColorChange(img, event) {
             <select
               class="admin-select pim__color-select"
               :value="img.idMauSac ?? ''"
+              :disabled="processing"
               @change="onColorChange(img, $event)"
             >
               <option value="">Dùng chung (mọi màu)</option>
@@ -219,6 +267,7 @@ function onColorChange(img, event) {
               type="radio"
               name="main-image"
               :checked="img.laAnhChinh"
+              :disabled="processing"
               @change="setMain(index)"
             />
             Đặt làm ảnh chính
@@ -229,7 +278,7 @@ function onColorChange(img, event) {
               type="button"
               class="admin-icon-btn"
               title="Lên"
-              :disabled="index === 0"
+              :disabled="processing || index === 0"
               @click="moveImage(index, -1)"
             >
               ↑
@@ -238,7 +287,7 @@ function onColorChange(img, event) {
               type="button"
               class="admin-icon-btn"
               title="Xuống"
-              :disabled="index === images.length - 1"
+              :disabled="processing || index === images.length - 1"
               @click="moveImage(index, 1)"
             >
               ↓
@@ -246,6 +295,7 @@ function onColorChange(img, event) {
             <button
               type="button"
               class="admin-btn admin-btn-danger"
+              :disabled="processing"
               @click="removeImage(index)"
             >
               Xóa
@@ -276,6 +326,15 @@ function onColorChange(img, event) {
   font-size: 14px;
   font-weight: 600;
   color: var(--admin-text, var(--ink, #1a1814));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pim__count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--admin-muted, #8a7b6a);
 }
 
 .pim__drop {
@@ -293,6 +352,11 @@ function onColorChange(img, event) {
 .pim__drop--active {
   border-color: var(--admin-primary, #c9a96e);
   background: rgba(201, 169, 110, 0.12);
+}
+
+.pim__drop--busy {
+  cursor: wait;
+  opacity: 0.85;
 }
 
 .pim__drop p {
