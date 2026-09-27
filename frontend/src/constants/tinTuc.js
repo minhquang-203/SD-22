@@ -3,6 +3,10 @@
  * Nội dung tự viết — tham khảo nguồn, không sao chép nguyên văn.
  */
 
+import anhQuizDa from '@/assets/tin-tuc/cam-nang-quiz-da.jpg'
+import anhUuDaiHe from '@/assets/tin-tuc/cam-nang-uu-dai-he.jpg'
+import anhSpfPa from '@/assets/tin-tuc/cam-nang-spf-pa.jpg'
+
 export const TIN_TUC_DANH_MUC = [
   'Tất cả',
   'Kiến thức chống nắng',
@@ -36,7 +40,7 @@ export const tinTucBaiViet = [
     tieuDe: 'SPF và PA là gì? Đọc đúng ký hiệu trên kem chống nắng',
     danhMuc: 'Kiến thức chống nắng',
     ngay: '2026-03-12',
-    anhBia: null,
+    anhBia: anhSpfPa,
     icon: 'shield',
     tomTat:
       'Hai dòng chữ nhỏ trên tuýp kem — SPF và PA — nói lên khả năng bảo vệ tia UVB và UVA. Biết đọc đúng giúp bạn chọn sản phẩm phù hợp hơn.',
@@ -204,7 +208,7 @@ export const tinTucBaiViet = [
     tieuDe: 'Làm quiz da 2 phút — tìm kem chống nắng hợp với bạn',
     danhMuc: 'Tin SUNOVA',
     ngay: '2026-03-18',
-    anhBia: null,
+    anhBia: anhQuizDa,
     icon: 'droplet',
     tomTat:
       'Trả lời vài câu về loại da, thói quen ngoài trời và sở thích kết cấu — SUNOVA gợi ý sản phẩm gần với nhu cầu thực tế của bạn.',
@@ -224,7 +228,7 @@ export const tinTucBaiViet = [
     tieuDe: 'Ưu đãi mùa hè: giảm giá bộ sưu tập chống nắng',
     danhMuc: 'Tin SUNOVA',
     ngay: '2026-03-15',
-    anhBia: null,
+    anhBia: anhUuDaiHe,
     icon: 'sun',
     tomTat:
       'Mùa nắng cao điểm là lúc “lá chắn” da cần sẵn sàng. Khám phá các sản phẩm đang giảm trong bộ sưu tập chống nắng SUNOVA.',
