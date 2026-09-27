@@ -20,13 +20,11 @@ const route = useRoute()
     <TheNavbar />
     <main class="sf-main">
       <ErrorBoundary variant="storefront">
+        <!-- Không dùng Transition: mode out-in dễ kẹt trang cũ khi soft-nav. -->
         <router-view v-slot="{ Component }">
-          <!-- Wrapper 1 element: Transition mode="out-in" không animate được multi-root (vd. TraCuuDon). -->
-          <Transition name="sf-fade" mode="out-in">
-            <div :key="route.path" class="sf-page">
-              <component :is="Component" />
-            </div>
-          </Transition>
+          <div :key="route.fullPath" class="sf-page">
+            <component :is="Component" />
+          </div>
         </router-view>
       </ErrorBoundary>
     </main>

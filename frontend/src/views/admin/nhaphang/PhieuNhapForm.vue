@@ -263,7 +263,12 @@ async function loadDetail(id) {
     }))
     markClean()
   } catch (e) {
-    toast(formatApiError(e, 'Không tải được phiếu'), 'error')
+    const raw = typeof e === 'string' ? e : formatApiError(e, 'Không tải được phiếu')
+    const is404 =
+      /not found|không tìm|404|NOT_FOUND/i.test(String(raw)) ||
+      e?.response?.status === 404 ||
+      e?.code === 'NOT_FOUND'
+    toast(is404 ? 'Không tìm thấy phiếu nhập' : raw, 'error')
     router.push('/admin/nhap-hang')
   } finally {
     loading.value = false
