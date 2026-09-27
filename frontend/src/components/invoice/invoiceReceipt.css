@@ -123,18 +123,20 @@
   margin-top: 4px;
 }
 
-.inv-receipt__qr {
+.inv-receipt__foot {
   text-align: center;
-  margin: 4px 0;
+  margin: 2px 0 0;
 }
 
-.inv-receipt__qr :deep(canvas),
-.inv-receipt__qr :deep(img) {
-  margin: 0 auto;
+.inv-receipt__lookup {
+  margin: 0;
+  font-size: 9px;
+  color: #444;
+  line-height: 1.35;
 }
 
 .inv-receipt__policy {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   font-size: 9px;
   color: #444;
   line-height: 1.35;
@@ -143,7 +145,7 @@
 .inv-receipt__thanks {
   text-align: center;
   font-weight: 600;
-  margin-top: 8px;
+  margin-top: 6px;
   font-size: 11px;
   line-height: 1.4;
 }
@@ -152,6 +154,6 @@
   text-align: center;
   font-size: 9px;
   color: #444;
-  margin-top: 8px;
+  margin-top: 4px;
   line-height: 1.35;
 }
