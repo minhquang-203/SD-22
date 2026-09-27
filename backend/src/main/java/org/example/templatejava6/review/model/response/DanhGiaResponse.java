@@ -28,7 +28,7 @@ public class DanhGiaResponse {
     public DanhGiaResponse(DanhGia dg) {
         this.id = dg.getId();
         this.idKhachHang = dg.getIdKhachHang();
-        this.tenKhachHang = dg.getKhachHang() != null ? dg.getKhachHang().getHoTen() : ("khachhang_" + dg.getIdKhachHang());
+        this.tenKhachHang = dg.getKhachHang() != null ? dg.getKhachHang().getHoTen() : "Khách hàng";
         this.idSanPham = dg.getSanPham() != null ? dg.getSanPham().getId() : null;
         this.soSao = dg.getSoSao();
         this.noiDung = dg.getNoiDung();

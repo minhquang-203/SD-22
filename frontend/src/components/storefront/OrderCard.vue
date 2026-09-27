@@ -13,8 +13,6 @@ const props = defineProps({
   cancelLoading: { type: Boolean, default: false },
   returnActionLoading: { type: Boolean, default: false },
   detailLoading: { type: Boolean, default: false },
-  /** Chỉ xem (khách vãng lai): ẩn đánh giá. Hủy / trả hàng vẫn hiện nếu đơn đủ điều kiện. */
-  readOnly: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['review', 'cancelOrder', 'requestReturn', 'expand'])
@@ -168,7 +166,6 @@ function onHeadClick() {
 }
 
 function canReview(line) {
-  if (props.readOnly) return false
   const delivered = props.order?.trangThai === 'HOAN_THANH' || props.order?.trangThai === 'GIAO_THANH_CONG'
   return delivered && !line?.daDanhGia && line?.idSanPham
 }

@@ -25,6 +25,7 @@ const orders = ref([])
 const error = ref('')
 const showReviewModal = ref(false)
 const reviewLine = ref(null)
+const reviewToken = ref('')
 const reviewNotice = ref('')
 const cancelLoadingId = ref(null)
 const cancelNotice = ref('')
@@ -307,18 +308,26 @@ function statusGroup(order) {
 }
 
 function openReview(line) {
+  const fromGuest = guestOrder.value && (guestOrder.value.chiTiets || []).some((row) => row.id === line?.id)
+    ? guestOrder.value
+    : null
+  const fromAccount = orders.value.find((order) => (order.chiTiets || []).some((row) => row.id === line?.id))
   reviewLine.value = line
+  reviewToken.value = String((fromGuest || fromAccount)?.trackingToken || '').trim()
   showReviewModal.value = true
 }
 
 function closeReview() {
   showReviewModal.value = false
   reviewLine.value = null
+  reviewToken.value = ''
 }
 
 function onReviewSubmitted({ lineId }) {
   reviewNotice.value = 'Cảm ơn bạn đã đánh giá! Đánh giá của bạn đã được hiển thị.'
-  for (const order of orders.value) {
+  const pools = [...orders.value]
+  if (guestOrder.value) pools.push(guestOrder.value)
+  for (const order of pools) {
     const line = (order.chiTiets || []).find((item) => item.id === lineId)
     if (line) {
       line.daDanhGia = true
@@ -477,14 +486,15 @@ async function handleGuestCancelOrder(order) {
       <p v-if="guestLookupLoading && route.query.token" class="sf-order-msg">Đang tải đơn hàng...</p>
       <p v-if="guestError" class="sf-order-msg sf-order-msg--err">{{ guestError }}</p>
       <p v-if="cancelNotice && !isLoggedIn" class="sf-order-msg sf-order-msg--ok">{{ cancelNotice }}</p>
+      <p v-if="reviewNotice" class="sf-order-msg sf-order-msg--ok">{{ reviewNotice }}</p>
       <p v-if="returnNotice" class="sf-order-msg sf-order-msg--ok">{{ returnNotice }}</p>
 
       <div v-if="guestOrder" class="sf-order-list">
         <OrderCard
           :order="guestOrder"
           :default-open="true"
-          read-only
           :cancel-loading="cancelLoadingId === guestOrder.id"
+          @review="openReview"
           @cancel-order="handleGuestCancelOrder"
           @request-return="openReturn"
         />
@@ -570,6 +580,7 @@ async function handleGuestCancelOrder(order) {
     <ProductReviewModal
       :visible="showReviewModal"
       :line="reviewLine"
+      :tracking-token="reviewToken"
       @close="closeReview"
       @submitted="onReviewSubmitted"
     />

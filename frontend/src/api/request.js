@@ -59,6 +59,9 @@ request.interceptors.request.use((config) => {
   } else if (url.includes('/yeu-cau-mua-so-luong-lon')) {
     // POST công khai: gắn token khách nếu có (để BE biết đã đăng nhập)
     attachBearer(config, getCustomerToken())
+  } else if (url.includes('/danh-gia/add') || url.includes('/danh-gia/like')) {
+    // Đánh giá: token khách nếu đã đăng nhập. Khách vãng lai chứng minh bằng tracking token trong body.
+    attachBearer(config, getCustomerToken())
   } else if (isCustomerApi) {
     attachBearer(config, getCustomerToken())
   } else {

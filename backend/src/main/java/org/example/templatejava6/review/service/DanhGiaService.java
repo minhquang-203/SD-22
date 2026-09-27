@@ -1,6 +1,8 @@
 package org.example.templatejava6.review.service;
 
+import org.example.templatejava6.common.enums.TrangThaiDonHang;
 import org.example.templatejava6.common.exception.ApiException;
+import org.example.templatejava6.order.entity.HoaDon;
 import org.example.templatejava6.order.entity.HoaDonChiTiet;
 import org.example.templatejava6.order.repository.HoaDonChiTietRepository;
 import org.example.templatejava6.product.entity.SanPham;
@@ -14,8 +16,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -36,15 +42,31 @@ public class DanhGiaService {
 
     @Transactional
     public void add(DanhGiaRequest request, MultipartFile file) {
-        if (request.getIdHoaDonChiTiet() != null
-                && danhGiaRepository.findFirstByHoaDonChiTiet_Id(request.getIdHoaDonChiTiet()).isPresent()) {
+        if (request.getIdHoaDonChiTiet() == null) {
+            throw new ApiException("Chỉ đánh giá được sản phẩm trong đơn đã giao.", "VALIDATION_ERROR");
+        }
+        HoaDonChiTiet hdct = hoaDonChiTietRepository.findById(request.getIdHoaDonChiTiet())
+                .orElseThrow(() -> new ApiException("Không tìm thấy sản phẩm trong đơn hàng.", "VALIDATION_ERROR"));
+        HoaDon hoaDon = hdct.getIdHoaDon();
+        if (!soHuuDonDeDanhGia(hoaDon, request.getTrackingToken())) {
+            throw new ApiException("Bạn chỉ đánh giá được sản phẩm trong đơn đã giao của mình.", "VALIDATION_ERROR");
+        }
+        if (danhGiaRepository.findFirstByHoaDonChiTiet_Id(request.getIdHoaDonChiTiet()).isPresent()) {
             throw new ApiException("Bạn đã đánh giá sản phẩm này trong đơn hàng", "VALIDATION_ERROR");
+        }
+        if (hoaDon.getTrangThai() != TrangThaiDonHang.HOAN_THANH) {
+            throw new ApiException("Chỉ đánh giá được khi đơn đã giao.", "VALIDATION_ERROR");
+        }
+        Integer idSanPham = idSanPhamCuaDong(hdct);
+        if (idSanPham == null || !idSanPham.equals(request.getIdSanPham())) {
+            throw new ApiException("Sản phẩm không thuộc dòng đơn này.", "VALIDATION_ERROR");
         }
 
         DanhGia dg = new DanhGia();
-        dg.setIdKhachHang(request.getIdKhachHang());
+        dg.setIdKhachHang(hoaDon.getIdKhachHang() != null ? hoaDon.getIdKhachHang().getId() : null);
         dg.setSoSao(request.getSoSao());
         dg.setNoiDung(request.getNoiDung());
+        dg.setHoaDonChiTiet(hdct);
         
         if (file != null && !file.isEmpty()) {
             String fileName = fileStorageService.store(file);
@@ -70,18 +92,8 @@ public class DanhGiaService {
             dg.setHinhAnhVideo(request.getHinhAnhVideo());
         }
 
-        if (request.getIdSanPham() != null) {
-            dg.setSanPham(sanPhamService.getSanPhamOrThrow(request.getIdSanPham()));
-        } else {
-            throw new ApiException("Lỗi: idSanPham không được trống. Dữ liệu cũ có thể bị thiếu.", "VALIDATION_ERROR");
-        }
-        
-        if (request.getIdHoaDonChiTiet() != null) {
-            HoaDonChiTiet hdct = hoaDonChiTietRepository.findById(request.getIdHoaDonChiTiet())
-                    .orElseThrow(() -> new ApiException("Không tìm thấy chi tiết hóa đơn", "NOT_FOUND"));
-            dg.setHoaDonChiTiet(hdct);
-        }
-        
+        dg.setSanPham(sanPhamService.getSanPhamOrThrow(idSanPham));
+
         dg.setTrangThai("DA_DUYET");
         dg.setNgayTao(LocalDateTime.now());
         danhGiaRepository.save(dg);
@@ -114,5 +126,53 @@ public class DanhGiaService {
                 .orElseThrow(() -> new ApiException("Không tìm thấy đánh giá", "NOT_FOUND"));
         dg.setSoLuotThich((dg.getSoLuotThich() != null ? dg.getSoLuotThich() : 0) + 1);
         danhGiaRepository.save(dg);
+    }
+
+    /** Khách đăng nhập khớp tài khoản trên đơn, hoặc khách vãng lai khớp mã tra cứu. */
+    private boolean soHuuDonDeDanhGia(HoaDon hoaDon, String trackingToken) {
+        if (hoaDon == null) {
+            return false;
+        }
+        Integer idTrenDon = hoaDon.getIdKhachHang() != null ? hoaDon.getIdKhachHang().getId() : null;
+        Integer idDangNhap = currentKhachHangIdOrNull();
+        if (idTrenDon != null && idTrenDon.equals(idDangNhap)) {
+            return true;
+        }
+        return tokenKhopDon(hoaDon, trackingToken);
+    }
+
+    private Integer currentKhachHangIdOrNull() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return null;
+        }
+        boolean laKhach = authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_KHACH_HANG".equals(authority.getAuthority()));
+        if (!laKhach || authentication.getName() == null) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(authentication.getName());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private static boolean tokenKhopDon(HoaDon hoaDon, String token) {
+        String expected = hoaDon.getTrackingToken();
+        String given = token != null ? token.trim() : "";
+        if (expected == null || expected.isBlank() || given.length() < 32) {
+            return false;
+        }
+        byte[] a = expected.getBytes(StandardCharsets.UTF_8);
+        byte[] b = given.getBytes(StandardCharsets.UTF_8);
+        return MessageDigest.isEqual(a, b);
+    }
+
+    private static Integer idSanPhamCuaDong(HoaDonChiTiet hdct) {
+        if (hdct.getIdChiTietSanPham() == null || hdct.getIdChiTietSanPham().getSanPham() == null) {
+            return null;
+        }
+        return hdct.getIdChiTietSanPham().getSanPham().getId();
     }
 }

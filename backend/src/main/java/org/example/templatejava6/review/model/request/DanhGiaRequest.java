@@ -14,7 +14,7 @@ import lombok.Setter;
 @NoArgsConstructor
 public class DanhGiaRequest {
 
-    @NotNull(message = "Id khách hàng không được để trống")
+    /** Null khi khách vãng lai đánh giá đơn không gắn tài khoản. */
     private Integer idKhachHang;
 
     @NotNull(message = "Id sản phẩm không được để trống")
@@ -29,6 +29,11 @@ public class DanhGiaRequest {
 
     private String hinhAnhVideo;
 
+    @NotNull(message = "Chỉ đánh giá được sản phẩm trong đơn đã giao")
     private Integer idHoaDonChiTiet;
+
+    /** Mã tra cứu đơn — bắt buộc với khách vãng lai (đơn không gắn tài khoản). */
+    private String trackingToken;
+
     private String imageBase64;
 }

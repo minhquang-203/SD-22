@@ -2,11 +2,11 @@
 import { ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import request from '@/api/request'
-import { getCustomerId } from '@/composables/useAuth'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
   line: { type: Object, default: null },
+  trackingToken: { type: String, default: '' },
 })
 
 const emit = defineEmits(['close', 'submitted'])
@@ -40,12 +40,6 @@ async function submitReview() {
     return
   }
 
-  const idKhachHang = getCustomerId()
-  if (!idKhachHang) {
-    error.value = 'Vui lòng đăng nhập để đánh giá.'
-    return
-  }
-
   submitting.value = true
   error.value = ''
 
@@ -55,7 +49,7 @@ async function submitReview() {
       noiDung: noiDung.value.trim(),
       idSanPham: line.idSanPham,
       idHoaDonChiTiet: line.id,
-      idKhachHang,
+      trackingToken: props.trackingToken || null,
     }
 
     if (reviewFile.value) {
@@ -71,7 +65,7 @@ async function submitReview() {
     emit('submitted', { lineId: line.id })
     handleClose()
   } catch (e) {
-    error.value = e.response?.data?.message || e.message || 'Không gửi được đánh giá.'
+    error.value = (typeof e === 'string' && e) || e.response?.data?.message || e.message || 'Không gửi được đánh giá.'
   } finally {
     submitting.value = false
   }

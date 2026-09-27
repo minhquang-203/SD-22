@@ -92,7 +92,8 @@ public class SecurityConfig {
                     // Tra cứu đơn + trả hàng khách vãng lai (token): đặt TRƯỚC rule /cua-toi
                     .requestMatchers("/api/hoa-don/tra-cuu", "/api/hoa-don/tra-cuu/**").permitAll()
                     .requestMatchers("/api/hoa-don/cua-toi", "/api/hoa-don/cua-toi/**").hasRole("KHACH_HANG")
-                    .requestMatchers(HttpMethod.POST, "/api/danh-gia/add").hasRole("KHACH_HANG")
+                    // Khách đã mua (kể cả vãng lai, không có JWT) được gửi đánh giá.
+                    .requestMatchers(HttpMethod.POST, "/api/danh-gia/add").permitAll()
                     .requestMatchers(HttpMethod.PUT, "/api/danh-gia/like/**").hasRole("KHACH_HANG")
                     .requestMatchers(HttpMethod.PUT, "/api/nhan-vien/toi/doi-mat-khau")
                         .hasAnyRole("NHAN_VIEN", "QUAN_LY", "CHU")
