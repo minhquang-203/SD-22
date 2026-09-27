@@ -687,7 +687,8 @@ watch(
   font-family: inherit;
 }
 
-.voucher-input:focus {
+.voucher-input:focus,
+.voucher-input:focus-within {
   border-color: #14181c;
 }
 
@@ -704,7 +705,8 @@ watch(
   background: #f3e4e1;
 }
 
-.voucher-input:disabled {
+.voucher-input:disabled,
+.voucher-input.money-input--disabled {
   opacity: 0.65;
   background: #f3f1eb;
 }

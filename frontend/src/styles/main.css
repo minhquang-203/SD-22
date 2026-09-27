@@ -301,6 +301,7 @@ h2,
 }
 
 .admin-input:focus,
+.admin-input:focus-within,
 .admin-select:focus,
 .admin-textarea:focus {
   border-color: var(--admin-primary);

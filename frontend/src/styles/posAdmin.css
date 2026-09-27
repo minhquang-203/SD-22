@@ -1015,8 +1015,8 @@
   color: var(--pos-muted);
 }
 
-.pos-counter .pos-pay-extra input,
-.pos-counter .pos-pay-extra .money-input__control {
+.pos-counter .pos-pay-extra input:not(.money-input__control),
+.pos-counter .pos-pay-extra .money-input {
   height: 36px;
   padding: 0 10px;
   border: 1px solid var(--pos-line-strong);
@@ -1029,14 +1029,27 @@
   box-sizing: border-box;
 }
 
-.pos-counter .pos-pay-extra input:focus,
-.pos-counter .pos-pay-extra .money-input__control:focus {
+.pos-counter .pos-pay-extra .money-input__control {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   outline: none;
-  border-color: var(--pos-cream);
+  width: 0;
+  flex: 1 1 0;
+  min-width: 0;
+  font: inherit;
+  color: inherit;
 }
 
-.pos-counter .pos-pay-extra .money-input {
-  width: 100%;
+.pos-counter .pos-pay-extra input:not(.money-input__control):focus,
+.pos-counter .pos-pay-extra .money-input:focus-within {
+  outline: none;
+  border-color: var(--pos-cream);
 }
 
 .pos-counter .pos-denoms {

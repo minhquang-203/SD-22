@@ -38,6 +38,8 @@ function formatDots(value) {
   const n = Number(value)
   if (!Number.isFinite(n)) return ''
   const abs = Math.trunc(Math.abs(n))
+  // 0 để trống: placeholder hiện "0", gõ số mới không bị dính số cũ, xóa hết thì không nhảy lại.
+  if (abs === 0) return ''
   return String(abs).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 }
 
@@ -150,10 +152,13 @@ function onKeydown(e) {
 <template>
   <div
     class="money-input"
-    :class="{
-      'money-input--error': error,
-      'money-input--disabled': disabled,
-    }"
+    :class="[
+      inputClass,
+      {
+        'money-input--error': error,
+        'money-input--disabled': disabled,
+      },
+    ]"
   >
     <input
       :id="id"
@@ -164,7 +169,7 @@ function onKeydown(e) {
       :value="display"
       :placeholder="placeholder"
       :disabled="disabled"
-      :class="['money-input__control', inputClass]"
+      class="money-input__control"
       @input="onInput"
       @keydown="onKeydown"
       @blur="onBlur"
@@ -176,37 +181,43 @@ function onKeydown(e) {
 
 <style scoped>
 .money-input {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   width: 100%;
   min-width: 0;
-  gap: 6px;
+  gap: 8px;
   box-sizing: border-box;
 }
 
 .money-input__control {
-  flex: 1;
+  flex: 1 1 0;
+  width: 0;
   min-width: 0;
-  width: 100%;
-  text-align: right;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  font: inherit;
+  line-height: inherit;
+  color: inherit;
+  text-align: inherit;
   font-variant-numeric: tabular-nums;
-  box-sizing: border-box;
+  appearance: none;
 }
 
-/* Inherit common admin/form input look when class passed via inputClass */
-.money-input__control.admin-input,
-.money-input__control.voucher-input,
-.money-input__control.pn-line__input,
-.money-input__control.pn-control,
-.money-input__control.pn-qty-input {
-  display: block;
+.money-input__control:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 .money-input__suffix {
   flex-shrink: 0;
-  font-size: 0.85em;
-  font-weight: 600;
-  color: var(--admin-muted, #6b7280);
+  font: inherit;
+  line-height: 1;
+  opacity: 0.55;
   user-select: none;
 }
 
@@ -215,7 +226,7 @@ function onKeydown(e) {
   pointer-events: none;
 }
 
-.money-input--error .money-input__control {
+.money-input--error {
   border-color: #dc2626;
 }
 </style>
