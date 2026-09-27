@@ -94,6 +94,8 @@ public class SecurityConfig {
                     .requestMatchers("/api/hoa-don/cua-toi", "/api/hoa-don/cua-toi/**").hasRole("KHACH_HANG")
                     .requestMatchers(HttpMethod.POST, "/api/danh-gia/add").hasRole("KHACH_HANG")
                     .requestMatchers(HttpMethod.PUT, "/api/danh-gia/like/**").hasRole("KHACH_HANG")
+                    .requestMatchers(HttpMethod.PUT, "/api/nhan-vien/toi/doi-mat-khau")
+                        .hasAnyRole("NHAN_VIEN", "QUAN_LY", "CHU")
                     .requestMatchers("/api/nhan-vien", "/api/nhan-vien/**").hasAnyRole("QUAN_LY", "CHU")
                     .requestMatchers("/api/nhap-hang", "/api/nhap-hang/**").hasAnyRole("QUAN_LY", "CHU")
                     .requestMatchers("/api/nha-cung-cap", "/api/nha-cung-cap/**").hasAnyRole("QUAN_LY", "CHU")

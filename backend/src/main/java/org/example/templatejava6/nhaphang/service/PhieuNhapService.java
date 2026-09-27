@@ -102,7 +102,9 @@ public class PhieuNhapService {
             throw new ApiException("Phiếu nhập bắt buộc có nhà cung cấp", "VALIDATION_ERROR");
         }
         if (!Boolean.TRUE.equals(p.getNhaCungCap().getTrangThai())) {
-            throw new ApiException("Nhà cung cấp đã ngừng dùng", "INACTIVE");
+            throw new ApiException(
+                    "Nhà cung cấp đã ngừng hợp tác, vui lòng chọn nhà cung cấp khác",
+                    "INACTIVE");
         }
         if (p.getChiTiets() == null || p.getChiTiets().isEmpty()) {
             throw new ApiException("Phiếu nhập chưa có dòng hàng", "VALIDATION_ERROR");
@@ -177,7 +179,9 @@ public class PhieuNhapService {
         }
         NhaCungCap ncc = nhaCungCapService.getOrThrow(request.getIdNhaCungCap());
         if (!Boolean.TRUE.equals(ncc.getTrangThai())) {
-            throw new ApiException("Nhà cung cấp đã ngừng dùng", "INACTIVE");
+            throw new ApiException(
+                    "Nhà cung cấp đã ngừng hợp tác, vui lòng chọn nhà cung cấp khác",
+                    "INACTIVE");
         }
         p.setNhaCungCap(ncc);
         p.setSoHoaDonDauVao(blankToNull(request.getSoHoaDonDauVao()));

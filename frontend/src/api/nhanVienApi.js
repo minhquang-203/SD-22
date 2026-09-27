@@ -24,3 +24,8 @@ export function updateNhanVienStatus(id, trangThai) {
 export function datLaiMatKhauNhanVien(id, payload) {
   return request.put(`/nhan-vien/${id}/dat-lai-mat-khau`, payload)
 }
+
+/** Nhân viên / quản lý / chủ tự đổi mật khẩu (JWT). */
+export function doiMatKhauToi(payload) {
+  return request.put('/nhan-vien/toi/doi-mat-khau', payload)
+}

@@ -1,11 +1,12 @@
 <script setup>
-import { nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import StatusDot from '@/components/ui/StatusDot.vue'
 import {
   createNhaCungCap,
-  deleteNhaCungCap,
   getNhaCungCapList,
+  toggleNhaCungCapTrangThai,
   updateNhaCungCap,
 } from '@/api/nhapHangApi'
 import { toast } from '@/composables/useToast'
@@ -17,8 +18,11 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const loading = ref(false)
 const saving = ref(false)
+const togglingId = ref(null)
 const rows = ref([])
 const keyword = ref('')
+/** '' | 'true' | 'false' */
+const statusFilter = ref('')
 
 const showForm = ref(false)
 const editingId = ref(null)
@@ -31,6 +35,13 @@ const form = ref({
   ghiChu: '',
 })
 const fieldErrors = ref({ ten: '', soDienThoai: '', email: '' })
+
+const filteredRows = computed(() => {
+  const list = rows.value || []
+  if (statusFilter.value === 'true') return list.filter((r) => r.trangThai !== false)
+  if (statusFilter.value === 'false') return list.filter((r) => r.trangThai === false)
+  return list
+})
 
 async function load() {
   loading.value = true
@@ -131,21 +142,39 @@ async function saveForm() {
   }
 }
 
-async function onDelete(row) {
-  if (!row.trangThai) return
+async function onToggleStatus(row) {
+  if (togglingId.value) return
+  const isActive = row.trangThai !== false
   const ok = await confirm({
-    title: 'Ngừng dùng nhà cung cấp',
-    message: `Ngừng dùng nhà cung cấp ${row.ma} — ${row.ten}?`,
-    confirmText: 'Ngừng dùng',
-    danger: true,
+    title: isActive ? 'Ngừng hợp tác' : 'Hợp tác lại',
+    message: isActive
+      ? `Ngừng hợp tác với ${row.ten}? Nhà cung cấp này sẽ không được chọn khi tạo phiếu nhập mới.`
+      : `Hợp tác lại với ${row.ten}?`,
+    confirmText: isActive ? 'Ngừng hợp tác' : 'Hợp tác lại',
+    danger: isActive,
   })
   if (!ok) return
+
+  togglingId.value = row.id
   try {
-    await deleteNhaCungCap(row.id)
-    toast('Đã ngừng dùng nhà cung cấp', 'success')
-    await load()
+    const res = await toggleNhaCungCapTrangThai(row.id)
+    const next = res.data
+    const idx = rows.value.findIndex((r) => r.id === row.id)
+    if (idx >= 0 && next) {
+      rows.value[idx] = { ...rows.value[idx], ...next }
+    } else if (next) {
+      row.trangThai = next.trangThai
+    }
+    toast(
+      next?.trangThai !== false
+        ? `Đã hợp tác lại với ${row.ten}`
+        : `Đã ngừng hợp tác với ${row.ten}`,
+      'success',
+    )
   } catch (e) {
-    toast(formatApiError(e, 'Không xóa được nhà cung cấp'), 'error')
+    toast(formatApiError(e, 'Không đổi được trạng thái nhà cung cấp'), 'error')
+  } finally {
+    togglingId.value = null
   }
 }
 
@@ -182,6 +211,14 @@ onMounted(load)
           />
         </div>
       </div>
+      <div class="soleil-toolbar__field">
+        <label class="soleil-toolbar__label">Trạng thái</label>
+        <select v-model="statusFilter" class="soleil-toolbar__select">
+          <option value="">Tất cả</option>
+          <option value="true">Đang hợp tác</option>
+          <option value="false">Ngừng hợp tác</option>
+        </select>
+      </div>
       <button type="button" class="soleil-btn-outline" @click="load">
         <Icon icon="icon-park-outline:search" width="15" />
         Tìm
@@ -191,7 +228,7 @@ onMounted(load)
     <div class="soleil-table-card">
       <div class="soleil-table-card__head">
         <span class="ncc-table-title">Danh sách nhà cung cấp</span>
-        <span class="ncc-table-meta">{{ rows.length }} NCC</span>
+        <span class="ncc-table-meta">{{ filteredRows.length }} / {{ rows.length }} NCC</span>
       </div>
 
       <div class="overflow-x-auto">
@@ -211,13 +248,17 @@ onMounted(load)
             <tr v-if="loading">
               <td colspan="7" class="ncc-empty-cell">Đang tải…</td>
             </tr>
-            <tr v-else-if="!rows.length">
+            <tr v-else-if="!filteredRows.length">
               <td colspan="7" class="ncc-empty-cell">
-                Chưa có nhà cung cấp. Bấm «Thêm nhà cung cấp» để tạo.
+                {{ rows.length ? 'Không có NCC khớp bộ lọc.' : 'Chưa có nhà cung cấp. Bấm «Thêm nhà cung cấp» để tạo.' }}
               </td>
             </tr>
             <template v-else>
-              <tr v-for="row in rows" :key="row.id">
+              <tr
+                v-for="row in filteredRows"
+                :key="row.id"
+                :class="{ 'ncc-row--inactive': row.trangThai === false }"
+              >
                 <td class="soleil-col-text">
                   <span class="ncc-mono">{{ row.ma }}</span>
                 </td>
@@ -230,12 +271,18 @@ onMounted(load)
                   <span class="ncc-addr" :title="row.diaChi || ''">{{ row.diaChi || '—' }}</span>
                 </td>
                 <td class="soleil-col-center">
-                  <span
-                    class="ncc-badge"
-                    :class="row.trangThai ? 'ncc-badge--ok' : 'ncc-badge--muted'"
+                  <button
+                    type="button"
+                    class="soleil-status-toggle ncc-status-btn"
+                    :disabled="togglingId === row.id"
+                    :title="row.trangThai !== false ? 'Ngừng hợp tác' : 'Hợp tác lại'"
+                    @click="onToggleStatus(row)"
                   >
-                    {{ row.trangThai ? 'Đang dùng' : 'Ngừng' }}
-                  </span>
+                    <StatusDot
+                      :status="row.trangThai !== false ? 'active' : 'expired'"
+                      :label="row.trangThai !== false ? 'Đang hợp tác' : 'Ngừng hợp tác'"
+                    />
+                  </button>
                 </td>
                 <td class="soleil-col-center">
                   <div class="soleil-actions-cell ncc-actions">
@@ -246,15 +293,6 @@ onMounted(load)
                       @click="openEdit(row)"
                     >
                       <Icon icon="icon-park-outline:edit" width="16" />
-                    </button>
-                    <button
-                      v-if="row.trangThai"
-                      type="button"
-                      class="soleil-act-btn soleil-act-btn--danger"
-                      title="Ngừng dùng"
-                      @click="onDelete(row)"
-                    >
-                      <Icon icon="icon-park-outline:delete" width="16" />
                     </button>
                   </div>
                 </td>
@@ -386,7 +424,8 @@ onMounted(load)
   font-weight: 700;
 }
 
-.ncc-page :deep(.soleil-toolbar__input) {
+.ncc-page :deep(.soleil-toolbar__input),
+.ncc-page :deep(.soleil-toolbar__select) {
   border-color: var(--ncc-line-strong);
   background: #fff;
   color: var(--ncc-ink);
@@ -410,6 +449,10 @@ onMounted(load)
   color: var(--ncc-ink);
   border-bottom: 1px solid var(--ncc-line);
   font-size: 13.5px;
+}
+
+.ncc-row--inactive td {
+  opacity: 0.55;
 }
 
 .ncc-table-title {
@@ -448,25 +491,9 @@ onMounted(load)
   white-space: nowrap;
 }
 
-.ncc-badge {
-  display: inline-flex;
-  padding: 0.3rem 0.7rem;
-  border-radius: 3px;
-  border: 1px solid transparent;
-  font-size: 11.5px;
-  font-weight: 800;
-}
-
-.ncc-badge--ok {
-  background: var(--ncc-ok-bg);
-  border-color: #86efac;
-  color: var(--ncc-ok);
-}
-
-.ncc-badge--muted {
-  background: var(--ncc-cancel-bg);
-  border-color: #a1a1aa;
-  color: var(--ncc-cancel);
+.ncc-status-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
 }
 
 .ncc-actions {
@@ -475,15 +502,6 @@ onMounted(load)
 
 :deep(.soleil-col-center) {
   text-align: center;
-}
-
-.soleil-act-btn--danger {
-  color: #991b1b;
-}
-
-.soleil-act-btn--danger:hover {
-  background: #fdecec;
-  border-color: #f5c2c2;
 }
 
 .ncc-modal {

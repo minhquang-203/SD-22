@@ -9,6 +9,9 @@ import { getRoleLabel } from '@/utils/adminAuth'
 import { formatCurrency } from '@/utils/format'
 import { orderStatusLabel } from '@/utils/orderStatus'
 import { confirm } from '@/composables/useConfirm'
+import { toast } from '@/composables/useToast'
+import { doiMatKhauToi } from '@/api/nhanVienApi'
+import { formatApiError } from '@/utils/apiError'
 
 const props = defineProps({
   title: { type: String, default: 'SUNOVA Admin' },
@@ -52,6 +55,14 @@ const avatarLetter = computed(() => {
 const showDropdown = ref(false)
 const showUserMenu = ref(false)
 const loadingNotif = ref(false)
+
+const showChangePw = ref(false)
+const changingPw = ref(false)
+const showPwCu = ref(false)
+const showPwMoi = ref(false)
+const showPwLai = ref(false)
+const pwForm = ref({ matKhauCu: '', matKhauMoi: '', matKhauLai: '' })
+const pwErrors = ref({ matKhauCu: '', matKhauMoi: '', matKhauLai: '' })
 
 const hasBadge = hasNotifBadge
 const badgeText = notifBadgeText
@@ -230,6 +241,67 @@ async function handleLogout() {
   if (!ok) return
   dangXuat()
   await router.push('/admin/dang-nhap')
+}
+
+function openChangePassword() {
+  showUserMenu.value = false
+  pwForm.value = { matKhauCu: '', matKhauMoi: '', matKhauLai: '' }
+  pwErrors.value = { matKhauCu: '', matKhauMoi: '', matKhauLai: '' }
+  showPwCu.value = false
+  showPwMoi.value = false
+  showPwLai.value = false
+  showChangePw.value = true
+}
+
+function closeChangePassword() {
+  if (changingPw.value) return
+  showChangePw.value = false
+}
+
+function validatePwField(field) {
+  const f = pwForm.value
+  const e = { ...pwErrors.value }
+  if (field === 'matKhauCu' || field === 'all') {
+    e.matKhauCu = f.matKhauCu ? '' : 'Nhập mật khẩu hiện tại'
+  }
+  if (field === 'matKhauMoi' || field === 'all') {
+    if (!f.matKhauMoi) e.matKhauMoi = 'Nhập mật khẩu mới'
+    else if (f.matKhauMoi.length < 6) e.matKhauMoi = 'Mật khẩu tối thiểu 6 ký tự'
+    else if (f.matKhauCu && f.matKhauMoi === f.matKhauCu) e.matKhauMoi = 'Mật khẩu mới phải khác mật khẩu hiện tại'
+    else e.matKhauMoi = ''
+  }
+  if (field === 'matKhauLai' || field === 'all') {
+    if (!f.matKhauLai) e.matKhauLai = 'Nhập lại mật khẩu mới'
+    else if (f.matKhauLai !== f.matKhauMoi) e.matKhauLai = 'Mật khẩu nhập lại không khớp'
+    else e.matKhauLai = ''
+  }
+  pwErrors.value = e
+  return !e.matKhauCu && !e.matKhauMoi && !e.matKhauLai
+}
+
+async function submitChangePassword() {
+  if (!validatePwField('all')) {
+    toast('Kiểm tra lại thông tin mật khẩu', 'warn')
+    return
+  }
+  changingPw.value = true
+  try {
+    await doiMatKhauToi({
+      matKhauCu: pwForm.value.matKhauCu,
+      matKhauMoi: pwForm.value.matKhauMoi,
+    })
+    showChangePw.value = false
+    toast('Đổi mật khẩu thành công. Vui lòng đăng nhập lại.', 'success')
+    dangXuat()
+    await router.push({
+      path: '/admin/dang-nhap',
+      query: { passwordChanged: '1' },
+    })
+  } catch (err) {
+    toast(formatApiError(err, 'Không đổi được mật khẩu'), 'error')
+  } finally {
+    changingPw.value = false
+  }
 }
 </script>
 
@@ -459,6 +531,10 @@ async function handleLogout() {
             <span class="admin-user-dropdown__name">{{ displayName }}</span>
             <span class="admin-user-dropdown__role">{{ roleLabel }}</span>
           </div>
+          <button type="button" class="admin-user-dropdown__item" role="menuitem" @click="openChangePassword">
+            <Icon icon="icon-park-outline:lock" />
+            Đổi mật khẩu
+          </button>
           <button type="button" class="admin-user-dropdown__logout" role="menuitem" @click="handleLogout">
             <Icon icon="icon-park-outline:logout" />
             Đăng xuất
@@ -467,6 +543,103 @@ async function handleLogout() {
       </div>
     </div>
   </header>
+
+  <div
+    v-if="showChangePw"
+    class="admin-pw-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="admin-pw-title"
+    @click.self="closeChangePassword"
+  >
+    <div class="admin-pw-modal__panel">
+      <div class="admin-pw-modal__head">
+        <div>
+          <h3 id="admin-pw-title">Đổi mật khẩu</h3>
+          <p>Nhập mật khẩu hiện tại và mật khẩu mới (≥ 6 ký tự)</p>
+        </div>
+        <button
+          type="button"
+          class="admin-pw-modal__close"
+          :disabled="changingPw"
+          aria-label="Đóng"
+          @click="closeChangePassword"
+        >
+          <Icon icon="icon-park-outline:close" width="16" />
+        </button>
+      </div>
+
+      <label class="admin-pw-field">
+        <span>Mật khẩu hiện tại</span>
+        <div class="admin-pw-wrap">
+          <input
+            v-model="pwForm.matKhauCu"
+            class="admin-pw-input"
+            :class="{ 'admin-pw-input--error': pwErrors.matKhauCu }"
+            :type="showPwCu ? 'text' : 'password'"
+            autocomplete="current-password"
+            :disabled="changingPw"
+            @blur="validatePwField('matKhauCu')"
+            @input="pwErrors.matKhauCu = ''"
+          />
+          <button type="button" class="admin-pw-toggle" tabindex="-1" @click="showPwCu = !showPwCu">
+            <Icon :icon="showPwCu ? 'icon-park-outline:preview-close-one' : 'icon-park-outline:preview-open'" width="16" />
+          </button>
+        </div>
+        <em v-if="pwErrors.matKhauCu" class="admin-pw-error">{{ pwErrors.matKhauCu }}</em>
+      </label>
+
+      <label class="admin-pw-field">
+        <span>Mật khẩu mới</span>
+        <div class="admin-pw-wrap">
+          <input
+            v-model="pwForm.matKhauMoi"
+            class="admin-pw-input"
+            :class="{ 'admin-pw-input--error': pwErrors.matKhauMoi }"
+            :type="showPwMoi ? 'text' : 'password'"
+            autocomplete="new-password"
+            :disabled="changingPw"
+            @blur="validatePwField('matKhauMoi')"
+            @input="pwErrors.matKhauMoi = ''"
+          />
+          <button type="button" class="admin-pw-toggle" tabindex="-1" @click="showPwMoi = !showPwMoi">
+            <Icon :icon="showPwMoi ? 'icon-park-outline:preview-close-one' : 'icon-park-outline:preview-open'" width="16" />
+          </button>
+        </div>
+        <em v-if="pwErrors.matKhauMoi" class="admin-pw-error">{{ pwErrors.matKhauMoi }}</em>
+      </label>
+
+      <label class="admin-pw-field">
+        <span>Nhập lại mật khẩu mới</span>
+        <div class="admin-pw-wrap">
+          <input
+            v-model="pwForm.matKhauLai"
+            class="admin-pw-input"
+            :class="{ 'admin-pw-input--error': pwErrors.matKhauLai }"
+            :type="showPwLai ? 'text' : 'password'"
+            autocomplete="new-password"
+            :disabled="changingPw"
+            @blur="validatePwField('matKhauLai')"
+            @input="pwErrors.matKhauLai = ''"
+            @keydown.enter.prevent="submitChangePassword"
+          />
+          <button type="button" class="admin-pw-toggle" tabindex="-1" @click="showPwLai = !showPwLai">
+            <Icon :icon="showPwLai ? 'icon-park-outline:preview-close-one' : 'icon-park-outline:preview-open'" width="16" />
+          </button>
+        </div>
+        <em v-if="pwErrors.matKhauLai" class="admin-pw-error">{{ pwErrors.matKhauLai }}</em>
+      </label>
+
+      <div class="admin-pw-modal__actions">
+        <button type="button" class="soleil-btn-outline" :disabled="changingPw" @click="closeChangePassword">
+          Hủy
+        </button>
+        <button type="button" class="soleil-btn-primary" :disabled="changingPw" @click="submitChangePassword">
+          {{ changingPw ? 'Đang lưu…' : 'Đổi mật khẩu' }}
+        </button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
@@ -822,6 +995,27 @@ async function handleLogout() {
   color: var(--bronze, #a67c3d);
 }
 
+.admin-user-dropdown__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--ink, #1e1510);
+  cursor: pointer;
+  text-align: left;
+}
+
+.admin-user-dropdown__item:hover {
+  background: rgba(201, 169, 110, 0.1);
+}
+
 .admin-user-dropdown__logout {
   display: flex;
   align-items: center;
@@ -841,5 +1035,136 @@ async function handleLogout() {
 
 .admin-user-dropdown__logout:hover {
   background: #fff1f2;
+}
+
+.admin-pw-modal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--admin-z-modal, 5000);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 26, 28, 0.45);
+}
+
+.admin-pw-modal__panel {
+  width: min(420px, 100%);
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid var(--sand, #ede5d8);
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  box-shadow: 0 16px 40px rgba(15, 26, 28, 0.18);
+}
+
+.admin-pw-modal__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.admin-pw-modal__head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink, #1e1510);
+}
+
+.admin-pw-modal__head p {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: rgba(30, 21, 16, 0.55);
+}
+
+.admin-pw-modal__close {
+  border: 1px solid var(--sand, #ede5d8);
+  background: #fff;
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: rgba(30, 21, 16, 0.7);
+}
+
+.admin-pw-modal__close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-pw-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #4a3f34;
+}
+
+.admin-pw-wrap {
+  position: relative;
+}
+
+.admin-pw-input {
+  width: 100%;
+  border: 1px solid #c9b8a4;
+  border-radius: 8px;
+  padding: 0.6rem 2.5rem 0.6rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink, #1e1510);
+  background: #fff;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.admin-pw-input:focus {
+  border-color: #8f7349;
+  box-shadow: 0 0 0 2px rgba(143, 115, 73, 0.18);
+}
+
+.admin-pw-input--error {
+  border-color: #c45c3e;
+  background: #fff8f5;
+}
+
+.admin-pw-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: rgba(30, 21, 16, 0.45);
+  cursor: pointer;
+  padding: 4px;
+  display: grid;
+  place-items: center;
+}
+
+.admin-pw-error {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #a33b1c;
+}
+
+.admin-pw-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
 }
 </style>

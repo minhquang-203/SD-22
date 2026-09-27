@@ -19,7 +19,9 @@ public class PhieuNhapResponse {
     private Integer id;
     private String maPhieuNhap;
     private Integer idNhaCungCap;
+    private String maNhaCungCap;
     private String tenNhaCungCap;
+    private Boolean trangThaiNhaCungCap;
     private Integer idNhanVien;
     private String tenNhanVien;
     private String soHoaDonDauVao;
@@ -36,7 +38,9 @@ public class PhieuNhapResponse {
         this.maPhieuNhap = p.getMaPhieuNhap();
         if (p.getNhaCungCap() != null) {
             this.idNhaCungCap = p.getNhaCungCap().getId();
+            this.maNhaCungCap = p.getNhaCungCap().getMa();
             this.tenNhaCungCap = p.getNhaCungCap().getTen();
+            this.trangThaiNhaCungCap = p.getNhaCungCap().getTrangThai();
         }
         if (p.getNhanVien() != null) {
             this.idNhanVien = p.getNhanVien().getId();

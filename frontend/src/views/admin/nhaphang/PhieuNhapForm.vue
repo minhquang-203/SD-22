@@ -201,8 +201,37 @@ function buildPayload() {
 }
 
 async function loadNcc() {
+  const currentId = idNhaCungCap.value
+  const keptInactive = nccOptions.value.find(
+    (n) => n.id === currentId && n.trangThai === false,
+  )
   const res = await getNhaCungCapList('', true)
   nccOptions.value = (res.data || []).filter((n) => n.trangThai !== false)
+  if (keptInactive && !nccOptions.value.some((n) => n.id === keptInactive.id)) {
+    nccOptions.value = [...nccOptions.value, keptInactive]
+  }
+}
+
+/** Giữ NCC đang gắn trên phiếu nháp dù đã ngừng hợp tác, để vẫn hiện tên + nhãn. */
+function ensureNccOptionFromPhieu(p) {
+  if (!p?.idNhaCungCap) return
+  const exists = nccOptions.value.some((n) => n.id === p.idNhaCungCap)
+  if (exists) return
+  nccOptions.value = [
+    ...nccOptions.value,
+    {
+      id: p.idNhaCungCap,
+      ma: p.maNhaCungCap || '',
+      ten: p.tenNhaCungCap || 'NCC',
+      trangThai: p.trangThaiNhaCungCap === true,
+    },
+  ]
+}
+
+function nccOptionLabel(n) {
+  const base = `${n.ma || ''} — ${n.ten || ''}`.replace(/^ — /, '').trim()
+  if (n.trangThai === false) return `${base} (Ngừng hợp tác)`
+  return base
 }
 
 async function loadDetail(id) {
@@ -213,6 +242,7 @@ async function loadDetail(id) {
     phieuId.value = p.id
     maPhieu.value = p.maPhieuNhap
     trangThai.value = p.trangThai
+    ensureNccOptionFromPhieu(p)
     idNhaCungCap.value = p.idNhaCungCap
     soHoaDonDauVao.value = p.soHoaDonDauVao || ''
     giamGia.value = Number(p.giamGia || 0)
@@ -1164,7 +1194,7 @@ onBeforeRouteLeave(async () => {
             >
               <option :value="null">— Chọn NCC —</option>
               <option v-for="n in nccOptions" :key="n.id" :value="n.id">
-                {{ n.ma }} — {{ n.ten }}
+                {{ nccOptionLabel(n) }}
               </option>
             </select>
             <button

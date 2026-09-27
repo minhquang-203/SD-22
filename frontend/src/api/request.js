@@ -2,13 +2,9 @@ import axios from 'axios'
 import router from '@/router'
 import { formatApiError } from '@/utils/apiError'
 import { getAdminToken, useAdminAuth } from '@/composables/useAdminAuth'
-<<<<<<< HEAD
-import { getCustomerToken, clearCustomerAuth } from '@/composables/useAuth'
-=======
 import { getCustomerToken, useAuth } from '@/composables/useAuth'
 import { useAuthModal } from '@/composables/useAuthModal'
 import { toast } from '@/composables/useToast'
->>>>>>> 1391de8fff197ee69316cdfc8232a7a4b6810198
 
 const CUSTOMER_API_PREFIXES = [
   '/yeu-thich',
@@ -95,24 +91,6 @@ request.interceptors.response.use(
     const isKhachAuthRequest = url.includes('/auth/khach/')
     const onAdmin = router.currentRoute.value.path.startsWith('/admin')
 
-<<<<<<< HEAD
-    if (isCustomerApi && (status === 401 || status === 403)) {
-      clearCustomerAuth()
-      return Promise.reject('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại')
-    }
-
-    if (!isCustomerApi && !isAdminLoginRequest && !isKhachAuthRequest && getAdminToken() && (status === 401 || status === 403)) {
-      useAdminAuth().dangXuat()
-      const currentPath = router.currentRoute.value.path
-      if (currentPath.startsWith('/admin') && currentPath !== '/admin/dang-nhap') {
-        router.push({
-          path: '/admin/dang-nhap',
-          query: {
-            redirect: router.currentRoute.value.fullPath,
-            expired: '1',
-          },
-        })
-=======
     // 401 — hết phiên: đăng xuất đúng khu
     if (status === 401 && !isAdminLoginRequest && !isKhachAuthRequest) {
       if (isCustomerApi || (!onAdmin && getCustomerToken())) {
@@ -145,7 +123,6 @@ request.interceptors.response.use(
         const msg = 'Phiên đăng nhập quản trị đã hết hạn, vui lòng đăng nhập lại'
         toast(msg, 'warn')
         return Promise.reject(msg)
->>>>>>> 1391de8fff197ee69316cdfc8232a7a4b6810198
       }
     }
 

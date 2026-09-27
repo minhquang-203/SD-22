@@ -30,7 +30,26 @@ import { getLoHangConHangTheoBienThe } from '@/api/loHangApi'
 import InvoiceReceipt from '@/components/invoice/InvoiceReceipt.vue'
 import { normalizeInvoice } from '@/utils/invoiceReceipt'
 import { printInvoice, saveInvoicePdf } from '@/utils/printInvoice'
+import { useAdminAuth } from '@/composables/useAdminAuth'
 import '@/styles/posAdmin.css'
+
+/** Nhân viên: tối đa mỗi biến thể trong 1 đơn tại quầy. Chủ/QL không bị giới hạn này. */
+const MAX_QTY_NHAN_VIEN = 50
+const MSG_NV_MAX =
+  'Nhân viên chỉ được bán tối đa 50 sản phẩm cho mỗi mặt hàng. Vui lòng báo chủ cửa hàng hoặc quản lý.'
+
+const { vaiTro } = useAdminAuth()
+
+function normalizeRole(raw) {
+  return String(raw || '')
+    .trim()
+    .replace(/^ROLE_/i, '')
+    .toUpperCase()
+}
+
+function laNhanVien() {
+  return normalizeRole(vaiTro.value) === 'NHAN_VIEN'
+}
 
 /**
  * Cấu hình VietQR nhận chuyển khoản tại quầy (1 chỗ sửa).
@@ -284,6 +303,81 @@ function isOutOfStock(product) {
   return !product.soLuongTon || product.soLuongTon <= 0
 }
 
+/** Tổng SL của cùng biến thể trong giỏ (có thể nhiều dòng / nhiều lô). */
+function tongTheoBienThe(idChiTietSanPham, excludeLine = null) {
+  return cart.value.reduce((sum, l) => {
+    if (l.idChiTietSanPham !== idChiTietSanPham) return sum
+    if (excludeLine && cartKey(l) === cartKey(excludeLine)) return sum
+    return sum + Number(l.soLuong || 0)
+  }, 0)
+}
+
+/** Giới hạn SL cho 1 biến thể: NV = min(tồn, 50); Chủ/QL = tồn. */
+function tinhGioiHan(bienThe) {
+  const ton = Math.max(0, Number(bienThe?.soLuongTon) || 0)
+  return laNhanVien() ? Math.min(ton, MAX_QTY_NHAN_VIEN) : ton
+}
+
+/** SL tối đa còn cộng thêm được cho dòng này (đã trừ dòng khác cùng biến thể). */
+function maxChoDong(line) {
+  const cap = tinhGioiHan(line)
+  const others = tongTheoBienThe(line.idChiTietSanPham, line)
+  return Math.max(0, cap - others)
+}
+
+function canIncreaseQty(line) {
+  return Number(line.soLuong || 0) < maxChoDong(line)
+}
+
+/**
+ * Điểm duy nhất đặt số lượng 1 dòng — mọi đường +/- / gõ / thêm thẻ / lô đều đi qua đây.
+ * Tổng theo biến thể không vượt tinhGioiHan; không vượt tồn.
+ */
+function datSoLuong(line, soMoi, { fromInput = false, silent = false } = {}) {
+  if (!line) return false
+  const ton = Math.max(0, Number(line.soLuongTon) || 0)
+  const maxLine = maxChoDong(line)
+  const raw = typeof soMoi === 'number' ? soMoi : Number(soMoi)
+  let qty = raw
+
+  if (!Number.isFinite(qty) || qty < 1) {
+    if (fromInput && !silent) toast('Số lượng tối thiểu là 1', 'warn')
+    qty = 1
+  }
+
+  if (ton > 0 && qty > ton) {
+    if (!silent) toast(`Chỉ còn ${ton} sản phẩm trong kho`, 'error')
+    qty = ton
+  }
+
+  if (qty > maxLine) {
+    if (!silent && laNhanVien() && maxLine < ton) {
+      toast(MSG_NV_MAX, 'warn')
+    } else if (!silent && qty > maxLine) {
+      toast(`Chỉ còn ${ton} sản phẩm trong kho`, 'error')
+    }
+    qty = maxLine
+  }
+
+  if (qty < 1) {
+    if (!silent && laNhanVien()) toast(MSG_NV_MAX, 'warn')
+    return false
+  }
+
+  if (qty === line.soLuong) return false
+
+  const hadManual = Boolean(line.phanBoLos?.length || line.idLoHang != null)
+  line.soLuong = qty
+  if (hadManual) {
+    clearManualLot(line)
+    if (!silent) notify('Đã đổi số lượng — chọn lại lô hoặc giữ FEFO tự động', 'success')
+  }
+  if (appliedVoucher.value) {
+    void recalculateVoucher()
+  }
+  return true
+}
+
 function posExpiryBadge(product) {
   if (product.soNgayConLai == null || !product.hanSuDungGanNhat) return null
   if (product.soNgayConLai <= 0) return 'expired'
@@ -308,12 +402,24 @@ function addToCart(product) {
       !l.phanBoLos?.length,
   )
   if (existing) {
-    if (existing.soLuong >= product.soLuongTon) {
-      notify(`Đã đạt tồn tối đa cho ${product.sku}`, 'error')
+    if (!canIncreaseQty(existing)) {
+      const cap = tinhGioiHan(existing)
+      if (laNhanVien() && cap <= MAX_QTY_NHAN_VIEN && tongTheoBienThe(product.idChiTietSanPham) >= cap) {
+        toast(MSG_NV_MAX, 'warn')
+      } else {
+        notify(`Đã đạt tồn tối đa cho ${product.sku}`, 'error')
+      }
       return
     }
-    existing.soLuong += 1
+    datSoLuong(existing, existing.soLuong + 1)
   } else {
+    const others = tongTheoBienThe(product.idChiTietSanPham)
+    const cap = tinhGioiHan(product)
+    if (others >= cap) {
+      if (laNhanVien() && cap <= MAX_QTY_NHAN_VIEN) toast(MSG_NV_MAX, 'warn')
+      else notify(`Đã đạt tồn tối đa cho ${product.sku}`, 'error')
+      return
+    }
     cart.value.push({
       idChiTietSanPham: product.idChiTietSanPham,
       sku: product.sku,
@@ -354,7 +460,7 @@ function changeQty(line, delta) {
     removeLine(line)
     return
   }
-  applyLineQty(line, next)
+  datSoLuong(line, next)
 }
 
 /** Gõ trực tiếp số lượng trong đơn — cùng luật kẹp với +/-. */
@@ -362,34 +468,8 @@ function onQtyCommit(line, event) {
   const el = event?.target
   const digits = String(el?.value ?? '').replace(/[^\d]/g, '')
   const parsed = digits === '' ? NaN : Number.parseInt(digits, 10)
-  applyLineQty(line, parsed, { fromInput: true })
+  datSoLuong(line, parsed, { fromInput: true })
   if (el) el.value = String(line.soLuong)
-}
-
-function applyLineQty(line, next, { fromInput = false } = {}) {
-  const max = Math.max(0, Number(line.soLuongTon) || 0)
-  const raw = typeof next === 'number' ? next : Number(next)
-  let qty = raw
-
-  if (!Number.isFinite(qty) || qty < 1) {
-    if (fromInput) toast('Số lượng tối thiểu là 1', 'warn')
-    qty = 1
-  } else if (max > 0 && qty > max) {
-    toast(`Chỉ còn ${max} sản phẩm trong kho`, 'error')
-    qty = max
-  }
-
-  if (qty === line.soLuong) return
-
-  const hadManual = Boolean(line.phanBoLos?.length || line.idLoHang != null)
-  line.soLuong = qty
-  if (hadManual) {
-    clearManualLot(line)
-    notify('Đã đổi số lượng — chọn lại lô hoặc giữ FEFO tự động', 'success')
-  }
-  if (appliedVoucher.value) {
-    void recalculateVoucher()
-  }
 }
 
 function removeLine(line) {
@@ -475,6 +555,16 @@ async function confirmLotSelection() {
     return
   }
 
+  const maxAllowed = maxChoDong(line)
+  if (tong > maxAllowed) {
+    if (laNhanVien() && tinhGioiHan(line) <= MAX_QTY_NHAN_VIEN) {
+      toast(MSG_NV_MAX, 'warn')
+    } else {
+      notify(`Tổng chọn (${tong}) vượt giới hạn cho phép (tối đa ${maxAllowed}).`, 'error')
+    }
+    return
+  }
+
   for (const { lot, soLuong } of selected) {
     if (soLuong > Number(lot.soLuongCon)) {
       notify(`Lô [${lot.soLo}] không đủ hàng (còn ${lot.soLuongCon}).`, 'error')
@@ -541,6 +631,17 @@ function clearLotSelection() {
   )
   if (dup) {
     const total = dup.soLuong + line.soLuong
+    const cap = tinhGioiHan(line)
+    const othersExcludingBoth = cart.value.reduce((sum, l) => {
+      if (l.idChiTietSanPham !== line.idChiTietSanPham) return sum
+      if (l === dup || l === line) return sum
+      return sum + Number(l.soLuong || 0)
+    }, 0)
+    if (othersExcludingBoth + total > cap) {
+      if (laNhanVien() && cap <= MAX_QTY_NHAN_VIEN) toast(MSG_NV_MAX, 'warn')
+      else notify(`Gộp dòng vượt tồn SKU (còn ${line.soLuongTon}).`, 'error')
+      return
+    }
     if (total > line.soLuongTon) {
       notify(`Gộp dòng vượt tồn SKU (còn ${line.soLuongTon}).`, 'error')
       return
@@ -1102,6 +1203,31 @@ function loadCartFromDetail(detail) {
         : null,
     }))
     .filter((line) => line.soLuong > 0)
+
+  // Kẹp lại theo vai trò + tồn (đơn chờ cũ có thể vượt 50 nếu NV mở lại)
+  if (laNhanVien()) {
+    const byVariant = new Map()
+    for (const line of cart.value) {
+      const list = byVariant.get(line.idChiTietSanPham) || []
+      list.push(line)
+      byVariant.set(line.idChiTietSanPham, list)
+    }
+    let clamped = false
+    for (const lines of byVariant.values()) {
+      const cap = tinhGioiHan(lines[0])
+      let used = 0
+      for (const line of lines) {
+        const remain = Math.max(0, cap - used)
+        if (line.soLuong > remain) {
+          line.soLuong = remain
+          clamped = true
+        }
+        used += line.soLuong
+      }
+    }
+    cart.value = cart.value.filter((l) => l.soLuong > 0)
+    if (clamped) toast(MSG_NV_MAX, 'warn')
+  }
 }
 
 async function resumeHeldOrder(order) {
@@ -1655,7 +1781,7 @@ onBeforeUnmount(() => {
                   @keydown.enter.prevent="onQtyCommit(line, $event)"
                   @blur="onQtyCommit(line, $event)"
                 />
-                <button type="button" :disabled="line.soLuong >= line.soLuongTon" @click="changeQty(line, 1)">＋</button>
+                <button type="button" :disabled="!canIncreaseQty(line)" @click="changeQty(line, 1)">＋</button>
               </div>
               <button type="button" class="pos-line__rm" @click="removeLine(line)">Xóa</button>
             </div>

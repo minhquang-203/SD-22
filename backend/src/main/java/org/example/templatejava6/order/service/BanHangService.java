@@ -76,6 +76,10 @@ public class BanHangService {
     private static final String LOAI_TAI_QUAY = "TAI_QUAY";
     private static final String GUEST_PREFIX = "__POS_GUEST__|";
     private static final int MAX_HELD_ORDERS = 15;
+    /** Nhân viên bán tại quầy: tối đa mỗi biến thể trong 1 đơn. */
+    private static final int MAX_QTY_NHAN_VIEN = 50;
+    private static final String MSG_NV_QTY_LIMIT =
+            "Nhân viên chỉ được bán tối đa 50 sản phẩm cho mỗi mặt hàng. Vui lòng báo chủ cửa hàng hoặc quản lý.";
     private static final String TRANG_THAI_THANH_CONG = "THANH_CONG";
     private static final String MA_TIEN_MAT = "TIEN_MAT";
     private static final String MA_VNPAY = "VNPAY";
@@ -242,6 +246,8 @@ public class BanHangService {
             throw new ApiException("Giỏ hàng trống. Không thể giữ đơn.", "EMPTY_CART");
         }
 
+        assertStaffQtyLimit(req.getItems());
+
         long soDonCho = hoaDonRepository.countByTrangThaiAndLoaiDon(TrangThaiDonHang.CHO, LOAI_TAI_QUAY);
         if (soDonCho >= MAX_HELD_ORDERS) {
             throw new ApiException("Đã đạt tối đa 15 hóa đơn chờ", "MAX_HELD_ORDERS");
@@ -361,6 +367,7 @@ public class BanHangService {
         if (req.getItems() == null || req.getItems().isEmpty()) {
             throw new ApiException("Giỏ hàng trống. Vui lòng thêm sản phẩm.", "EMPTY_CART");
         }
+        assertStaffQtyLimit(req.getItems());
         boolean isSplitPayment = req.getDanhSachThanhToan() != null && !req.getDanhSachThanhToan().isEmpty();
         if (req.getIdPhuongThucThanhToan() == null) {
             throw new ApiException("Vui lòng chọn phương thức thanh toán.", "MISSING_PAYMENT");
@@ -828,6 +835,37 @@ public class BanHangService {
             throw new ApiException("Tài khoản đã bị khóa", "ACCOUNT_DISABLED");
         }
         return nv;
+    }
+
+    /**
+     * Nhân viên: tổng số lượng mỗi biến thể trong đơn không vượt 50.
+     * Chủ / Quản lý: bỏ qua. Tồn kho vẫn kiểm tra riêng.
+     */
+    private void assertStaffQtyLimit(List<TaoDonTaiQuayRequest.ItemRequest> items) {
+        if (items == null || items.isEmpty()) {
+            return;
+        }
+        NhanVien nv = currentNhanVien();
+        String ma = nv.getVaiTro() != null ? nv.getVaiTro().getMaVaiTro() : null;
+        if (ma == null || !"NHAN_VIEN".equalsIgnoreCase(ma.trim())) {
+            return;
+        }
+        Map<Integer, Integer> totalByVariant = new HashMap<>();
+        for (TaoDonTaiQuayRequest.ItemRequest item : items) {
+            if (item == null || item.getIdChiTietSanPham() == null) {
+                continue;
+            }
+            int qty = item.getSoLuong() != null ? item.getSoLuong() : 0;
+            if (qty <= 0) {
+                continue;
+            }
+            totalByVariant.merge(item.getIdChiTietSanPham(), qty, Integer::sum);
+        }
+        for (Integer total : totalByVariant.values()) {
+            if (total > MAX_QTY_NHAN_VIEN) {
+                throw new ApiException(MSG_NV_QTY_LIMIT, "STAFF_QTY_LIMIT");
+            }
+        }
     }
 
     private List<LineCalc> buildLines(

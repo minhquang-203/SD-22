@@ -58,6 +58,15 @@ public class NhaCungCapService {
         nhaCungCapRepository.save(n);
     }
 
+    /** Đảo trạng thái Đang hợp tác <-> Ngừng hợp tác. */
+    @Transactional
+    public NhaCungCapResponse toggleTrangThai(Integer id) {
+        NhaCungCap n = getOrThrow(id);
+        boolean next = !Boolean.TRUE.equals(n.getTrangThai());
+        n.setTrangThai(next);
+        return new NhaCungCapResponse(nhaCungCapRepository.save(n));
+    }
+
     public NhaCungCap getOrThrow(Integer id) {
         return nhaCungCapRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Không tìm thấy nhà cung cấp", "NOT_FOUND"));

@@ -1,6 +1,7 @@
 package org.example.templatejava6.staff.controller;
 
 import jakarta.validation.Valid;
+import org.example.templatejava6.staff.model.request.DoiMatKhauNhanVienRequest;
 import org.example.templatejava6.staff.model.request.NhanVienCreateRequest;
 import org.example.templatejava6.staff.model.request.NhanVienDatLaiMatKhauRequest;
 import org.example.templatejava6.staff.model.request.NhanVienTrangThaiRequest;
@@ -50,6 +51,12 @@ public class NhanVienController {
             @Valid @RequestBody NhanVienTrangThaiRequest request
     ) {
         return nhanVienService.doiTrangThai(id, request);
+    }
+
+    /** Tự đổi mật khẩu — lấy người dùng từ JWT (mọi vai trò nội bộ). */
+    @PutMapping("/toi/doi-mat-khau")
+    public void doiMatKhauToi(@Valid @RequestBody DoiMatKhauNhanVienRequest request) {
+        nhanVienService.doiMatKhauToi(request);
     }
 
     @PutMapping("/{id:\\d+}/dat-lai-mat-khau")

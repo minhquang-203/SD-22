@@ -16,6 +16,9 @@ export const updateNhaCungCap = (id, payload) => request.put(`/nha-cung-cap/${id
 
 export const deleteNhaCungCap = (id) => request.delete(`/nha-cung-cap/${id}`)
 
+export const toggleNhaCungCapTrangThai = (id) =>
+  request.put(`/nha-cung-cap/${id}/trang-thai`)
+
 export const timBienTheNhapHang = (keyword = '', page = 0, size = 20) =>
   request.get('/nhap-hang/tim-bien-the', { params: { keyword, page, size } })
 

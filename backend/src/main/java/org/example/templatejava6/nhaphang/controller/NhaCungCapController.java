@@ -41,4 +41,9 @@ public class NhaCungCapController {
     public void delete(@PathVariable Integer id) {
         nhaCungCapService.softDelete(id);
     }
+
+    @PutMapping("{id}/trang-thai")
+    public NhaCungCapResponse toggleTrangThai(@PathVariable Integer id) {
+        return nhaCungCapService.toggleTrangThai(id);
+    }
 }
