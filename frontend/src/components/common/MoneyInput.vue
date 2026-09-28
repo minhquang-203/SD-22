@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch } from 'vue'
 
 const props = defineProps({
   modelValue: { type: [Number, String, null], default: null },
@@ -17,6 +17,8 @@ const emit = defineEmits(['update:modelValue', 'input', 'blur', 'focus'])
 
 const inputEl = ref(null)
 const display = ref(formatDots(props.modelValue))
+/** Đang soạn chữ bằng bộ gõ (Unikey/EVKey/IME) — không được sửa value giữa chừng. */
+let composing = false
 
 function digitsOnly(raw) {
   return String(raw ?? '').replace(/\D/g, '')
@@ -43,10 +45,10 @@ function formatDots(value) {
   return String(abs).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 }
 
-function countDigitsBefore(str, caret) {
+function countDigitsAfter(str, caret) {
   let count = 0
-  const end = Math.max(0, Math.min(caret, str.length))
-  for (let i = 0; i < end; i++) {
+  const start = Math.max(0, Math.min(caret, str.length))
+  for (let i = start; i < str.length; i++) {
     if (/\d/.test(str[i])) count++
   }
   return count
@@ -64,6 +66,15 @@ function caretFromDigitCount(formatted, digitCount) {
   return formatted.length
 }
 
+function clamp(num) {
+  if (num == null) return null
+  if (props.max != null && Number.isFinite(props.max) && num > props.max) {
+    return Math.trunc(props.max)
+  }
+  if (num < 0) return 0
+  return num
+}
+
 function syncFromModel(v) {
   const nextNum = v == null || v === '' ? null : Number(v)
   const current = parseMoney(display.value)
@@ -77,41 +88,58 @@ function syncFromModel(v) {
 
 watch(
   () => props.modelValue,
-  (v) => {
-    syncFromModel(v)
-  },
+  (v) => syncFromModel(v),
 )
 
-function onInput(e) {
-  const el = e.target
+/**
+ * Đọc lại value trình duyệt vừa gõ, format và đặt con trỏ ngay (đồng bộ).
+ * Con trỏ neo theo số chữ số bên PHẢI: dấu chấm nghìn chỉ chèn thêm bên trái
+ * nên gõ nối cuối luôn giữ con trỏ ở cuối.
+ */
+function reformat(el) {
   const raw = el.value
   const caret = el.selectionStart ?? raw.length
-  const digitsBefore = countDigitsBefore(raw, caret)
+  const digitsAfter = countDigitsAfter(raw, caret)
 
-  let num = parseMoney(raw)
-  if (num != null && props.max != null && Number.isFinite(props.max) && num > props.max) {
-    num = Math.trunc(props.max)
-  }
-  // Chặn số âm (không cho dấu -)
-  if (num != null && num < 0) num = 0
-  if (num != null && props.min != null && props.min >= 0 && num < 0) num = props.min
-
+  const parsed = parseMoney(raw)
+  const num = clamp(parsed)
   const formatted = formatDots(num)
+
   display.value = formatted
+  if (el.value !== formatted) el.value = formatted
 
-  emit('update:modelValue', num)
-  emit('input', num)
-
-  nextTick(() => {
-    const node = inputEl.value
-    if (!node) return
-    const pos = caretFromDigitCount(formatted, digitsBefore)
+  const totalDigits = digitsOnly(formatted).length
+  const pos =
+    num !== parsed
+      ? formatted.length
+      : caretFromDigitCount(formatted, Math.max(0, totalDigits - digitsAfter))
+  if (document.activeElement === el) {
     try {
-      node.setSelectionRange(pos, pos)
+      el.setSelectionRange(pos, pos)
     } catch {
       /* ignore */
     }
-  })
+  }
+
+  const current = props.modelValue == null || props.modelValue === '' ? null : Number(props.modelValue)
+  if (current !== num) {
+    emit('update:modelValue', num)
+    emit('input', num)
+  }
+}
+
+function onInput(e) {
+  if (composing || e.isComposing) return
+  reformat(e.target)
+}
+
+function onCompositionStart() {
+  composing = true
+}
+
+function onCompositionEnd(e) {
+  composing = false
+  reformat(e.target)
 }
 
 function onBlur(e) {
@@ -125,27 +153,23 @@ function onFocus(e) {
 }
 
 function onKeydown(e) {
-  // Cho phép điều khiển; chặn chữ cái (trừ Ctrl/Meta shortcuts)
-  if (e.ctrlKey || e.metaKey || e.altKey) return
-  const allow = [
-    'Backspace',
-    'Delete',
-    'Tab',
-    'Enter',
-    'Escape',
-    'ArrowLeft',
-    'ArrowRight',
-    'ArrowUp',
-    'ArrowDown',
-    'Home',
-    'End',
-  ]
-  if (allow.includes(e.key)) return
-  if (/^\d$/.test(e.key)) return
-  // Chấm ngăn cách có thể gõ nhưng sẽ bị strip — vẫn cho để paste UX; chặn chữ
-  if (e.key.length === 1 && !/\d/.test(e.key)) {
-    e.preventDefault()
+  if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return
+  const el = e.target
+  const start = el.selectionStart
+  const end = el.selectionEnd
+  // Backspace/Delete ngay cạnh dấu chấm nghìn: nhảy qua dấu chấm để xoá chữ số kế bên,
+  // nếu không trình duyệt chỉ xoá dấu chấm rồi format lại y như cũ.
+  if (start != null && start === end) {
+    if (e.key === 'Backspace' && start > 0 && el.value[start - 1] === '.') {
+      el.setSelectionRange(start - 1, start - 1)
+      return
+    }
+    if (e.key === 'Delete' && el.value[start] === '.') {
+      el.setSelectionRange(start + 1, start + 1)
+      return
+    }
   }
+  if (e.key.length === 1 && !/^\d$/.test(e.key)) e.preventDefault()
 }
 </script>
 
@@ -172,6 +196,8 @@ function onKeydown(e) {
       class="money-input__control"
       @input="onInput"
       @keydown="onKeydown"
+      @compositionstart="onCompositionStart"
+      @compositionend="onCompositionEnd"
       @blur="onBlur"
       @focus="onFocus"
     />
