@@ -7,6 +7,7 @@ import java.util.List;
 public class CauHoiQuizResponse {
     private Integer id;
     private String title;
+    private Integer thuTu;
     private List<DapAnResponse> answers;
 
     @Data

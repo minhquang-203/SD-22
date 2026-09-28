@@ -37,6 +37,7 @@ uploads/*
 !uploads/products/
 uploads/products/*
 !uploads/products/sp*.jpg
+!uploads/products/beauty_of_joseon_rice.jpg
 !uploads/products/.gitkeep
 
 ### Secrets / local overrides (commit .env.example only)

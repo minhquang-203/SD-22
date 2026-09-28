@@ -25,16 +25,23 @@
             </div>
 
             <div class="answers-edit-list">
-              <p class="label-sm">Các đáp án:</p>
+              <div class="answers-header-row">
+                <span class="col-icon">Icon</span>
+                <span class="col-label">Nội dung đáp án</span>
+                <span class="col-score">Điểm</span>
+                <span class="col-tag">Gắn loại da</span>
+                <span class="col-filter">Bộ lọc</span>
+                <span class="col-action"></span>
+              </div>
               <div v-for="(ans, aIndex) in currentQuestion.answers" :key="aIndex" class="inline-answer-row">
-                <input type="text" v-model="ans.icon" placeholder="Tên Icon (VD: lucide:sun)" class="flex-1 text-sm font-mono" title="Tên Icon từ thư viện Lucide hoặc Phosphor">
-                <input type="text" v-model="ans.label" placeholder="Nội dung đáp án" class="flex-2">
-                <input type="number" v-model="ans.scoreValue" placeholder="Điểm" class="flex-1 text-center">
-                <select v-model="ans.tagId" class="flex-1">
+                <input type="text" v-model="ans.icon" placeholder="Icon (VD: sun)" class="input-icon" title="Tên icon (không bắt buộc)">
+                <input type="text" v-model="ans.label" placeholder="Nội dung đáp án" class="input-label">
+                <input type="number" v-model="ans.scoreValue" placeholder="Điểm" class="input-score text-center">
+                <select v-model="ans.tagId" class="select-tag">
                   <option :value="null">-- Không gắn --</option>
                   <option v-for="tag in availableTags" :key="tag.id" :value="tag.id">{{ tag.name }}</option>
                 </select>
-                <select v-model="ans.filterKeyword" class="flex-1" title="Bộ lọc ép buộc loại chống nắng">
+                <select v-model="ans.filterKeyword" class="select-filter" title="Bộ lọc ép buộc loại chống nắng">
                   <option :value="null">-- Bộ lọc --</option>
                   <option value="VAT_LY">Vật lý</option>
                   <option value="HOA_HOC">Hóa học</option>
@@ -65,6 +72,7 @@
                 <span v-for="(ans, aIndex) in q.answers" :key="aIndex" class="preview-badge">
                   <span v-if="ans.icon" class="text-xs mr-1 opacity-70">[{{ ans.icon }}]</span>
                   {{ ans.label }} ({{ ans.scoreValue }}đ)
+                  <span v-if="ans.tagId" class="tag-badge-preview">🏷️ {{ getTagName(ans.tagId) }}</span>
                   <span v-if="ans.filterKeyword" class="text-xs ml-1" style="color: #e67e22;">[🔍{{ ans.filterKeyword }}]</span>
                 </span>
               </div>
@@ -81,21 +89,29 @@
             <input type="text" v-model="currentQuestion.title" class="input-title-edit" placeholder="Nhập câu hỏi mới...">
           </div>
           <div class="answers-edit-list">
+            <div class="answers-header-row">
+              <span class="col-icon">Icon</span>
+              <span class="col-label">Nội dung đáp án</span>
+              <span class="col-score">Điểm</span>
+              <span class="col-tag">Gắn loại da</span>
+              <span class="col-filter">Bộ lọc</span>
+              <span class="col-action"></span>
+            </div>
             <div v-for="(ans, aIndex) in currentQuestion.answers" :key="aIndex" class="inline-answer-row">
-              <input type="text" v-model="ans.icon" placeholder="Tên Icon (VD: lucide:sun)" class="flex-1 text-sm font-mono">
-              <input type="text" v-model="ans.label" placeholder="Nội dung đáp án" class="flex-2">
-              <input type="number" v-model="ans.scoreValue" placeholder="Điểm" class="flex-1 text-center">
-              <select v-model="ans.tagId" class="flex-1">
+              <input type="text" v-model="ans.icon" placeholder="Icon (VD: sun)" class="input-icon" title="Tên icon (không bắt buộc)">
+              <input type="text" v-model="ans.label" placeholder="Nội dung đáp án" class="input-label">
+              <input type="number" v-model="ans.scoreValue" placeholder="Điểm" class="input-score text-center">
+              <select v-model="ans.tagId" class="select-tag">
                 <option :value="null">-- Không gắn --</option>
                 <option v-for="tag in availableTags" :key="tag.id" :value="tag.id">{{ tag.name }}</option>
               </select>
-              <select v-model="ans.filterKeyword" class="flex-1" title="Bộ lọc ép buộc loại chống nắng">
+              <select v-model="ans.filterKeyword" class="select-filter" title="Bộ lọc ép buộc loại chống nắng">
                 <option :value="null">-- Bộ lọc --</option>
                 <option value="VAT_LY">Vật lý</option>
                 <option value="HOA_HOC">Hóa học</option>
                 <option value="LAI">Lai</option>
               </select>
-              <button class="btn-remove-ans" @click="removeAnswer(aIndex)">✖</button>
+              <button class="btn-remove-ans" @click="removeAnswer(aIndex)" title="Xóa đáp án">✖</button>
             </div>
             <button class="btn-text" @click="addAnswer">+ Thêm đáp án</button>
           </div>
@@ -165,7 +181,7 @@ const availableTags = ref([
 const loadQuestions = async () => {
   try {
     const response = await request.get('/admin/quizzes');
-    questions.value = response.data;
+    questions.value = (response.data || []).slice().sort((a, b) => (a.thuTu || 0) - (b.thuTu || 0));
   } catch (error) {
     console.error("Lỗi kết nối Backend:", error);
   }
@@ -178,14 +194,19 @@ const startEdit = (q) => {
   currentQuestion.value = JSON.parse(JSON.stringify(q));
 };
 
+const getTagName = (tagId) => {
+  const tag = availableTags.value.find((t) => t.id === Number(tagId));
+  return tag ? tag.name : '';
+};
+
 const addNewInline = () => {
   editingId.value = 'new';
   currentQuestion.value = {
     id: null,
     title: '',
     answers: [
-      { label: '', icon: '', tagId: '', scoreValue: 10 },
-      { label: '', icon: '', tagId: '', scoreValue: 10 }
+      { label: '', icon: '', tagId: null, scoreValue: 2, filterKeyword: null },
+      { label: '', icon: '', tagId: null, scoreValue: 2, filterKeyword: null }
     ]
   };
 };
@@ -195,13 +216,23 @@ const cancelEdit = () => {
   currentQuestion.value = null;
 };
 
-const addAnswer = () => { currentQuestion.value.answers.push({ label: '', icon: '', tagId: null, scoreValue: 10, filterKeyword: null }); };
+const addAnswer = () => { currentQuestion.value.answers.push({ label: '', icon: '', tagId: null, scoreValue: 2, filterKeyword: null }); };
 const removeAnswer = (index) => { currentQuestion.value.answers.splice(index, 1); };
 
 const saveQuestion = async () => {
   if (!currentQuestion.value.title.trim()) { alert("Vui lòng nhập câu hỏi!"); return; }
   if (currentQuestion.value.answers.length < 2) { alert("Cần ít nhất 2 đáp án!"); return; }
   
+  const emptyAns = currentQuestion.value.answers.some(a => !a.label || !a.label.trim());
+  if (emptyAns) {
+    alert("Vui lòng nhập đầy đủ nội dung cho tất cả các đáp án!");
+    return;
+  }
+
+  currentQuestion.value.answers.forEach(a => {
+    a.scoreValue = Number(a.scoreValue) || 0;
+  });
+
   try {
     if (editingId.value !== 'new') {
       await request.put(`/admin/quizzes/${currentQuestion.value.id}`, currentQuestion.value);
@@ -280,25 +311,53 @@ const confirmDeleteQuestion = async () => {
 .box-body { padding: 20px; }
 .q-title-display { font-size: 15px; color: #1f2937; margin: 0 0 16px 0; font-weight: 500; }
 .ans-badges-preview { display: flex; flex-wrap: wrap; gap: 8px; }
-.preview-badge { background: #f3f4f6; color: #4b5563; font-size: 12px; padding: 6px 12px; border-radius: 20px; border: 1px solid #e5e7eb; }
+.preview-badge { background: #f3f4f6; color: #4b5563; font-size: 12px; padding: 6px 12px; border-radius: 20px; border: 1px solid #e5e7eb; display: inline-flex; align-items: center; }
+.tag-badge-preview { display: inline-block; background: #eef2ff; color: #4f46e5; padding: 1px 7px; border-radius: 12px; font-size: 11px; margin-left: 5px; font-weight: 600; border: 1px solid #c7d2fe; }
 
 .edit-mode { border: 1px solid #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
 .edit-header h4 { margin: 0; color: #2563eb; font-size: 14px; }
 .input-title-edit { width: 100%; border: none; border-bottom: 2px solid #e5e7eb; padding: 12px 20px; font-size: 16px; outline: none; transition: 0.2s; background: transparent; }
 .input-title-edit:focus { border-bottom-color: #3b82f6; }
 
-.answers-edit-list { padding: 20px; background: #fafafa; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; }
-.label-sm { font-size: 13px; font-weight: 600; color: #4b5563; margin-top: 0; margin-bottom: 12px; }
+.answers-edit-list { padding: 18px 20px; background: #fafafa; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; }
+.answers-header-row {
+  display: flex;
+  gap: 8px;
+  padding: 0 4px 8px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 12px;
+}
+.inline-answer-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; width: 100%; }
+.inline-answer-row input, .inline-answer-row select {
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  min-width: 0;
+  box-sizing: border-box;
+  background: #fff;
+}
+.inline-answer-row input:focus, .inline-answer-row select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
 
-.inline-answer-row { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
-.inline-answer-row input, .inline-answer-row select { padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; outline: none; }
-.inline-answer-row input:focus, .inline-answer-row select:focus { border-color: #3b82f6; }
-.flex-2 { flex: 2; } .flex-1 { flex: 1; }
+.col-icon, .input-icon { width: 120px; flex-shrink: 0; }
+.col-label, .input-label { flex: 1; min-width: 140px; }
+.col-score, .input-score { width: 60px; flex-shrink: 0; text-align: center; }
+.col-tag, .select-tag { width: 130px; flex-shrink: 0; }
+.col-filter, .select-filter { width: 105px; flex-shrink: 0; }
+.col-action, .btn-remove-ans { width: 30px; height: 30px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 .text-center { text-align: center; }
 
-.btn-remove-ans { background: #fee2e2; color: #ef4444; border: none; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; }
+.btn-remove-ans { background: #fee2e2; color: #ef4444; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
 .btn-remove-ans:hover { background: #fecaca; }
 .btn-text { background: none; border: none; color: #3b82f6; font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; margin-top: 8px; }
+.btn-text:hover { text-decoration: underline; }
 
 .action-footer { display: flex; justify-content: flex-end; gap: 12px; padding: 16px 20px; border-top: 1px solid #e5e7eb; background: #fff; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; }
 .btn-cancel { background: white; border: 1px solid #d1d5db; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; color: #374151; }

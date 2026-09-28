@@ -451,8 +451,10 @@ INSERT INTO anh_san_pham (id, id_san_pham, id_chi_tiet_san_pham, id_mau_sac, url
 (14, 14, NULL, NULL, N'/uploads/products/4f93eb7f-759c-4d2f-937c-36a46420f02d_inni.jpg', 1, 1),
 (15, 15, NULL, NULL, N'/uploads/products/7c923398-c538-4c24-aabc-e69205c2b776_inni.jpg', 1, 1),
 (16, 16, NULL, NULL, N'/uploads/products/7301c795-839c-4cd1-8d05-464674c574ab_etla.jpg', 1, 1),
-(17, 18, NULL, NULL, N'/uploads/products/61970462-f52f-47a5-98dc-09caa9ed6a0c_ec.jpg', 1, 1),
-(18, 19, NULL, NULL, N'/uploads/products/7901c743580f451b958acd4d1dc85098.jpg', 1, 1);
+(17, 17, NULL, NULL, N'/uploads/products/7301c795-839c-4cd1-8d05-464674c574ab_etla.jpg', 1, 1),
+(18, 18, NULL, NULL, N'/uploads/products/61970462-f52f-47a5-98dc-09caa9ed6a0c_ec.jpg', 1, 1),
+(19, 19, NULL, NULL, N'/uploads/products/7901c743580f451b958acd4d1dc85098.jpg', 1, 1),
+(20, 20, NULL, NULL, N'/uploads/products/beauty_of_joseon_rice.jpg', 1, 1);
 SET IDENTITY_INSERT anh_san_pham OFF;
 GO
 /* ---------- 7. NHÀ CUNG CẤP, PHIẾU NHẬP, LÔ HÀNG ---------- */
@@ -2141,19 +2143,19 @@ INSERT INTO routine_combo (id, ten, mo_ta, id_loai_da, trang_thai, thu_tu, ngay_
 (1, N'Combo Kiềm Dầu Suốt Ngày', N'Bộ đôi kiềm dầu cho da dầu: gel dùng hằng ngày, tinh chất dặm lại buổi trưa.', 1, 1, 1, '2025-03-01 09:00:00'),
 (2, N'Combo Cấp Ẩm Cho Da Khô', N'Chống nắng dưỡng ẩm, cho lớp nền căng mượt, không bong tróc.', 2, 1, 2, '2025-03-01 09:00:00'),
 (3, N'Combo Cân Bằng Da Hỗn Hợp', N'Nâng tông nhẹ và kiềm dầu vùng chữ T.', 3, 1, 3, '2025-03-01 09:00:00'),
-(4, N'Combo Đi Biển Cả Ngày', N'Kháng nước cho mặt và toàn thân khi đi biển, đi bơi.', 4, 1, 4, '2025-03-01 09:00:00'),
+(4, N'Combo Bảo Vệ Toàn Diện Da Thường', N'Bộ đôi bảo vệ da hằng ngày: dưỡng ẩm tự nhiên buổi sáng, bảo vệ ngoài trời tăng cường.', 4, 1, 4, '2025-03-01 09:00:00'),
 (5, N'Combo Dịu Nhẹ Da Nhạy Cảm', N'Chỉ dùng sản phẩm dịu nhẹ, hạn chế kích ứng.', 5, 1, 5, '2025-03-01 09:00:00');
 SET IDENTITY_INSERT routine_combo OFF;
 GO
 SET IDENTITY_INSERT routine_combo_chi_tiet ON;
 INSERT INTO routine_combo_chi_tiet (id, id_routine, id_san_pham, thu_tu, ghi_chu) VALUES
-(1, 1, 2, 1, N'Chống nắng chính buổi sáng'),
+(1, 1, 15, 1, N'Chống nắng chính buổi sáng (Chân ái)'),
 (2, 1, 12, 2, N'Dặm lại buổi trưa, không bết'),
 (3, 2, 20, 1, N'Chống nắng dưỡng ẩm hằng ngày'),
 (4, 2, 17, 2, N'Dùng khi đi ngoài trời lâu'),
 (5, 3, 9, 1, N'Nâng tông, thay kem lót'),
 (6, 3, 4, 2, N'Kiềm dầu vùng chữ T'),
-(7, 4, 1, 1, N'Cho mặt, kháng nước'),
+(7, 4, 20, 1, N'Chống nắng chính hằng ngày (Chân ái)'),
 (8, 4, 7, 2, N'Cho toàn thân'),
 (9, 5, 8, 1, N'Kem vật lý rau má'),
 (10, 5, 3, 2, N'Fluid siêu mỏng cho da nhạy cảm');

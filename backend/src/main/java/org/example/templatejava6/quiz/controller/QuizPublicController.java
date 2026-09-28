@@ -39,6 +39,7 @@ public class QuizPublicController {
         CauHoiQuizResponse response = new CauHoiQuizResponse();
         response.setId(entity.getId());
         response.setTitle(entity.getNoiDung());
+        response.setThuTu(entity.getThuTu());
 
         List<CauHoiQuizResponse.DapAnResponse> ansResponses = new ArrayList<>();
         if (entity.getDapAns() != null) {

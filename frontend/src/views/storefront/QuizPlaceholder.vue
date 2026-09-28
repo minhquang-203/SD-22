@@ -309,8 +309,8 @@
 
             <div class="sg-routine-grid">
               <div
-                v-for="ct in routineCombo.chiTiets"
-                :key="ct.idSanPham"
+                v-for="(ct, ctIdx) in routineCombo.chiTiets"
+                :key="ct.thuTu || ctIdx"
                 class="sg-routine-card"
                 @click="goToProduct(ct.idSanPham)"
               >
@@ -329,13 +329,13 @@
             </div>
           </div>
 
-          <!-- FALLBACK NẾU KHÔNG CÓ ROUTINE COMBO -> HIỂN THỊ CÁC GỢI Ý THAY THẾ -->
-          <div class="sg-result__routine" v-else-if="recommendedProducts.length > 1">
+          <!-- CÁC LỰA CHỌN THAY THẾ KHÁC (LUÔN HIỆN CÙNG VỚI COMBO, TỰ ĐỘNG LOẠI TRỪ CÁC SẢN PHẨM ĐÃ CÓ TRONG COMBO) -->
+          <div class="sg-result__routine" v-if="alternativeProducts.length > 0">
             <h3 class="sg-result__routine-title">CÁC LỰA CHỌN THAY THẾ KHÁC</h3>
             <p class="sg-result__routine-subtitle">Dưới đây là các sản phẩm cũng có độ tương thích rất cao với làn da của bạn.</p>
             <div class="sg-routine-grid">
               <div
-                v-for="(product, index) in recommendedProducts.slice(1)"
+                v-for="(product, index) in alternativeProducts"
                 :key="product.id"
                 class="sg-routine-card"
                 @click="goToProduct(product.id)"
@@ -547,6 +547,13 @@ const routineTotalPrice = computed(() => {
   return routineCombo.value.chiTiets.reduce((sum, ct) => sum + (ct.gia || 0), 0);
 });
 
+// Danh sách các lựa chọn thay thế (loại trừ các sản phẩm đã xuất hiện trong Routine Combo)
+const alternativeProducts = computed(() => {
+  if (recommendedProducts.value.length <= 1) return [];
+  const comboProductIds = new Set((routineCombo.value?.chiTiets || []).map((ct) => ct.idSanPham));
+  return recommendedProducts.value.slice(1).filter((p) => !comboProductIds.has(p.id));
+});
+
 // NAVIGATION GUARDS - BẮT SỰ KIỆN CHUYỂN TRANG
 
 onBeforeRouteLeave((to, from, next) => {
@@ -599,7 +606,7 @@ const fetchQuizQuestions = async () => {
   loading.value = true;
   try {
     const res = await getQuizQuestions();
-    questions.value = res.data || [];
+    questions.value = (res.data || []).slice().sort((a, b) => (a.thuTu || 0) - (b.thuTu || 0));
   } catch (error) {
     console.error('Lỗi tải quiz:', error);
     questions.value = [];
@@ -642,10 +649,14 @@ const selectAnswer = (answer) => {
 
 const prevStep = () => { if (currentStep.value > 1) currentStep.value--; };
 
-const handleNext = () => {
+const handleNext = async () => {
+  if (!isCurrentAnswered.value) return;
   if (isLastStep.value) {
     currentStep.value++;
     analyzing.value = true;
+    if (allProducts.value.length === 0) {
+      await fetchProducts();
+    }
     calculateResult();
   } else {
     currentStep.value++;
@@ -744,17 +755,50 @@ const calculateResult = () => {
           .slice()
           .sort((a, b) => (a.thuTu || 0) - (b.thuTu || 0));
 
+        const mappedChiTiets = sortedChiTiets.map((ct) => {
+          const p = allProducts.value.find((x) => x.id === ct.idSanPham);
+          const itemPrice = p ? (p.giaSauGiamMin || p.giaMin || p.gia || 0) : 0;
+          return {
+            ...ct,
+            anhChinhUrl: ct.anhChinhUrl || p?.anhChinhUrl || null,
+            gia: itemPrice,
+          };
+        });
+
+        // ĐỒNG BỘ TUYỆT ĐỐI: Bước 1 của Combo luôn tự động gắn Sản phẩm chân ái
+        if (recommendedProducts.value.length > 0 && mappedChiTiets.length > 0) {
+          const hero = recommendedProducts.value[0];
+          const oldStep1Id = sortedChiTiets[0].idSanPham;
+
+          // Nếu các bước sau vô tình trùng với Hero, hoán đổi với sản phẩm cũ của bước 1 để tránh trùng lặp
+          for (let i = 1; i < mappedChiTiets.length; i++) {
+            if (mappedChiTiets[i].idSanPham === hero.id && oldStep1Id !== hero.id) {
+              const altP = allProducts.value.find((x) => x.id === oldStep1Id);
+              if (altP) {
+                mappedChiTiets[i] = {
+                  ...mappedChiTiets[i],
+                  idSanPham: altP.id,
+                  tenSanPham: altP.ten,
+                  anhChinhUrl: altP.anhChinhUrl,
+                  gia: altP.giaSauGiamMin || altP.giaMin || altP.gia || 0,
+                };
+              }
+            }
+          }
+
+          mappedChiTiets[0] = {
+            ...mappedChiTiets[0],
+            idSanPham: hero.id,
+            tenSanPham: hero.ten,
+            anhChinhUrl: hero.anhChinhUrl,
+            gia: hero.giaSauGiamMin || hero.giaMin || hero.gia || 0,
+            ghiChu: mappedChiTiets[0].ghiChu || 'Chống nắng chính (Sản phẩm chân ái)',
+          };
+        }
+
         routineCombo.value = {
           ...fetchedRoutine,
-          chiTiets: sortedChiTiets.map((ct) => {
-            const p = allProducts.value.find((x) => x.id === ct.idSanPham);
-            const itemPrice = p ? (p.giaSauGiamMin || p.giaMin || p.gia || 0) : 0;
-            return {
-              ...ct,
-              anhChinhUrl: ct.anhChinhUrl || p?.anhChinhUrl || null,
-              gia: itemPrice,
-            };
-          }),
+          chiTiets: mappedChiTiets,
         };
       } else {
         console.warn("Routine bị từ chối do vi phạm bộ lọc y khoa của khách hàng.");

@@ -8,4 +8,5 @@ import java.util.List;
 @Repository
 public interface CauHoiQuizRepository extends JpaRepository<CauHoiQuiz, Integer> {
     List<CauHoiQuiz> findByTrangThaiTrueOrderByThuTuAsc();
+    List<CauHoiQuiz> findAllByOrderByThuTuAsc();
 }

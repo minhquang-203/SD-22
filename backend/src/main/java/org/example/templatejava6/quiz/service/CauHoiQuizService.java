@@ -22,7 +22,7 @@ public class CauHoiQuizService {
 
     // LẤY DANH SÁCH & MAP SANG RESPONSE
     public List<CauHoiQuizResponse> getAllQuizzes() {
-        List<CauHoiQuiz> entities = cauHoiRepo.findAll();
+        List<CauHoiQuiz> entities = cauHoiRepo.findAllByOrderByThuTuAsc();
         return entities.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
@@ -100,6 +100,7 @@ public class CauHoiQuizService {
         CauHoiQuizResponse response = new CauHoiQuizResponse();
         response.setId(entity.getId());
         response.setTitle(entity.getNoiDung());
+        response.setThuTu(entity.getThuTu());
 
         List<CauHoiQuizResponse.DapAnResponse> ansResponses = new ArrayList<>();
         if(entity.getDapAns() != null) {
