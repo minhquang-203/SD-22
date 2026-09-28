@@ -526,6 +526,20 @@ public class LoHangService {
                         && LoHangResponse.isSapHetHan(l.getHanSuDung()));
     }
 
+    /** Kiểm tra lô còn bán được (tồn tại, active, chưa hết hạn) — gọi sớm trước khi tạo hóa đơn. */
+    @Transactional(readOnly = true)
+    public void assertLoCoTheBan(Integer idLoHang) {
+        if (idLoHang == null) {
+            return;
+        }
+        LoHang lot = loHangRepository.findById(idLoHang)
+                .orElseThrow(() -> new ApiException("Không tìm thấy lô hàng.", "LOT_NOT_FOUND"));
+        if (!Boolean.TRUE.equals(lot.getTrangThai())) {
+            throw new ApiException("Lô hàng không còn hoạt động.", "INACTIVE_LOT");
+        }
+        assertLoChuaHetHan(lot);
+    }
+
     private void assertLoChuaHetHan(LoHang lot) {
         if (LoHangResponse.isHetHan(lot.getHanSuDung())) {
             throw new ApiException("Lô đã hết hạn, không được bán", "LOT_EXPIRED");

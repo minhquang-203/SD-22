@@ -2197,7 +2197,7 @@ SET IDENTITY_INSERT du_lieu_uv OFF;
 GO
 SET IDENTITY_INSERT banner_trang_chu ON;
 INSERT INTO banner_trang_chu (id, tieu_de, tieu_de_chinh, mo_ta, nut_text, link_url, anh_url, thu_tu, trang_thai, ngay_tao) VALUES
-(1, N'Trắc nghiệm da', N'Tìm sản phẩm chống nắng phù hợp với bạn', N'Trả lời 6 câu hỏi ngắn — SUNOVA phân tích làn da và gợi ý sản phẩm dành riêng cho bạn.', N'Làm Quiz Ngay', N'/quiz', N'/uploads/products/afba71ad7d074cbdbbd30e1fbb6653dd.png', 1, 1, '2025-03-01 00:00:00'),
+(1, N'Trắc nghiệm da', N'Tìm sản phẩm chống nắng phù hợp với bạn', N'Trả lời 6 câu hỏi ngắn — SUNOVA phân tích làn da và gợi ý sản phẩm dành riêng cho bạn.', N'Làm Quiz Ngay', N'/quiz', N'/banner-video.mp4', 1, 1, '2025-03-01 00:00:00'),
 (2, N'Thu vàng ưu đãi', N'Giảm đến 10% bộ sưu tập nâng tông', N'Áp dụng từ 20/09 đến 20/10/2026 cho Skin Aqua, Innisfree, Beauty of Joseon.', N'Mua ngay', N'/san-pham', N'/uploads/products/64676e87d11e4255b19439be44cce9c6.webp', 2, 1, '2026-09-19 00:00:00'),
 (3, N'Chính hãng – rõ lô – rõ hạn', N'Quản lý từng lô, bán hàng hạn gần trước', N'Mọi sản phẩm tại SUNOVA đều ghi rõ số lô và hạn sử dụng trên hóa đơn.', N'Xem sản phẩm', N'/san-pham', N'/uploads/products/c91b8a8836ce4728834f86481affb03b.webp', 3, 1, '2025-03-01 00:00:00');
 SET IDENTITY_INSERT banner_trang_chu OFF;

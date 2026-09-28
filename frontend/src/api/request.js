@@ -162,7 +162,11 @@ request.interceptors.response.use(
       }
 
       if (getAdminToken()) {
-        useAdminAuth().dangXuat()
+        try {
+          useAdminAuth().dangXuat()
+        } catch {
+          /* ignore */
+        }
         if (onAdmin && router.currentRoute.value.path !== '/admin/dang-nhap') {
           router.push({
             path: '/admin/dang-nhap',
@@ -172,7 +176,7 @@ request.interceptors.response.use(
             },
           })
         }
-        const msg = 'Phiên đăng nhập quản trị đã hết hạn, vui lòng đăng nhập lại'
+        const msg = 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại'
         toast(msg, 'warn')
         return Promise.reject(msg)
       }

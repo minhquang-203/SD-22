@@ -994,6 +994,13 @@ public class BanHangService {
                         "OUT_OF_STOCK");
             }
         }
+        if (phanBoLos != null && !phanBoLos.isEmpty()) {
+            for (LoHangService.PhanBoLo pb : phanBoLos) {
+                loHangService.assertLoCoTheBan(pb.idLoHang());
+            }
+        } else if (idLoHang != null) {
+            loHangService.assertLoCoTheBan(idLoHang);
+        }
         BigDecimal donGia = checkoutPricingService.resolveDonGia(cts, saleMap);
         if (donGia == null || donGia.compareTo(BigDecimal.ZERO) < 0) {
             throw new ApiException("Giá bán SKU " + cts.getSku() + " không hợp lệ.", "INVALID_PRICE");
