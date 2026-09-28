@@ -32,7 +32,13 @@ public interface ChiTietSanPhamRepository extends JpaRepository<ChiTietSanPham, 
 
     List<ChiTietSanPham> findBySanPhamAndTrangThaiTrue(SanPham sanPham);
 
-    List<ChiTietSanPham> findBySanPham(SanPham sanPham);
+    @Query("""
+            SELECT c FROM ChiTietSanPham c
+            LEFT JOIN FETCH c.mauSac
+            WHERE c.sanPham = :sanPham
+            ORDER BY c.id ASC
+            """)
+    List<ChiTietSanPham> findBySanPham(@Param("sanPham") SanPham sanPham);
 
     @Query("SELECT c FROM ChiTietSanPham c JOIN FETCH c.sanPham LEFT JOIN FETCH c.mauSac "
             + "WHERE c.trangThai = true AND c.sanPham.id IN :sanPhamIds "

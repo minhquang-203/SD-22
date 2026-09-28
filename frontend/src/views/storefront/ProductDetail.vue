@@ -17,6 +17,7 @@ import { openBulkOrderModal } from '@/composables/useBulkOrderModal'
 import { formatDiscountPercent, formatVND } from '@/utils/formatVND'
 import { formatSpfPaDetail } from '@/utils/formatChiSo'
 import { productImageUrl } from '@/utils/productImage'
+import { resolveGalleryUrls } from '@/utils/productGalleryByColor'
 
 const route = useRoute()
 const router = useRouter()
@@ -57,38 +58,25 @@ const variantOriginalPrice = computed(() => {
 
 const variantSalePrice = computed(() => formatVND(selectedVariant.value?.giaSauGiam))
 
-/** Gallery theo màu đang chọn: ưu tiên ảnh riêng màu → fallback ảnh chung → anhChinhUrl */
-const galleryImages = computed(() => {
-  const all = [...(product.value?.anhs || [])].filter((a) => a?.url)
-  const colorId = selectedVariant.value?.idMauSac ?? null
-
-  const sortAnhs = (list) =>
-    [...list].sort((a, b) => {
-      const mainA = a.laAnhChinh ? 0 : 1
-      const mainB = b.laAnhChinh ? 0 : 1
-      if (mainA !== mainB) return mainA - mainB
-      return (a.thuTu ?? 0) - (b.thuTu ?? 0)
-    })
-
-  let list = []
-  if (colorId != null) {
-    list = sortAnhs(all.filter((a) => a.idMauSac === colorId))
-  }
-  if (!list.length) {
-    list = sortAnhs(all.filter((a) => a.idMauSac == null))
-  }
-  if (!list.length) {
-    list = sortAnhs(all)
-  }
-
-  const urls = list.map((a) => a.url)
-  if (!urls.length && product.value?.anhChinhUrl) urls.push(product.value.anhChinhUrl)
-  return urls
-})
+/**
+ * Gallery theo SKU/màu đang chọn.
+ * Ảnh chính (laAnhChinh) chỉ dùng khi chưa chọn màu hoặc màu đó không có ảnh riêng/chung.
+ * Đã chọn màu: ảnh đúng màu → Dùng chung → ảnh chính → ảnh đầu.
+ */
+const galleryImages = computed(() =>
+  resolveGalleryUrls(
+    product.value?.anhs,
+    selectedVariant.value?.idMauSac,
+    product.value?.anhChinhUrl,
+  ),
+)
 
 const activeImage = computed(() => {
   const url = galleryImages.value[activeImageIndex.value]
-  return url ? productImageUrl(url) : productImageUrl(product.value?.anhChinhUrl)
+  if (url) return productImageUrl(url)
+  // Không fallback về anhChinhUrl nếu gallery đã resolve theo màu (tránh giữ ảnh hồng khi chọn tông sáng)
+  const first = galleryImages.value[0]
+  return first ? productImageUrl(first) : ''
 })
 
 const hasGalleryNav = computed(() => galleryImages.value.length > 1)
@@ -115,9 +103,10 @@ function prevImage() {
 }
 
 watch(
-  () => selectedVariant.value?.idMauSac,
+  () => [selectedVariantId.value, selectedVariant.value?.idMauSac],
   () => {
     activeImageIndex.value = 0
+    galleryFading.value = false
   },
 )
 
@@ -374,7 +363,7 @@ onUnmounted(() => {
         <div class="sf-pdp__gallery">
           <div class="sf-pdp__main-img">
             <img
-              :src="activeImage || productImageUrl(product.anhChinhUrl)"
+              :src="activeImage || productImageUrl(galleryImages[0] || product.anhChinhUrl)"
               :alt="product.ten"
               :class="{ 'is-fading': galleryFading }"
             />
