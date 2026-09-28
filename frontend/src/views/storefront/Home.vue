@@ -253,7 +253,6 @@ onMounted(async () => {
               >
                 {{ activeBanner.nutText || 'Xem ngay' }}
               </component>
-              <RouterLink to="/quiz" class="sf-home-btn sf-home-btn--ghost">Làm quiz 2 phút</RouterLink>
             </div>
           </template>
         </div>
