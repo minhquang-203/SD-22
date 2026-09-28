@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Đảm bảo có banner quiz mặc định với tiếng Việt đúng encoding
- * (tránh lỗi charset khi seed bằng SQL trên một số máy Windows).
+ * Tạo banner quiz mặc định một lần khi bảng còn trống.
+ * Banner đã có (kể cả bản admin đã sửa) không bị ghi đè khi khởi động lại.
  */
 @Component
 public class BannerDataInitializer implements ApplicationRunner {
@@ -23,29 +23,17 @@ public class BannerDataInitializer implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        if (bannerTrangChuRepository.count() == 0) {
-            BannerTrangChu banner = new BannerTrangChu();
-            applyDefaultQuizContent(banner);
-            banner.setThuTu(1);
-            banner.setTrangThai(true);
-            bannerTrangChuRepository.save(banner);
+        // Chỉ tạo khi chưa có banner. Không ghi đè banner đã sửa trong admin
+        // (kể cả banner quiz mặc định) mỗi lần khởi động.
+        if (bannerTrangChuRepository.count() > 0) {
             return;
         }
 
-        bannerTrangChuRepository.findAll().stream()
-                .filter(b -> "/quiz".equalsIgnoreCase(String.valueOf(b.getLinkUrl()).trim()))
-                .filter(this::looksBrokenEncoding)
-                .forEach(b -> {
-                    applyDefaultQuizContent(b);
-                    bannerTrangChuRepository.save(b);
-                });
-    }
-
-    private boolean looksBrokenEncoding(BannerTrangChu b) {
-        String title = b.getTieuDeChinh() == null ? "" : b.getTieuDeChinh();
-        String eyebrow = b.getTieuDe() == null ? "" : b.getTieuDe();
-        return title.contains("?") || title.contains("�") || eyebrow.contains("?") || eyebrow.contains("�")
-                || (!title.contains("chống") && !title.contains("phù hợp"));
+        BannerTrangChu banner = new BannerTrangChu();
+        applyDefaultQuizContent(banner);
+        banner.setThuTu(1);
+        banner.setTrangThai(true);
+        bannerTrangChuRepository.save(banner);
     }
 
     private void applyDefaultQuizContent(BannerTrangChu banner) {

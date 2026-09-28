@@ -29,6 +29,7 @@ import { getPhoneValidationError, normalizePhoneDigits } from '@/utils/phone'
 import { getLoHangConHangTheoBienThe } from '@/api/loHangApi'
 import InvoiceReceipt from '@/components/invoice/InvoiceReceipt.vue'
 import MoneyInput from '@/components/common/MoneyInput.vue'
+import HorizontalScroll from '@/components/storefront/HorizontalScroll.vue'
 import { normalizeInvoice } from '@/utils/invoiceReceipt'
 import { printInvoice, saveInvoicePdf } from '@/utils/printInvoice'
 import { useAdminAuth } from '@/composables/useAdminAuth'
@@ -1594,24 +1595,29 @@ onBeforeUnmount(() => {
     <div class="pos-main">
       <section class="pos-catalog" aria-label="Chọn sản phẩm">
         <div class="pos-chips">
-          <button
-            type="button"
-            class="pos-chip"
-            :class="{ 'is-on': categoryFilter == null }"
-            @click="categoryFilter = null"
+          <HorizontalScroll
+            :item-count="categoryChips.length + 1"
+            aria-label="Lọc danh mục"
           >
-            Tất cả
-          </button>
-          <button
-            v-for="cat in categoryChips"
-            :key="cat"
-            type="button"
-            class="pos-chip"
-            :class="{ 'is-on': categoryFilter === cat }"
-            @click="categoryFilter = cat"
-          >
-            {{ cat }}
-          </button>
+            <button
+              type="button"
+              class="pos-chip"
+              :class="{ 'is-on': categoryFilter == null }"
+              @click="categoryFilter = null"
+            >
+              Tất cả
+            </button>
+            <button
+              v-for="cat in categoryChips"
+              :key="cat"
+              type="button"
+              class="pos-chip"
+              :class="{ 'is-on': categoryFilter === cat }"
+              @click="categoryFilter = cat"
+            >
+              {{ cat }}
+            </button>
+          </HorizontalScroll>
         </div>
 
         <div

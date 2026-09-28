@@ -103,7 +103,14 @@ function removeRow(index) {
     </div>
 
     <div class="overflow-x-auto border rounded-lg">
-      <table class="admin-table">
+      <table class="admin-table variant-sku-table">
+        <colgroup>
+          <col class="col-sku" />
+          <col class="col-mau" />
+          <col class="col-dung-tich" />
+          <col class="col-gia-ban" />
+          <col class="col-action" />
+        </colgroup>
         <thead>
           <tr>
             <th>
@@ -126,7 +133,7 @@ function removeRow(index) {
             </td>
           </tr>
           <tr v-for="(row, index) in rows" :key="row.id ?? `new-${index}`">
-            <td class="min-w-[180px]">
+            <td class="col-sku">
               <input
                 v-model="row.sku"
                 class="admin-input"
@@ -147,7 +154,7 @@ function removeRow(index) {
                 Nhãn gợi ý: {{ variantLabel(row) }}
               </p>
             </td>
-            <td>
+            <td class="col-mau">
               <select
                 v-model="row.idMauSac"
                 class="admin-select"
@@ -185,7 +192,7 @@ function removeRow(index) {
               />
               <p v-if="rowError(index, 'giaBan')" class="field-error">{{ rowError(index, 'giaBan') }}</p>
             </td>
-            <td>
+            <td class="col-action">
               <button type="button" class="admin-btn admin-btn-danger !px-2.5" @click="removeRow(index)">
                 ✕
               </button>
@@ -225,27 +232,70 @@ function removeRow(index) {
 .sku-hint--label {
   color: #8c6b4a;
 }
+.variant-sku-table {
+  table-layout: fixed;
+  width: 100%;
+}
+.variant-sku-table tbody td {
+  vertical-align: top;
+}
+.col-sku {
+  width: auto;
+}
+.col-mau {
+  width: 210px;
+}
+/* Đủ cho 9999 ml */
 .col-dung-tich {
   width: 92px;
-  max-width: 92px;
 }
+/* Đủ cho 100.000.000 đ (hàng trăm triệu) */
 .col-gia-ban {
-  min-width: 160px;
-  width: 28%;
+  width: 168px;
+}
+.col-action {
+  width: 52px;
+}
+.variant-sku-table td.col-dung-tich,
+.variant-sku-table th.col-dung-tich,
+.variant-sku-table td.col-gia-ban,
+.variant-sku-table th.col-gia-ban {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.variant-sku-table .admin-input,
+.variant-sku-table .admin-select,
+.variant-sku-table .gia-ban-money {
+  height: 38px;
+  box-sizing: border-box;
+  line-height: 1.25;
 }
 .dung-tich-field {
   display: flex;
   align-items: center;
   gap: 4px;
-  max-width: 88px;
+  width: 100%;
+  min-width: 0;
+  height: 38px;
 }
 .dung-tich-input {
-  width: 58px;
-  min-width: 58px;
-  flex: 0 0 58px;
-  padding-left: 8px;
-  padding-right: 6px;
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 38px;
+  padding-left: 6px;
+  padding-right: 4px;
   text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.dung-tich-input::-webkit-outer-spin-button,
+.dung-tich-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.dung-tich-input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 .dung-tich-unit {
   font-size: 12px;
@@ -253,12 +303,22 @@ function removeRow(index) {
   flex-shrink: 0;
 }
 .gia-ban-money {
-  display: block;
-  width: 100%;
-}
-.gia-ban-money :deep(input) {
+  display: flex;
+  align-items: center;
   width: 100%;
   min-width: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.gia-ban-money :deep(.money-input__control) {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+.gia-ban-money :deep(.money-input__suffix) {
+  line-height: 1;
 }
 .field-error {
   margin: 4px 0 0;

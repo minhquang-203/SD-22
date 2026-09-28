@@ -7,7 +7,6 @@ export const LY_DO_OPTIONS = [
   'Sản phẩm lỗi / hỏng',
   'Sai sản phẩm / sai biến thể',
   'Không đúng mô tả',
-  'Đổi ý / không còn nhu cầu',
   'Khác',
 ]
 
