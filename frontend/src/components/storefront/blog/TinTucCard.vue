@@ -71,6 +71,7 @@ const icon = computed(() => props.bai.icon || 'sun')
   display: grid;
   place-items: center;
   overflow: hidden;
+  background: #fff;
 }
 
 .tt-card__media--gold {
@@ -87,6 +88,11 @@ const icon = computed(() => props.bai.icon || 'sun')
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.28s ease;
+}
+
+.tt-card:hover .tt-card__img {
+  transform: scale(1.04);
 }
 
 .tt-card__glow {

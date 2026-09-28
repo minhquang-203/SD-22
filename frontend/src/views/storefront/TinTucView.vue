@@ -77,10 +77,19 @@ const gridPosts = computed(() => {
         class="tt-featured__media"
         :class="`tt-featured__media--${featuredTone}`"
       >
-        <span class="tt-featured__glow" aria-hidden="true" />
-        <svg viewBox="0 0 48 48" fill="none" class="tt-featured__icon" aria-hidden="true">
-          <use :href="`#blog-icon-${featured.icon || 'sun'}`" />
-        </svg>
+        <img
+          v-if="featured.anhBia"
+          :src="featured.anhBia"
+          :alt="featured.tieuDe"
+          class="tt-featured__img"
+          loading="eager"
+        />
+        <template v-else>
+          <span class="tt-featured__glow" aria-hidden="true" />
+          <svg viewBox="0 0 48 48" fill="none" class="tt-featured__icon" aria-hidden="true">
+            <use :href="`#blog-icon-${featured.icon || 'sun'}`" />
+          </svg>
+        </template>
       </RouterLink>
       <div class="tt-featured__content">
         <span class="tt-featured__badge">{{ featured.danhMuc }}</span>
@@ -218,10 +227,27 @@ const gridPosts = computed(() => {
   position: relative;
   display: grid;
   place-items: center;
-  min-height: 220px;
+  min-height: 240px;
   border-radius: 16px;
   text-decoration: none;
   overflow: hidden;
+  background: #ffffff;
+  border: 1px solid rgba(158, 115, 64, 0.12);
+}
+
+.tt-featured__img {
+  width: 100%;
+  height: 100%;
+  min-height: 240px;
+  max-height: 350px;
+  object-fit: contain;
+  background: #ffffff;
+  display: block;
+  transition: transform 0.35s ease;
+}
+
+.tt-featured__media:hover .tt-featured__img {
+  transform: scale(1.02);
 }
 
 .tt-featured__media--gold {

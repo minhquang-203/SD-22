@@ -3,9 +3,16 @@
  * Nội dung tự viết — tham khảo nguồn, không sao chép nguyên văn.
  */
 
+import anhSpfPa from '@/assets/tin-tuc/cam-nang-spf-pa.png'
+import anhChiSoPa from '@/assets/tin-tuc/cam-nang-chi-so-pa.png'
+import anhSpfBaoNhieu from '@/assets/tin-tuc/cam-nang-spf-bao-nhieu.png'
+import anhChonTheoLoaiDa from '@/assets/tin-tuc/cam-nang-chon-theo-loai-da.png'
+import anhUvaUvb from '@/assets/tin-tuc/cam-nang-uva-uvb.png'
+import anhCapDoPa from '@/assets/tin-tuc/cam-nang-cap-do-pa.jpg'
+import anhHieuDungSpf from '@/assets/tin-tuc/cam-nang-hieu-dung-spf.jpg'
 import anhQuizDa from '@/assets/tin-tuc/cam-nang-quiz-da.jpg'
 import anhUuDaiHe from '@/assets/tin-tuc/cam-nang-uu-dai-he.jpg'
-import anhSpfPa from '@/assets/tin-tuc/cam-nang-spf-pa.jpg'
+import anhHangChinhHang from '@/assets/tin-tuc/cam-nang-hang-chinh-hang.jpg'
 
 export const TIN_TUC_DANH_MUC = [
   'Tất cả',
@@ -64,7 +71,7 @@ export const tinTucBaiViet = [
     tieuDe: 'Ngoài SPF, vì sao cần để ý chỉ số PA?',
     danhMuc: 'Kiến thức chống nắng',
     ngay: '2026-03-08',
-    anhBia: null,
+    anhBia: anhChiSoPa,
     icon: 'sun',
     tomTat:
       'SPF bảo vệ khỏi cháy nắng; PA nhắc bạn về tia UVA — “kẻ thầm lặng” vẫn xuyên qua kính và mây. Bỏ qua PA là bỏ nửa bức tranh bảo vệ da.',
@@ -88,7 +95,7 @@ export const tinTucBaiViet = [
     tieuDe: 'SPF bao nhiêu là đủ? Không phải càng cao càng tốt',
     danhMuc: 'Hướng dẫn chọn sản phẩm',
     ngay: '2026-02-28',
-    anhBia: null,
+    anhBia: anhSpfBaoNhieu,
     icon: 'thermometer',
     tomTat:
       'SPF 100 không đồng nghĩa bảo vệ gấp đôi SPF 50. Chọn mức phù hợp thói quen ngoài trời và bôi đúng cách quan trọng hơn chạy theo số “khủng”.',
@@ -112,7 +119,7 @@ export const tinTucBaiViet = [
     tieuDe: 'Chọn kem chống nắng theo loại da: dầu, khô, hỗn hợp',
     danhMuc: 'Hướng dẫn chọn sản phẩm',
     ngay: '2026-02-20',
-    anhBia: null,
+    anhBia: anhChonTheoLoaiDa,
     icon: 'droplet',
     tomTat:
       'Cùng SPF 50 nhưng gel cho da dầu và cream cho da khô cho cảm giác hoàn toàn khác. Khớp kết cấu với loại da giúp bạn duy trì thói quen bôi mỗi sáng.',
@@ -136,7 +143,7 @@ export const tinTucBaiViet = [
     tieuDe: 'Tia UVA và UVB khác nhau thế nào?',
     danhMuc: 'Kiến thức chống nắng',
     ngay: '2026-02-14',
-    anhBia: null,
+    anhBia: anhUvaUvb,
     icon: 'sun',
     tomTat:
       'UVB “đốt” bề mặt gây cháy nắng; UVA “xuyên” sâu hơn và hiện diện hầu như cả ngày. Hiểu hai loại tia giúp bạn chọn kem phổ rộng có chủ đích.',
@@ -160,7 +167,7 @@ export const tinTucBaiViet = [
     tieuDe: 'Chỉ số PA có mấy cấp độ?',
     danhMuc: 'Kiến thức chống nắng',
     ngay: '2026-02-05',
-    anhBia: null,
+    anhBia: anhCapDoPa,
     icon: 'map',
     tomTat:
       'Từ PA+ đến PA++++, mỗi cấp thể hiện mức bền vững trước tia UVA khác nhau. Biết thang đo giúp bạn so sánh sản phẩm nhanh trên kệ.',
@@ -184,7 +191,7 @@ export const tinTucBaiViet = [
     tieuDe: 'Hiểu đúng SPF, PA để chọn kem chống nắng',
     danhMuc: 'Kiến thức chống nắng',
     ngay: '2026-01-28',
-    anhBia: null,
+    anhBia: anhHieuDungSpf,
     icon: 'shield',
     tomTat:
       'Gom lại trong một bài: SPF nói về UVB, PA nói về UVA, và cách chọn mức phù hợp nhịp sống nhiệt đới của bạn.',
@@ -248,7 +255,7 @@ export const tinTucBaiViet = [
     tieuDe: 'SUNOVA cam kết 100% hàng chính hãng, rõ lô và hạn sử dụng',
     danhMuc: 'Tin SUNOVA',
     ngay: '2026-03-01',
-    anhBia: null,
+    anhBia: anhHangChinhHang,
     icon: 'shield',
     tomTat:
       'Mỗi sản phẩm trên SUNOVA đi kèm thông tin rõ ràng về nguồn gốc và hạn dùng — để bạn yên tâm bảo vệ da mỗi ngày.',

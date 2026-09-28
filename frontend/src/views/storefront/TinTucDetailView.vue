@@ -220,14 +220,18 @@ watch(
 }
 
 .tt-detail__cover {
-  display: grid;
-  place-items: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   width: 100%;
   max-width: 720px;
-  aspect-ratio: 16 / 8;
+  min-height: 240px;
+  max-height: 480px;
   margin-bottom: 28px;
   border-radius: 18px;
   overflow: hidden;
+  background: #fdfaf6;
+  border: 1px solid rgba(158, 115, 64, 0.12);
 }
 
 .tt-detail__cover--gold {
@@ -242,8 +246,9 @@ watch(
 
 .tt-detail__cover-img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  max-height: 480px;
+  object-fit: contain;
+  display: block;
 }
 
 .tt-detail__cover-icon {
