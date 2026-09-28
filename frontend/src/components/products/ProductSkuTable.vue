@@ -114,8 +114,8 @@ function removeRow(index) {
               >?</span>
             </th>
             <th>Màu sắc</th>
-            <th>Dung tích *</th>
-            <th>Giá bán *</th>
+            <th class="col-dung-tich">Dung tích *</th>
+            <th class="col-gia-ban">Giá bán *</th>
             <th></th>
           </tr>
         </thead>
@@ -157,26 +157,26 @@ function removeRow(index) {
                 <option v-for="m in mauSacOptions" :key="m.id" :value="m.id">{{ m.ten }}</option>
               </select>
             </td>
-            <td>
+            <td class="col-dung-tich">
               <div class="dung-tich-field">
                 <input
                   v-model.number="row.dungTichMl"
                   type="number"
-                  class="admin-input"
+                  class="admin-input dung-tich-input"
                   :class="{ 'is-invalid': rowError(index, 'dungTichMl') }"
                   min="0"
                   step="0.1"
-                  placeholder="VD: 50"
+                  placeholder="50"
                   @input="onVariantFieldChange(row); clearRowError(index, 'dungTichMl')"
                 />
                 <span class="dung-tich-unit">ml</span>
               </div>
               <p v-if="rowError(index, 'dungTichMl')" class="field-error">{{ rowError(index, 'dungTichMl') }}</p>
             </td>
-            <td>
+            <td class="col-gia-ban">
               <MoneyInput
                 v-model="row.giaBan"
-                class="admin-input-money"
+                class="admin-input-money gia-ban-money"
                 input-class="admin-input"
                 :error="!!rowError(index, 'giaBan')"
                 :min="0"
@@ -225,19 +225,40 @@ function removeRow(index) {
 .sku-hint--label {
   color: #8c6b4a;
 }
+.col-dung-tich {
+  width: 92px;
+  max-width: 92px;
+}
+.col-gia-ban {
+  min-width: 160px;
+  width: 28%;
+}
 .dung-tich-field {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  max-width: 88px;
 }
-.dung-tich-field .admin-input {
-  flex: 1;
-  min-width: 0;
+.dung-tich-input {
+  width: 58px;
+  min-width: 58px;
+  flex: 0 0 58px;
+  padding-left: 8px;
+  padding-right: 6px;
+  text-align: right;
 }
 .dung-tich-unit {
   font-size: 12px;
   color: var(--admin-muted);
   flex-shrink: 0;
+}
+.gia-ban-money {
+  display: block;
+  width: 100%;
+}
+.gia-ban-money :deep(input) {
+  width: 100%;
+  min-width: 0;
 }
 .field-error {
   margin: 4px 0 0;
