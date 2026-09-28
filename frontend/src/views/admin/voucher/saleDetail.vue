@@ -231,7 +231,7 @@
                     <div class="sd-product-picker__item-name">{{ ap.tenSanPham }}</div>
                     <div class="sd-product-picker__item-meta">SKU: {{ ap.sku }} · {{ ap.tenMauSac || '—' }}</div>
                   </div>
-                  <span class="sd-product-picker__item-price">{{ formatCurrency(ap.giaBan) }}</span>
+                  <span class="sd-product-picker__item-price">{{ formatCurrency(ap.giaGoc ?? ap.giaBan) }}</span>
                 </label>
               </div>
             </div>
@@ -378,11 +378,10 @@ async function loadProducts() {
 async function loadAvailableProducts() {
   loadingAvailable.value = true
   try {
-    const res = await getSanPhamBan(modalSearch.value || '', 0)
+    const res = await getSanPhamBan(modalSearch.value.trim(), 0, 100)
+    const list = Array.isArray(res.data) ? res.data : res.data?.content || []
     const existingIds = new Set(products.value.map((p) => p.idChiTietSanPham))
-    availableProducts.value = (res.data || []).filter(
-      (p) => !existingIds.has(p.idChiTietSanPham),
-    )
+    availableProducts.value = list.filter((p) => !existingIds.has(p.idChiTietSanPham))
   } catch (err) {
     availableProducts.value = []
     toast(normalizeError(err) || 'Không tìm được sản phẩm', 'warn')

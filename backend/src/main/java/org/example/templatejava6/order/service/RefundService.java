@@ -8,7 +8,6 @@ import org.example.templatejava6.common.enums.TrangThaiTraHang;
 import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.common.service.ProductFileStorageService;
 import org.example.templatejava6.notification.enums.LoaiThongBao;
-import org.example.templatejava6.notification.service.OrderMailService;
 import org.example.templatejava6.notification.service.ThongBaoService;
 import org.example.templatejava6.order.entity.AnhHoanTien;
 import org.example.templatejava6.order.entity.HoaDon;
@@ -74,7 +73,6 @@ public class RefundService {
     private final RefundGatewayRegistry refundGatewayRegistry;
     private final ProductFileStorageService productFileStorageService;
     private final ThongBaoService thongBaoService;
-    private final OrderMailService orderMailService;
     private final OrderRealtimeService orderRealtimeService;
     private final ReturnStockService returnStockService;
 
@@ -88,7 +86,6 @@ public class RefundService {
                          RefundGatewayRegistry refundGatewayRegistry,
                          ProductFileStorageService productFileStorageService,
                          ThongBaoService thongBaoService,
-                         OrderMailService orderMailService,
                          OrderRealtimeService orderRealtimeService,
                          ReturnStockService returnStockService) {
         this.hoanTienRepository = hoanTienRepository;
@@ -101,7 +98,6 @@ public class RefundService {
         this.refundGatewayRegistry = refundGatewayRegistry;
         this.productFileStorageService = productFileStorageService;
         this.thongBaoService = thongBaoService;
-        this.orderMailService = orderMailService;
         this.orderRealtimeService = orderRealtimeService;
         this.returnStockService = returnStockService;
     }
@@ -233,7 +229,6 @@ public class RefundService {
                 "/admin/hoan-tien",
                 saved.getId(),
                 hoaDon.getMaHoaDon());
-        orderMailService.guiHoanTienHoanTat(hoaDon, saved.getSoTien(), saved.getMaGiaoDichHoan());
         thongBaoService.taoThongBaoKhach(
                 idKhachHangCua(hoaDon),
                 LoaiThongBao.HOAN_TIEN_THANH_CONG,

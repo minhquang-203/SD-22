@@ -144,7 +144,13 @@ public class VnpayRefundGateway implements RefundGateway {
 
         String apiUrl = resolveMerchantApiUrl();
         String rawResponse = postJson(apiUrl, body);
-        return parseResponse(rawResponse);
+        RefundResult result = parseResponse(rawResponse);
+        if (!result.isSuccessful()) {
+            log.warn("VNPAY refund bị từ chối: txnRef={} type={} amount={} transactionDate={} code={} message={} raw={}",
+                    command.getOriginalTransactionRef(), transactionType, amount, command.getProviderPayDate(),
+                    result.getResponseCode(), result.getMessage(), truncate(rawResponse, 300));
+        }
+        return result;
     }
 
     private String postJson(String apiUrl, Map<String, String> body) {
@@ -212,6 +218,8 @@ public class VnpayRefundGateway implements RefundGateway {
                     "sslTrustMode", sslTrustMode,
                     "javaHome", System.getProperty("java.home", "")));
             // #endregion
+            log.warn("Không gọi được VNPAY refund API {}: {} - {}", apiUrl,
+                    root.getClass().getSimpleName(), root.getMessage());
             throw new ApiException(
                     "Không gọi được API hoàn tiền VNPAY (" + apiUrl + "): "
                             + root.getClass().getSimpleName() + " - " + root.getMessage(),

@@ -6,7 +6,6 @@ import org.example.templatejava6.common.enums.TrangThaiTraHang;
 import org.example.templatejava6.common.exception.ApiException;
 import org.example.templatejava6.common.service.ProductFileStorageService;
 import org.example.templatejava6.notification.enums.LoaiThongBao;
-import org.example.templatejava6.notification.service.OrderMailService;
 import org.example.templatejava6.notification.service.ThongBaoService;
 import org.example.templatejava6.order.entity.AnhYeuCauTraHang;
 import org.example.templatejava6.order.entity.ChiTietTraHangLo;
@@ -109,7 +108,6 @@ public class ReturnRequestService {
     private final GhnTrackingService ghnTrackingService;
     private final RefundService refundService;
     private final ThongBaoService thongBaoService;
-    private final OrderMailService orderMailService;
     private final ProductFileStorageService productFileStorageService;
     private final OrderRealtimeService orderRealtimeService;
     private final HoanTienRepository hoanTienRepository;
@@ -129,7 +127,6 @@ public class ReturnRequestService {
                                 GhnTrackingService ghnTrackingService,
                                 RefundService refundService,
                                 ThongBaoService thongBaoService,
-                                OrderMailService orderMailService,
                                 ProductFileStorageService productFileStorageService,
                                 OrderRealtimeService orderRealtimeService,
                                 HoanTienRepository hoanTienRepository,
@@ -148,7 +145,6 @@ public class ReturnRequestService {
         this.ghnTrackingService = ghnTrackingService;
         this.refundService = refundService;
         this.thongBaoService = thongBaoService;
-        this.orderMailService = orderMailService;
         this.productFileStorageService = productFileStorageService;
         this.orderRealtimeService = orderRealtimeService;
         this.hoanTienRepository = hoanTienRepository;
@@ -336,7 +332,6 @@ public class ReturnRequestService {
                 "Yêu cầu trả hàng đơn " + hoaDon.getMaHoaDon() + " đã được duyệt");
 
         ghiNhatKy(hoaDon, "TRA_HANG_DA_DUYET", "Duyệt yêu cầu trả hàng — đơn chuyển TRA_HANG, chờ khách tạo vận đơn hoàn hàng");
-        orderMailService.guiYeuCauTraHangDuocDuyet(hoaDon);
         thongBaoService.taoThongBaoKhach(
                 idKhachHangCua(hoaDon),
                 LoaiThongBao.TRA_HANG_DUOC_DUYET,
@@ -364,7 +359,6 @@ public class ReturnRequestService {
         luuAnhTraHang(saved, filterValidFiles(files), AnhYeuCauTraHang.LOAI_TU_CHOI);
         ghiNhatKy(yc.getIdHoaDon(), "TRA_HANG_TU_CHOI",
                 "Từ chối yêu cầu trả hàng" + (lyDo != null && !lyDo.isBlank() ? ": " + lyDo : ""));
-        orderMailService.guiYeuCauTraHangBiTuChoi(yc.getIdHoaDon(), lyDo);
         HoaDon hoaDonTuChoi = yc.getIdHoaDon();
         thongBaoService.taoThongBaoKhach(
                 idKhachHangCua(hoaDonTuChoi),
@@ -629,7 +623,6 @@ public class ReturnRequestService {
         refundService.taoHoanTienTraHangNeuChua(
                 hoaDon, refundService.resolveSoTienHoan(hoaDon), saved,
                 yc.getTenNganHang(), yc.getSoTaiKhoan(), yc.getChuTaiKhoan());
-        orderMailService.guiDaNhanHangTra(hoaDon);
         return saved;
     }
 
@@ -1018,7 +1011,6 @@ public class ReturnRequestService {
         }
 
         if (hoaDon != null) {
-            orderMailService.guiYeuCauTraHangBiTuChoi(hoaDon, lyDo);
             thongBaoService.taoThongBaoKhach(
                     idKhachHangCua(hoaDon),
                     LoaiThongBao.TRA_HANG_BI_TU_CHOI,
