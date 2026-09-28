@@ -6,6 +6,7 @@ import axios from 'axios'
 import ProductCard from '@/components/storefront/ProductCard.vue'
 import BlogIconSprite from '@/components/storefront/blog/BlogIconSprite.vue'
 import TinTucCard from '@/components/storefront/blog/TinTucCard.vue'
+import HorizontalScroll from '@/components/storefront/HorizontalScroll.vue'
 import { fetchAllProducts, fetchDanhMucList } from '@/api/storefrontApi'
 import { fetchActiveBanners } from '@/api/bannerApi'
 import { productImageUrl } from '@/utils/productImage'
@@ -314,16 +315,18 @@ onMounted(async () => {
 
     <section v-if="loading || categories.length" v-sf-reveal class="sf-cats" aria-label="Danh mục">
       <div v-if="loading" class="sf-container sf-cats__skel" />
-      <div v-else class="sf-container sf-cats__row">
-        <RouterLink
-          v-for="cat in categories"
-          :key="cat.id"
-          :to="`/san-pham?danhMuc=${cat.id}`"
-          class="sf-cat"
-        >
-          <span class="sf-cat__label">{{ cat.ten }}</span>
-          <span v-if="cat.moTa" class="sf-cat__sub">{{ cat.moTa }}</span>
-        </RouterLink>
+      <div v-else class="sf-container">
+        <HorizontalScroll :item-count="categories.length" aria-label="Danh mục sản phẩm">
+          <RouterLink
+            v-for="cat in categories"
+            :key="cat.id"
+            :to="`/san-pham?danhMuc=${cat.id}`"
+            class="sf-cat"
+          >
+            <span class="sf-cat__label">{{ cat.ten }}</span>
+            <span v-if="cat.moTa" class="sf-cat__sub">{{ cat.moTa }}</span>
+          </RouterLink>
+        </HorizontalScroll>
       </div>
     </section>
 
@@ -704,22 +707,34 @@ onMounted(async () => {
 .sf-cats {
   background: #fff;
   border-bottom: 1px solid var(--home-line);
-  padding: 0;
+  padding: 0.35rem 0;
 }
 
-.sf-cats__row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+.sf-cats :deep(.sf-hscroll__track) {
+  gap: 0;
+  padding: 0;
+  align-items: stretch;
+}
+
+.sf-cats :deep(.sf-hscroll__arrow) {
+  width: 2.1rem;
+  height: 2.1rem;
 }
 
 .sf-cat {
-  padding: 1.35rem 1rem;
+  flex: 0 0 auto;
+  min-width: 148px;
+  max-width: 200px;
+  padding: 0.95rem 1.1rem;
   text-align: center;
   text-decoration: none;
   color: inherit;
-  border: 1px solid var(--home-line);
-  margin: -1px 0 0 -1px;
+  border-right: 1px solid var(--home-line);
   transition: background 0.2s;
+}
+
+.sf-cat:last-child {
+  border-right: 0;
 }
 
 .sf-cat:hover {
@@ -731,6 +746,9 @@ onMounted(async () => {
   font-size: 13px;
   font-weight: 600;
   color: var(--home-teal-deep);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sf-cat__sub {
@@ -744,7 +762,7 @@ onMounted(async () => {
 }
 
 .sf-cats__skel {
-  height: 72px;
+  height: 64px;
   background: #f9f5f0;
 }
 
@@ -780,9 +798,6 @@ onMounted(async () => {
     width: 2.1rem;
     height: 2.1rem;
   }
-  .sf-cats__row {
-    grid-template-columns: repeat(3, 1fr);
-  }
   .sf-trust__row {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -793,8 +808,10 @@ onMounted(async () => {
     padding-top: 3rem;
     padding-bottom: 2.5rem;
   }
-  .sf-cats__row {
-    grid-template-columns: repeat(2, 1fr);
+  .sf-cat {
+    min-width: 132px;
+    max-width: 170px;
+    padding: 0.8rem 0.9rem;
   }
   .sf-trust__row {
     grid-template-columns: 1fr;
