@@ -34,6 +34,7 @@ public class GioHangService {
     @Autowired private ChiTietSanPhamRepository chiTietSanPhamRepository;
     @Autowired private AnhSanPhamRepository anhSanPhamRepository;
     @Autowired private DotGiamGiaService dotGiamGiaService;
+    @Autowired private org.example.templatejava6.product.service.LoHangService loHangService;
 
     @Transactional
     public GioHangResponse getByKhachHang(Integer idKhachHang) {
@@ -131,7 +132,7 @@ public class GioHangService {
     }
 
     private void validateStock(ChiTietSanPham chiTietSanPham, Integer soLuong) {
-        int ton = chiTietSanPham.getSoLuongTon() != null ? chiTietSanPham.getSoLuongTon() : 0;
+        int ton = loHangService.tonKhaDung(chiTietSanPham.getId());
         if (soLuong == null || soLuong <= 0) {
             throw new ApiException("Số lượng sản phẩm không hợp lệ", "INVALID_QTY");
         }
@@ -156,6 +157,7 @@ public class GioHangService {
                             item, resolveImageUrl(item.getChiTietSanPham()));
                     if (item.getChiTietSanPham() != null) {
                         response.applySalePrice(saleMap.get(item.getChiTietSanPham().getId()));
+                        response.setSoLuongTon(loHangService.tonKhaDung(item.getChiTietSanPham().getId()));
                     }
                     return response;
                 })

@@ -16,11 +16,16 @@ public class ChiTietSanPhamResponse {
     private BigDecimal dungTichMl;
     private BigDecimal giaBan;
     private Integer soLuongTon;
+    /** Tồn bán được (lô active chưa hết hạn). */
+    private Integer soLuongKhaDung;
+    /** Tổng soLuongCon của lô đã hết hạn. */
+    private Integer soLuongHetHan;
     private Boolean trangThai;
     private Integer idMauSac;
     private String tenMauSac;
     private LocalDate hanSuDungGanNhat;
     private Boolean sapHetHan;
+    private Boolean hetHan;
     /** Giá gốc khi biến thể đang trong đợt giảm giá */
     private BigDecimal giaGoc;
     /** Giá sau giảm */

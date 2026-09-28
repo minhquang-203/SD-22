@@ -186,6 +186,7 @@ public class LoHangService {
                         "Lô [" + lot.getSoLo() + "] không thuộc biến thể đang bán.",
                         "LOT_MISMATCH");
             }
+            assertLoChuaHetHan(lot);
             int available = lot.getSoLuongCon() != null ? lot.getSoLuongCon() : 0;
             if (available < canLay) {
                 throw new ApiException(
@@ -220,6 +221,7 @@ public class LoHangService {
         if (lotCtsId == null || !lotCtsId.equals(idChiTietSanPham)) {
             throw new ApiException("Lô không thuộc biến thể đang bán.", "LOT_MISMATCH");
         }
+        assertLoChuaHetHan(lot);
         int available = lot.getSoLuongCon() != null ? lot.getSoLuongCon() : 0;
         if (available < soLuong) {
             ChiTietSanPham ct = getChiTietOrThrow(idChiTietSanPham);
@@ -274,7 +276,7 @@ public class LoHangService {
         if (soLuong <= 0) {
             return List.of();
         }
-        List<LoHang> lots = loHangRepository.findAvailableForFefo(idChiTietSanPham);
+        List<LoHang> lots = loHangRepository.findAvailableForFefo(idChiTietSanPham, LocalDate.now());
         List<PhanBoLo> phanBo = new ArrayList<>();
         int remaining = soLuong;
         for (LoHang lot : lots) {
@@ -468,19 +470,47 @@ public class LoHangService {
     public void syncTonKho(Integer idChiTietSanPham) {
         ChiTietSanPham ct = chiTietSanPhamRepository.findByIdForUpdate(idChiTietSanPham)
                 .orElseThrow(() -> new ApiException("Không tìm thấy biến thể sản phẩm", "NOT_FOUND"));
+        // so_luong_ton = tổng tồn thực tế (kể cả lô hết hạn)
         int total = loHangRepository.sumSoLuongCon(idChiTietSanPham);
         ct.setSoLuongTon(total);
         chiTietSanPhamRepository.save(ct);
     }
 
+    /** Tồn khả dụng để bán (bỏ lô hết hạn). */
+    @Transactional(readOnly = true)
+    public int tonKhaDung(Integer idChiTietSanPham) {
+        if (idChiTietSanPham == null) {
+            return 0;
+        }
+        return loHangRepository.sumSoLuongConKhaDung(idChiTietSanPham, LocalDate.now());
+    }
+
+    /** Tổng số lượng còn trong lô đã hết hạn. */
+    @Transactional(readOnly = true)
+    public int tonHetHan(Integer idChiTietSanPham) {
+        if (idChiTietSanPham == null) {
+            return 0;
+        }
+        return loHangRepository.sumSoLuongConHetHan(idChiTietSanPham, LocalDate.now());
+    }
+
+    @Transactional(readOnly = true)
+    public long countLoHetHanConHang() {
+        return loHangRepository.countLoHetHanConHang(LocalDate.now());
+    }
+
+    /** HSD gần nhất trong các lô còn bán được (chưa hết hạn). */
     @Transactional(readOnly = true)
     public LocalDate nearestExpiry(Integer idChiTietSanPham) {
+        LocalDate today = LocalDate.now();
         return loHangRepository.findByChiTietSanPham_IdOrderByNgayNhapDescHanSuDungAsc(idChiTietSanPham)
                 .stream()
                 .filter(l -> Boolean.TRUE.equals(l.getTrangThai()))
                 .filter(l -> l.getSoLuongCon() != null && l.getSoLuongCon() > 0)
+                .filter(l -> !LoHangResponse.isHetHan(l.getHanSuDung()))
                 .map(LoHang::getHanSuDung)
                 .filter(d -> d != null)
+                .filter(d -> !d.isBefore(today))
                 .min(Comparator.naturalOrder())
                 .orElse(null);
     }
@@ -492,7 +522,14 @@ public class LoHangService {
                 .anyMatch(l -> Boolean.TRUE.equals(l.getTrangThai())
                         && l.getSoLuongCon() != null
                         && l.getSoLuongCon() > 0
+                        && !LoHangResponse.isHetHan(l.getHanSuDung())
                         && LoHangResponse.isSapHetHan(l.getHanSuDung()));
+    }
+
+    private void assertLoChuaHetHan(LoHang lot) {
+        if (LoHangResponse.isHetHan(lot.getHanSuDung())) {
+            throw new ApiException("Lô đã hết hạn, không được bán", "LOT_EXPIRED");
+        }
     }
 
     private ChiTietSanPham getChiTietOrThrow(Integer id) {

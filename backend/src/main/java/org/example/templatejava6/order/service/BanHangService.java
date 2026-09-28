@@ -180,6 +180,7 @@ public class BanHangService {
         if (nearest != null) {
             res.setSoNgayConLai((int) ChronoUnit.DAYS.between(LocalDate.now(), nearest));
         }
+        res.setSoLuongTon(loHangService.tonKhaDung(cts.getId()));
         return res;
     }
 
@@ -232,7 +233,7 @@ public class BanHangService {
             dong.setDonGia(line.donGia);
             VariantSaleInfo sale = saleMap.get(line.cts.getId());
             dong.setGiaGoc(sale != null && sale.getGiaGoc() != null ? sale.getGiaGoc() : line.cts.getGiaBan());
-            dong.setSoLuongTon(line.cts.getSoLuongTon());
+            dong.setSoLuongTon(loHangService.tonKhaDung(line.cts.getId()));
             dong.setTrangThai(line.cts.getTrangThai());
             dongGias.add(dong);
         }
@@ -325,7 +326,7 @@ public class BanHangService {
             item.setTenMauSac(cts.getMauSac() != null ? cts.getMauSac().getTen() : null);
             item.setDonGia(line.getDonGia());
             item.setSoLuong(line.getSoLuong() != null ? line.getSoLuong() : 0);
-            item.setSoLuongTon(cts.getSoLuongTon() != null ? cts.getSoLuongTon() : 0);
+            item.setSoLuongTon(loHangService.tonKhaDung(cts.getId()));
             List<HoaDonChiTietLo> lotRows = hoaDonChiTietLoRepository.findByHoaDonChiTiet(line);
             if (lotRows != null && !lotRows.isEmpty()) {
                 List<DonChoDetailResponse.PhanBoLoItem> phanBo = new ArrayList<>();
@@ -921,7 +922,7 @@ public class BanHangService {
                 ChiTietSanPham cts = chiTietSanPhamRepository.findById(e.getKey())
                         .orElseThrow(() -> new ApiException(
                                 "Biến thể sản phẩm không tồn tại (id=" + e.getKey() + ").", "NOT_FOUND"));
-                int ton = cts.getSoLuongTon() != null ? cts.getSoLuongTon() : 0;
+                int ton = loHangService.tonKhaDung(e.getKey());
                 if (ton < e.getValue()) {
                     throw new ApiException(
                             "Không đủ tồn cho SKU " + cts.getSku() + " (còn " + ton + ").",
@@ -986,7 +987,7 @@ public class BanHangService {
             throw new ApiException("SKU " + cts.getSku() + " không còn bán.", "INACTIVE_SKU");
         }
         if (checkStock) {
-            int ton = cts.getSoLuongTon() != null ? cts.getSoLuongTon() : 0;
+            int ton = loHangService.tonKhaDung(idCts);
             if (ton < soLuong) {
                 throw new ApiException(
                         "Không đủ tồn cho SKU " + cts.getSku() + " (còn " + ton + ").",

@@ -436,7 +436,7 @@ public class OnlineCheckoutService {
             VariantSaleInfo sale = saleMap.get(cts.getId());
             boolean bienTheOk = Boolean.TRUE.equals(cts.getTrangThai());
             boolean sanPhamOk = cts.getSanPham() == null || Boolean.TRUE.equals(cts.getSanPham().getTrangThai());
-            int ton = cts.getSoLuongTon() != null ? cts.getSoLuongTon() : 0;
+            int ton = loHangService.tonKhaDung(cts.getId());
             result.add(GiaHienTaiItemResponse.builder()
                     .idChiTietSanPham(cts.getId())
                     .idSanPham(cts.getSanPham() != null ? cts.getSanPham().getId() : null)
@@ -591,7 +591,7 @@ public class OnlineCheckoutService {
             if (existing != null) {
                 soLuong += existing.soLuong();
             }
-            int ton = chiTietSanPham.getSoLuongTon() != null ? chiTietSanPham.getSoLuongTon() : 0;
+            int ton = loHangService.tonKhaDung(chiTietSanPham.getId());
             if (ton < soLuong) {
                 throw new ApiException(
                         "Không đủ tồn cho SKU " + chiTietSanPham.getSku() + " (còn " + ton + ").",
@@ -623,7 +623,7 @@ public class OnlineCheckoutService {
             if (existing != null) {
                 soLuong += existing.soLuong();
             }
-            int ton = chiTietSanPham.getSoLuongTon() != null ? chiTietSanPham.getSoLuongTon() : 0;
+            int ton = loHangService.tonKhaDung(chiTietSanPham.getId());
             if (ton < soLuong) {
                 throw new ApiException(
                         "Không đủ tồn cho SKU " + chiTietSanPham.getSku() + " (còn " + ton + ").",

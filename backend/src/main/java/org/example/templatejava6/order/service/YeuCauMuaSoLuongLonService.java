@@ -6,6 +6,7 @@ import org.example.templatejava6.order.model.request.TaoYeuCauMuaSoLuongLonReque
 import org.example.templatejava6.product.entity.ChiTietSanPham;
 import org.example.templatejava6.product.entity.SanPham;
 import org.example.templatejava6.product.repository.ChiTietSanPhamRepository;
+import org.example.templatejava6.product.service.LoHangService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -37,6 +38,7 @@ public class YeuCauMuaSoLuongLonService {
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     private final ChiTietSanPhamRepository chiTietSanPhamRepository;
+    private final LoHangService loHangService;
     private final JavaMailSender mailSender;
 
     /** key = sdt|idCtsp → epoch millis lần gửi gần nhất */
@@ -53,8 +55,10 @@ public class YeuCauMuaSoLuongLonService {
 
     public YeuCauMuaSoLuongLonService(
             ChiTietSanPhamRepository chiTietSanPhamRepository,
+            LoHangService loHangService,
             ObjectProvider<JavaMailSender> mailSenderProvider) {
         this.chiTietSanPhamRepository = chiTietSanPhamRepository;
+        this.loHangService = loHangService;
         this.mailSender = mailSenderProvider.getIfAvailable();
     }
 
@@ -68,7 +72,7 @@ public class YeuCauMuaSoLuongLonService {
         ChiTietSanPham ct = chiTietSanPhamRepository.findByIdWithSanPham(req.getIdChiTietSanPham())
                 .orElseThrow(() -> new ApiException("Không tìm thấy sản phẩm", "NOT_FOUND"));
 
-        int ton = ct.getSoLuongTon() != null ? ct.getSoLuongTon() : 0;
+        int ton = loHangService.tonKhaDung(ct.getId());
         if (req.getSoLuong() > ton) {
             throw new ApiException(
                     "Số lượng yêu cầu vượt quá tồn kho hiện có (còn " + ton + " sản phẩm)",

@@ -21,16 +21,22 @@ public interface LoHangRepository extends JpaRepository<LoHang, Integer> {
             """)
     List<LoHang> findByChiTietSanPham_IdOrderByNgayNhapDescHanSuDungAsc(@Param("idCts") Integer idChiTietSanPham);
 
-    /** SELECT FOR UPDATE — serialize FEFO deduct cho cùng SKU. */
+    /**
+     * SELECT FOR UPDATE — serialize FEFO deduct cho cùng SKU.
+     * Chỉ lô active, còn hàng, chưa hết hạn (HSD null hoặc &gt;= hôm nay).
+     */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT l FROM LoHang l
             WHERE l.chiTietSanPham.id = :idCts
               AND l.trangThai = true
               AND l.soLuongCon > 0
+              AND (l.hanSuDung IS NULL OR l.hanSuDung >= :today)
             ORDER BY CASE WHEN l.hanSuDung IS NULL THEN 1 ELSE 0 END, l.hanSuDung ASC, l.id ASC
             """)
-    List<LoHang> findAvailableForFefo(@Param("idCts") Integer idChiTietSanPham);
+    List<LoHang> findAvailableForFefo(
+            @Param("idCts") Integer idChiTietSanPham,
+            @Param("today") java.time.LocalDate today);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT l FROM LoHang l WHERE l.id = :id")
@@ -47,15 +53,39 @@ public interface LoHangRepository extends JpaRepository<LoHang, Integer> {
             """)
     List<LoHang> findActiveForRestock(@Param("idCts") Integer idChiTietSanPham);
 
+    /** Tổng tồn thực tế (mọi lô active) — đồng bộ cột so_luong_ton. */
     @Query("""
             SELECT COALESCE(SUM(l.soLuongCon), 0) FROM LoHang l
             WHERE l.chiTietSanPham.id = :idCts AND l.trangThai = true
             """)
     int sumSoLuongCon(@Param("idCts") Integer idChiTietSanPham);
 
+    /** Tồn khả dụng = lô active còn hàng, chưa hết hạn. */
+    @Query("""
+            SELECT COALESCE(SUM(l.soLuongCon), 0) FROM LoHang l
+            WHERE l.chiTietSanPham.id = :idCts
+              AND l.trangThai = true
+              AND (l.hanSuDung IS NULL OR l.hanSuDung >= :today)
+            """)
+    int sumSoLuongConKhaDung(
+            @Param("idCts") Integer idChiTietSanPham,
+            @Param("today") java.time.LocalDate today);
+
+    /** Tổng số lượng còn trong các lô đã hết hạn. */
+    @Query("""
+            SELECT COALESCE(SUM(l.soLuongCon), 0) FROM LoHang l
+            WHERE l.chiTietSanPham.id = :idCts
+              AND l.trangThai = true
+              AND l.hanSuDung IS NOT NULL
+              AND l.hanSuDung < :today
+            """)
+    int sumSoLuongConHetHan(
+            @Param("idCts") Integer idChiTietSanPham,
+            @Param("today") java.time.LocalDate today);
+
     /**
-     * ID sản phẩm có ít nhất 1 lô active, còn hàng, HSD trong [today, limitExclusive).
-     * Khớp LoHangResponse.isSapHetHan khi limitExclusive = today+6 tháng.
+     * ID sản phẩm có ít nhất 1 lô active, còn hàng, HSD trong [today, limitInclusive].
+     * Khớp LoHangResponse.isSapHetHan (≤ 30 ngày).
      */
     @Query("""
             SELECT DISTINCT cts.sanPham.id FROM LoHang l
@@ -64,9 +94,19 @@ public interface LoHangRepository extends JpaRepository<LoHang, Integer> {
               AND l.soLuongCon > 0
               AND l.hanSuDung IS NOT NULL
               AND l.hanSuDung >= :today
-              AND l.hanSuDung < :limitExclusive
+              AND l.hanSuDung <= :limitInclusive
             """)
     List<Integer> findSanPhamIdsCoLoCanHan(
             @Param("today") java.time.LocalDate today,
-            @Param("limitExclusive") java.time.LocalDate limitExclusive);
+            @Param("limitInclusive") java.time.LocalDate limitInclusive);
+
+    /** Số lô đã hết hạn còn hàng (badge). */
+    @Query("""
+            SELECT COUNT(l) FROM LoHang l
+            WHERE l.trangThai = true
+              AND l.soLuongCon > 0
+              AND l.hanSuDung IS NOT NULL
+              AND l.hanSuDung < :today
+            """)
+    long countLoHetHanConHang(@Param("today") java.time.LocalDate today);
 }

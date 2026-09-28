@@ -394,11 +394,25 @@ onMounted(async () => {
               </td>
               <td>{{ row.dungTichMl ? `${row.dungTichMl} ml` : '—' }}</td>
               <td>{{ formatCurrency(row.giaBan) }}</td>
-              <td>{{ row.soLuongTon ?? 0 }}</td>
+              <td>
+                <div>{{ row.soLuongTon ?? 0 }}</div>
+                <div
+                  v-if="Number(row.soLuongHetHan) > 0"
+                  class="text-[11px] text-[var(--admin-muted)] mt-0.5"
+                >
+                  Khả dụng: {{ row.soLuongKhaDung ?? 0 }} · Hết hạn: {{ row.soLuongHetHan }}
+                </div>
+              </td>
               <td>
                 <span>{{ row.hanSuDungGanNhat ? formatDate(row.hanSuDungGanNhat) : '—' }}</span>
                 <span
-                  v-if="row.sapHetHan"
+                  v-if="row.hetHan || Number(row.soLuongHetHan) > 0"
+                  class="ml-1 inline-block text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-800"
+                >
+                  Hết hạn
+                </span>
+                <span
+                  v-else-if="row.sapHetHan"
                   class="ml-1 inline-block text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800"
                 >
                   Sắp HH

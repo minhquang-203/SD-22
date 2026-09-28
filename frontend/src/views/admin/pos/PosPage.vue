@@ -504,6 +504,9 @@ async function openLotPicker(line) {
     } else if (line.idLoHang != null) {
       draft[line.idLoHang] = Number(line.soLuong) || 0
     }
+    lotOptions.value.forEach((l) => {
+      if (l.hetHan) draft[l.id] = 0
+    })
     lotQtyDraft.value = draft
   } catch (err) {
     notify(String(err), 'error')
@@ -528,7 +531,12 @@ const lotDraftTotal = computed(() =>
 const lotDraftCanConfirm = computed(() => lotDraftTotal.value > 0)
 
 function setLotDraftQty(lotId, raw) {
-  const max = Number(lotOptions.value.find((l) => l.id === lotId)?.soLuongCon) || 0
+  const lot = lotOptions.value.find((l) => l.id === lotId)
+  if (lot?.hetHan) {
+    lotQtyDraft.value = { ...lotQtyDraft.value, [lotId]: 0 }
+    return
+  }
+  const max = Number(lot?.soLuongCon) || 0
   let n = Number(raw)
   if (!Number.isFinite(n) || n < 0) n = 0
   if (n > max) n = max
@@ -544,7 +552,7 @@ async function confirmLotSelection() {
       lot,
       soLuong: Number(lotQtyDraft.value[lot.id]) || 0,
     }))
-    .filter((x) => x.soLuong > 0)
+    .filter((x) => x.soLuong > 0 && !x.lot.hetHan)
 
   const tong = selected.reduce((s, x) => s + x.soLuong, 0)
   if (tong <= 0) {
@@ -575,7 +583,7 @@ async function confirmLotSelection() {
 
   // Cảnh báo nếu bỏ qua lô cận hạn có HSD sớm hơn lô đang lấy
   const skippedNear = lotOptions.value.find((l) => {
-    if (!l.sapHetHan) return false
+    if (l.hetHan || !l.sapHetHan) return false
     const take = Number(lotQtyDraft.value[l.id]) || 0
     if (take > 0) return false
     return selected.some(
@@ -2178,11 +2186,19 @@ onBeforeUnmount(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="lot in lotOptions" :key="lot.id">
+                  <tr
+                    v-for="lot in lotOptions"
+                    :key="lot.id"
+                    :class="{ 'opacity-50': lot.hetHan }"
+                  >
                     <td class="font-medium">
                       {{ lot.soLo }}
                       <span
-                        v-if="lot.sapHetHan"
+                        v-if="lot.hetHan"
+                        class="ml-1 inline-block text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-800"
+                      >Hết hạn</span>
+                      <span
+                        v-else-if="lot.sapHetHan"
                         class="ml-1 inline-block text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800"
                       >Cận hạn</span>
                     </td>
@@ -2194,8 +2210,9 @@ onBeforeUnmount(() => {
                         type="number"
                         class="admin-input !py-1"
                         min="0"
-                        :max="lot.soLuongCon"
-                        :value="lotQtyDraft[lot.id] ?? 0"
+                        :max="lot.hetHan ? 0 : lot.soLuongCon"
+                        :disabled="!!lot.hetHan"
+                        :value="lot.hetHan ? 0 : (lotQtyDraft[lot.id] ?? 0)"
                         @input="setLotDraftQty(lot.id, $event.target.value)"
                       />
                     </td>

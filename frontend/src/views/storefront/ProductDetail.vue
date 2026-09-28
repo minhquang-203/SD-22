@@ -156,14 +156,20 @@ function showToast(msg) {
   setTimeout(() => { toast.value = '' }, 2500)
 }
 
+function stockOf(v) {
+  if (!v) return 0
+  if (v.soLuongKhaDung != null) return Number(v.soLuongKhaDung) || 0
+  return Number(v.soLuongTon) || 0
+}
+
 function selectVariant(v) {
   selectedVariantId.value = v.id
-  const max = Math.min(Number(v.soLuongTon) || 1, GIOI_HAN_MUA_LE)
+  const max = Math.min(stockOf(v) || 1, GIOI_HAN_MUA_LE)
   if (quantity.value > max) quantity.value = Math.max(1, max)
 }
 
 watch(
-  () => selectedVariant.value?.soLuongTon,
+  () => stockOf(selectedVariant.value),
   (ton) => {
     const max = Math.min(Number(ton) || 1, GIOI_HAN_MUA_LE)
     if (quantity.value > max) quantity.value = Math.max(1, max)
@@ -173,13 +179,13 @@ watch(
 function pdpMaxQty() {
   const v = selectedVariant.value
   if (!v) return 1
-  return Math.min(Number(v.soLuongTon) || 1, GIOI_HAN_MUA_LE)
+  return Math.min(stockOf(v) || 1, GIOI_HAN_MUA_LE)
 }
 
 function onPdpIncrease() {
   const v = selectedVariant.value
   if (!v) return
-  const stock = Number(v.soLuongTon) || 0
+  const stock = stockOf(v)
   if (quantity.value >= stock && stock < GIOI_HAN_MUA_LE) {
     showToast(`Chỉ còn ${stock} sản phẩm`)
     return
@@ -207,7 +213,8 @@ async function addToCart() {
     showToast('Vui lòng chọn biến thể')
     return false
   }
-  if (!v.soLuongTon || v.soLuongTon <= 0) {
+  const stock = stockOf(v)
+  if (!stock || stock <= 0) {
     showToast('Biến thể đã hết hàng')
     return false
   }
@@ -223,7 +230,7 @@ async function addToCart() {
       giaBan: sellingPrice,
       giaGoc: v.giaSauGiam != null ? originalPrice : null,
       phanTramGiam: v.phanTramGiam ?? null,
-      soLuongTon: Number(v.soLuongTon) || 0,
+      soLuongTon: stock,
       soLuong: quantity.value,
       anhUrl: activeImage.value || product.value.anhChinhUrl,
       tenMauSac: v.tenMauSac,
@@ -237,7 +244,6 @@ async function addToCart() {
       })
       showToast(`Đã thêm tối đa ${GIOI_HAN_MUA_LE} sản phẩm (mua lẻ)`)
     } else if (result?.capped && result.capReason === 'stock') {
-      const stock = Number(v.soLuongTon) || 0
       showToast(`Chỉ còn ${stock} sản phẩm`)
     } else {
       showToast('Đã thêm vào giỏ hàng')
@@ -443,7 +449,7 @@ onUnmounted(() => {
           </div>
 
           <p class="sf-pdp__stock">
-            <template v-if="selectedVariant?.soLuongTon > 0">Còn {{ selectedVariant.soLuongTon }} sản phẩm</template>
+            <template v-if="stockOf(selectedVariant) > 0">Còn {{ stockOf(selectedVariant) }} sản phẩm</template>
             <template v-else class="out">Hết hàng</template>
           </p>
 

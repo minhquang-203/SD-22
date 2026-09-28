@@ -158,7 +158,7 @@ public class SanPhamService {
                 .map(sp -> toListResponse(sp, variantAggMap, canHanIds));
     }
 
-    /** Đếm SP sắp hết hàng (tồn &lt; 50) và có lô cận hạn — badge sidebar. */
+    /** Đếm SP sắp hết hàng (tồn &lt; 50), SP cận hạn, và số lô hết hạn còn hàng — badge sidebar. */
     @Transactional(readOnly = true)
     public SanPhamCanhBaoCountResponse canhBaoCount() {
         Map<Integer, VariantAgg> variantAggMap = loadVariantAggMap();
@@ -171,7 +171,8 @@ public class SanPhamService {
                 sapHetHang++;
             }
         }
-        return new SanPhamCanhBaoCountResponse(sapHetHang, canHanIds.size());
+        return new SanPhamCanhBaoCountResponse(
+                sapHetHang, canHanIds.size(), loHangService.countLoHetHanConHang());
     }
 
     @Transactional(readOnly = true)
@@ -281,6 +282,11 @@ public class SanPhamService {
                     ChiTietSanPhamResponse res = new ChiTietSanPhamResponse(ct);
                     res.setHanSuDungGanNhat(loHangService.nearestExpiry(ct.getId()));
                     res.setSapHetHan(loHangService.hasSapHetHan(ct.getId()));
+                    int khaDung = loHangService.tonKhaDung(ct.getId());
+                    int hetHanQty = loHangService.tonHetHan(ct.getId());
+                    res.setSoLuongKhaDung(khaDung);
+                    res.setSoLuongHetHan(hetHanQty);
+                    res.setHetHan(hetHanQty > 0);
                     applyVariantSale(res, saleMap.get(ct.getId()));
                     return res;
                 }).toList());
@@ -391,7 +397,8 @@ public class SanPhamService {
 
     private Set<Integer> loadCoLoCanHanProductIds() {
         LocalDate today = LocalDate.now();
-        return new HashSet<>(loHangRepository.findSanPhamIdsCoLoCanHan(today, today.plusDays(NGAY_CANH_BAO_CAN_HAN)));
+        return new HashSet<>(loHangRepository.findSanPhamIdsCoLoCanHan(
+                today, today.plusDays(NGAY_CANH_BAO_CAN_HAN)));
     }
 
     private SanPhamResponse toListResponse(SanPham sp, Map<Integer, VariantAgg> variantAggMap) {

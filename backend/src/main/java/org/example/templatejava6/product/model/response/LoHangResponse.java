@@ -21,6 +21,7 @@ public class LoHangResponse {
     private String ghiChu;
     private Boolean trangThai;
     private Boolean sapHetHan;
+    private Boolean hetHan;
 
     public LoHangResponse(LoHang lo) {
         this.id = lo.getId();
@@ -33,14 +34,24 @@ public class LoHangResponse {
         this.soLuongLoi = lo.getSoLuongLoi() != null ? lo.getSoLuongLoi() : 0;
         this.ghiChu = lo.getGhiChu();
         this.trangThai = lo.getTrangThai();
-        this.sapHetHan = isSapHetHan(lo.getHanSuDung());
+        this.hetHan = isHetHan(lo.getHanSuDung());
+        this.sapHetHan = !Boolean.TRUE.equals(this.hetHan) && isSapHetHan(lo.getHanSuDung());
     }
 
+    /** Hết hạn: HSD trước hôm nay. */
+    public static boolean isHetHan(LocalDate hanSuDung) {
+        if (hanSuDung == null) {
+            return false;
+        }
+        return hanSuDung.isBefore(LocalDate.now());
+    }
+
+    /** Sắp hết hạn: còn hạn và HSD trong vòng 30 ngày (kể cả đúng ngày +30). */
     public static boolean isSapHetHan(LocalDate hanSuDung) {
         if (hanSuDung == null) {
             return false;
         }
         LocalDate today = LocalDate.now();
-        return !hanSuDung.isBefore(today) && hanSuDung.isBefore(today.plusMonths(6));
+        return !hanSuDung.isBefore(today) && !hanSuDung.isAfter(today.plusDays(30));
     }
 }

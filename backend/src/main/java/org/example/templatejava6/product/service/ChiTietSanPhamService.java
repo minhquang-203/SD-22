@@ -80,6 +80,11 @@ public class ChiTietSanPhamService {
         ChiTietSanPhamResponse res = new ChiTietSanPhamResponse(ct);
         res.setHanSuDungGanNhat(loHangService.nearestExpiry(ct.getId()));
         res.setSapHetHan(loHangService.hasSapHetHan(ct.getId()));
+        int khaDung = loHangService.tonKhaDung(ct.getId());
+        int hetHanQty = loHangService.tonHetHan(ct.getId());
+        res.setSoLuongKhaDung(khaDung);
+        res.setSoLuongHetHan(hetHanQty);
+        res.setHetHan(hetHanQty > 0);
         return res;
     }
 

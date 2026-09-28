@@ -142,7 +142,8 @@ async function loadProductWarnings() {
     const res = await getSanPhamCanhBaoCount()
     const sapHetHang = Number(res.data?.sapHetHang) || 0
     const canHan = Number(res.data?.canHan) || 0
-    productWarnCount.value = sapHetHang + canHan
+    const hetHan = Number(res.data?.hetHan) || 0
+    productWarnCount.value = sapHetHang + canHan + hetHan
   } catch {
     // im lặng
   }

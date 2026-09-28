@@ -58,7 +58,13 @@ const emit = defineEmits(['close', 'edit'])
               <td>
                 <span>{{ lot.hanSuDung ? formatDate(lot.hanSuDung) : '—' }}</span>
                 <span
-                  v-if="lot.sapHetHan"
+                  v-if="lot.hetHan"
+                  class="ml-2 inline-block text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-800"
+                >
+                  Hết hạn — không được bán
+                </span>
+                <span
+                  v-else-if="lot.sapHetHan"
                   class="ml-2 inline-block text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800"
                 >
                   Sắp hết hạn
