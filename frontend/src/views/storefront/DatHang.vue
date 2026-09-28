@@ -500,9 +500,31 @@ watch(
   },
 )
 
+// StorefrontLayout key theo route.fullPath: xóa query sau VNPay sẽ mount lại trang,
+// nên kết quả phải qua sessionStorage để lần mount sau vẫn hiện màn hoàn tất.
+const PAYMENT_RESULT_KEY = 'sunova_payment_result'
+
+function restorePaymentResult() {
+  let saved = null
+  try {
+    saved = JSON.parse(sessionStorage.getItem(PAYMENT_RESULT_KEY) || 'null')
+  } catch {
+    saved = null
+  }
+  sessionStorage.removeItem(PAYMENT_RESULT_KEY)
+  if (!saved?.callback || Date.now() - Number(saved.at || 0) > 30000) return false
+  paymentCallback.value = saved.callback
+  guestCheckoutEmail.value = saved.guestEmail || ''
+  guestTrackingToken.value = saved.guestToken || ''
+  return true
+}
+
 function parsePaymentCallback() {
-  const { success, orderCode, orderId, message, provider, transactionRef } = route.query
-  if (success === undefined || success === null || success === '') return
+  const { success, orderCode, orderId, message, provider, transactionRef, token } = route.query
+  if (success === undefined || success === null || success === '') {
+    restorePaymentResult()
+    return
+  }
 
   paymentCallback.value = {
     success: success === 'true' || success === true,
@@ -513,14 +535,12 @@ function parsePaymentCallback() {
     transactionRef: typeof transactionRef === 'string' ? transactionRef : '',
   }
 
-  router.replace({ path: route.path })
-
   if (paymentCallback.value.success) {
     const pending = readGuestPending()
+    guestTrackingToken.value = (typeof token === 'string' && token) || pending?.trackingToken || ''
     if (pending) {
       // Khách vãng lai vừa thanh toán VNPay xong: xóa biến thể đã mua khỏi giỏ localStorage.
       guestCheckoutEmail.value = pending.email || ''
-      guestTrackingToken.value = pending.trackingToken || ''
       void syncAfterGuestCheckout(pending.ids || []).catch(() => {})
       clearGuestPending()
     } else {
@@ -535,6 +555,17 @@ function parsePaymentCallback() {
     void refreshCart({ force: true }).catch(() => {})
     toast(paymentCallback.value.message || 'Thanh toán thất bại')
   }
+
+  sessionStorage.setItem(
+    PAYMENT_RESULT_KEY,
+    JSON.stringify({
+      callback: paymentCallback.value,
+      guestEmail: guestCheckoutEmail.value,
+      guestToken: guestTrackingToken.value,
+      at: Date.now(),
+    }),
+  )
+  router.replace({ path: route.path })
 }
 
 async function submitCheckout() {

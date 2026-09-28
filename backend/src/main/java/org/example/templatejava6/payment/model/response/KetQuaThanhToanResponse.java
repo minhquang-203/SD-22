@@ -15,4 +15,6 @@ public class KetQuaThanhToanResponse {
     private String providerTransactionNo;
     private String responseCode;
     private String message;
+    /** Chỉ có với đơn khách vãng lai đã thanh toán thành công — để hiện nút theo dõi đơn. */
+    private String trackingToken;
 }

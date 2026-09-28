@@ -369,6 +369,9 @@ public class PaymentService {
                 .providerTransactionNo(callback.getProviderTransactionNo())
                 .responseCode(callback.getResponseCode())
                 .message(message)
+                .trackingToken(success && hoaDon != null && hoaDon.getIdKhachHang() == null
+                        ? hoaDon.getTrackingToken()
+                        : null)
                 .build();
     }
 

@@ -78,7 +78,8 @@ public class PaymentController {
                 + "&orderCode=" + encode(result.getMaHoaDon())
                 + "&transactionRef=" + encode(result.getTransactionRef())
                 + "&responseCode=" + encode(result.getResponseCode())
-                + "&message=" + encode(result.getMessage());
+                + "&message=" + encode(result.getMessage())
+                + (result.getTrackingToken() != null ? "&token=" + encode(result.getTrackingToken()) : "");
     }
 
     private String encode(Object value) {
