@@ -301,10 +301,34 @@
             <h3 class="sg-result__routine-title">COMBO DÀNH RIÊNG CHO BẠN</h3>
             <p class="sg-result__routine-subtitle"><strong>{{ routineCombo.ten }}</strong>: {{ routineCombo.moTa }}</p>
 
-            <!-- TỔNG GIÁ CẢ BỘ ROUTINE (ĐỂ KHÁCH VÀ ADMIN THẤY RÕ TRỌN BỘ) -->
-            <div class="sg-routine-total-box" v-if="routineTotalPrice > 0">
-              <span class="sg-routine-total-label">Tổng giá cả bộ:</span>
-              <span class="sg-routine-total-price">{{ formatPrice(routineTotalPrice) }}</span>
+            <!-- TỔNG GIÁ VÀ NÚT MUA TRỌN BỘ COMBO -->
+            <div class="sg-routine-action-bar" v-if="routineTotalPrice > 0">
+              <div class="sg-routine-total-box">
+                <span class="sg-routine-total-label">Tổng giá cả bộ:</span>
+                <span class="sg-routine-total-price">{{ formatPrice(routineTotalPrice) }}</span>
+              </div>
+              <div class="sg-routine-btn-group">
+                <button
+                  type="button"
+                  class="sg-btn-buy-combo sg-btn-buy-combo--cart"
+                  :disabled="addingCombo"
+                  @click.stop="addWholeComboToCart(false)"
+                  title="Thêm toàn bộ các sản phẩm trong combo vào giỏ hàng"
+                >
+                  <Icon icon="solar:cart-plus-bold" width="18" />
+                  <span>{{ addingCombo ? 'Đang thêm...' : 'Thêm combo vào giỏ' }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="sg-btn-buy-combo sg-btn-buy-combo--checkout"
+                  :disabled="addingCombo"
+                  @click.stop="addWholeComboToCart(true)"
+                  title="Mua ngay toàn bộ combo và đến giỏ hàng thanh toán"
+                >
+                  <Icon icon="solar:bag-check-bold" width="18" />
+                  <span>Mua ngay cả combo</span>
+                </button>
+              </div>
             </div>
 
             <div class="sg-routine-grid">
@@ -372,11 +396,13 @@ import { Icon } from '@iconify/vue';
 
 // CHUẨN KIẾN TRÚC GỌI API (Đã thay đổi theo hướng dẫn đồ án)
 
-import { getProducts } from '@/api/sanPhamApi';
+import { getProducts, getProductDetail } from '@/api/sanPhamApi';
 import { getQuizQuestions, saveQuizResult } from '@/api/quizApi';
 import { getRoutinesByLoaiDa } from '@/api/routineApi';
 import { rankProductsByQuiz, saveQuizProfile } from '@/utils/quizRecommend';
 import { productImageUrl } from '@/utils/productImage';
+import { useCart } from '@/composables/useCart';
+import { toast } from '@/composables/useToast';
 import sunovaMarkImg from '@/assets/logo/sunova_mark.png';
 
 const router = useRouter();
@@ -854,6 +880,79 @@ const retakeQuiz = () => {
   analyzing.value = false;
   currentStep.value = 1;
   allowLeave.value = false; 
+};
+
+// ============================================
+// MUA TRỌN BỘ COMBO ROUTINE
+// ============================================
+const addingCombo = ref(false);
+
+const addWholeComboToCart = async (goToCheckout = false) => {
+  if (!routineCombo.value?.chiTiets || routineCombo.value.chiTiets.length === 0) return;
+  addingCombo.value = true;
+  try {
+    const { addItem } = useCart();
+    let addedCount = 0;
+
+    for (const ct of routineCombo.value.chiTiets) {
+      if (!ct.idSanPham) continue;
+
+      let detailRes = null;
+      try {
+        detailRes = await getProductDetail(ct.idSanPham);
+      } catch (e) {
+        console.error('Lỗi tải chi tiết sản phẩm combo:', ct.idSanPham, e);
+      }
+
+      const productData = detailRes?.data;
+      const variants = productData?.chiTiets || [];
+      // Ưu tiên biến thể còn hàng, nếu không có thì lấy biến thể đầu tiên
+      const variant = variants.find((v) => (v.soLuongTon || 0) > 0) || variants[0];
+
+      if (variant) {
+        const originalPrice = Number(variant.giaGoc ?? variant.giaBan ?? ct.gia ?? 0);
+        const sellingPrice =
+          variant.giaSauGiam != null
+            ? Number(variant.giaSauGiam)
+            : variant.giaBan != null
+              ? Number(variant.giaBan)
+              : Number(ct.gia || originalPrice);
+        const stock = Math.max(1, Number(variant.soLuongTon) || 10);
+
+        await addItem({
+          idChiTietSanPham: variant.id,
+          idSanPham: ct.idSanPham,
+          tenSanPham: ct.tenSanPham || productData?.ten || 'Sản phẩm combo',
+          tenThuongHieu: productData?.tenThuongHieu || '',
+          sku: variant.sku || '',
+          giaBan: sellingPrice,
+          giaGoc: variant.giaSauGiam != null ? originalPrice : null,
+          phanTramGiam: variant.phanTramGiam ?? null,
+          soLuongTon: stock,
+          soLuong: 1,
+          anhUrl: ct.anhChinhUrl || variant.anhUrl || productData?.anhChinhUrl,
+          tenMauSac: variant.tenMauSac,
+          dungTichMl: variant.dungTichMl,
+        });
+        addedCount++;
+      }
+    }
+
+    if (addedCount > 0) {
+      toast(`Đã thêm trọn bộ combo (${addedCount} bước) vào giỏ hàng!`, 'info');
+      if (goToCheckout) {
+        allowLeave.value = true;
+        router.push('/gio-hang');
+      }
+    } else {
+      toast('Không tìm thấy sản phẩm khả dụng trong combo.', 'warn');
+    }
+  } catch (err) {
+    console.error('Lỗi thêm combo vào giỏ:', err);
+    toast('Có lỗi xảy ra khi thêm combo vào giỏ.', 'warn');
+  } finally {
+    addingCombo.value = false;
+  }
 };
 </script>
 
@@ -1624,15 +1723,31 @@ const retakeQuiz = () => {
 .sg-result__routine-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; color: var(--sq-espresso); margin: 0 0 8px; }
 .sg-result__routine-subtitle { font-size: 14px; color: var(--sq-text-muted); margin: 0 0 18px; }
 
+.sg-routine-action-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 0 auto 30px;
+}
+
+@media (min-width: 680px) {
+  .sg-routine-action-bar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+}
+
 .sg-routine-total-box {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   background: var(--sq-cream);
   border: 1.5px solid var(--sq-gold);
-  padding: 8px 24px;
+  padding: 8px 22px;
   border-radius: 30px;
-  margin: 0 auto 30px;
   box-shadow: 0 4px 15px rgba(201, 169, 110, 0.15);
 }
 .sg-routine-total-label {
@@ -1645,6 +1760,60 @@ const retakeQuiz = () => {
   font-size: 18px;
   font-weight: 800;
   color: var(--sq-gold-dark);
+}
+
+.sg-routine-btn-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.sg-btn-buy-combo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border-radius: 30px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  border: none;
+}
+
+.sg-btn-buy-combo--cart {
+  background: #ffffff;
+  color: var(--sq-espresso);
+  border: 1.5px solid var(--sq-espresso);
+}
+
+.sg-btn-buy-combo--cart:hover:not(:disabled) {
+  background: var(--sq-espresso);
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(36, 26, 18, 0.2);
+}
+
+.sg-btn-buy-combo--checkout {
+  background: linear-gradient(135deg, #c9a96e, #9e7340);
+  color: #ffffff;
+  box-shadow: 0 4px 15px rgba(158, 115, 64, 0.35);
+}
+
+.sg-btn-buy-combo--checkout:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d8b87d, #ad804b);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(158, 115, 64, 0.45);
+}
+
+.sg-btn-buy-combo:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
 }
 
 .sg-routine-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
